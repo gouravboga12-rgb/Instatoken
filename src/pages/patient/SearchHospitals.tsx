@@ -1,0 +1,317 @@
+import React, { useState, useEffect } from 'react';
+import { useApp } from '../../context/AppContext';
+import { Card } from '../../components/ui/Card';
+import { Badge } from '../../components/ui/Badge';
+import { Search, MapPin, Clock, Star, ArrowLeft } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+
+interface SearchHospitalsProps {
+  onHospitalSelect: (id: string) => void;
+  defaultFilter?: string;
+}
+
+export const SearchHospitals: React.FC<SearchHospitalsProps> = ({ 
+  onHospitalSelect, 
+  defaultFilter = '' 
+}) => {
+  const { hospitals } = useApp();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // Search and filter states
+  const [query, setQuery] = useState(searchParams.get('q') || '');
+  const [selectedSpecialty, setSelectedSpecialty] = useState(searchParams.get('specialty') || 'All');
+  const [activeFilter, setActiveFilter] = useState<string>(defaultFilter || searchParams.get('filter') || 'all');
+  
+  useEffect(() => {
+    const q = searchParams.get('q');
+    const specialty = searchParams.get('specialty');
+    const filter = searchParams.get('filter');
+    if (q !== null) setQuery(q);
+    if (specialty !== null) setSelectedSpecialty(specialty);
+    if (filter !== null) setActiveFilter(filter);
+  }, [searchParams]);
+
+  // Available specialties for filter
+  const specialties = ['All', 'Multi Speciality', 'Children Hospital', 'Eye Hospital', 'Dental Clinic', 'Orthopedic', 'Cardiology', 'Neurology', 'ENT', 'Gynecology'];
+
+  // Filter & sort logic
+  const getFilteredHospitals = () => {
+    let list = [...hospitals];
+
+    // Filter by text search (name, address, category, doctors)
+    if (query.trim()) {
+      const qLower = query.toLowerCase();
+      list = list.filter(h => 
+        h.name.toLowerCase().includes(qLower) || 
+        h.category.toLowerCase().includes(qLower) ||
+        h.address.toLowerCase().includes(qLower) ||
+        h.doctors.some(d => d.name.toLowerCase().includes(qLower) || d.specialty.toLowerCase().includes(qLower))
+      );
+    }
+
+    // Filter by specialty dropdown/pill
+    if (selectedSpecialty !== 'All') {
+      list = list.filter(h => h.category === selectedSpecialty || h.departments.some(d => d.name === selectedSpecialty));
+    }
+
+    // Apply quick filters & sorts
+    if (activeFilter === 'nearby') {
+      list.sort((a, b) => a.distance - b.distance);
+    } else if (activeFilter === 'top-rated') {
+      list.sort((a, b) => b.rating - a.rating);
+    } else if (activeFilter === 'short-wait') {
+      list.sort((a, b) => {
+        const aWait = a.baseWaitingTime + a.doctors.reduce((acc, doc) => acc + Math.max(0, doc.nextAvailableToken - doc.currentQueue - 1) * doc.estimatedWaitPerPatient, 0) / (a.doctors.length || 1);
+        const bWait = b.baseWaitingTime + b.doctors.reduce((acc, doc) => acc + Math.max(0, doc.nextAvailableToken - doc.currentQueue - 1) * doc.estimatedWaitPerPatient, 0) / (b.doctors.length || 1);
+        return aWait - bWait;
+      });
+    } else if (activeFilter === 'lowest-fee') {
+      list.sort((a, b) => {
+        const aMin = Math.min(...a.doctors.map(d => d.consultationFee), 500);
+        const bMin = Math.min(...b.doctors.map(d => d.consultationFee), 500);
+        return aMin - bMin;
+      });
+    } else if (activeFilter === 'emergency') {
+      list = list.filter(h => h.facilities.includes("24/7 Emergency") || h.facilities.includes("24/7 Emergency Care") || h.facilities.includes("24/7 Neonatal Emergency"));
+    }
+
+    return list;
+  };
+
+  const filteredHospitals = getFilteredHospitals();
+
+  return (
+    <div className="pb-24 bg-slate-50 min-h-screen md:bg-transparent md:min-h-0 md:pb-6">
+      
+      {/* Mobile Search Header */}
+      <div className="sticky top-0 bg-white/95 backdrop-blur-md px-5 py-4 border-b border-slate-100 z-30 space-y-3 md:hidden">
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={() => navigate(-1)}
+            className="p-2 rounded-xl hover:bg-slate-100 text-slate-600 transition-colors cursor-pointer"
+          >
+            <ArrowLeft size={18} />
+          </button>
+          <div className="relative flex-1">
+            <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input 
+              type="text"
+              placeholder="Search hospital or doctor..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
+            />
+          </div>
+        </div>
+
+        {/* Mobile Sorting Pills */}
+        <div className="flex gap-2 overflow-x-auto no-scrollbar py-1">
+          {['all', 'nearby', 'top-rated', 'short-wait', 'lowest-fee'].map((f) => (
+            <button
+              key={f}
+              onClick={() => setActiveFilter(f)}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold shrink-0 cursor-pointer border uppercase tracking-wider text-[9px] ${
+                activeFilter === f 
+                  ? 'bg-blue-600 text-white border-blue-600' 
+                  : 'bg-white text-slate-500 border-slate-100'
+              }`}
+            >
+              {f.replace('-', ' ')}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Main Desktop Search & Sidebar Container */}
+      <div className="flex flex-col md:flex-row gap-6 mt-4 md:mt-0">
+        
+        {/* Left Filter Sidebar (Desktop Only) */}
+        <div className="hidden md:block w-64 shrink-0 bg-white border border-slate-100 rounded-3xl p-5 shadow-xs h-fit sticky top-20">
+          <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-4">Sorting Filter</h3>
+          
+          <div className="space-y-2 mb-6">
+            {[
+              { id: 'all', label: 'Recommended' },
+              { id: 'nearby', label: 'Nearest Distance' },
+              { id: 'top-rated', label: 'Highest Rated' },
+              { id: 'short-wait', label: 'Shortest Waiting' },
+              { id: 'lowest-fee', label: 'Lowest Consulting Fee' },
+              { id: 'emergency', label: 'Emergency Facilities' }
+            ].map((f) => (
+              <button
+                key={f.id}
+                onClick={() => setActiveFilter(f.id)}
+                className={`w-full text-left px-3 py-2 text-xs rounded-xl font-semibold transition-colors flex items-center justify-between cursor-pointer ${
+                  activeFilter === f.id ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                {f.label}
+                {activeFilter === f.id && <span className="w-1.5 h-1.5 bg-blue-600 rounded-full" />}
+              </button>
+            ))}
+          </div>
+
+          <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-4">Specialties</h3>
+          <div className="space-y-1.5">
+            {specialties.map((spec) => (
+              <button
+                key={spec}
+                onClick={() => setSelectedSpecialty(spec)}
+                className={`w-full text-left px-3 py-1.5 text-xs rounded-xl font-semibold transition-all cursor-pointer ${
+                  selectedSpecialty === spec ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-slate-50'
+                }`}
+              >
+                {spec}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Right Search Result List */}
+        <div className="flex-1 px-5 md:px-0">
+          
+          {/* Desktop Search Header */}
+          <div className="hidden md:flex items-center justify-between gap-4 mb-5">
+            <div className="relative max-w-md w-full">
+              <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input 
+                type="text"
+                placeholder="Search hospital or doctor..."
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                className="w-full pl-11 pr-4 py-2.5 bg-white border border-slate-100 rounded-2xl shadow-sm text-sm focus:outline-none focus:border-blue-500 transition-all"
+              />
+            </div>
+            <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">
+              {filteredHospitals.length} centers found
+            </p>
+          </div>
+
+          {/* Mobile Specialties Slider */}
+          <div className="mb-4 md:hidden">
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Filter by Specialty</label>
+            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
+              {specialties.map((spec) => (
+                <button
+                  key={spec}
+                  onClick={() => setSelectedSpecialty(spec)}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold shrink-0 cursor-pointer transition-all ${selectedSpecialty === spec ? 'bg-slate-800 text-white' : 'bg-white border border-slate-100 text-slate-600'}`}
+                >
+                  {spec}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <p className="text-xs text-slate-400 font-semibold mb-4 md:hidden">
+            Showing {filteredHospitals.length} hospitals found
+          </p>
+
+          {/* Hospital Cards Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {filteredHospitals.length > 0 ? (
+              filteredHospitals.map((hosp) => {
+                const totalWaitTime = hosp.doctors.reduce((acc, doc) => {
+                  const ahead = Math.max(0, doc.nextAvailableToken - doc.currentQueue - 1);
+                  return acc + (ahead * doc.estimatedWaitPerPatient);
+                }, 0);
+                const avgWait = Math.round(totalWaitTime / (hosp.doctors.length || 1)) + hosp.baseWaitingTime;
+                const minFee = hosp.doctors.length > 0 ? Math.min(...hosp.doctors.map(d => d.consultationFee)) : 0;
+
+                return (
+                  <Card 
+                    key={hosp.id} 
+                    hoverable 
+                    padding="none" 
+                    onClick={() => onHospitalSelect(hosp.id)}
+                    className="overflow-hidden flex flex-col justify-between h-full"
+                  >
+                    <div className="flex p-4 gap-4">
+                      {/* Left Image */}
+                      <div className="w-20 h-20 rounded-2xl overflow-hidden shrink-0 border border-slate-100 bg-slate-100">
+                        <img 
+                          src={hosp.image} 
+                          alt={hosp.name} 
+                          className="w-full h-full object-cover"
+                          onError={(e) => { (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(hosp.name)}&background=DBEAFE&color=2563EB&size=100&bold=true&font-size=0.35`; }}
+                        />
+                      </div>
+
+                      {/* Right Info */}
+                      <div className="flex-1 min-w-0 flex flex-col justify-between">
+                        <div>
+                          <div className="flex items-start justify-between">
+                            <Badge variant="blue" className="text-[9px] px-2 py-0.5 rounded-md">
+                              {hosp.category}
+                            </Badge>
+                            <div className="flex items-center gap-0.5 text-amber-500">
+                              <Star size={12} fill="currentColor" />
+                              <span className="text-xs font-bold text-slate-700">{hosp.rating}</span>
+                            </div>
+                          </div>
+                          <h4 className="font-extrabold text-slate-800 text-sm tracking-tight mt-1 line-clamp-1">
+                            {hosp.name}
+                          </h4>
+                          <p className="text-[10px] text-slate-400 mt-0.5 line-clamp-1 leading-normal">
+                            {hosp.address}
+                          </p>
+                        </div>
+
+                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-50">
+                          <div className="flex items-center gap-2.5">
+                            <span className="flex items-center text-[10px] font-medium text-slate-500">
+                              <MapPin size={10} className="text-blue-500 mr-0.5" />
+                              {hosp.distance} km
+                            </span>
+                            <span className="flex items-center text-[10px] font-medium text-slate-500">
+                              <Clock size={10} className="text-emerald-500 mr-0.5" />
+                              {avgWait}m Wait
+                            </span>
+                          </div>
+                          {minFee > 0 && (
+                            <span className="text-slate-700 font-extrabold text-xs">
+                              ₹{minFee}+
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Doctor preview strip */}
+                    <div className="bg-slate-50/80 px-4 py-2.5 border-t border-slate-100 flex items-center justify-between text-xs">
+                      <span className="text-[9px] text-slate-400 font-semibold uppercase">
+                        {hosp.doctors.length} Doctors Available
+                      </span>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onHospitalSelect(hosp.id);
+                        }}
+                        className="text-[10px] text-blue-600 font-extrabold hover:underline flex items-center gap-0.5 cursor-pointer"
+                      >
+                        Book OPD Token
+                      </button>
+                    </div>
+                  </Card>
+                );
+              })
+            ) : (
+              <div className="col-span-2 text-center py-12 bg-white rounded-3xl border border-slate-100 shadow-xs">
+                <p className="text-sm font-bold text-slate-400">No hospitals match your search criteria</p>
+                <button 
+                  onClick={() => { setQuery(''); setSelectedSpecialty('All'); setActiveFilter('all'); }}
+                  className="mt-3 text-xs text-blue-600 font-bold hover:underline cursor-pointer"
+                >
+                  Reset All Filters
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  );
+};
