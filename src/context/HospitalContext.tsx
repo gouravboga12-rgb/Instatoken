@@ -226,17 +226,12 @@ interface HospitalContextType {
 
 const MOCK_CREDENTIALS = [
   { email: 'admin@apollo.com', password: 'password', userId: 'huser-1' },
-  { email: 'reception@apollo.com', password: 'password', userId: 'huser-2' },
-  { email: 'doctor@apollo.com', password: 'password', userId: 'huser-3' },
-  { email: 'accounts@apollo.com', password: 'password', userId: 'huser-4' },
 ];
 
 const MOCK_USERS: HospitalUser[] = [
   { id: 'huser-1', name: 'Dr. Rajesh Kumar', email: 'admin@apollo.com', role: 'owner', hospitalId: 'hosp-apollo', hospitalName: 'Apollo Spectra Hospital', avatar: '', isOnline: true },
-  { id: 'huser-2', name: 'Navya Sharma', email: 'reception@apollo.com', role: 'receptionist', hospitalId: 'hosp-apollo', hospitalName: 'Apollo Spectra Hospital', avatar: '', isOnline: true },
-  { id: 'huser-3', name: 'Dr. Arvind Sharma', email: 'doctor@apollo.com', role: 'doctor', hospitalId: 'hosp-apollo', hospitalName: 'Apollo Spectra Hospital', avatar: '', isOnline: false },
-  { id: 'huser-4', name: 'Pradeep Rajan', email: 'accounts@apollo.com', role: 'accountant', hospitalId: 'hosp-apollo', hospitalName: 'Apollo Spectra Hospital', avatar: '', isOnline: true },
 ];
+
 
 // ─── Initial Mock Data ────────────────────────────────────────────────────────
 

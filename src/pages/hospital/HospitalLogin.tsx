@@ -29,9 +29,6 @@ export const HospitalLogin: React.FC = () => {
   const fillDemo = (role: string) => {
     const creds: Record<string, { email: string; password: string }> = {
       owner: { email: 'admin@apollo.com', password: 'password' },
-      receptionist: { email: 'reception@apollo.com', password: 'password' },
-      doctor: { email: 'doctor@apollo.com', password: 'password' },
-      accountant: { email: 'accounts@apollo.com', password: 'password' },
     };
     const c = creds[role];
     if (c) { setEmail(c.email); setPassword(c.password); setError(''); }
@@ -130,22 +127,12 @@ export const HospitalLogin: React.FC = () => {
           {/* Demo Quick Fill */}
           <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 mb-6">
             <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-2.5">Quick Demo Login</p>
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { role: 'owner', label: 'Owner', color: 'bg-purple-100 text-purple-700 hover:bg-purple-200' },
-                { role: 'receptionist', label: 'Receptionist', color: 'bg-green-100 text-green-700 hover:bg-green-200' },
-                { role: 'doctor', label: 'Doctor', color: 'bg-blue-100 text-blue-700 hover:bg-blue-200' },
-                { role: 'accountant', label: 'Accountant', color: 'bg-amber-100 text-amber-700 hover:bg-amber-200' },
-              ].map(d => (
-                <button
-                  key={d.role}
-                  onClick={() => fillDemo(d.role)}
-                  className={`${d.color} text-xs font-bold py-2 px-3 rounded-xl transition-colors cursor-pointer border-none`}
-                >
-                  Login as {d.label}
-                </button>
-              ))}
-            </div>
+            <button
+              onClick={() => fillDemo('owner')}
+              className="w-full bg-purple-100 text-purple-750 hover:bg-purple-200 text-xs font-bold py-2.5 px-3 rounded-xl transition-colors cursor-pointer border-none text-center block"
+            >
+              Login as Hospital Admin
+            </button>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
