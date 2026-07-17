@@ -298,10 +298,10 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
             </div>
 
             {/* Social Logins */}
-            <div className="grid grid-cols-2 gap-3 mb-4">
+            <div className="mb-4">
               <button 
                 onClick={() => { login('google-user@gmail.com', 'google'); onSuccess(); }}
-                className="flex items-center justify-center gap-2 py-2 px-3 border border-slate-150 rounded-xl bg-white text-slate-600 text-xs font-semibold hover:bg-slate-50 transition-colors cursor-pointer"
+                className="flex w-full items-center justify-center gap-2 py-2 px-3 border border-slate-150 rounded-xl bg-white text-slate-600 text-xs font-semibold hover:bg-slate-50 transition-colors cursor-pointer"
               >
                 <svg className="w-3.5 h-3.5" viewBox="0 0 24 24">
                   <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.67 1.64 15.04 1 12 1 7.35 1 3.37 3.65 1.39 7.56l3.85 2.99c.9-2.7 3.42-4.51 6.76-4.51z"/>
@@ -310,15 +310,6 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
                   <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.91l-3.7-2.87c-1.18.79-2.69 1.26-4.26 1.26-3.34 0-5.86-1.81-6.76-4.51L1.39 16.96C3.37 20.35 7.35 23 12 23z"/>
                 </svg>
                 Google
-              </button>
-              <button 
-                onClick={() => { login('apple-user@icloud.com', 'apple'); onSuccess(); }}
-                className="flex items-center justify-center gap-2 py-2 px-3 border border-slate-150 rounded-xl bg-white text-slate-600 text-xs font-semibold hover:bg-slate-50 transition-colors cursor-pointer"
-              >
-                <svg className="w-3.5 h-3.5 text-black fill-current" viewBox="0 0 24 24">
-                  <path d="M17.05 20.28c-.98.95-2.05 1.88-3.08 1.88-1.02 0-1.4-.61-2.53-.61-1.13 0-1.56.61-2.53.61-1.01 0-2.1-.98-3.11-1.88-2.07-2.01-3.64-5.69-3.64-8.87 0-5.06 3.28-7.75 6.4-7.75 1.05 0 2.05.37 2.68.37.64 0 1.88-.45 3.16-.45 1.34 0 2.56.49 3.36 1.35-3.32 2-2.77 6.43.34 7.69-1.03 2.51-2.31 5.01-3.23 7.66zm-3.09-17.7c1.15-1.39 1.08-3.07 1.08-3.07s-1.58.07-2.73 1.4c-1.02 1.18-.94 2.92-.94 2.92s1.44.14 2.59-1.25z"/>
-                </svg>
-                Apple
               </button>
             </div>
 
