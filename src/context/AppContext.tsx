@@ -143,7 +143,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (Array.isArray(parsed) && parsed.length > 0) {
           return HOSPITALS.map(defaultHosp => {
             const found = parsed.find((p: Hospital) => p.id === defaultHosp.id);
-            return found ? { ...found, image: defaultHosp.image, gallery: defaultHosp.gallery } : defaultHosp;
+            if (!found) return defaultHosp;
+            
+            // Sync doctor photos from defaultHosp
+            const updatedDoctors = defaultHosp.doctors.map(defDoc => {
+              const cachedDoc = found.doctors?.find((cd: Doctor) => cd.id === defDoc.id);
+              return cachedDoc ? { ...cachedDoc, image: defDoc.image } : defDoc;
+            });
+
+            return {
+              ...found,
+              image: defaultHosp.image,
+              gallery: defaultHosp.gallery,
+              doctors: updatedDoctors
+            };
           });
         }
       } catch (e) {}

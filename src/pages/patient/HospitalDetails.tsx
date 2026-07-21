@@ -194,7 +194,7 @@ export const HospitalDetails: React.FC<HospitalDetailsProps> = ({ onDoctorSelect
                           src={doc.image} 
                           alt={doc.name} 
                           className="w-full h-full object-cover"
-                          onError={(e) => { (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(doc.name)}&background=EFF6FF&color=2563EB&size=80&bold=true`; }}
+                          onError={(e) => { (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=400&auto=format&fit=crop&q=80"; }}
                         />
                       </div>
                       

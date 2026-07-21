@@ -516,7 +516,7 @@ export const Profile: React.FC = () => {
                     src={doc.image} 
                     alt={doc.name}
                     className="w-12 h-12 rounded-full object-cover shrink-0 border border-blue-100 bg-white"
-                    onError={(e) => { (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(doc.name)}&background=EFF6FF&color=2563EB&size=80&bold=true`; }}
+                    onError={(e) => { (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=400&auto=format&fit=crop&q=80"; }}
                   />
                   <div className="min-w-0">
                     <h4 className="font-extrabold text-slate-900 text-xs truncate">{doc.name}</h4>
