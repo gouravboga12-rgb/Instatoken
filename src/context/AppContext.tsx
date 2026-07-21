@@ -102,12 +102,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const saved = localStorage.getItem('insta_user');
     if (saved) {
       const parsed = JSON.parse(saved);
-      if (parsed && parsed.subscription === undefined) {
-        parsed.subscription = {
-          planName: "3-Day Pass",
-          expiresAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-          price: 10
-        };
+      if (parsed) {
+        if (parsed.subscription === undefined) {
+          parsed.subscription = {
+            planName: "3-Day Pass",
+            expiresAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+            price: 10
+          };
+        }
+        if (!parsed.savedDoctors) {
+          parsed.savedDoctors = [];
+        }
       }
       return parsed;
     }
@@ -261,6 +266,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         phone: "+91 9999999999",
         role: "admin",
         savedHospitals: [],
+        savedDoctors: [],
         familyMembers: [],
         subscription: null
       });
@@ -273,6 +279,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         phone: !emailOrPhone.includes('@') ? emailOrPhone : "+91 9876543210",
         role: "patient",
         savedHospitals: ["hosp-apollo"],
+        savedDoctors: ["doc-arvind"],
         familyMembers: [
           { id: "fam-1", name: "Ramesh Sharma", age: 58, gender: "Male", relationship: "Father" },
           { id: "fam-2", name: "Kanta Sharma", age: 52, gender: "Female", relationship: "Mother" }
@@ -295,6 +302,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       phone,
       role: 'patient',
       savedHospitals: [],
+      savedDoctors: [],
       familyMembers: [],
       subscription: null
     });

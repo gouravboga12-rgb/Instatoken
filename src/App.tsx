@@ -21,7 +21,7 @@ import { HospitalLayout } from './pages/hospital/HospitalLayout';
 import { Footer } from './components/common/Footer';
 import { 
   Home as HomeIcon, Search as SearchIcon, Award, User as UserIcon, 
-  Activity, MapPin, Bell, ChevronDown, Loader2, Zap, Building2
+  Activity, MapPin, Bell, ChevronDown, Loader2
 } from 'lucide-react';
 
 const TopNavbar: React.FC = () => {

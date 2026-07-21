@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 
 export const Profile: React.FC = () => {
-  const { user, hospitals, logout, addFamilyMember, removeFamilyMember, toggleSaveDoctor, toggleSaveHospital } = useApp();
+  const { user, hospitals, logout, addFamilyMember, removeFamilyMember, toggleSaveDoctor } = useApp();
   const navigate = useNavigate();
 
   const [isAddFamilyOpen, setIsAddFamilyOpen] = useState(false);
