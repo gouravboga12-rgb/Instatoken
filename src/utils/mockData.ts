@@ -381,9 +381,9 @@ export const HOSPITALS: Hospital[] = [
     distance: 2.1,
     baseWaitingTime: 15,
     address: "Financial District, Gachibowli, Hyderabad",
-    image: "https://images.unsplash.com/photo-1586773860418-d3b3da96a362?w=800&auto=format&fit=crop&q=80",
+    image: "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=800&auto=format&fit=crop&q=80",
     gallery: [
-      "https://images.unsplash.com/photo-1586773860418-d3b3da96a362?w=800&auto=format&fit=crop&q=80",
+      "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=800&auto=format&fit=crop&q=80",
       "https://images.unsplash.com/photo-1587351021759-3e566b6af7cc?w=800&auto=format&fit=crop&q=80"
     ],
     about: "Continental Hospitals is a JCI and NABH accredited multi-specialty hospital in Hyderabad, offering state-of-the-art diagnostic and clinical care across various medical departments.",
@@ -492,9 +492,9 @@ export const HOSPITALS: Hospital[] = [
     distance: 3.4,
     baseWaitingTime: 25,
     address: "Ram Nagar, Visakhapatnam",
-    image: "https://images.unsplash.com/photo-1538108176447-280586497d96?w=800&auto=format&fit=crop&q=80",
+    image: "https://images.unsplash.com/photo-1587351021759-3e566b6af7cc?w=800&auto=format&fit=crop&q=80",
     gallery: [
-      "https://images.unsplash.com/photo-1538108176447-280586497d96?w=800&auto=format&fit=crop&q=80"
+      "https://images.unsplash.com/photo-1587351021759-3e566b6af7cc?w=800&auto=format&fit=crop&q=80"
     ],
     about: "Care Hospitals, Visakhapatnam, is a premier healthcare center specializing in comprehensive orthopedic care, joint replacement surgeries, trauma management, and pediatric diagnostics.",
     facilities: ["Orthopedic ICU", "Physiotherapy Center", "24/7 Emergency Care", "Ambulance"],
