@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { AppProvider, useApp } from './context/AppContext';
 import { Onboarding } from './pages/common/Onboarding';
+import { SplashScreen } from './components/common/SplashScreen';
 import { Login } from './pages/common/Login';
 import { Home } from './pages/patient/Home';
 import { SearchHospitals } from './pages/patient/SearchHospitals';
@@ -13,14 +14,14 @@ import { LiveTokenStatus } from './pages/patient/LiveTokenStatus';
 import { MyBookings } from './pages/patient/MyBookings';
 import { Profile } from './pages/patient/Profile';
 import { Notifications } from './pages/patient/Notifications';
-import { Plans } from './pages/patient/Plans';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { HospitalProvider } from './context/HospitalContext';
 import { HospitalLogin } from './pages/hospital/HospitalLogin';
 import { HospitalLayout } from './pages/hospital/HospitalLayout';
+import { Footer } from './components/common/Footer';
 import { 
   Home as HomeIcon, Search as SearchIcon, Award, User as UserIcon, 
-  Activity, MapPin, Bell, ChevronDown, Loader2
+  Activity, MapPin, Bell, ChevronDown, Loader2, Zap, Building2
 } from 'lucide-react';
 
 const TopNavbar: React.FC = () => {
@@ -32,26 +33,27 @@ const TopNavbar: React.FC = () => {
   const [locating, setLocating] = useState(false);
 
   const locations = [
+    "Gachibowli, Hyderabad",
+    "Vijayawada, Andhra Pradesh",
     "Koramangala, Bengaluru", 
     "HSR Layout, Bengaluru", 
-    "Gachibowli, Hyderabad",
-    "ITI Road, Vijayawada",
     "Ram Nagar, Visakhapatnam",
-    "Indiranagar, Bengaluru",
-    "Jayanagar, Bengaluru"
+    "Indiranagar, Bengaluru"
   ];
 
   return (
     <header className="hidden md:block bg-white border-b border-slate-100 sticky top-0 z-40">
-      <div className="max-w-[1400px] mx-auto px-6 h-16 flex items-center justify-between">
+      <div className="w-full px-6 md:px-10 h-16 flex items-center justify-between">
         {/* Logo */}
         <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
           <div className="bg-blue-600 p-2 rounded-xl text-white">
             <Activity size={18} />
           </div>
           <div>
-            <h1 className="text-base font-black text-slate-800 tracking-tight leading-none">InstaToken</h1>
-            <span className="text-[9px] text-slate-400 font-bold mt-0.5 block">Skip the Line. Save the Time.</span>
+            <h1 className="text-base font-black text-blue-600 tracking-tight leading-none font-heading flex items-center gap-0.5">
+              Insta<span className="inline-flex items-center justify-center bg-blue-600 text-white rounded-full w-4 h-4 text-[10px]">✓</span>Token
+            </h1>
+            <span className="text-[9px] text-slate-400 font-bold mt-0.5 block">Book Your Hospital Token in Minutes</span>
           </div>
         </div>
 
@@ -59,27 +61,21 @@ const TopNavbar: React.FC = () => {
         <nav className="flex items-center gap-6 text-xs font-bold uppercase tracking-wider">
           <button 
             onClick={() => navigate('/')}
-            className={`transition-colors cursor-pointer ${location.pathname === '/' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}
+            className={`transition-colors cursor-pointer ${location.pathname === '/' ? 'text-blue-600 font-black' : 'text-slate-500 hover:text-slate-800'}`}
           >
             Home
           </button>
           <button 
             onClick={() => navigate('/search')}
-            className={`transition-colors cursor-pointer ${location.pathname === '/search' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}
+            className={`transition-colors cursor-pointer ${location.pathname === '/search' ? 'text-blue-600 font-black' : 'text-slate-500 hover:text-slate-800'}`}
           >
-            Discover
-          </button>
-          <button 
-            onClick={() => navigate('/plans')}
-            className={`transition-colors cursor-pointer ${location.pathname === '/plans' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}
-          >
-            Passes
+            Nearby Hospitals
           </button>
           <button 
             onClick={() => navigate('/bookings')}
-            className={`transition-colors cursor-pointer ${location.pathname === '/bookings' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}
+            className={`transition-colors cursor-pointer ${location.pathname === '/bookings' ? 'text-blue-600 font-black' : 'text-slate-500 hover:text-slate-800'}`}
           >
-            OPD Tokens
+            My Bookings
           </button>
           {user?.role === 'admin' && (
             <button 
@@ -190,6 +186,9 @@ const AppContent: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // App load Splash Screen state
+  const [showSplash, setShowSplash] = useState<boolean>(true);
+
   // Onboarding completion state
   const [onboarded, setOnboarded] = useState<boolean>(() => {
     return localStorage.getItem('insta_onboarded') === 'true';
@@ -202,12 +201,24 @@ const AppContent: React.FC = () => {
   const isHospitalRoute = location.pathname.startsWith('/hospital');
   const isHospitalLoginRoute = location.pathname === '/hospital-login';
 
+  // Always show Splash Screen first when opening website or logging in
+  if (showSplash && !isHospitalRoute && !isHospitalLoginRoute) {
+    return <SplashScreen onFinish={() => setShowSplash(false)} />;
+  }
+
   if (!onboarded && !isHospitalRoute && !isHospitalLoginRoute) {
     return <Onboarding onComplete={() => setOnboarded(true)} />;
   }
 
   if (!user && !isHospitalRoute && !isHospitalLoginRoute) {
-    return <Login onSuccess={() => navigate('/')} />;
+    return (
+      <Login 
+        onSuccess={() => {
+          setShowSplash(true);
+          navigate('/');
+        }} 
+      />
+    );
   }
 
   // Determine if we should show the navigation bars
@@ -216,8 +227,7 @@ const AppContent: React.FC = () => {
     '/search',
     '/bookings',
     '/profile',
-    '/notifications',
-    '/plans'
+    '/notifications'
   ].includes(location.pathname);
 
   // If on admin or hospital routes, do not wrap in patient responsive frame
@@ -229,7 +239,7 @@ const AppContent: React.FC = () => {
       {showBottomNav && <TopNavbar />}
 
       {/* Main Page Area Container */}
-      <div className={`flex-grow w-full ${isAdminRoute ? '' : 'max-w-[1400px] mx-auto px-0 md:px-6 md:mt-6 pb-24 md:pb-6'}`}>
+      <div className={`flex-grow w-full ${isAdminRoute ? '' : 'w-full px-0 md:px-8 md:mt-6 pb-24 md:pb-6'}`}>
         <Routes>
           <Route path="/" element={
             <Home 
@@ -270,7 +280,6 @@ const AppContent: React.FC = () => {
           <Route path="/bookings" element={<MyBookings />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/notifications" element={<Notifications />} />
-          <Route path="/plans" element={<Plans />} />
           
           {/* Admin routes */}
           <Route path="/admin" element={<AdminDashboard />} />
@@ -284,47 +293,50 @@ const AppContent: React.FC = () => {
         </Routes>
       </div>
 
+      {/* Desktop Footer */}
+      {!isAdminRoute && <Footer />}
+
       {/* Bottom Navigation Menu (visible only on mobile) */}
       {showBottomNav && (
-        <div className="md:hidden fixed bottom-0 left-0 w-full bg-white/95 backdrop-blur-md border-t border-slate-100 flex items-center justify-around py-3 z-40 shadow-lg">
+        <div className="md:hidden fixed bottom-0 left-0 w-full bg-white/95 backdrop-blur-md border-t border-slate-100 flex items-center justify-around py-2.5 z-40 shadow-lg">
           <button 
             onClick={() => navigate('/')}
-            className={`flex flex-col items-center gap-1 cursor-pointer transition-colors ${
+            className={`flex flex-col items-center gap-0.5 cursor-pointer transition-colors ${
               location.pathname === '/' ? 'text-blue-600 font-extrabold scale-105' : 'text-slate-400 hover:text-slate-600'
             }`}
           >
             <HomeIcon size={20} />
-            <span className="text-[9px]">Home</span>
+            <span className="text-[10px] font-semibold">Home</span>
           </button>
           
           <button 
             onClick={() => navigate('/search')}
-            className={`flex flex-col items-center gap-1 cursor-pointer transition-colors ${
+            className={`flex flex-col items-center gap-0.5 cursor-pointer transition-colors ${
               location.pathname === '/search' ? 'text-blue-600 font-extrabold scale-105' : 'text-slate-400 hover:text-slate-600'
             }`}
           >
             <SearchIcon size={20} />
-            <span className="text-[9px]">Discover</span>
+            <span className="text-[10px] font-semibold">Nearby Hospitals</span>
           </button>
           
           <button 
             onClick={() => navigate('/bookings')}
-            className={`flex flex-col items-center gap-1 cursor-pointer transition-colors ${
+            className={`flex flex-col items-center gap-0.5 cursor-pointer transition-colors ${
               location.pathname === '/bookings' ? 'text-blue-600 font-extrabold scale-105' : 'text-slate-400 hover:text-slate-600'
             }`}
           >
             <Award size={20} />
-            <span className="text-[9px]">OPD Tokens</span>
+            <span className="text-[10px] font-semibold">Bookings</span>
           </button>
           
           <button 
             onClick={() => navigate('/profile')}
-            className={`flex flex-col items-center gap-1 cursor-pointer transition-colors ${
+            className={`flex flex-col items-center gap-0.5 cursor-pointer transition-colors ${
               location.pathname === '/profile' ? 'text-blue-600 font-extrabold scale-105' : 'text-slate-400 hover:text-slate-600'
             }`}
           >
             <UserIcon size={20} />
-            <span className="text-[9px]">Profile</span>
+            <span className="text-[10px] font-semibold">Profile</span>
           </button>
         </div>
       )}

@@ -22,6 +22,7 @@ export interface UserProfile {
   phone: string;
   role: 'patient' | 'admin';
   savedHospitals: string[];
+  savedDoctors: string[];
   familyMembers: FamilyMember[];
   subscription: Subscription | null;
 }
@@ -73,6 +74,7 @@ interface AppContextType {
   addFamilyMember: (name: string, age: number, gender: string, relationship: string) => void;
   removeFamilyMember: (id: string) => void;
   toggleSaveHospital: (hospitalId: string) => void;
+  toggleSaveDoctor: (doctorId: string) => void;
   bookToken: (
     patientDetails: { name: string; age: number; gender: string; phone: string; email: string; address: string },
     hospitalId: string,
@@ -115,6 +117,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       phone: "+91 9876543210",
       role: "patient",
       savedHospitals: ["hosp-apollo"],
+      savedDoctors: ["doc-arvind"],
       familyMembers: [
         { id: "fam-1", name: "Ramesh Sharma", age: 58, gender: "Male", relationship: "Father" },
         { id: "fam-2", name: "Kanta Sharma", age: 52, gender: "Female", relationship: "Mother" }
@@ -129,7 +132,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [hospitals, setHospitals] = useState<Hospital[]>(() => {
     const saved = localStorage.getItem('insta_hospitals');
-    return saved ? JSON.parse(saved) : HOSPITALS;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return HOSPITALS.map(defaultHosp => {
+            const found = parsed.find((p: Hospital) => p.id === defaultHosp.id);
+            return found ? { ...found, image: defaultHosp.image, gallery: defaultHosp.gallery } : defaultHosp;
+          });
+        }
+      } catch (e) {}
+    }
+    return HOSPITALS;
   });
 
   const [articles] = useState<HealthArticle[]>(HEALTH_ARTICLES);
@@ -321,15 +335,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const toggleSaveHospital = (hospitalId: string) => {
     if (!user) return;
-    const isSaved = user.savedHospitals.includes(hospitalId);
+    const isSaved = user.savedHospitals?.includes(hospitalId);
     const updated = isSaved
       ? user.savedHospitals.filter(id => id !== hospitalId)
-      : [...user.savedHospitals, hospitalId];
+      : [...(user.savedHospitals || []), hospitalId];
 
     setUser(prev => prev ? { ...prev, savedHospitals: updated } : null);
     addNotification(
       isSaved ? "Removed from Favorites" : "Added to Favorites",
       isSaved ? "Hospital removed from your saved list." : "Hospital bookmarked for quick booking.",
+      "info"
+    );
+  };
+
+  const toggleSaveDoctor = (doctorId: string) => {
+    if (!user) return;
+    const savedDocs = user.savedDoctors || [];
+    const isSaved = savedDocs.includes(doctorId);
+    const updated = isSaved
+      ? savedDocs.filter(id => id !== doctorId)
+      : [...savedDocs, doctorId];
+
+    setUser(prev => prev ? { ...prev, savedDoctors: updated } : null);
+    addNotification(
+      isSaved ? "Doctor Removed" : "Doctor Favorited",
+      isSaved ? "Doctor removed from your favorites list." : "Doctor added to your Favorite Doctors in profile.",
       "info"
     );
   };
@@ -411,7 +441,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // Send notification
         addNotification(
           "Appointment Cancelled",
-          `Token #${appt.tokenNumber} for Dr. ${appt.doctorName} was cancelled. Refund processed.`,
+          `Token #${appt.tokenNumber} for Dr. ${appt.doctorName} was cancelled. Note: Token booking fee is non-refundable.`,
           "warning"
         );
         return { ...appt, status: 'cancelled' };
@@ -605,6 +635,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addFamilyMember,
       removeFamilyMember,
       toggleSaveHospital,
+      toggleSaveDoctor,
       bookToken,
       cancelAppointment,
       advanceQueue,

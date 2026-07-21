@@ -53,13 +53,13 @@ export const LiveTokenStatus: React.FC = () => {
   ];
 
   return (
-    <div className="pb-24 bg-slate-50 min-h-screen md:min-h-0 md:bg-transparent md:pb-6 max-w-2xl mx-auto flex flex-col justify-between">
+    <div className="pb-24 bg-slate-50 min-h-screen md:min-h-0 md:pb-6 w-full flex flex-col justify-between">
       
       {/* Scrollable Content */}
       <div className="px-5 py-6 flex-1">
         
         {/* Header */}
-        <div className="flex items-center gap-3 mb-6">
+        <div className="flex items-center gap-3 mb-6 md:bg-white md:p-4 md:rounded-2xl md:shadow-xs border-b border-slate-100">
           <button 
             onClick={() => navigate('/')}
             className="p-2.5 rounded-xl hover:bg-slate-200 text-slate-600 transition-colors bg-white shadow-xs cursor-pointer"
@@ -68,55 +68,62 @@ export const LiveTokenStatus: React.FC = () => {
           </button>
           <div>
             <h2 className="text-base font-black text-slate-800 tracking-tight font-heading">Live Queue Tracker</h2>
-            <p className="text-[10px] text-slate-400 font-semibold">{appointment.hospitalName}</p>
+            <p className="text-[10px] text-slate-400 font-semibold">{appointment.hospitalName} • Dr. {appointment.doctorName}</p>
           </div>
         </div>
 
-        {/* Big Live Dashboard */}
-        <Card className="p-6 border-none shadow-xl bg-white mb-5 text-center relative overflow-hidden flex flex-col items-center">
+        <div className="md:grid md:grid-cols-12 md:gap-8 items-start">
           
-          {/* Pulsing Live indicator */}
-          <div className="absolute top-4 right-4 flex items-center gap-1.5 bg-red-50 border border-red-100 rounded-full px-2.5 py-0.5 text-[9px] font-bold text-red-600 animate-pulse">
-            <span className="w-1.5 h-1.5 bg-red-500 rounded-full" />
-            LIVE QUEUE
+          {/* Left Column: Big Live Dashboard */}
+          <div className="md:col-span-5 space-y-4 mb-5 md:mb-0">
+            {/* Big Live Dashboard */}
+            <Card className="p-6 border-none shadow-xl bg-white text-center relative overflow-hidden flex flex-col items-center">
+              
+              {/* Pulsing Live indicator */}
+              <div className="absolute top-4 right-4 flex items-center gap-1.5 bg-red-50 border border-red-100 rounded-full px-2.5 py-0.5 text-[9px] font-bold text-red-600 animate-pulse">
+                <span className="w-1.5 h-1.5 bg-red-500 rounded-full" />
+                LIVE QUEUE
+              </div>
+
+              <p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-widest mt-4">Cabin Entry Wait Estimation</p>
+              
+              {/* Waiting estimation dial */}
+              <div className="my-6 relative w-36 h-36 rounded-full border-4 border-slate-100 flex flex-col items-center justify-center bg-slate-50 shadow-inner">
+                {step === 4 ? (
+                  <>
+                    <CheckCircle size={36} className="text-emerald-500 stroke-[2.5] mb-1.5 animate-bounce" />
+                    <span className="text-[10px] font-black text-emerald-600">Your Turn Now!</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-3xl font-black text-slate-800 tracking-tight font-heading">{remainingWaitTime}</span>
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">minutes left</span>
+                  </>
+                )}
+              </div>
+
+              {/* OPD Token Numbers Info */}
+              <div className="grid grid-cols-2 gap-4 w-full border-t border-slate-100 pt-4 mt-2">
+                <div className="border-r border-slate-100">
+                  <span className="text-[9px] font-bold text-slate-400 uppercase block tracking-wider">Active Token</span>
+                  <span className="text-2xl font-black text-slate-800 font-heading block mt-0.5 animate-pulse">{currentToken || '--'}</span>
+                  <span className="text-[8px] text-slate-400">Currently in cabin</span>
+                </div>
+                
+                <div>
+                  <span className="text-[9px] font-bold text-slate-400 uppercase block tracking-wider">Your Token</span>
+                  <span className="text-2xl font-black text-blue-600 font-heading block mt-0.5">{userToken}</span>
+                  <span className="text-[8px] text-slate-400">Assigned OPD slot</span>
+                </div>
+              </div>
+            </Card>
           </div>
 
-          <p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-widest mt-4">Cabin Entry Wait Estimation</p>
-          
-          {/* Waiting estimation dial */}
-          <div className="my-6 relative w-36 h-36 rounded-full border-4 border-slate-100 flex flex-col items-center justify-center bg-slate-50 shadow-inner">
-            {step === 4 ? (
-              <>
-                <CheckCircle size={36} className="text-emerald-500 stroke-[2.5] mb-1.5 animate-bounce" />
-                <span className="text-[10px] font-black text-emerald-600">Your Turn Now!</span>
-              </>
-            ) : (
-              <>
-                <span className="text-3xl font-black text-slate-800 tracking-tight font-heading">{remainingWaitTime}</span>
-                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">minutes left</span>
-              </>
-            )}
-          </div>
-
-          {/* OPD Token Numbers Info */}
-          <div className="grid grid-cols-2 gap-4 w-full border-t border-slate-100 pt-4 mt-2">
-            <div className="border-r border-slate-100">
-              <span className="text-[9px] font-bold text-slate-400 uppercase block tracking-wider">Active Token</span>
-              <span className="text-2xl font-black text-slate-800 font-heading block mt-0.5 animate-pulse">{currentToken || '--'}</span>
-              <span className="text-[8px] text-slate-400">Currently in cabin</span>
-            </div>
-            
-            <div>
-              <span className="text-[9px] font-bold text-slate-400 uppercase block tracking-wider">Your Token</span>
-              <span className="text-2xl font-black text-blue-600 font-heading block mt-0.5">{userToken}</span>
-              <span className="text-[8px] text-slate-400">Assigned OPD slot</span>
-            </div>
-          </div>
-        </Card>
-
-        {/* Live Queue Stepper */}
-        <Card className="p-5 border-none shadow-xs bg-white mb-5">
-          <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-4">Queue Progress Journey</h3>
+          {/* Right Column: Queue Progress Stepper & Actions */}
+          <div className="md:col-span-7 space-y-5">
+            {/* Live Queue Stepper */}
+            <Card className="p-5 border-none shadow-xs bg-white">
+              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-4">Queue Progress Journey</h3>
           
           <div className="relative pl-6 space-y-5 border-l-2 border-slate-100">
             {stepsList.map((st) => {
@@ -162,39 +169,42 @@ export const LiveTokenStatus: React.FC = () => {
           </div>
         )}
 
-      </div>
+        {/* Hospital contact info / actions footer */}
+        <div className="pt-2 space-y-3.5">
+          <div className="grid grid-cols-2 gap-3">
+            <a 
+              href={`tel:${hospital.contact}`}
+              className="flex items-center justify-center gap-1.5 py-2.5 px-4 border border-slate-200 hover:border-slate-300 rounded-xl bg-white text-slate-600 text-xs font-semibold hover:bg-slate-50 transition-all cursor-pointer"
+            >
+              <PhoneCall size={14} />
+              Call Reception
+            </a>
 
-      {/* Hospital contact info / actions footer */}
-      <div className="px-5 pb-6 space-y-3.5">
-        <div className="grid grid-cols-2 gap-3">
-          <a 
-            href={`tel:${hospital.contact}`}
-            className="flex items-center justify-center gap-1.5 py-2.5 px-4 border border-slate-200 hover:border-slate-300 rounded-xl bg-white text-slate-600 text-xs font-semibold hover:bg-slate-50 transition-all cursor-pointer"
-          >
-            <PhoneCall size={14} />
-            Call Reception
-          </a>
+            <a 
+              href={`https://www.google.com/maps?q=${hospital.lat},${hospital.lng}`}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center justify-center gap-1.5 py-2.5 px-4 border border-slate-200 hover:border-slate-300 rounded-xl bg-white text-slate-600 text-xs font-semibold hover:bg-slate-50 transition-all cursor-pointer"
+            >
+              <Navigation size={14} />
+              Get Directions
+            </a>
+          </div>
 
-          <a 
-            href={`https://www.google.com/maps?q=${hospital.lat},${hospital.lng}`}
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center justify-center gap-1.5 py-2.5 px-4 border border-slate-200 hover:border-slate-300 rounded-xl bg-white text-slate-600 text-xs font-semibold hover:bg-slate-50 transition-all cursor-pointer"
+          <Button 
+            variant="outline" 
+            size="lg" 
+            fullWidth 
+            onClick={() => navigate('/')}
+            className="py-2.5 text-xs text-slate-500 font-bold border-slate-200 rounded-xl cursor-pointer"
           >
-            <Navigation size={14} />
-            Get Directions
-          </a>
+            View Other Bookings
+          </Button>
         </div>
 
-        <Button 
-          variant="outline" 
-          size="lg" 
-          fullWidth 
-          onClick={() => navigate('/')}
-          className="py-2.5 text-xs text-slate-500 font-bold border-slate-200 rounded-xl cursor-pointer"
-        >
-          View Other Bookings
-        </Button>
+          </div>
+        </div>
+
       </div>
 
     </div>

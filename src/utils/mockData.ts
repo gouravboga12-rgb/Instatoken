@@ -55,6 +55,55 @@ export interface HealthArticle {
   date: string;
 }
 
+// Inline high-quality SVG fallback generator for hospitals (never falls back to plain initials text)
+export const getHospitalSVGImage = (name: string) => {
+  const shortName = name.replace("Hospital", "").replace("Spectra", "").replace("Children's", "").trim();
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500" viewBox="0 0 800 500" fill="none">
+    <defs>
+      <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#E0F2FE"/>
+        <stop offset="100%" stop-color="#BAE6FD"/>
+      </linearGradient>
+      <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#2563EB"/>
+        <stop offset="100%" stop-color="#1D4ED8"/>
+      </linearGradient>
+    </defs>
+    <rect width="800" height="500" fill="url(#sky)"/>
+    <rect x="0" y="380" width="800" height="120" fill="#94A3B8"/>
+    <rect x="0" y="390" width="800" height="8" fill="#E2E8F0"/>
+    
+    <!-- Main Hospital Building Structure -->
+    <rect x="180" y="100" width="440" height="280" rx="16" fill="url(#glass)"/>
+    <rect x="200" y="120" width="400" height="240" rx="12" fill="#FFFFFF"/>
+    
+    <!-- Cross Header Badge -->
+    <rect x="330" y="60" width="140" height="50" rx="12" fill="#2563EB"/>
+    <path d="M400 72V98M387 85H413" stroke="white" stroke-width="8" stroke-linecap="round"/>
+    
+    <!-- Windows Grid -->
+    <rect x="230" y="150" width="60" height="45" rx="6" fill="#38BDF8"/>
+    <rect x="310" y="150" width="60" height="45" rx="6" fill="#38BDF8"/>
+    <rect x="390" y="150" width="60" height="45" rx="6" fill="#38BDF8"/>
+    <rect x="470" y="150" width="60" height="45" rx="6" fill="#38BDF8"/>
+    
+    <rect x="230" y="220" width="60" height="45" rx="6" fill="#38BDF8"/>
+    <rect x="310" y="220" width="60" height="45" rx="6" fill="#38BDF8"/>
+    <rect x="390" y="220" width="60" height="45" rx="6" fill="#38BDF8"/>
+    <rect x="470" y="220" width="60" height="45" rx="6" fill="#38BDF8"/>
+    
+    <!-- Entrance Glass Doors -->
+    <rect x="350" y="290" width="100" height="70" rx="6" fill="#0F172A"/>
+    <rect x="355" y="295" width="42" height="65" fill="#38BDF8" opacity="0.8"/>
+    <rect x="403" y="295" width="42" height="65" fill="#38BDF8" opacity="0.8"/>
+    
+    <!-- Hospital Name Banner -->
+    <rect x="150" y="420" width="500" height="50" rx="25" fill="#FFFFFF" stroke="#2563EB" stroke-width="3"/>
+    <text x="400" y="452" font-family="system-ui, sans-serif" font-weight="900" font-size="20" fill="#1E40AF" text-anchor="middle">${shortName} Hospital</text>
+  </svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+};
+
 export const CATEGORIES = [
   "Multi Speciality",
   "Children Hospital",
@@ -89,11 +138,11 @@ export const HOSPITALS: Hospital[] = [
     distance: 1.8,
     baseWaitingTime: 20,
     address: "Koramangala 5th Block, near Sony World Signal, Bengaluru",
-    image: "https://images.unsplash.com/photo-1586773860418-d3b3da96a362?auto=format&fit=crop&q=80&w=1000",
+    image: "https://images.unsplash.com/photo-1587351021759-3e566b6af7cc?w=800&auto=format&fit=crop&q=80",
     gallery: [
-      "https://images.unsplash.com/photo-1586773860418-d3b3da96a362?auto=format&fit=crop&q=80&w=500",
-      "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&q=80&w=500",
-      "https://images.unsplash.com/photo-1538108176447-280586497d96?auto=format&fit=crop&q=80&w=500"
+      "https://images.unsplash.com/photo-1587351021759-3e566b6af7cc?w=800&auto=format&fit=crop&q=80",
+      "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=800&auto=format&fit=crop&q=80",
+      "https://images.unsplash.com/photo-1516549655169-df83a0774514?w=800&auto=format&fit=crop&q=80"
     ],
     about: "Apollo Spectra is a state-of-the-art multi-specialty hospital committed to bringing you the best clinical outcomes in a simplified, service-oriented environment. Equipped with advanced diagnostic infrastructure and led by top healthcare specialists.",
     facilities: ["24/7 Emergency", "ICU", "Pharmacy", "Ambulance", "Lab Testing", "Cafeteria"],
@@ -118,7 +167,7 @@ export const HOSPITALS: Hospital[] = [
         consultationFee: 800,
         rating: 4.9,
         reviewsCount: 312,
-        image: "https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=400",
+        image: "https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=400&auto=format&fit=crop&q=80",
         availability: {
           days: ["Mon", "Tue", "Wed", "Thu", "Fri"],
           slots: ["09:00 AM", "09:30 AM", "10:00 AM", "10:30 AM", "11:00 AM", "02:00 PM", "02:30 PM", "03:00 PM"]
@@ -137,7 +186,7 @@ export const HOSPITALS: Hospital[] = [
         consultationFee: 1000,
         rating: 4.7,
         reviewsCount: 184,
-        image: "https://images.unsplash.com/photo-1594824813573-246434de83fb?auto=format&fit=crop&q=80&w=400",
+        image: "https://images.unsplash.com/photo-1594824813573-246434de83fb?w=400&auto=format&fit=crop&q=80",
         availability: {
           days: ["Mon", "Wed", "Fri"],
           slots: ["10:00 AM", "10:30 AM", "11:00 AM", "11:30 AM", "03:00 PM", "03:30 PM", "04:00 PM"]
@@ -156,7 +205,7 @@ export const HOSPITALS: Hospital[] = [
         consultationFee: 900,
         rating: 4.8,
         reviewsCount: 220,
-        image: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?auto=format&fit=crop&q=80&w=400",
+        image: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&auto=format&fit=crop&q=80",
         availability: {
           days: ["Tue", "Thu", "Sat"],
           slots: ["09:30 AM", "10:00 AM", "10:30 AM", "11:00 AM", "11:30 AM", "12:00 PM"]
@@ -176,10 +225,10 @@ export const HOSPITALS: Hospital[] = [
     distance: 3.2,
     baseWaitingTime: 15,
     address: "HSR Layout Sector 2, opposite HSR Club, Bengaluru",
-    image: "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&q=80&w=1000",
+    image: "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=800&auto=format&fit=crop&q=80",
     gallery: [
-      "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&q=80&w=500",
-      "https://images.unsplash.com/photo-1502740479091-63bc883e082f?auto=format&fit=crop&q=80&w=500"
+      "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=800&auto=format&fit=crop&q=80",
+      "https://images.unsplash.com/photo-1502740479091-63bc883e082f?w=800&auto=format&fit=crop&q=80"
     ],
     about: "Rainbow Children's Hospital is Bengaluru's premier pediatric and neonatal intensive care provider. Offering colorfully themed child-friendly waiting rooms, specialized play zones, and world-class care by leading pediatricians.",
     facilities: ["24/7 Neonatal Emergency", "Child Play Zone", "Pediatric ICU", "Ambulance", "Pediatric Pharmacy"],
@@ -202,7 +251,7 @@ export const HOSPITALS: Hospital[] = [
         consultationFee: 600,
         rating: 4.9,
         reviewsCount: 450,
-        image: "https://images.unsplash.com/photo-1537368910025-700350fe46c7?auto=format&fit=crop&q=80&w=400",
+        image: "https://images.unsplash.com/photo-1537368910025-700350fe46c7?w=400&auto=format&fit=crop&q=80",
         availability: {
           days: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
           slots: ["09:00 AM", "09:45 AM", "10:30 AM", "11:15 AM", "12:00 PM", "03:00 PM", "03:45 PM", "04:30 PM", "05:15 PM"]
@@ -221,7 +270,7 @@ export const HOSPITALS: Hospital[] = [
         consultationFee: 500,
         rating: 4.6,
         reviewsCount: 98,
-        image: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=400",
+        image: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=400&auto=format&fit=crop&q=80",
         availability: {
           days: ["Mon", "Wed", "Fri"],
           slots: ["10:00 AM", "11:00 AM", "12:00 PM", "02:00 PM", "03:00 PM", "04:00 PM"]
@@ -241,9 +290,9 @@ export const HOSPITALS: Hospital[] = [
     distance: 4.5,
     baseWaitingTime: 35,
     address: "Indiranagar 100ft Road, near Metro Station, Bengaluru",
-    image: "https://images.unsplash.com/photo-1538108176447-280586497d96?auto=format&fit=crop&q=80&w=1000",
+    image: "https://images.unsplash.com/photo-1516549655169-df83a0774514?w=800&auto=format&fit=crop&q=80",
     gallery: [
-      "https://images.unsplash.com/photo-1538108176447-280586497d96?auto=format&fit=crop&q=80&w=500"
+      "https://images.unsplash.com/photo-1516549655169-df83a0774514?w=800&auto=format&fit=crop&q=80"
     ],
     about: "Narayana Nethralaya is an ultra-modern eye care hospital offering state-of-the-art diagnostics and surgeries. From LASIK and cataracts to complex retinal treatments, we keep your vision crystal clear.",
     facilities: ["Advanced Diagnostics", "Lasik Wing", "Daycare Surgery", "Optical Shop", "Contact Lens Lab"],
@@ -265,7 +314,7 @@ export const HOSPITALS: Hospital[] = [
         consultationFee: 650,
         rating: 4.9,
         reviewsCount: 382,
-        image: "https://images.unsplash.com/photo-1594824813573-246434de83fb?auto=format&fit=crop&q=80&w=400&id=2",
+        image: "https://images.unsplash.com/photo-1527613426441-4da17471b66d?w=400&auto=format&fit=crop&q=80",
         availability: {
           days: ["Mon", "Tue", "Wed", "Thu", "Fri"],
           slots: ["09:00 AM", "09:30 AM", "10:00 AM", "10:30 AM", "11:00 AM", "11:30 AM", "02:00 PM", "02:30 PM", "03:00 PM", "03:30 PM"]
@@ -285,10 +334,10 @@ export const HOSPITALS: Hospital[] = [
     distance: 5.1,
     baseWaitingTime: 45,
     address: "Bannerghatta Road, opposite IIM-B, Bengaluru",
-    image: "https://images.unsplash.com/photo-1551076805-e1869033e561?auto=format&fit=crop&q=80&w=1000",
+    image: "https://images.unsplash.com/photo-1629909613654-28e377c37b09?w=800&auto=format&fit=crop&q=80",
     gallery: [
-      "https://images.unsplash.com/photo-1551076805-e1869033e561?auto=format&fit=crop&q=80&w=500",
-      "https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&q=80&w=500"
+      "https://images.unsplash.com/photo-1629909613654-28e377c37b09?w=800&auto=format&fit=crop&q=80",
+      "https://images.unsplash.com/photo-1586773860418-d3b3da96a362?w=800&auto=format&fit=crop&q=80"
     ],
     about: "Fortis Hospital, Bannerghatta Road, is a renowned multi-specialty healthcare provider offering cutting-edge therapies in cardiology, cardio-thoracic surgeries, neurology, and orthopedics.",
     facilities: ["24/7 Emergency Care", "Cardiac ICU", "Blood Bank", "Cafeteria", "Pharmacy Hub", "Surgical Suites"],
@@ -312,7 +361,7 @@ export const HOSPITALS: Hospital[] = [
         consultationFee: 700,
         rating: 4.8,
         reviewsCount: 290,
-        image: "https://images.unsplash.com/photo-1527613426441-4da17471b66d?auto=format&fit=crop&q=80&w=400",
+        image: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=400&auto=format&fit=crop&q=80",
         availability: {
           days: ["Mon", "Tue", "Thu", "Fri"],
           slots: ["10:00 AM", "10:30 AM", "11:00 AM", "11:30 AM", "12:00 PM", "03:00 PM", "03:30 PM", "04:00 PM"]
@@ -332,10 +381,10 @@ export const HOSPITALS: Hospital[] = [
     distance: 2.1,
     baseWaitingTime: 15,
     address: "Financial District, Gachibowli, Hyderabad",
-    image: "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&q=80&w=500",
+    image: "https://images.unsplash.com/photo-1586773860418-d3b3da96a362?w=800&auto=format&fit=crop&q=80",
     gallery: [
-      "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&q=80&w=500",
-      "https://images.unsplash.com/photo-1586773860418-d3b3da96a362?auto=format&fit=crop&q=80&w=500"
+      "https://images.unsplash.com/photo-1586773860418-d3b3da96a362?w=800&auto=format&fit=crop&q=80",
+      "https://images.unsplash.com/photo-1587351021759-3e566b6af7cc?w=800&auto=format&fit=crop&q=80"
     ],
     about: "Continental Hospitals is a JCI and NABH accredited multi-specialty hospital in Hyderabad, offering state-of-the-art diagnostic and clinical care across various medical departments.",
     facilities: ["24/7 Emergency Care", "ICU", "Ambulance Services", "Pharmacy Hub", "Surgical Desks"],
@@ -359,7 +408,7 @@ export const HOSPITALS: Hospital[] = [
         consultationFee: 900,
         rating: 4.8,
         reviewsCount: 140,
-        image: "https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=400",
+        image: "https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=400&auto=format&fit=crop&q=80",
         availability: {
           days: ["Mon", "Tue", "Wed", "Thu", "Fri"],
           slots: ["10:00 AM", "10:30 AM", "11:00 AM", "11:30 AM", "02:00 PM", "02:30 PM", "03:00 PM"]
@@ -378,7 +427,7 @@ export const HOSPITALS: Hospital[] = [
         consultationFee: 750,
         rating: 4.7,
         reviewsCount: 95,
-        image: "https://images.unsplash.com/photo-1594824813573-246434de83fb?auto=format&fit=crop&q=80&w=400",
+        image: "https://images.unsplash.com/photo-1594824813573-246434de83fb?w=400&auto=format&fit=crop&q=80",
         availability: {
           days: ["Mon", "Wed", "Fri"],
           slots: ["02:00 PM", "02:30 PM", "03:00 PM", "03:30 PM", "04:00 PM"]
@@ -398,9 +447,9 @@ export const HOSPITALS: Hospital[] = [
     distance: 1.2,
     baseWaitingTime: 10,
     address: "ITI Road, Near Benz Circle, Vijayawada",
-    image: "https://images.unsplash.com/photo-1504813184591-015578c7c907?auto=format&fit=crop&q=80&w=500",
+    image: "https://images.unsplash.com/photo-1512678080530-7760d81faba6?w=800&auto=format&fit=crop&q=80",
     gallery: [
-      "https://images.unsplash.com/photo-1504813184591-015578c7c907?auto=format&fit=crop&q=80&w=500"
+      "https://images.unsplash.com/photo-1512678080530-7760d81faba6?w=800&auto=format&fit=crop&q=80"
     ],
     about: "Ramesh Hospitals is a leading cardiac care provider in Andhra Pradesh, delivering advanced cardiology and emergency critical care services.",
     facilities: ["Cardiac ICU", "24/7 Trauma Care", "Pharmacy Hub", "Diagnostic Lab", "Ambulance"],
@@ -423,7 +472,7 @@ export const HOSPITALS: Hospital[] = [
         consultationFee: 800,
         rating: 4.9,
         reviewsCount: 420,
-        image: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?auto=format&fit=crop&q=80&w=400",
+        image: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&auto=format&fit=crop&q=80",
         availability: {
           days: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
           slots: ["09:30 AM", "10:00 AM", "10:30 AM", "11:00 AM", "11:30 AM", "03:00 PM", "03:30 PM"]
@@ -443,9 +492,9 @@ export const HOSPITALS: Hospital[] = [
     distance: 3.4,
     baseWaitingTime: 25,
     address: "Ram Nagar, Visakhapatnam",
-    image: "https://images.unsplash.com/photo-1551076805-e1869033e561?auto=format&fit=crop&q=80&w=500",
+    image: "https://images.unsplash.com/photo-1538108176447-280586497d96?w=800&auto=format&fit=crop&q=80",
     gallery: [
-      "https://images.unsplash.com/photo-1551076805-e1869033e561?auto=format&fit=crop&q=80&w=500"
+      "https://images.unsplash.com/photo-1538108176447-280586497d96?w=800&auto=format&fit=crop&q=80"
     ],
     about: "Care Hospitals, Visakhapatnam, is a premier healthcare center specializing in comprehensive orthopedic care, joint replacement surgeries, trauma management, and pediatric diagnostics.",
     facilities: ["Orthopedic ICU", "Physiotherapy Center", "24/7 Emergency Care", "Ambulance"],
@@ -468,7 +517,7 @@ export const HOSPITALS: Hospital[] = [
         consultationFee: 700,
         rating: 4.8,
         reviewsCount: 155,
-        image: "https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=400",
+        image: "https://images.unsplash.com/photo-1537368910025-700350fe46c7?w=400&auto=format&fit=crop&q=80",
         availability: {
           days: ["Mon", "Tue", "Thu", "Fri"],
           slots: ["10:00 AM", "10:30 AM", "11:00 AM", "11:30 AM", "02:00 PM", "02:30 PM", "03:00 PM"]
@@ -487,7 +536,7 @@ export const HEALTH_ARTICLES: HealthArticle[] = [
     title: "Understanding OPD Digital Tokens: A Smart Guide to Skipping Queues",
     category: "Health Tech",
     readTime: "3 min read",
-    image: "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&q=80&w=400",
+    image: "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=400&auto=format&fit=crop&q=80",
     content: "OPD queues can be exhausting, especially when you are unwell. Digital booking systems let you secure a queue spot online, giving you real-time updates and letting you arrive right when the doctor is ready to see you.",
     date: "July 12, 2026"
   },
@@ -496,7 +545,7 @@ export const HEALTH_ARTICLES: HealthArticle[] = [
     title: "5 Simple Ways to Maintain Cardiovascular Health Daily",
     category: "Cardiology",
     readTime: "5 min read",
-    image: "https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&q=80&w=400",
+    image: "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=400&auto=format&fit=crop&q=80",
     content: "Your heart works non-stop. Keeping it healthy doesn't require a complete lifestyle overhaul. Focus on 30 minutes of walking daily, reducing sodium, sleeping 7-8 hours, managing stress, and eating fiber-rich foods.",
     date: "July 10, 2026"
   },
@@ -505,7 +554,7 @@ export const HEALTH_ARTICLES: HealthArticle[] = [
     title: "Caring for Children's Teeth: Dental Hygiene Tips for Parents",
     category: "Pediatric Dental",
     readTime: "4 min read",
-    image: "https://images.unsplash.com/photo-1471864190281-a93a3070b6de?auto=format&fit=crop&q=80&w=400",
+    image: "https://images.unsplash.com/photo-1471864190281-a93a3070b6de?w=400&auto=format&fit=crop&q=80",
     content: "Good dental habits start early. Make brushing fun for children using soft-bristled, colorful brushes. Monitor sugar intake and schedule their first dentist visit by their first birthday to screen for early cavities.",
     date: "July 08, 2026"
   }

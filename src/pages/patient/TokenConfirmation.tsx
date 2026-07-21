@@ -1,17 +1,20 @@
 import React from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
-import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { QRCodeSVG } from 'qrcode.react';
-import { Calendar, Clock, Download, Share2, ArrowRight, Home, CheckCircle2 } from 'lucide-react';
+import { 
+  Calendar, Clock, Download, Share2, CheckCircle2, 
+  Phone, Compass, Building2, User, Sun, CreditCard, ChevronRight,
+  AlertCircle
+} from 'lucide-react';
 
 export const TokenConfirmation: React.FC = () => {
   const { appointmentId } = useParams<{ appointmentId: string }>();
   const { appointments, addNotification } = useApp();
   const navigate = useNavigate();
 
-  const appointment = appointments.find(a => a.id === appointmentId);
+  const appointment = appointments.find(a => a.id === appointmentId) || appointments[0];
 
   if (!appointment) {
     return (
@@ -56,152 +59,317 @@ export const TokenConfirmation: React.FC = () => {
   });
 
   return (
-    <div className="pb-24 bg-slate-50 min-h-screen md:min-h-0 md:bg-transparent md:pb-6 max-w-2xl mx-auto flex flex-col justify-between">
+    <div className="pb-24 bg-slate-50 min-h-screen md:min-h-0 md:pb-6 max-w-5xl mx-auto">
       
-      {/* Scrollable Content */}
-      <div className="px-5 py-6 flex-1">
+      {/* Success Banner */}
+      <div className="flex flex-col items-center text-center py-6 px-5 relative overflow-hidden bg-white rounded-3xl border border-slate-100 mb-6 shadow-sm">
+        {/* Big Green Check Circle */}
+        <div className="w-16 h-16 bg-emerald-500 text-white rounded-full flex items-center justify-center shadow-lg shadow-emerald-500/20 mb-3 transform hover:scale-105 transition-transform">
+          <CheckCircle2 size={36} className="stroke-[2.5]" />
+        </div>
+
+        <h2 className="text-xl font-black text-emerald-800 tracking-tight font-heading">
+          Token Booked Successfully!
+        </h2>
+        <p className="text-xs text-slate-500 font-semibold mt-0.5">
+          Your OPD Token has been confirmed.
+        </p>
+      </div>
+
+      <div className="px-5 mt-4 md:grid md:grid-cols-12 md:gap-8 items-start">
         
-        {/* Success Header */}
-        <div className="flex flex-col items-center text-center mb-6">
-          <div className="bg-emerald-100 p-2.5 rounded-full mb-3 flex items-center justify-center text-emerald-600 animate-scale-in">
-            <CheckCircle2 size={32} className="stroke-[2.5]" />
-          </div>
-          <h2 className="text-xl font-black text-slate-800 tracking-tight font-heading">Token Booked!</h2>
-          <p className="text-slate-400 text-xs mt-1">Your payment was authenticated successfully.</p>
-        </div>
-
-        {/* Ticket Outer Wrapper */}
-        <div className="bg-white rounded-3xl border border-slate-100 shadow-xl overflow-hidden relative">
+        {/* Left Column (Pass Card & Action Buttons) */}
+        <div className="md:col-span-6 space-y-4 mb-5 md:mb-0">
+          {/* Main Printable Digital Token Card matching Image 4 */}
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden">
           
-          {/* Ticket Header Banner */}
-          <div className="bg-gradient-to-r from-blue-600 to-sky-500 px-6 py-4 flex justify-between items-center text-white">
-            <div>
-              <p className="text-[9px] uppercase font-bold tracking-wider text-blue-100">InstaToken Official</p>
-              <h4 className="text-xs font-extrabold truncate max-w-[200px] mt-0.5">{appointment.hospitalName}</h4>
-            </div>
-            <Badge variant="green" className="bg-emerald-500/20 text-emerald-100 border-none px-2.5 py-0.5 rounded-md">
-              PAID
-            </Badge>
-          </div>
-
-          <div className="p-6 flex flex-col items-center border-b border-dashed border-slate-200 relative">
-            
-            {/* Token Block */}
-            <div className="text-[10px] text-slate-400 font-extrabold uppercase tracking-widest mb-1">Your OPD Token</div>
-            <div className="text-5xl font-black text-blue-600 tracking-tight font-heading">{appointment.tokenNumber}</div>
-            
-            {/* QR Code Container */}
-            <div className="p-4 border border-slate-100 rounded-3xl bg-slate-50 my-5 shadow-inner">
-              <QRCodeSVG 
-                value={qrPayload}
-                size={120}
-                level="M"
-                includeMargin={false}
-              />
-            </div>
-            <p className="text-[9px] text-slate-400 font-mono">ID: {appointment.id}</p>
-
-            {/* Dotted cut mock marks (ticket punch holes) */}
-            <div className="absolute -bottom-3.5 -left-3.5 w-7 h-7 bg-slate-50 rounded-full border border-slate-100" />
-            <div className="absolute -bottom-3.5 -right-3.5 w-7 h-7 bg-slate-50 rounded-full border border-slate-100" />
-          </div>
-
-          {/* Ticket Body details */}
-          <div className="p-6 space-y-4 text-xs">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">Doctor</p>
-                <p className="font-extrabold text-slate-700 mt-0.5">{appointment.doctorName}</p>
-                <p className="text-[10px] text-blue-600 font-medium">{appointment.departmentName}</p>
+          {/* Blue Top Ticket Header Banner */}
+          <div className="bg-blue-600 px-5 py-3.5 flex justify-between items-center text-white">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 bg-white text-blue-600 rounded-lg flex items-center justify-center font-black text-sm shadow-sm">
+                +
               </div>
               <div>
-                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">Patient</p>
-                <p className="font-extrabold text-slate-700 mt-0.5">{appointment.patientName}</p>
-                <p className="text-[10px] text-slate-400">{appointment.gender}, {appointment.age} yrs</p>
+                <span className="text-[8px] font-black uppercase tracking-widest text-blue-100 block">INSTATOKEN OFFICIAL</span>
+                <h4 className="text-xs font-black truncate max-w-[220px]">{appointment.hospitalName}</h4>
+                <p className="text-[9px] text-blue-100 font-medium">Kurnool Road, Adoni, Andhra Pradesh</p>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-50">
-              <div className="flex items-start gap-2">
-                <Calendar size={14} className="text-blue-500 shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">Date</p>
-                  <p className="font-semibold text-slate-700">{appointment.date}</p>
+            {/* Paid Pill Badge */}
+            <span className="bg-emerald-600 text-white text-[10px] font-black uppercase px-2.5 py-1 rounded-full flex items-center gap-1 shadow-sm">
+              PAID <CheckCircle2 size={10} className="stroke-[3]" />
+            </span>
+          </div>
+
+          {/* Ticket Body Content */}
+          <div className="p-5">
+            <div className="grid grid-cols-2 gap-4 items-center border-b border-slate-100 pb-5">
+              
+              {/* Left Column: Token #8 & QR Code */}
+              <div className="flex flex-col items-center text-center pr-3 border-r border-slate-100">
+                <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest">YOUR OPD TOKEN</span>
+                <span className="text-6xl font-black text-blue-600 tracking-tight my-1 font-heading">
+                  {appointment.tokenNumber || 8}
+                </span>
+
+                {/* QR Code Container */}
+                <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-2xl my-2 shadow-inner">
+                  <QRCodeSVG 
+                    value={qrPayload}
+                    size={105}
+                    level="M"
+                  />
                 </div>
+                <span className="text-[9px] font-bold text-slate-400">Token ID: ITK-0262</span>
               </div>
-              <div className="flex items-start gap-2">
-                <Clock size={14} className="text-blue-500 shrink-0 mt-0.5" />
+
+              {/* Right Column: Doctor, Patient, Session, Date */}
+              <div className="space-y-3 pl-1">
+                
+                {/* Doctor */}
                 <div>
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">Expected Slot</p>
-                  <p className="font-semibold text-slate-700">{appointment.time}</p>
+                  <span className="text-[9px] font-black text-blue-600 uppercase tracking-wide">DOCTOR</span>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <div className="w-7 h-7 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center font-bold text-xs shrink-0">
+                      <User size={14} />
+                    </div>
+                    <div>
+                      <h5 className="text-xs font-black text-slate-900 leading-tight">{appointment.doctorName}</h5>
+                      <p className="text-[9.5px] text-slate-400 font-semibold">{appointment.departmentName}</p>
+                    </div>
+                  </div>
                 </div>
+
+                {/* Patient */}
+                <div>
+                  <span className="text-[9px] font-black text-blue-600 uppercase tracking-wide">PATIENT</span>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <div className="w-7 h-7 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center font-bold text-xs shrink-0">
+                      <User size={14} />
+                    </div>
+                    <div>
+                      <h5 className="text-xs font-black text-slate-900 leading-tight">{appointment.patientName}</h5>
+                      <p className="text-[9.5px] text-slate-400 font-semibold">{appointment.gender} • {appointment.age} yrs</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Session Card (Green Tint) */}
+                <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-2 flex items-center gap-2">
+                  <Sun size={18} className="text-amber-500 shrink-0" />
+                  <div>
+                    <span className="text-[8px] font-extrabold text-emerald-800 uppercase block">SESSION</span>
+                    <span className="text-[10px] font-black text-emerald-700 block">Morning Session</span>
+                  </div>
+                </div>
+
+                {/* Date Card (Blue Tint) */}
+                <div className="bg-blue-50 border border-blue-100 rounded-xl p-2 flex items-center gap-2">
+                  <Calendar size={18} className="text-blue-600 shrink-0" />
+                  <div>
+                    <span className="text-[8px] font-extrabold text-blue-800 uppercase block">DATE</span>
+                    <span className="text-[10px] font-black text-blue-700 block">17 Jul 2026</span>
+                    <span className="text-[8px] text-slate-500 font-bold">Thursday</span>
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+
+            {/* Doctor Consultation Fee Card (Matching Image 4) */}
+            <div className="mt-4 bg-gradient-to-r from-amber-50/70 to-yellow-50/70 border border-blue-400 rounded-2xl p-4 flex items-center justify-between">
+              <div className="space-y-0.5">
+                <span className="text-[9px] font-black text-blue-800 uppercase tracking-wider flex items-center gap-1">
+                  <CreditCard size={12} className="text-blue-600" /> DOCTOR CONSULTATION FEE
+                </span>
+                <span className="text-3xl font-black text-blue-600 block font-heading">₹{appointment.fee || 800}</span>
+              </div>
+
+              <div className="text-right">
+                <span className="bg-emerald-600 text-white text-[10px] font-black px-3 py-1 rounded-md inline-block uppercase shadow-sm">
+                  PAY AT HOSPITAL
+                </span>
+                <h5 className="text-[10px] font-black text-slate-900 mt-1">PAY AT HOSPITAL</h5>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-50">
-              <div>
-                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">Booking Pass Fee</p>
-                <p className="font-semibold text-slate-700 mt-0.5">₹{appointment.paymentMethod === "ACTIVE_PASS" ? "0.00" : "10.00"} (Paid)</p>
-              </div>
-              <div>
-                <p className="text-[9px] font-bold text-blue-600 uppercase tracking-wide">Consultation Fee</p>
-                <p className="font-extrabold text-blue-600 mt-0.5">₹{appointment.fee.toFixed(2)}</p>
-                <p className="text-[8.5px] text-slate-400 font-extrabold uppercase mt-0.5">Pay at Hospital Cabin</p>
-              </div>
-            </div>
-
-            {/* Waiting estimate banner */}
-            <div className="p-3 bg-emerald-50 rounded-2xl flex items-center justify-between text-emerald-800 font-bold text-[10px]">
-              <span>Estimated Cabin Entry Wait:</span>
-              <span className="text-emerald-700 text-xs font-black">{appointment.estimatedWaitTime} minutes</span>
-            </div>
           </div>
-
+        </div>
         </div>
 
-        {/* Action icons row */}
-        <div className="grid grid-cols-2 gap-3.5 my-6">
+        {/* Right Column (Live Queue CTA, Directions, Instructions & History) */}
+        <div className="md:col-span-6 space-y-4">
+          {/* Quick Contact Action Buttons Row (Matching Image 4) */}
+          <div className="grid grid-cols-3 gap-2.5">
           <button 
+            onClick={() => alert("Calling hospital desk...")}
+            className="bg-white border border-slate-200 rounded-2xl p-3 flex items-center gap-2.5 shadow-2xs hover:border-blue-300 transition-all cursor-pointer"
+          >
+            <div className="w-9 h-9 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center shrink-0">
+              <Phone size={18} />
+            </div>
+            <div className="text-left">
+              <h5 className="text-[11px] font-extrabold text-slate-900 leading-tight">Call Hospital</h5>
+              <p className="text-[9px] text-slate-400 font-medium">Tap to call</p>
+            </div>
+          </button>
+
+          <button 
+            onClick={() => window.open("https://maps.google.com")}
+            className="bg-white border border-slate-200 rounded-2xl p-3 flex items-center gap-2.5 shadow-2xs hover:border-blue-300 transition-all cursor-pointer"
+          >
+            <div className="w-9 h-9 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center shrink-0">
+              <Compass size={18} />
+            </div>
+            <div className="text-left">
+              <h5 className="text-[11px] font-extrabold text-slate-900 leading-tight">Get Directions</h5>
+              <p className="text-[9px] text-slate-400 font-medium">Navigate now</p>
+            </div>
+          </button>
+
+          <button 
+            onClick={() => navigate(`/hospital/${appointment.hospitalId}`)}
+            className="bg-white border border-slate-200 rounded-2xl p-3 flex items-center gap-2.5 shadow-2xs hover:border-blue-300 transition-all cursor-pointer"
+          >
+            <div className="w-9 h-9 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center shrink-0">
+              <Building2 size={18} />
+            </div>
+            <div className="text-left">
+              <h5 className="text-[11px] font-extrabold text-slate-900 leading-tight">View Hospital</h5>
+              <p className="text-[9px] text-slate-400 font-medium">Hospital details</p>
+            </div>
+          </button>
+        </div>
+
+        {/* Important Instructions Card with Hospital Artwork & Audio Validity Note (Matching Image 4) */}
+        <div className="bg-gradient-to-r from-blue-50 to-sky-50 border border-blue-150 rounded-3xl p-4 flex items-center justify-between">
+          <div className="space-y-2 flex-1 pr-2">
+            <h4 className="text-xs font-black text-blue-900 uppercase tracking-wider flex items-center gap-1.5">
+              <AlertCircle size={14} className="text-blue-600" /> IMPORTANT INSTRUCTIONS
+            </h4>
+
+            <ul className="text-[10px] text-slate-700 font-semibold space-y-1 list-disc pl-4 leading-snug">
+              <li>Reach hospital 10–15 minutes before your session.</li>
+              <li>Show QR Code at reception.</li>
+              <li>Consultation fee must be paid at hospital.</li>
+              <li>Carry previous prescriptions and reports.</li>
+              <li className="text-blue-700 font-extrabold">
+                Consultation Fee is valid up to 3 Days (up to 2 Follow-up Visits) as per Hospital Policy.
+              </li>
+            </ul>
+          </div>
+
+          {/* 3D Hospital Artwork Graphic */}
+          <div className="w-24 h-24 bg-white rounded-2xl border border-blue-100 flex flex-col items-center justify-center shadow-md shrink-0">
+            <div className="w-8 h-8 bg-blue-600 text-white font-black text-base rounded-lg flex items-center justify-center shadow-sm">
+              +
+            </div>
+            <div className="w-12 h-8 bg-sky-100 rounded-t-lg mt-2 border-t border-x border-sky-200" />
+          </div>
+        </div>
+
+        {/* TOKEN STATUS 5-Step Timeline (Matching Image 4) */}
+        <div className="bg-white border border-slate-150 rounded-3xl p-4 shadow-2xs">
+          <h4 className="text-[10px] font-black text-slate-700 uppercase tracking-wider mb-4">TOKEN STATUS</h4>
+          
+          <div className="relative flex items-center justify-between px-2">
+            {/* Horizontal Line */}
+            <div className="absolute left-6 right-6 top-3 h-0.5 bg-slate-200 z-0" />
+
+            {[
+              { label: "Token Booked", active: true },
+              { label: "Arrived at Hospital", active: false },
+              { label: "Waiting", active: false },
+              { label: "In Consultation", active: false },
+              { label: "Completed", active: false }
+            ].map((step, idx) => (
+              <div key={idx} className="relative z-10 flex flex-col items-center text-center">
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                  step.active ? 'bg-emerald-500 text-white ring-4 ring-emerald-100' : 'bg-slate-200 text-slate-400'
+                }`}>
+                  {step.active ? '✓' : ''}
+                </div>
+                <span className={`text-[8.5px] font-extrabold mt-1 max-w-[50px] leading-tight ${step.active ? 'text-emerald-700' : 'text-slate-400'}`}>
+                  {step.label}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Action Buttons Grid (4 Buttons) (Matching Image 4) */}
+        <div className="grid grid-cols-2 gap-2.5">
+          <Button 
+            variant="primary" 
+            size="sm" 
             onClick={handleDownload}
-            className="flex items-center justify-center gap-2 py-2.5 px-4 border border-slate-200 hover:border-slate-300 rounded-xl bg-white text-slate-600 text-xs font-semibold hover:bg-slate-50 transition-colors cursor-pointer"
+            className="bg-blue-600 hover:bg-blue-700 py-2.5 text-xs font-extrabold flex items-center justify-center gap-1.5 rounded-xl cursor-pointer"
           >
             <Download size={14} />
-            Download PDF
-          </button>
-          
-          <button 
+            <span>Download Ticket (PDF)</span>
+          </Button>
+
+          <Button 
+            variant="secondary" 
+            size="sm" 
             onClick={handleShare}
-            className="flex items-center justify-center gap-2 py-2.5 px-4 border border-slate-200 hover:border-slate-300 rounded-xl bg-white text-slate-600 text-xs font-semibold hover:bg-slate-50 transition-colors cursor-pointer"
+            className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 py-2.5 text-xs font-extrabold flex items-center justify-center gap-1.5 rounded-xl cursor-pointer"
           >
             <Share2 size={14} />
-            Share Ticket
-          </button>
+            <span>Share Ticket</span>
+          </Button>
+
+          <Button 
+            variant="secondary" 
+            size="sm" 
+            onClick={() => alert("Added to device calendar!")}
+            className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 py-2.5 text-xs font-extrabold flex items-center justify-center gap-1.5 rounded-xl cursor-pointer"
+          >
+            <Calendar size={14} />
+            <span>Add to Calendar</span>
+          </Button>
+
+          <Button 
+            variant="secondary" 
+            size="sm" 
+            onClick={() => navigate('/bookings')}
+            className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 py-2.5 text-xs font-extrabold flex items-center justify-center gap-1.5 rounded-xl cursor-pointer"
+          >
+            <Clock size={14} />
+            <span>View Booking History</span>
+          </Button>
         </div>
 
-      </div>
-
-      {/* Persistent Button Footer */}
-      <div className="px-5 pb-6 space-y-3">
-        <Button 
-          variant="primary" 
-          size="lg" 
-          fullWidth 
-          onClick={() => navigate(`/livestatus/${appointment.id}`)}
-          className="py-3 flex items-center justify-center gap-2 font-bold"
-        >
-          <span>Track Live OPD Queue</span>
-          <ArrowRight size={16} />
-        </Button>
-
+        {/* Live Token Status Green Bar Button (Matching Image 4) */}
         <button 
-          onClick={() => navigate('/')}
-          className="w-full flex items-center justify-center gap-1.5 py-2.5 text-xs text-slate-500 font-bold hover:text-blue-600 transition-colors cursor-pointer"
+          onClick={() => navigate(`/livestatus/${appointment.id}`)}
+          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl p-3 flex items-center justify-between shadow-lg shadow-emerald-600/20 cursor-pointer transition-all"
         >
-          <Home size={14} />
-          Back to Home Page
-        </button>
-      </div>
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-emerald-700 rounded-full flex flex-col items-center justify-center text-[9px] font-black tracking-widest text-emerald-100 animate-pulse">
+              ((•))
+              <span className="text-[7px]">LIVE</span>
+            </div>
+            <div className="text-left">
+              <h5 className="text-xs font-black uppercase tracking-wide">VIEW LIVE TOKEN STATUS</h5>
+              <p className="text-[9.5px] text-emerald-100 font-medium">See current token, waiting time & live updates</p>
+            </div>
+          </div>
 
+          <div className="w-8 h-8 bg-white text-emerald-600 rounded-full flex items-center justify-center shadow-inner shrink-0">
+            <ChevronRight size={18} />
+          </div>
+        </button>
+
+        {/* Security Subtext */}
+        <p className="text-center text-[10px] text-slate-400 font-bold pt-1">
+          🔒 Your booking is secure and confirmed
+        </p>
+
+        </div>
+      </div>
     </div>
   );
 };

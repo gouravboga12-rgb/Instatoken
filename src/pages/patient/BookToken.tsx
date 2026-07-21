@@ -1,40 +1,39 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Button } from '../../components/ui/Button';
-import { Card } from '../../components/ui/Card';
-import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { ArrowLeft, Clock, Check, UserPlus, AlertCircle, Sparkles, Zap } from 'lucide-react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { 
+  ArrowLeft, Calendar as CalendarIcon, Clock, User, Phone, 
+  MapPin, ShieldCheck, Sun, Moon, Ticket, ArrowRight, Zap, Users,
+  ChevronDown, Heart
+} from 'lucide-react';
 
 export const BookToken: React.FC = () => {
   const { hospitalId, doctorId } = useParams<{ hospitalId: string; doctorId: string }>();
-  const { hospitals, user, bookToken } = useApp();
+  const { hospitals, user, bookToken, toggleSaveDoctor } = useApp();
   const navigate = useNavigate();
-  const location = useLocation();
 
-  useEffect(() => {
-    const activePass = user?.subscription && new Date(user.subscription.expiresAt) > new Date();
-    if (!activePass) {
-      navigate(`/plans?redirect=${encodeURIComponent(location.pathname)}`, { replace: true });
-    }
-  }, [user, navigate, location]);
-
-  const hospital = hospitals.find(h => h.id === hospitalId);
-  const doctor = hospital?.doctors.find(d => d.id === doctorId);
+  const hospital = hospitals.find(h => h.id === hospitalId) || hospitals[0];
+  const doctor = hospital?.doctors.find(d => d.id === doctorId) || hospital?.doctors[0];
 
   // States
-  const [selectedDate, setSelectedDate] = useState<string>('');
-  const [selectedSlot, setSelectedSlot] = useState<string>('');
-  const [patientSource, setPatientSource] = useState<'self' | 'family' | 'new'>('self');
-  const [selectedFamilyId, setSelectedFamilyId] = useState<string>('');
+  const [selectedDate, setSelectedDate] = useState<string>('2026-07-17');
+  const [selectedSession, setSelectedSession] = useState<'Morning' | 'Afternoon' | 'Evening' | 'Night'>('Morning');
+
+  const sessionOptions = [
+    { id: 'Morning', title: 'Morning', timing: '10:00 AM - 12:00 PM', icon: <Sun size={20} />, activeClass: 'bg-amber-50/70 border-amber-400', iconBg: 'bg-amber-100 text-amber-600' },
+    { id: 'Afternoon', title: 'Afternoon', timing: '01:00 PM - 04:00 PM', icon: <Sun size={20} className="text-orange-500" />, activeClass: 'bg-orange-50/70 border-orange-400', iconBg: 'bg-orange-100 text-orange-600' },
+    { id: 'Evening', title: 'Evening', timing: '05:00 PM - 09:00 PM', icon: <Moon size={20} />, activeClass: 'bg-blue-50/70 border-blue-500', iconBg: 'bg-blue-100 text-blue-600' },
+    { id: 'Night', title: 'Night', timing: '09:00 PM - 12:00 AM', icon: <Moon size={20} className="text-indigo-600" />, activeClass: 'bg-indigo-50/70 border-indigo-500', iconBg: 'bg-indigo-100 text-indigo-600' }
+  ];
   
   // Patient details form
   const [name, setName] = useState(user?.name || '');
   const [age, setAge] = useState<string>('28');
   const [gender, setGender] = useState<string>('Male');
-  const [phone, setPhone] = useState(user?.phone || '');
-  const [email, setEmail] = useState(user?.email || '');
-  const [address, setAddress] = useState('Koramangala, Bengaluru');
-  const [isExisting, setIsExisting] = useState(true);
+  const [phone, setPhone] = useState(user?.phone || '+91 9876543210');
+  const [place, setPlace] = useState('Vijayawada');
+  const [isExisting, setIsExisting] = useState(false);
   
   const [error, setError] = useState('');
 
@@ -49,106 +48,40 @@ export const BookToken: React.FC = () => {
     );
   }
 
-  // Generate next 5 dates for calendar select
-  const getDates = () => {
-    const dates = [];
-    const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    
-    for (let i = 0; i < 5; i++) {
-      const d = new Date();
-      d.setDate(d.getDate() + i);
-      
-      const dayName = daysOfWeek[d.getDay()];
-      // Check if doctor works on this day (Availability days)
-      const isAvailable = doctor.availability.days.includes(dayName);
+  // Generate date pills (Image 3: Today 17 Jul, Sat 18 Jul, Sun 19 Jul, Mon 20 Jul, Tue 21 Jul)
+  const dateOptions = [
+    { label: 'Today', dayNum: '17', month: 'Jul', dateStr: '2026-07-17' },
+    { label: 'Sat', dayNum: '18', month: 'Jul', dateStr: '2026-07-18' },
+    { label: 'Sun', dayNum: '19', month: 'Jul', dateStr: '2026-07-19' },
+    { label: 'Mon', dayNum: '20', month: 'Jul', dateStr: '2026-07-20' },
+    { label: 'Tue', dayNum: '21', month: 'Jul', dateStr: '2026-07-21' }
+  ];
 
-      dates.push({
-        isoString: d.toISOString().split('T')[0],
-        dayNum: d.getDate(),
-        dayName,
-        monthName: months[d.getMonth()],
-        isAvailable
-      });
-    }
-    return dates;
-  };
-
-  const datesList = getDates();
-
-  // Set initial date if not set
-  if (!selectedDate && datesList.length > 0) {
-    const firstAvailable = datesList.find(d => d.isAvailable);
-    if (firstAvailable) {
-      setSelectedDate(firstAvailable.isoString);
-    }
-  }
-
-  const handleFamilySelect = (memberId: string) => {
-    const member = user?.familyMembers.find(m => m.id === memberId);
-    if (member) {
-      setSelectedFamilyId(memberId);
-      setName(member.name);
-      setAge(member.age.toString());
-      setGender(member.gender);
-      setPhone(user?.phone || '');
-      setEmail(user?.email || '');
-    }
-  };
-
-  const handlePatientTypeChange = (type: 'self' | 'family' | 'new') => {
-    setPatientSource(type);
-    setError('');
-    
-    if (type === 'self' && user) {
-      setName(user.name);
-      setAge('28');
-      setGender('Male');
-      setPhone(user.phone);
-      setEmail(user.email);
-    } else if (type === 'family') {
-      if (user?.familyMembers && user.familyMembers.length > 0) {
-        handleFamilySelect(user.familyMembers[0].id);
-      } else {
-        setName('');
-        setAge('');
-        setGender('Male');
-      }
-    } else {
-      setName('');
-      setAge('');
-      setGender('Male');
-      setPhone('');
-      setEmail('');
-    }
-  };
-
-  const handleProceedToPayment = (e: React.FormEvent) => {
+  const handleProceedToBooking = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    if (!selectedDate) {
-      setError('Please select an appointment date');
+    if (!name.trim()) {
+      setError('Please enter patient name');
       return;
     }
-    if (!selectedSlot) {
-      setError('Please select a time slot');
-      return;
-    }
-    if (!name || !age || !phone || !email) {
-      setError('Please fill in all patient fields');
+    if (!phone.trim()) {
+      setError('Please enter mobile number');
       return;
     }
 
     const patientDetails = {
       name,
-      age: parseInt(age),
+      age: parseInt(age) || 28,
       gender,
       phone,
-      email,
-      address,
+      email: user?.email || 'patient@example.com',
+      address: place,
       isExisting
     };
+
+    const activeSessionObj = sessionOptions.find(s => s.id === selectedSession);
+    const slotTime = activeSessionObj ? `${activeSessionObj.title} (${activeSessionObj.timing})` : '10:00 AM - 12:00 PM';
 
     try {
       const appt = bookToken(
@@ -156,8 +89,8 @@ export const BookToken: React.FC = () => {
         hospital.id,
         doctor.id,
         selectedDate,
-        selectedSlot,
-        "ACTIVE_PASS"
+        slotTime,
+        "PLATFORM_FEE_DIRECT"
       );
       
       import('canvas-confetti').then((confetti) => {
@@ -174,281 +107,354 @@ export const BookToken: React.FC = () => {
     }
   };
 
-  // Calculate live token queue metrics
-  const tokensAhead = Math.max(0, doctor.nextAvailableToken - doctor.currentQueue - 1);
-  const queueTimeEst = tokensAhead * doctor.estimatedWaitPerPatient;
-
   return (
-    <div className="pb-24 bg-slate-50 min-h-screen md:min-h-0 md:bg-transparent md:pb-6 max-w-2xl mx-auto">
+    <div className="pb-24 bg-slate-50 min-h-screen md:min-h-0 md:pb-6 w-full">
       
-      {/* Header */}
-      <div className="sticky top-0 bg-white/95 backdrop-blur-md px-5 py-4 border-b border-slate-100 z-30 flex items-center gap-3">
-        <button 
-          onClick={() => navigate(-1)}
-          className="p-2.5 rounded-xl hover:bg-slate-100 text-slate-600 transition-colors cursor-pointer"
-        >
-          <ArrowLeft size={16} />
-        </button>
-        <h2 className="text-base font-black text-slate-800 tracking-tight font-heading">Configure Booking</h2>
+      {/* Top Header Bar matching Image 3 */}
+      <div className="sticky top-0 bg-white/95 backdrop-blur-md px-5 py-3 border-b border-slate-100 z-30 flex items-center justify-between shadow-2xs md:rounded-2xl md:mb-6">
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={() => navigate(-1)}
+            className="w-9 h-9 rounded-full border border-slate-200 flex items-center justify-center text-blue-600 hover:bg-slate-50 transition-colors cursor-pointer"
+          >
+            <ArrowLeft size={18} />
+          </button>
+          <div>
+            <h2 className="text-base font-black text-slate-900 tracking-tight font-heading">Book Doctor OPD Token</h2>
+            <p className="text-[10px] text-slate-400 font-bold">Quick • Easy • Secure</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1 text-blue-600 bg-blue-50 border border-blue-100 px-2.5 py-1 rounded-full text-[10px] font-extrabold">
+          <ShieldCheck size={14} />
+          <span>100% Guaranteed Spot</span>
+        </div>
       </div>
 
-      <div className="px-5 mt-4">
+      <div className="px-5 mt-4 md:grid md:grid-cols-12 md:gap-8 items-start">
         
-        {/* Doctor Summary Card */}
-        <Card className="flex items-center gap-3.5 mb-5 border-none shadow-xs bg-gradient-to-r from-blue-600 to-sky-600 text-white p-4">
-          <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0 border border-white/20">
-            <img src={doctor.image} alt={doctor.name} className="w-full h-full object-cover" />
+        {/* Left Column (Desktop Only): Doctor Summary Card & Queue Preview */}
+        <div className="md:col-span-5 space-y-4 md:sticky md:top-24 mb-5 md:mb-0">
+          {/* Doctor Summary Card matching Image 3 */}
+          <div className="bg-white border border-slate-150 rounded-3xl p-5 shadow-2xs flex flex-col justify-between space-y-4">
+            <div className="flex items-center gap-3.5">
+              {/* Doctor Avatar Circle */}
+              <div className="w-16 h-16 rounded-full overflow-hidden shrink-0 border-2 border-blue-100 bg-blue-50">
+                <img 
+                  src={doctor.image} 
+                  alt={doctor.name} 
+                  className="w-full h-full object-cover" 
+                  onError={(e) => { (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(doctor.name)}&background=EFF6FF&color=2563EB&size=100&bold=true`; }}
+                />
+              </div>
+              
+              <div className="flex-1 space-y-0.5">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-extrabold text-sm text-slate-900 leading-snug">{doctor.name}</h3>
+                  <button 
+                    onClick={() => toggleSaveDoctor(doctor.id)}
+                    className="p-1 rounded-xl hover:bg-red-50 text-slate-400 transition-colors cursor-pointer"
+                    title={user?.savedDoctors?.includes(doctor.id) ? "Remove from Favourite Doctors" : "Add to Favourite Doctors"}
+                  >
+                    <Heart size={16} className={user?.savedDoctors?.includes(doctor.id) ? "text-red-500 fill-red-500" : "text-slate-400 hover:text-red-400"} />
+                  </button>
+                </div>
+                <p className="text-[11px] text-blue-600 font-extrabold">{doctor.specialty}</p>
+                <p className="text-[10px] text-slate-400 font-medium">{hospital.name}</p>
+
+                {/* Rating & Distance Badges */}
+                <div className="flex items-center gap-2 mt-1.5">
+                  <span className="bg-amber-50 text-amber-700 font-bold text-[9px] px-2 py-0.5 rounded-full flex items-center gap-0.5 border border-amber-100">
+                    ★ {doctor.rating} ({doctor.reviewsCount})
+                  </span>
+                  <span className="bg-blue-50 text-blue-700 font-bold text-[9px] px-2 py-0.5 rounded-full flex items-center gap-0.5 border border-blue-100">
+                    <MapPin size={10} /> {hospital.distance} km away
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Consultation Fee Breakdown */}
+            <div className="flex justify-between items-center border-t border-slate-100 pt-3">
+              <div>
+                <span className="text-[9px] text-slate-400 font-bold uppercase block">OPD Consultation Fee</span>
+                <span className="text-[9.5px] text-slate-500 font-semibold">Payable at clinic cabin</span>
+              </div>
+              <div className="text-right">
+                <span className="text-lg font-black text-slate-900 block">₹{doctor.consultationFee}</span>
+              </div>
+            </div>
           </div>
-          <div>
-            <h3 className="font-extrabold text-sm tracking-tight">{doctor.name}</h3>
-            <p className="text-[10px] text-blue-100 font-medium">{doctor.specialty}</p>
-            <p className="text-[9px] text-white/80 line-clamp-1 mt-0.5">{hospital.name}</p>
+
+          {/* Additional Desktop Banner Card */}
+          <div className="hidden md:block bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl p-5 text-white shadow-md">
+            <h4 className="font-extrabold text-xs tracking-wide uppercase mb-1">Instant OPD Token Features</h4>
+            <ul className="text-[11px] space-y-2 text-blue-50 font-medium mt-3">
+              <li className="flex items-center gap-2">
+                <ShieldCheck size={14} className="text-emerald-300 shrink-0" />
+                <span>Live queue tracking from mobile or desktop</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <ShieldCheck size={14} className="text-emerald-300 shrink-0" />
+                <span>Zero waiting inside crowded hospital halls</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <ShieldCheck size={14} className="text-emerald-300 shrink-0" />
+                <span>Automated SMS & WhatsApp alerts</span>
+              </li>
+            </ul>
           </div>
-        </Card>
+        </div>
+
+        {/* Right Column: Slot & Patient Form */}
+        <div className="md:col-span-7 space-y-5">
 
         {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-xl text-red-600 text-xs flex items-start gap-2">
-            <AlertCircle size={16} className="shrink-0 mt-0.5" />
-            <span>{error}</span>
+          <div className="p-3 bg-red-50 border border-red-100 rounded-xl text-red-600 text-xs font-bold">
+            {error}
           </div>
         )}
 
-        <form onSubmit={handleProceedToPayment} className="space-y-5">
+        <form onSubmit={handleProceedToBooking} className="space-y-5">
           
-          {/* Calendar Picker */}
+          {/* Section 1: Select Date matching Image 3 */}
           <div>
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2.5">Select Appointment Date</label>
+            <div className="flex justify-between items-center mb-2.5">
+              <h4 className="text-xs font-extrabold text-slate-900 flex items-center gap-1.5">
+                <CalendarIcon size={16} className="text-blue-600" />
+                <span>1. Select Date</span>
+              </h4>
+              <button type="button" className="text-xs text-blue-600 font-extrabold hover:underline flex items-center gap-1">
+                <span>View Calendar</span>
+                <CalendarIcon size={12} />
+              </button>
+            </div>
+
+            {/* Horizontal Date Selector Pills */}
             <div className="grid grid-cols-5 gap-2">
-              {datesList.map((dt) => (
-                <button
-                  key={dt.isoString}
-                  type="button"
-                  disabled={!dt.isAvailable}
-                  onClick={() => setSelectedDate(dt.isoString)}
-                  className={`p-2.5 rounded-2xl flex flex-col items-center justify-center border transition-all cursor-pointer ${
-                    !dt.isAvailable 
-                      ? 'bg-slate-100 border-transparent text-slate-300 pointer-events-none' 
-                      : selectedDate === dt.isoString
-                        ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-500/10 scale-105'
-                        : 'bg-white border-slate-100 text-slate-600 hover:border-slate-300'
-                  }`}
-                >
-                  <span className="text-[8px] font-semibold uppercase">{dt.dayName}</span>
-                  <span className="text-sm font-black mt-0.5">{dt.dayNum}</span>
-                  <span className="text-[8px] mt-0.5">{dt.monthName}</span>
-                </button>
-              ))}
+              {dateOptions.map((dt) => {
+                const isActive = selectedDate === dt.dateStr;
+                return (
+                  <button
+                    key={dt.dateStr}
+                    type="button"
+                    onClick={() => setSelectedDate(dt.dateStr)}
+                    className={`py-3 px-2 rounded-2xl flex flex-col items-center justify-center border transition-all cursor-pointer ${
+                      isActive 
+                        ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-500/20 scale-105' 
+                        : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+                    }`}
+                  >
+                    <span className={`text-[10px] font-bold ${isActive ? 'text-white' : 'text-slate-500'}`}>{dt.label}</span>
+                    <span className="text-lg font-black mt-0.5">{dt.dayNum}</span>
+                    <span className={`text-[9px] font-medium ${isActive ? 'text-white/80' : 'text-slate-400'}`}>{dt.month}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          {/* Time Slot Grid */}
+          {/* Section 2: Select Session matching Image 3 */}
           <div>
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2.5">Available Slots</label>
-            <div className="grid grid-cols-4 gap-2">
-              {doctor.availability.slots.map((slot) => (
-                <button
-                  key={slot}
-                  type="button"
-                  onClick={() => setSelectedSlot(slot)}
-                  className={`py-2 text-[10px] font-bold rounded-xl border text-center transition-all cursor-pointer ${
-                    selectedSlot === slot
-                      ? 'bg-slate-800 border-slate-800 text-white'
-                      : 'bg-white border-slate-100 text-slate-600 hover:border-slate-300'
-                  }`}
-                >
-                  {slot}
-                </button>
-              ))}
-            </div>
-          </div>
+            <h4 className="text-xs font-extrabold text-slate-900 flex items-center gap-1.5 mb-2.5">
+              <Clock size={16} className="text-blue-600" />
+              <span>2. Select Session</span>
+            </h4>
 
-          {/* Patient Selector */}
-          <div>
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2.5">Who is the Patient?</label>
-            <div className="flex gap-2 p-1 bg-slate-100 rounded-xl mb-3">
-              <button
-                type="button"
-                onClick={() => handlePatientTypeChange('self')}
-                className={`flex-1 text-center py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${patientSource === 'self' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}
-              >
-                Self
-              </button>
-              <button
-                type="button"
-                onClick={() => handlePatientTypeChange('family')}
-                className={`flex-1 text-center py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${patientSource === 'family' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}
-              >
-                Family Member
-              </button>
-              <button
-                type="button"
-                onClick={() => handlePatientTypeChange('new')}
-                className={`flex-1 text-center py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${patientSource === 'new' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}
-              >
-                Add Details
-              </button>
-            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {sessionOptions.map((s) => {
+                const isActive = selectedSession === s.id;
+                return (
+                  <div 
+                    key={s.id}
+                    onClick={() => setSelectedSession(s.id as any)}
+                    className={`p-3.5 rounded-2xl border-2 transition-all cursor-pointer flex items-center justify-between ${
+                      isActive 
+                        ? s.activeClass + ' shadow-xs' 
+                        : 'bg-white border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className={`w-9 h-9 ${s.iconBg} rounded-xl flex items-center justify-center shrink-0`}>
+                        {s.icon}
+                      </div>
+                      <div>
+                        <h5 className="text-xs font-extrabold text-slate-900">{s.title}</h5>
+                        <p className="text-[9.5px] text-slate-500 font-semibold mt-0.5">{s.timing}</p>
+                      </div>
+                    </div>
 
-            {patientSource === 'family' && (
-              <div className="mb-3">
-                {user?.familyMembers && user.familyMembers.length > 0 ? (
-                  <div className="flex gap-2 overflow-x-auto no-scrollbar py-1">
-                    {user.familyMembers.map((m) => (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => handleFamilySelect(m.id)}
-                        className={`px-3 py-1.5 rounded-xl border text-xs font-semibold shrink-0 cursor-pointer flex items-center gap-1 transition-all ${selectedFamilyId === m.id ? 'bg-blue-50 border-blue-500 text-blue-600' : 'bg-white border-slate-100 text-slate-500'}`}
-                      >
-                        {m.name} ({m.relationship})
-                        {selectedFamilyId === m.id && <Check size={12} />}
-                      </button>
-                    ))}
+                    {/* Radio Circle */}
+                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                      isActive ? 'border-blue-600 bg-blue-600' : 'border-slate-300'
+                    }`}>
+                      {isActive && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                    </div>
                   </div>
-                ) : (
-                  <div className="text-center p-3 bg-white border border-slate-100 rounded-2xl flex flex-col items-center">
-                    <p className="text-[10px] text-slate-400 font-semibold mb-2">No family members registered</p>
-                    <button
-                      type="button"
-                      onClick={() => navigate('/profile')}
-                      className="text-[10px] text-blue-600 font-bold hover:underline flex items-center gap-0.5 cursor-pointer"
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Section 3: Patient Details Form Fields matching Image 3 */}
+          <div>
+            <h4 className="text-xs font-extrabold text-slate-900 flex items-center gap-1.5 mb-2.5">
+              <User size={16} className="text-blue-600" />
+              <span>3. Patient Details</span>
+            </h4>
+
+            <div className="bg-white border border-slate-150 rounded-3xl p-5 shadow-2xs space-y-3.5">
+              
+              {/* Full Name */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-extrabold text-slate-700 uppercase tracking-wide">Full Name</label>
+                <div className="relative">
+                  <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-blue-600" />
+                  <input 
+                    type="text" 
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Enter patient name"
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:bg-white focus:border-blue-600 focus:outline-none transition-all"
+                  />
+                </div>
+              </div>
+
+              {/* Mobile Number */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-extrabold text-slate-700 uppercase tracking-wide">Mobile Number</label>
+                <div className="relative">
+                  <Phone size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-blue-600" />
+                  <input 
+                    type="tel" 
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="Enter 10 digit mobile number"
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:bg-white focus:border-blue-600 focus:outline-none transition-all"
+                  />
+                </div>
+              </div>
+
+              {/* Age & Gender 2-Column Row */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-extrabold text-slate-700 uppercase tracking-wide">Age</label>
+                  <div className="relative">
+                    <CalendarIcon size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-blue-600" />
+                    <input 
+                      type="number" 
+                      value={age}
+                      onChange={(e) => setAge(e.target.value)}
+                      placeholder="Enter age"
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:bg-white focus:border-blue-600 focus:outline-none transition-all"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-extrabold text-slate-700 uppercase tracking-wide">Gender</label>
+                  <div className="relative">
+                    <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-blue-600" />
+                    <select 
+                      value={gender}
+                      onChange={(e) => setGender(e.target.value)}
+                      className="w-full pl-10 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:bg-white focus:border-blue-600 focus:outline-none transition-all appearance-none cursor-pointer"
                     >
-                      <UserPlus size={12} /> Add Family Member
-                    </button>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Other">Other</option>
+                    </select>
+                    <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                   </div>
-                )}
+                </div>
               </div>
-            )}
-          </div>
 
-          {/* Form Fields */}
-          <div className="bg-white border border-slate-100 rounded-3xl p-5 shadow-xs space-y-3.5">
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Patient Name</label>
-              <input 
-                type="text" 
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Full Name"
-                className="w-full px-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
+              {/* Place */}
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Age</label>
+                <label className="text-[10px] font-extrabold text-slate-700 uppercase tracking-wide">Place</label>
+                <div className="relative">
+                  <MapPin size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-blue-600" />
+                  <input 
+                    type="text" 
+                    value={place}
+                    onChange={(e) => setPlace(e.target.value)}
+                    placeholder="Enter your place"
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:bg-white focus:border-blue-600 focus:outline-none transition-all"
+                  />
+                </div>
+              </div>
+
+              {/* Existing Patient Checkbox */}
+              <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
                 <input 
-                  type="number" 
-                  value={age}
-                  onChange={(e) => setAge(e.target.value)}
-                  placeholder="Age"
-                  className="w-full px-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
+                  type="checkbox" 
+                  id="existingPatient"
+                  checked={isExisting}
+                  onChange={(e) => setIsExisting(e.target.checked)}
+                  className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
                 />
+                <label htmlFor="existingPatient" className="text-xs font-bold text-slate-700 cursor-pointer">
+                  Existing Patient? <span className="text-[10px] font-medium text-slate-400">(Visited this hospital before)</span>
+                </label>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Gender</label>
-                <select 
-                  value={gender}
-                  onChange={(e) => setGender(e.target.value)}
-                  className="w-full px-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
-                >
-                  <option value="Male">Male</option>
-                  <option value="Female">Female</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Mobile Number</label>
-                <input 
-                  type="tel" 
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="Mobile number"
-                  className="w-full px-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Email Address</label>
-                <input 
-                  type="email" 
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Email"
-                  className="w-full px-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Patient Address</label>
-              <input 
-                type="text" 
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                placeholder="Full Address"
-                className="w-full px-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
-              />
-            </div>
-
-            {/* Existing Patient Selector */}
-            <div className="flex items-center justify-between pt-2 border-t border-slate-50">
-              <div className="space-y-0.5">
-                <label className="text-xs font-bold text-slate-700">Existing Patient?</label>
-                <p className="text-[9px] text-slate-400">Have you visited this hospital before?</p>
-              </div>
-              <input 
-                type="checkbox" 
-                checked={isExisting}
-                onChange={(e) => setIsExisting(e.target.checked)}
-                className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
-              />
             </div>
           </div>
 
-          {/* Queue Wait Time Analytics Alert */}
-          <div className="p-4 bg-emerald-50/60 border border-emerald-100 rounded-3xl flex gap-3">
-            <Clock className="text-emerald-600 mt-0.5 shrink-0 animate-pulse" size={18} />
-            <div>
-              <p className="text-[10px] font-extrabold uppercase tracking-wide text-emerald-800">Queue Time Indicator</p>
-              <p className="text-[10px] text-emerald-700 leading-relaxed mt-0.5 font-semibold">
-                Token Assigned will be approx. <strong>#{doctor.nextAvailableToken}</strong>. 
-                There are <strong>{tokensAhead} patients</strong> in line before you. Estimated waiting time is <strong>{queueTimeEst} minutes</strong>.
-              </p>
+          {/* Platform Charge Info Note (User Audio Request: ₹10 platform fee paid directly) */}
+          <div className="p-3.5 bg-blue-50 border border-blue-100 rounded-2xl flex items-center justify-between text-xs font-bold text-blue-900">
+            <div className="flex items-center gap-2">
+              <Zap size={16} className="text-blue-600 shrink-0" />
+              <span>Platform Service Fee: ₹10</span>
             </div>
+            <span className="bg-blue-600 text-white text-[9px] font-black px-2 py-0.5 rounded-md">INSTANT TOKEN</span>
           </div>
 
-          {/* Platform Subscription Billing Details */}
-          {user?.subscription && (
-            <div className="p-4 bg-gradient-to-r from-blue-50 to-sky-50 border border-blue-100 rounded-3xl flex items-start gap-3">
-              <Zap className="text-blue-600 shrink-0 mt-0.5" size={18} />
-              <div>
-                <p className="text-[10.5px] font-extrabold uppercase tracking-wide text-blue-800">Active Booking Pass Detected</p>
-                <p className="text-[10px] text-blue-700 leading-normal mt-0.5 font-semibold">
-                  Your <strong>{user.subscription.planName}</strong> is active (expires on {new Date(user.subscription.expiresAt).toLocaleDateString()}). Platform booking fee is fully covered.
-                </p>
-                <p className="text-[9.5px] text-slate-500 mt-1 font-bold">Doctor OPD consultation fee of ₹{doctor.consultationFee} is payable directly at the hospital cabin.</p>
-              </div>
-            </div>
-          )}
-
-          {/* Checkout Submit */}
-          <Button 
-            type="submit" 
-            variant="primary" 
-            size="lg" 
-            fullWidth 
-            className="py-3 mt-4 text-sm font-bold flex items-center justify-center gap-2"
+          {/* Giant Full-Width Pill CTA Button matching Image 3 */}
+          <button 
+            type="submit"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-full p-2.5 flex items-center justify-between shadow-xl shadow-blue-500/25 transition-all cursor-pointer transform hover:scale-[1.01]"
           >
-            <span>Confirm & Generate Token (Free)</span>
-            <Sparkles size={16} />
-          </Button>
+            {/* Left Ticket Circle */}
+            <div className="w-11 h-11 bg-white text-blue-600 rounded-full flex items-center justify-center shrink-0 shadow-inner">
+              <Ticket size={22} />
+            </div>
+
+            {/* Center Text */}
+            <div className="text-center px-2">
+              <h4 className="text-base font-black tracking-tight leading-tight">Book Token</h4>
+              <p className="text-[10px] text-blue-100 font-medium">Get your token in just a few seconds</p>
+            </div>
+
+            {/* Right Arrow Circle */}
+            <div className="w-11 h-11 bg-white text-blue-600 rounded-full flex items-center justify-center shrink-0 shadow-inner">
+              <ArrowRight size={22} />
+            </div>
+          </button>
+
+          {/* Bottom Trust Indicators matching Image 3 */}
+          <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-200/60 text-center">
+            <div className="flex flex-col items-center">
+              <ShieldCheck size={18} className="text-blue-600 mb-1" />
+              <span className="text-[10px] font-extrabold text-slate-800">100% Secure</span>
+              <span className="text-[8px] text-slate-400 font-medium">Your data is safe</span>
+            </div>
+
+            <div className="flex flex-col items-center border-x border-slate-200">
+              <Zap size={18} className="text-blue-600 mb-1" />
+              <span className="text-[10px] font-extrabold text-slate-800">Ultra Fast</span>
+              <span className="text-[8px] text-slate-400 font-medium">Book in 30 seconds</span>
+            </div>
+
+            <div className="flex flex-col items-center">
+              <Users size={18} className="text-blue-600 mb-1" />
+              <span className="text-[10px] font-extrabold text-slate-800">Trusted by 1M+</span>
+              <span className="text-[8px] text-slate-400 font-medium">Happy patients</span>
+            </div>
+          </div>
 
         </form>
+        </div>
 
       </div>
     </div>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
+import { getHospitalSVGImage } from '../../utils/mockData';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Search, MapPin, Clock, Star, ArrowLeft } from 'lucide-react';
@@ -234,7 +235,7 @@ export const SearchHospitals: React.FC<SearchHospitalsProps> = ({
                           src={hosp.image} 
                           alt={hosp.name} 
                           className="w-full h-full object-cover"
-                          onError={(e) => { (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(hosp.name)}&background=DBEAFE&color=2563EB&size=100&bold=true&font-size=0.35`; }}
+                          onError={(e) => { (e.target as HTMLImageElement).src = getHospitalSVGImage(hosp.name); }}
                         />
                       </div>
 

@@ -78,7 +78,7 @@ export const Payment: React.FC = () => {
           if (redirectUrl) {
             navigate(redirectUrl, { replace: true });
           } else {
-            navigate('/plans');
+            navigate('/bookings');
           }
         }
       } catch (err) {
@@ -89,10 +89,10 @@ export const Payment: React.FC = () => {
   };
 
   return (
-    <div className="pb-24 bg-slate-50 min-h-screen md:min-h-0 md:bg-transparent md:pb-6 max-w-2xl mx-auto">
+    <div className="pb-24 bg-slate-50 min-h-screen md:min-h-0 md:pb-6 w-full">
       
       {/* Header */}
-      <div className="sticky top-0 bg-white/95 backdrop-blur-md px-5 py-4 border-b border-slate-100 z-30 flex items-center gap-3">
+      <div className="sticky top-0 bg-white/95 backdrop-blur-md px-5 py-4 border-b border-slate-100 z-30 flex items-center gap-3 md:rounded-2xl md:mb-6">
         <button 
           onClick={() => navigate(-1)}
           className="p-2.5 rounded-xl hover:bg-slate-100 text-slate-600 transition-colors cursor-pointer"
@@ -102,55 +102,59 @@ export const Payment: React.FC = () => {
         <h2 className="text-base font-black text-slate-800 tracking-tight font-heading">Secure Checkout</h2>
       </div>
 
-      <div className="px-5 mt-4">
+      <div className="px-5 mt-4 md:grid md:grid-cols-12 md:gap-8 items-start">
         
-        {/* Billing Invoice Breakdown */}
-        <Card className="p-5 border-none shadow-xs bg-white mb-5">
-          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-3">Billing Summary</h3>
-          
-          <div className="space-y-2 pb-3 border-b border-slate-100 text-xs">
-            <div className="flex justify-between text-slate-700 font-extrabold">
-              <span>Platform Booking Pass: {subPlan.name}</span>
-              <span>₹{basePrice.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between text-slate-500 font-medium">
-              <span>Convenience Charge</span>
-              <span>₹{convenienceFee.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between text-slate-500 font-medium">
-              <span>CGST (9%)</span>
-              <span>₹{cgst.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between text-slate-500 font-medium">
-              <span>SGST (9%)</span>
-              <span>₹{sgst.toFixed(2)}</span>
-            </div>
+        {/* Left Column (Desktop Only Sticky Billing Info) */}
+        <div className="md:col-span-5 space-y-4 md:sticky md:top-24 mb-5 md:mb-0">
+          {/* Billing Invoice Breakdown */}
+          <Card className="p-5 border-none shadow-xs bg-white">
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-3">Billing Summary</h3>
             
-            {patientDetails && fee > 0 && (
-              <div className="flex justify-between text-slate-400 font-bold border-t border-dashed border-slate-100 pt-2 text-[10px]">
-                <span>OPD Consultation Fee (Doctor Cabin)</span>
-                <span className="text-slate-500">₹{fee.toFixed(2)} (Pay at Hospital)</span>
+            <div className="space-y-2 pb-3 border-b border-slate-100 text-xs">
+              <div className="flex justify-between text-slate-700 font-extrabold">
+                <span>Platform Booking Pass: {subPlan.name}</span>
+                <span>₹{basePrice.toFixed(2)}</span>
               </div>
-            )}
-          </div>
+              <div className="flex justify-between text-slate-500 font-medium">
+                <span>Convenience Charge</span>
+                <span>₹{convenienceFee.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-slate-500 font-medium">
+                <span>CGST (9%)</span>
+                <span>₹{cgst.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-slate-500 font-medium">
+                <span>SGST (9%)</span>
+                <span>₹{sgst.toFixed(2)}</span>
+              </div>
+              
+              {patientDetails && fee > 0 && (
+                <div className="flex justify-between text-slate-400 font-bold border-t border-dashed border-slate-100 pt-2 text-[10px]">
+                  <span>OPD Consultation Fee (Doctor Cabin)</span>
+                  <span className="text-slate-500">₹{fee.toFixed(2)} (Pay at Hospital)</span>
+                </div>
+              )}
+            </div>
 
-          <div className="flex justify-between items-center pt-3 font-heading font-black text-sm text-slate-850">
-            <span>Total Payable Amount (Online)</span>
-            <span className="text-blue-600 text-base">₹{totalAmount.toFixed(2)}</span>
-          </div>
-        </Card>
+            <div className="flex justify-between items-center pt-3 font-heading font-black text-sm text-slate-850">
+              <span>Total Payable Amount (Online)</span>
+              <span className="text-blue-600 text-base">₹{totalAmount.toFixed(2)}</span>
+            </div>
+          </Card>
 
-        {/* Secure Transaction Alert */}
-        <div className="flex gap-2.5 bg-blue-50/50 border border-blue-100 p-3 rounded-2xl mb-5 text-[10px] text-slate-500 leading-relaxed">
-          <ShieldCheck size={16} className="text-blue-600 shrink-0 mt-0.5" />
-          <div>
-            <span className="font-extrabold text-blue-700">100% Secure Checkout</span>
-            <p className="mt-0.5">Your payment is encrypted using SSL technology and backed by PCI-DSS protocols.</p>
+          {/* Secure Transaction Alert */}
+          <div className="flex gap-2.5 bg-blue-50/50 border border-blue-100 p-3 rounded-2xl text-[10px] text-slate-500 leading-relaxed">
+            <ShieldCheck size={16} className="text-blue-600 shrink-0 mt-0.5" />
+            <div>
+              <span className="font-extrabold text-blue-700">100% Secure Checkout</span>
+              <p className="mt-0.5">Your payment is encrypted using SSL technology and backed by PCI-DSS protocols.</p>
+            </div>
           </div>
         </div>
 
-        {/* Form Container */}
-        <form onSubmit={handlePaymentSubmit} className="space-y-5">
+        {/* Right Column: Payment Methods Form */}
+        <div className="md:col-span-7">
+          <form onSubmit={handlePaymentSubmit} className="space-y-5">
           
           {/* Payment Method Selector Grid */}
           <div>
@@ -313,6 +317,7 @@ export const Payment: React.FC = () => {
           </Button>
 
         </form>
+        </div>
       </div>
 
       {/* Fullscreen processing modal overlay */}

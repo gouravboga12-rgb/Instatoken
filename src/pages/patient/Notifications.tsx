@@ -38,10 +38,10 @@ export const Notifications: React.FC = () => {
   };
 
   return (
-    <div className="pb-24 bg-slate-50 min-h-screen md:min-h-0 md:bg-transparent md:pb-6 max-w-2xl mx-auto">
+    <div className="pb-24 bg-slate-50 min-h-screen md:min-h-0 md:bg-transparent md:pb-6 max-w-4xl mx-auto">
       
       {/* Header */}
-      <div className="sticky top-0 bg-white/95 backdrop-blur-md px-5 py-4 border-b border-slate-100 z-30 flex items-center justify-between">
+      <div className="sticky top-0 bg-white/95 backdrop-blur-md px-5 py-4 border-b border-slate-100 z-30 flex items-center justify-between md:rounded-2xl md:mb-6">
         <div className="flex items-center gap-3">
           <button 
             onClick={() => navigate('/')}
@@ -49,7 +49,10 @@ export const Notifications: React.FC = () => {
           >
             <ArrowLeft size={16} />
           </button>
-          <h2 className="text-base font-black text-slate-800 tracking-tight font-heading">Notifications</h2>
+          <div>
+            <h2 className="text-base font-black text-slate-800 tracking-tight font-heading">Notifications & Updates</h2>
+            <p className="text-[10px] text-slate-400 font-bold hidden md:block">Real-time alerts on your OPD tokens, wait times & doctor updates</p>
+          </div>
         </div>
         
         {notifications.length > 0 && (
