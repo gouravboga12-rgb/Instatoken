@@ -1,17 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Button } from '../../components/ui/Button';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
   ArrowLeft, Calendar as CalendarIcon, Clock, User, Phone, 
   MapPin, ShieldCheck, Sun, Moon, Ticket, ArrowRight, Zap, Users,
-  ChevronDown, Heart
+  ChevronDown, Heart, Info
 } from 'lucide-react';
 
 export const BookToken: React.FC = () => {
   const { hospitalId, doctorId } = useParams<{ hospitalId: string; doctorId: string }>();
-  const { hospitals, user, bookToken, toggleSaveDoctor } = useApp();
+  const { hospitals, user, toggleSaveDoctor } = useApp();
   const navigate = useNavigate();
+  const patientFormRef = useRef<HTMLDivElement>(null);
 
   const hospital = hospitals.find(h => h.id === hospitalId) || hospitals[0];
   const doctor = hospital?.doctors.find(d => d.id === doctorId) || hospital?.doctors[0];
@@ -37,6 +38,16 @@ export const BookToken: React.FC = () => {
   
   const [error, setError] = useState('');
 
+  // Smooth auto-scroll to patient details form after user views date & session options
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (patientFormRef.current) {
+        patientFormRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 700);
+    return () => clearTimeout(timer);
+  }, []);
+
   if (!hospital || !doctor) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6 bg-white max-w-md mx-auto">
@@ -48,7 +59,7 @@ export const BookToken: React.FC = () => {
     );
   }
 
-  // Generate date pills (Image 3: Today 17 Jul, Sat 18 Jul, Sun 19 Jul, Mon 20 Jul, Tue 21 Jul)
+  // Generate date pills
   const dateOptions = [
     { label: 'Today', dayNum: '17', month: 'Jul', dateStr: '2026-07-17' },
     { label: 'Sat', dayNum: '18', month: 'Jul', dateStr: '2026-07-18' },
@@ -83,28 +94,18 @@ export const BookToken: React.FC = () => {
     const activeSessionObj = sessionOptions.find(s => s.id === selectedSession);
     const slotTime = activeSessionObj ? `${activeSessionObj.title} (${activeSessionObj.timing})` : '10:00 AM - 12:00 PM';
 
-    try {
-      const appt = bookToken(
+    // Navigate to Razorpay/UPI Payment Gateway
+    navigate('/payment', {
+      state: {
         patientDetails,
-        hospital.id,
-        doctor.id,
-        selectedDate,
-        slotTime,
-        "PLATFORM_FEE_DIRECT"
-      );
-      
-      import('canvas-confetti').then((confetti) => {
-        confetti.default({
-          particleCount: 120,
-          spread: 70,
-          origin: { y: 0.6 }
-        });
-      }).catch(() => {});
-
-      navigate(`/confirmation/${appt.id}`);
-    } catch (err) {
-      alert("Booking failed. Please try again.");
-    }
+        hospitalId: hospital.id,
+        doctorId: doctor.id,
+        date: selectedDate,
+        time: slotTime,
+        fee: doctor.consultationFee,
+        subscriptionPlan: { name: "OPD Booking Fee", price: 10, days: 3 }
+      }
+    });
   };
 
   return (
@@ -215,6 +216,12 @@ export const BookToken: React.FC = () => {
           </div>
         )}
 
+        {/* Step Guidance Banner for clear session/date identification & auto-scroll */}
+        <div className="bg-blue-50/90 border border-blue-200 p-3.5 rounded-2xl flex items-center gap-2.5 text-xs text-blue-950 font-bold shadow-2xs">
+          <Info size={18} className="text-blue-600 shrink-0" />
+          <span><b>Step 1:</b> Select your OPD <b>Date</b> & <b>Slot Session</b> below, then complete patient details.</span>
+        </div>
+
         <form onSubmit={handleProceedToBooking} className="space-y-5">
           
           {/* Section 1: Select Date matching Image 3 */}
@@ -297,7 +304,7 @@ export const BookToken: React.FC = () => {
           </div>
 
           {/* Section 3: Patient Details Form Fields matching Image 3 */}
-          <div>
+          <div ref={patientFormRef} className="scroll-mt-24">
             <h4 className="text-xs font-extrabold text-slate-900 flex items-center gap-1.5 mb-2.5">
               <User size={16} className="text-blue-600" />
               <span>3. Patient Details</span>

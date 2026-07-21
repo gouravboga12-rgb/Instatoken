@@ -195,55 +195,72 @@ export const TokenConfirmation: React.FC = () => {
               </div>
             </div>
 
+            {/* Consultation Validity Dates Banner */}
+            <div className="mt-3 bg-emerald-50 border border-emerald-200/80 rounded-2xl p-3 flex items-center justify-between">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 bg-emerald-100 text-emerald-700 rounded-xl flex items-center justify-center shrink-0 font-bold">
+                  <Calendar size={16} />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-[9px] font-black uppercase text-emerald-800 tracking-wide block">CONSULTATION VALIDITY DATES</span>
+                  <span className="text-xs font-black text-slate-900 block truncate">Valid: {appointment.date} — 24 Jul 2026</span>
+                  <span className="text-[9px] font-semibold text-emerald-700 truncate block">Includes 7 Days cabin validity & follow-up</span>
+                </div>
+              </div>
+              <span className="bg-emerald-600 text-white text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider shadow-2xs shrink-0 ml-2">
+                7 DAYS VALID
+              </span>
+            </div>
+
           </div>
         </div>
         </div>
 
         {/* Right Column (Live Queue CTA, Directions, Instructions & History) */}
         <div className="md:col-span-6 space-y-4">
-          {/* Quick Contact Action Buttons Row (Matching Image 4) */}
-          <div className="grid grid-cols-3 gap-2.5">
+          {/* Quick Contact Action Buttons Row - Fully Responsive & Aligned for Mobile/Tab */}
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
           <button 
             onClick={() => alert("Calling hospital desk...")}
-            className="bg-white border border-slate-200 rounded-2xl p-3 flex items-center gap-2.5 shadow-2xs hover:border-blue-300 transition-all cursor-pointer"
+            className="bg-white border border-slate-200 rounded-2xl p-2.5 sm:p-3 flex items-center gap-2 sm:gap-2.5 shadow-2xs hover:border-blue-300 transition-all cursor-pointer min-w-0"
           >
-            <div className="w-9 h-9 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center shrink-0">
-              <Phone size={18} />
+            <div className="w-8 h-8 sm:w-9 sm:h-9 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center shrink-0">
+              <Phone size={16} />
             </div>
-            <div className="text-left">
-              <h5 className="text-[11px] font-extrabold text-slate-900 leading-tight">Call Hospital</h5>
-              <p className="text-[9px] text-slate-400 font-medium">Tap to call</p>
+            <div className="text-left min-w-0">
+              <h5 className="text-[10.5px] sm:text-xs font-extrabold text-slate-900 leading-tight truncate">Call Hospital</h5>
+              <p className="text-[8.5px] sm:text-[9px] text-slate-400 font-medium truncate">Tap to call</p>
             </div>
           </button>
 
           <button 
             onClick={() => window.open("https://maps.google.com")}
-            className="bg-white border border-slate-200 rounded-2xl p-3 flex items-center gap-2.5 shadow-2xs hover:border-blue-300 transition-all cursor-pointer"
+            className="bg-white border border-slate-200 rounded-2xl p-2.5 sm:p-3 flex items-center gap-2 sm:gap-2.5 shadow-2xs hover:border-blue-300 transition-all cursor-pointer min-w-0"
           >
-            <div className="w-9 h-9 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center shrink-0">
-              <Compass size={18} />
+            <div className="w-8 h-8 sm:w-9 sm:h-9 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center shrink-0">
+              <Compass size={16} />
             </div>
-            <div className="text-left">
-              <h5 className="text-[11px] font-extrabold text-slate-900 leading-tight">Get Directions</h5>
-              <p className="text-[9px] text-slate-400 font-medium">Navigate now</p>
+            <div className="text-left min-w-0">
+              <h5 className="text-[10.5px] sm:text-xs font-extrabold text-slate-900 leading-tight truncate">Directions</h5>
+              <p className="text-[8.5px] sm:text-[9px] text-slate-400 font-medium truncate">Navigate</p>
             </div>
           </button>
 
           <button 
             onClick={() => navigate(`/hospital/${appointment.hospitalId}`)}
-            className="bg-white border border-slate-200 rounded-2xl p-3 flex items-center gap-2.5 shadow-2xs hover:border-blue-300 transition-all cursor-pointer"
+            className="bg-white border border-slate-200 rounded-2xl p-2.5 sm:p-3 flex items-center gap-2 sm:gap-2.5 shadow-2xs hover:border-blue-300 transition-all cursor-pointer min-w-0"
           >
-            <div className="w-9 h-9 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center shrink-0">
-              <Building2 size={18} />
+            <div className="w-8 h-8 sm:w-9 sm:h-9 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center shrink-0">
+              <Building2 size={16} />
             </div>
-            <div className="text-left">
-              <h5 className="text-[11px] font-extrabold text-slate-900 leading-tight">View Hospital</h5>
-              <p className="text-[9px] text-slate-400 font-medium">Hospital details</p>
+            <div className="text-left min-w-0">
+              <h5 className="text-[10.5px] sm:text-xs font-extrabold text-slate-900 leading-tight truncate">View Hospital</h5>
+              <p className="text-[8.5px] sm:text-[9px] text-slate-400 font-medium truncate">Details</p>
             </div>
           </button>
         </div>
 
-        {/* Important Instructions Card with Hospital Artwork & Audio Validity Note (Matching Image 4) */}
+        {/* Important Instructions Card with Hospital Artwork & Audio Validity Note */}
         <div className="bg-gradient-to-r from-blue-50 to-sky-50 border border-blue-150 rounded-3xl p-4 flex items-center justify-between">
           <div className="space-y-2 flex-1 pr-2">
             <h4 className="text-xs font-black text-blue-900 uppercase tracking-wider flex items-center gap-1.5">
@@ -253,10 +270,10 @@ export const TokenConfirmation: React.FC = () => {
             <ul className="text-[10px] text-slate-700 font-semibold space-y-1 list-disc pl-4 leading-snug">
               <li>Reach hospital 10–15 minutes before your session.</li>
               <li>Show QR Code at reception.</li>
-              <li>Consultation fee must be paid at hospital.</li>
+              <li>Consultation fee must be paid at hospital cabin.</li>
               <li>Carry previous prescriptions and reports.</li>
               <li className="text-blue-700 font-extrabold">
-                Consultation Fee is valid up to 3 Days (up to 2 Follow-up Visits) as per Hospital Policy.
+                Consultation Fee is valid for 7 Days (up to 2 Follow-up Visits) from booking date.
               </li>
             </ul>
           </div>

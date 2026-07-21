@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
-import { ArrowLeft, AlertTriangle, CheckCircle, Navigation, PhoneCall } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, CheckCircle, Navigation, PhoneCall, Calendar, Building2 } from 'lucide-react';
 
 export const LiveTokenStatus: React.FC = () => {
   const { appointmentId } = useParams<{ appointmentId: string }>();
@@ -169,36 +169,53 @@ export const LiveTokenStatus: React.FC = () => {
           </div>
         )}
 
+        {/* Consultation Validity Notice */}
+        <div className="bg-emerald-50 border border-emerald-150 rounded-2xl p-3 flex items-center justify-between text-xs text-emerald-900 font-bold">
+          <div className="flex items-center gap-2 min-w-0">
+            <Calendar size={15} className="text-emerald-600 shrink-0" />
+            <span className="truncate">Consultation Validity: {appointment.date} — 24 Jul 2026 (7 Days)</span>
+          </div>
+          <span className="bg-emerald-600 text-white text-[9px] font-black px-2 py-0.5 rounded-md uppercase shrink-0">7 DAYS VALID</span>
+        </div>
+
         {/* Hospital contact info / actions footer */}
         <div className="pt-2 space-y-3.5">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
             <a 
               href={`tel:${hospital.contact}`}
-              className="flex items-center justify-center gap-1.5 py-2.5 px-4 border border-slate-200 hover:border-slate-300 rounded-xl bg-white text-slate-600 text-xs font-semibold hover:bg-slate-50 transition-all cursor-pointer"
+              className="flex items-center justify-center gap-1.5 py-2.5 px-3 border border-slate-200 hover:border-slate-300 rounded-2xl bg-white text-slate-700 text-xs font-extrabold hover:bg-slate-50 transition-all cursor-pointer shadow-2xs min-w-0"
             >
-              <PhoneCall size={14} />
-              Call Reception
+              <PhoneCall size={14} className="text-blue-600 shrink-0" />
+              <span className="truncate">Call Reception</span>
             </a>
 
             <a 
               href={`https://www.google.com/maps?q=${hospital.lat},${hospital.lng}`}
               target="_blank"
               rel="noreferrer"
-              className="flex items-center justify-center gap-1.5 py-2.5 px-4 border border-slate-200 hover:border-slate-300 rounded-xl bg-white text-slate-600 text-xs font-semibold hover:bg-slate-50 transition-all cursor-pointer"
+              className="flex items-center justify-center gap-1.5 py-2.5 px-3 border border-slate-200 hover:border-slate-300 rounded-2xl bg-white text-slate-700 text-xs font-extrabold hover:bg-slate-50 transition-all cursor-pointer shadow-2xs min-w-0"
             >
-              <Navigation size={14} />
-              Get Directions
+              <Navigation size={14} className="text-blue-600 shrink-0" />
+              <span className="truncate">Get Directions</span>
             </a>
+
+            <button 
+              onClick={() => navigate(`/hospital/${hospital.id}`)}
+              className="col-span-2 sm:col-span-1 flex items-center justify-center gap-1.5 py-2.5 px-3 border border-slate-200 hover:border-slate-300 rounded-2xl bg-white text-slate-700 text-xs font-extrabold hover:bg-slate-50 transition-all cursor-pointer shadow-2xs min-w-0"
+            >
+              <Building2 size={14} className="text-blue-600 shrink-0" />
+              <span className="truncate">View Hospital</span>
+            </button>
           </div>
 
           <Button 
             variant="outline" 
             size="lg" 
             fullWidth 
-            onClick={() => navigate('/')}
-            className="py-2.5 text-xs text-slate-500 font-bold border-slate-200 rounded-xl cursor-pointer"
+            onClick={() => navigate('/bookings')}
+            className="py-2.5 text-xs text-slate-600 font-extrabold border-slate-200 rounded-2xl cursor-pointer"
           >
-            View Other Bookings
+            View My Bookings
           </Button>
         </div>
 
