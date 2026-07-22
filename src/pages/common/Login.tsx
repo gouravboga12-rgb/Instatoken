@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Button } from '../../components/ui/Button';
 import { useApp } from '../../context/AppContext';
-import { Mail, Phone, Lock, User, Activity, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Mail, Phone, Lock, User, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 interface LoginProps {
   onSuccess: () => void;

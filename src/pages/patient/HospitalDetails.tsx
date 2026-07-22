@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { getHospitalSVGImage } from '../../utils/mockData';
 import { Card } from '../../components/ui/Card';
-import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { 
   ArrowLeft, Star, MapPin, Clock, Heart, Share2, 

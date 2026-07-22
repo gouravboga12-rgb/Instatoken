@@ -9,7 +9,7 @@ import {
   Smile, ShieldAlert, Award, Loader2, FileText,
   Menu, ShoppingBag, BellRing, ShieldCheck, 
   Zap, ChevronDown, Building2, Share2,
-  Users, CheckCircle2, ArrowRight,
+  Users, ArrowRight,
   X, Home as HomeIcon, LogOut
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
