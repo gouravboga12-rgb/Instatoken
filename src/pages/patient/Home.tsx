@@ -788,17 +788,15 @@ export const Home: React.FC<HomeProps> = ({
                       </span>
                     </div>
 
-                    <Button 
-                      variant="primary" 
-                      size="sm"
+                    <button 
                       onClick={(e) => {
                         e.stopPropagation();
                         onHospitalSelect(hosp.id);
                       }}
-                      className="py-1.5 px-4 text-[10px] font-extrabold bg-blue-600 hover:bg-blue-700 rounded-xl cursor-pointer shadow-md shadow-blue-500/10 shrink-0"
+                      className="py-2 px-4 text-[10px] font-extrabold text-white bg-blue-600 hover:bg-blue-700 rounded-xl cursor-pointer shadow-md shadow-blue-500/20 shrink-0 transition-colors flex items-center gap-1.5"
                     >
-                      Book Token
-                    </Button>
+                      Book OPD Token
+                    </button>
                   </div>
 
                   {/* Distance & Timing info at the very bottom */}

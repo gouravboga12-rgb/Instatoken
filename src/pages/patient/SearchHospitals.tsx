@@ -300,7 +300,7 @@ export const SearchHospitals: React.FC<SearchHospitalsProps> = ({
                           e.stopPropagation();
                           onHospitalSelect(hosp.id);
                         }}
-                        className="text-[10px] text-blue-600 font-extrabold hover:underline flex items-center gap-0.5 cursor-pointer"
+                        className="text-[10px] text-white font-extrabold bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded-xl flex items-center gap-1 cursor-pointer shadow-sm shadow-blue-500/20 transition-colors"
                       >
                         Book OPD Token
                       </button>
