@@ -9,12 +9,45 @@ import {
   AlertCircle
 } from 'lucide-react';
 
+const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+export const formatLocalDate = (dateStr: string) => {
+  if (!dateStr) return { formattedDate: '', dayOfWeek: '', validUntilDate: '' };
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    const year = parseInt(parts[0], 10);
+    const monthIdx = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+    const date = new Date(year, monthIdx, day);
+    
+    const formattedDate = `${day} ${months[monthIdx]} ${year}`;
+    const dayOfWeek = weekdays[date.getDay()];
+    
+    // Valid Until: 7 days later
+    const validDate = new Date(year, monthIdx, day + 7);
+    const validUntilDate = `${validDate.getDate()} ${months[validDate.getMonth()]} ${validDate.getFullYear()}`;
+    
+    return {
+      formattedDate,
+      dayOfWeek,
+      validUntilDate
+    };
+  }
+  return {
+    formattedDate: dateStr,
+    dayOfWeek: '',
+    validUntilDate: ''
+  };
+};
+
 export const TokenConfirmation: React.FC = () => {
   const { appointmentId } = useParams<{ appointmentId: string }>();
   const { appointments, addNotification } = useApp();
   const navigate = useNavigate();
 
   const appointment = appointments.find(a => a.id === appointmentId) || appointments[0];
+  const { formattedDate, dayOfWeek, validUntilDate } = formatLocalDate(appointment?.date || '');
 
   if (!appointment) {
     return (
@@ -169,8 +202,8 @@ export const TokenConfirmation: React.FC = () => {
                   <Calendar size={18} className="text-blue-600 shrink-0" />
                   <div>
                     <span className="text-[8px] font-extrabold text-blue-800 uppercase block">DATE</span>
-                    <span className="text-[10px] font-black text-blue-700 block">17 Jul 2026</span>
-                    <span className="text-[8px] text-slate-500 font-bold">Thursday</span>
+                    <span className="text-[10px] font-black text-blue-700 block">{formattedDate}</span>
+                    <span className="text-[8px] text-slate-500 font-bold">{dayOfWeek}</span>
                   </div>
                 </div>
 
@@ -203,7 +236,7 @@ export const TokenConfirmation: React.FC = () => {
                 </div>
                 <div className="min-w-0">
                   <span className="text-[9px] font-black uppercase text-emerald-800 tracking-wide block">CONSULTATION VALIDITY DATES</span>
-                  <span className="text-xs font-black text-slate-900 block truncate">Valid: {appointment.date} — 24 Jul 2026</span>
+                  <span className="text-xs font-black text-slate-900 block truncate">Valid: {formattedDate} — {validUntilDate}</span>
                   <span className="text-[9px] font-semibold text-emerald-700 truncate block">Includes 7 Days cabin validity & follow-up</span>
                 </div>
               </div>

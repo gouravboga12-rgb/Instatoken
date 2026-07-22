@@ -92,6 +92,8 @@ interface AppContextType {
   markNotificationsAsRead: () => void;
   purchaseSubscription: (planName: string, price: number, durationDays: number) => void;
   detectAndSetLocation: () => void;
+  deleteAppointment: (id: string) => void;
+  clearPastHistory: () => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -566,6 +568,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
   };
 
+  const deleteAppointment = (id: string) => {
+    setAppointments(prev => {
+      const updated = prev.filter(appt => appt.id !== id);
+      localStorage.setItem('insta_appointments', JSON.stringify(updated));
+      return updated;
+    });
+    addNotification("History Updated", "Appointment booking was removed.", "info");
+  };
+
+  const clearPastHistory = () => {
+    setAppointments(prev => {
+      const updated = prev.filter(appt => appt.status === 'booked');
+      localStorage.setItem('insta_appointments', JSON.stringify(updated));
+      return updated;
+    });
+    addNotification("History Cleared", "All past booking history has been removed.", "info");
+  };
+
   const purchaseSubscription = (planName: string, price: number, durationDays: number) => {
     if (!user) return;
     const expiresAt = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString();
@@ -666,7 +686,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       clearNotifications,
       markNotificationsAsRead,
       purchaseSubscription,
-      detectAndSetLocation
+      detectAndSetLocation,
+      deleteAppointment,
+      clearPastHistory
     }}>
       {children}
     </AppContext.Provider>

@@ -5,11 +5,11 @@ import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { 
   MapPin, Bell, User, Search, Star, Clock, 
-  ChevronRight, ChevronLeft, Heart, Activity, Stethoscope, Baby, 
-  Smile, ShieldAlert, Award, Loader2,
+  ChevronRight, ChevronLeft, Heart, Activity, Baby, 
+  Smile, ShieldAlert, Award, Loader2, FileText,
   Menu, ShoppingBag, BellRing, ShieldCheck, 
   Zap, ChevronDown, Building2, Share2,
-  Users, CheckCircle2, ArrowRight, Calendar,
+  Users, CheckCircle2, ArrowRight,
   X, Home as HomeIcon, LogOut
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -432,10 +432,8 @@ export const Home: React.FC<HomeProps> = ({
           </button>
 
           <div>
-            <div className="flex items-center gap-1 cursor-pointer" onClick={() => navigate('/')}>
-              <h1 className="text-base font-black text-blue-600 tracking-tight font-heading flex items-center gap-0.5">
-                Insta<span className="inline-flex items-center justify-center bg-blue-600 text-white rounded-full w-4 h-4 text-[10px]">✓</span>Token
-              </h1>
+            <div className="flex items-center cursor-pointer" onClick={() => navigate('/')}>
+              <img src="/logo.png" className="h-7 rounded-lg object-contain shadow-2xs" alt="InstaToken Logo" />
             </div>
 
             {/* Location Selector Pill */}
@@ -670,17 +668,13 @@ export const Home: React.FC<HomeProps> = ({
           );
         })()}
 
-        {/* 4. 8 Quick Action Items Grid (4x2 layout on mobile, 8x1 on desktop) */}
-        <div className="grid grid-cols-4 md:grid-cols-8 gap-3">
+        {/* 4. 4 Quick Action Items Grid */}
+        <div className="grid grid-cols-4 gap-3">
           {[
             { title: "Nearby", sub: "Hospitals", icon: <MapPin className="text-blue-600" size={20} />, bg: "bg-blue-50", filter: "nearby" },
             { title: "Top Rated", sub: "Hospitals", icon: <Star className="text-amber-500 fill-amber-500" size={20} />, bg: "bg-amber-50", filter: "top-rated" },
-            { title: "Quick OPD", sub: "(10 Min)", icon: <Clock className="text-emerald-600" size={20} />, bg: "bg-emerald-50", filter: "short-wait" },
-            { title: "Find Doctor", sub: "By Specialty", icon: <Stethoscope className="text-purple-600" size={20} />, bg: "bg-purple-50", filter: "doctors" },
             { title: "My Tokens", sub: "View Bookings", icon: <Award className="text-blue-600" size={20} />, bg: "bg-blue-50", action: () => navigate('/bookings') },
-            { title: "Appointments", sub: "Upcoming", icon: <Calendar className="text-red-500" size={20} />, bg: "bg-red-50", action: () => navigate('/bookings') },
-            { title: "Emergency", sub: "Care", icon: <ShieldAlert className="text-rose-600" size={20} />, bg: "bg-rose-50", filter: "emergency" },
-            { title: "Health Tips", sub: "Daily Updates", icon: <CheckCircle2 className="text-teal-600" size={20} />, bg: "bg-teal-50", action: () => navigate('/search') }
+            { title: "Health Records", sub: "Medical History", icon: <FileText className="text-teal-600" size={20} />, bg: "bg-teal-50", action: () => navigate('/profile', { state: { openRecords: true } }) }
           ].map((item, idx) => (
             <button
               key={idx}
@@ -744,43 +738,52 @@ export const Home: React.FC<HomeProps> = ({
                 hoverable 
                 padding="none" 
                 onClick={() => onHospitalSelect(hosp.id)}
-                className="overflow-hidden p-4 bg-white border border-slate-150 rounded-3xl shadow-2xs cursor-pointer flex flex-col sm:flex-row items-center gap-4"
+                className="overflow-hidden bg-white border border-slate-150 rounded-3xl shadow-2xs cursor-pointer flex flex-col"
               >
-                <div className="w-full sm:w-36 h-28 rounded-2xl overflow-hidden shrink-0 bg-slate-100">
+                {/* Image Container with Badges Overlay */}
+                <div className="h-44 sm:h-52 w-full relative bg-slate-100">
                   <img 
                     src={hosp.image} 
                     alt={hosp.name} 
                     className="w-full h-full object-cover"
                     onError={(e) => { (e.target as HTMLImageElement).src = getHospitalSVGImage(hosp.name); }}
                   />
-                </div>
-
-                <div className="flex-1 w-full space-y-2">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h4 className="font-extrabold text-slate-900 text-sm flex items-center gap-1">
-                        <span>{hosp.name}</span>
-                        <span className="w-4 h-4 bg-emerald-500 rounded-full text-white text-[9px] font-black inline-flex items-center justify-center">✓</span>
-                      </h4>
-                      <p className="text-[10px] text-slate-400 font-medium mt-0.5">
-                        {hosp.address} • {hosp.distance} km
-                      </p>
-                    </div>
+                  {/* Gradient Overlay for text readability */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-transparent" />
+                  
+                  {/* Top Row: Verified Badge (Left) & Star Rating (Right) */}
+                  <div className="absolute top-3.5 left-3.5 right-3.5 flex justify-between items-center">
+                    <span className="bg-white/95 backdrop-blur-md text-emerald-700 font-extrabold text-[9px] px-2.5 py-1 rounded-full flex items-center gap-1 shadow-sm border border-emerald-50">
+                      <span className="w-3.5 h-3.5 bg-emerald-500 text-white rounded-full text-[8px] font-black inline-flex items-center justify-center">✓</span>
+                      Verified
+                    </span>
                     
-                    <div className="flex items-center gap-0.5 bg-amber-50 border border-amber-100 px-2 py-0.5 rounded-lg text-amber-700 font-extrabold text-[10px]">
-                      <Star size={12} className="fill-amber-500 text-amber-500" />
+                    <span className="bg-black/40 backdrop-blur-md text-white font-extrabold text-[9px] px-2.5 py-1 rounded-full flex items-center gap-1 shadow-sm border border-white/10">
+                      <Star size={10} className="fill-amber-400 text-amber-400" />
                       <span>{hosp.rating}</span>
-                      <span className="text-slate-400 font-normal">({hosp.reviewsCount})</span>
-                    </div>
+                    </span>
                   </div>
 
-                  {/* Badges & CTA Row */}
-                  <div className="flex items-center justify-between pt-2 border-t border-slate-50">
-                    <div className="flex gap-2">
-                      <span className="bg-emerald-50 text-emerald-700 font-extrabold text-[9px] px-2 py-1 rounded-lg border border-emerald-100 flex items-center gap-1">
+                  {/* Bottom Text Overlay: Hospital Name & Address */}
+                  <div className="absolute bottom-3.5 left-3.5 right-3.5 text-white">
+                    <h4 className="font-extrabold text-sm sm:text-base tracking-tight truncate leading-none">
+                      {hosp.name}
+                    </h4>
+                    <p className="text-[10px] text-slate-200 font-medium truncate mt-1.5">
+                      {hosp.address}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Bottom Body Details */}
+                <div className="p-4 space-y-3.5">
+                  {/* Badges and CTA Row */}
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex gap-1.5 flex-wrap">
+                      <span className="bg-emerald-50 text-emerald-700 font-extrabold text-[9px] px-2.5 py-1.5 rounded-xl border border-emerald-100 flex items-center gap-1">
                         <Clock size={10} /> No Waiting
                       </span>
-                      <span className="bg-blue-50 text-blue-700 font-extrabold text-[9px] px-2 py-1 rounded-lg border border-blue-100">
+                      <span className="bg-blue-50 text-blue-700 font-extrabold text-[9px] px-2.5 py-1.5 rounded-xl border border-blue-100">
                         {hosp.category}
                       </span>
                     </div>
@@ -792,10 +795,22 @@ export const Home: React.FC<HomeProps> = ({
                         e.stopPropagation();
                         onHospitalSelect(hosp.id);
                       }}
-                      className="py-1.5 px-4 text-[10px] font-extrabold bg-blue-600 hover:bg-blue-700 rounded-xl cursor-pointer"
+                      className="py-1.5 px-4 text-[10px] font-extrabold bg-blue-600 hover:bg-blue-700 rounded-xl cursor-pointer shadow-md shadow-blue-500/10 shrink-0"
                     >
                       Book Token
                     </Button>
+                  </div>
+
+                  {/* Distance & Timing info at the very bottom */}
+                  <div className="flex items-center gap-3 text-[10px] text-slate-400 font-semibold border-t border-slate-50 pt-2.5">
+                    <span className="flex items-center gap-1">
+                      <MapPin size={12} className="text-slate-400" />
+                      {hosp.distance} km
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Clock size={12} className="text-emerald-500" />
+                      ~15 min travel time
+                    </span>
                   </div>
                 </div>
               </Card>
@@ -821,13 +836,8 @@ export const Home: React.FC<HomeProps> = ({
             <div>
               {/* Header */}
               <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
-                <div className="flex items-center gap-2 cursor-pointer" onClick={() => { setIsMobileMenuOpen(false); navigate('/'); }}>
-                  <div className="bg-blue-600 p-1.5 rounded-xl text-white">
-                    <Activity size={16} />
-                  </div>
-                  <h1 className="text-base font-black text-blue-600 tracking-tight font-heading flex items-center gap-0.5">
-                    Insta<span className="inline-flex items-center justify-center bg-blue-600 text-white rounded-full w-4 h-4 text-[10px]">✓</span>Token
-                  </h1>
+                <div className="flex items-center cursor-pointer" onClick={() => { setIsMobileMenuOpen(false); navigate('/'); }}>
+                  <img src="/logo.png" className="h-8 rounded-lg object-contain" alt="InstaToken Logo" />
                 </div>
 
                 <button 

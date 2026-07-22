@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
@@ -13,6 +13,33 @@ import {
 export const Profile: React.FC = () => {
   const { user, hospitals, logout, addFamilyMember, removeFamilyMember, toggleSaveDoctor } = useApp();
   const navigate = useNavigate();
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  
+  const [isMedicalRecordsOpen, setIsMedicalRecordsOpen] = useState(
+    location.state?.openRecords || searchParams.get('tab') === 'records' || false
+  );
+
+  const openRecordsTrigger = location.state?.openRecords;
+  const tabRecordsTrigger = searchParams.get('tab') === 'records';
+
+  useEffect(() => {
+    if (openRecordsTrigger || tabRecordsTrigger) {
+      setIsMedicalRecordsOpen(true);
+      const newState = { ...location.state };
+      delete newState.openRecords;
+      
+      let newSearch = location.search;
+      if (tabRecordsTrigger) {
+        const tempParams = new URLSearchParams(location.search);
+        tempParams.delete('tab');
+        const searchStr = tempParams.toString();
+        newSearch = searchStr ? `?${searchStr}` : '';
+      }
+      
+      navigate(location.pathname + newSearch, { replace: true, state: newState });
+    }
+  }, [openRecordsTrigger, tabRecordsTrigger, location.search, location.pathname, location.state, navigate]);
 
   const [isAddFamilyOpen, setIsAddFamilyOpen] = useState(false);
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
@@ -186,7 +213,7 @@ export const Profile: React.FC = () => {
 
           {/* Card 3: Medical Records */}
           <button 
-            onClick={() => alert("Medical Records & Prescriptions module loaded.")}
+            onClick={() => setIsMedicalRecordsOpen(true)}
             className="bg-white border border-slate-150 rounded-2xl p-3.5 flex items-center justify-between shadow-2xs hover:border-blue-200 transition-all cursor-pointer text-left"
           >
             <div className="flex items-center gap-3">
@@ -552,6 +579,66 @@ export const Profile: React.FC = () => {
               <p className="text-[10px] mt-1 text-slate-400">Tap the heart icon on any doctor profile to save them here.</p>
             </div>
           )}
+        </div>
+      </Modal>
+
+      {/* Medical Records Modal */}
+      <Modal isOpen={isMedicalRecordsOpen} onClose={() => setIsMedicalRecordsOpen(false)} title="Health Records">
+        <div className="space-y-3.5 py-2 text-left">
+          <div className="flex justify-between items-center bg-blue-50 border border-blue-100 p-3 rounded-2xl">
+            <div>
+              <h4 className="text-xs font-black text-blue-700">Digital Health Vault</h4>
+              <p className="text-[10px] text-blue-600 font-semibold mt-0.5">All prescriptions, lab tests & reports are secured</p>
+            </div>
+            <button 
+              onClick={() => alert("Upload functionality: select file from device.")}
+              className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-black px-3 py-1.5 rounded-xl cursor-pointer shadow-xs transition-colors flex items-center gap-1"
+            >
+              <span>+ Upload</span>
+            </button>
+          </div>
+
+          <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-1">
+            {[
+              { id: "rec-1", name: "General Medicine Prescription", date: "20 Jul 2026", doctor: "Dr. Anil Kumar", hosp: "Apollo Spectra", fileType: "PDF", size: "245 KB" },
+              { id: "rec-2", name: "Cardiology Screening Report", date: "15 Jul 2026", doctor: "Dr. Sarah D'Souza", hosp: "Fortis Hospital", fileType: "PDF", size: "1.2 MB" },
+              { id: "rec-3", name: "Blood Test - Complete Count (CBC)", date: "10 Jun 2026", doctor: "Diagnostic Lab", hosp: "Rainbow Children's Hospital", fileType: "PDF", size: "512 KB" }
+            ].map((rec) => (
+              <div key={rec.id} className="bg-white border border-slate-150 p-3 rounded-2xl flex items-center justify-between gap-3 shadow-3xs hover:border-blue-200 transition-all">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-9 h-9 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center shrink-0 font-black text-[10px]">
+                    {rec.fileType}
+                  </div>
+                  <div className="min-w-0">
+                    <h4 className="font-extrabold text-slate-800 text-xs truncate leading-snug">{rec.name}</h4>
+                    <p className="text-[9.5px] text-slate-400 font-semibold mt-0.5">{rec.doctor} • {rec.date}</p>
+                    <p className="text-[9px] text-blue-600 font-extrabold">{rec.hosp}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1 shrink-0">
+                  <button 
+                    onClick={() => alert(`Opening ${rec.name} (${rec.size})...`)}
+                    className="p-2 text-slate-550 hover:bg-slate-100 rounded-xl cursor-pointer transition-colors text-[10px] font-bold border border-slate-200"
+                    title="View Document"
+                  >
+                    View
+                  </button>
+                  <button 
+                    onClick={() => alert(`Downloading ${rec.name}...`)}
+                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-xl cursor-pointer transition-colors text-[10px] font-bold"
+                    title="Download Document"
+                  >
+                    Download
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="text-center pt-2 text-[9.5px] text-slate-400 font-medium border-t border-slate-100">
+            Secured & Encrypted with 256-bit SSL encryption.
+          </div>
         </div>
       </Modal>
 

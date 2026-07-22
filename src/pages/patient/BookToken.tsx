@@ -1,24 +1,57 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Button } from '../../components/ui/Button';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
   ArrowLeft, Calendar as CalendarIcon, Clock, User, Phone, 
   MapPin, ShieldCheck, Sun, Moon, Ticket, ArrowRight, Zap, Users,
-  ChevronDown, Heart, Info
+  ChevronDown, Heart
 } from 'lucide-react';
+
+const monthsList = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const weekdaysList = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+const getTodayDateStr = () => {
+  const d = new Date();
+  d.setHours(12, 0, 0, 0);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const dateNum = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${dateNum}`;
+};
+
+const generateDynamicDateOptions = () => {
+  const options = [];
+  for (let i = 0; i < 5; i++) {
+    const d = new Date();
+    d.setHours(12, 0, 0, 0);
+    d.setDate(d.getDate() + i);
+    
+    const year = d.getFullYear();
+    const monthVal = String(d.getMonth() + 1).padStart(2, '0');
+    const dateNumVal = String(d.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${monthVal}-${dateNumVal}`;
+    
+    options.push({
+      label: i === 0 ? 'Today' : weekdaysList[d.getDay()],
+      dayNum: String(d.getDate()),
+      month: monthsList[d.getMonth()],
+      dateStr: dateStr
+    });
+  }
+  return options;
+};
 
 export const BookToken: React.FC = () => {
   const { hospitalId, doctorId } = useParams<{ hospitalId: string; doctorId: string }>();
   const { hospitals, user, toggleSaveDoctor } = useApp();
   const navigate = useNavigate();
-  const patientFormRef = useRef<HTMLDivElement>(null);
 
   const hospital = hospitals.find(h => h.id === hospitalId) || hospitals[0];
   const doctor = hospital?.doctors.find(d => d.id === doctorId) || hospital?.doctors[0];
 
   // States
-  const [selectedDate, setSelectedDate] = useState<string>('2026-07-17');
+  const [selectedDate, setSelectedDate] = useState<string>(getTodayDateStr());
   const [selectedSession, setSelectedSession] = useState<'Morning' | 'Afternoon' | 'Evening' | 'Night'>('Morning');
 
   const sessionOptions = [
@@ -35,18 +68,12 @@ export const BookToken: React.FC = () => {
   const [phone, setPhone] = useState(user?.phone || '+91 9876543210');
   const [place, setPlace] = useState('Vijayawada');
   const [isExisting, setIsExisting] = useState(false);
+  const [showRmpFields, setShowRmpFields] = useState(false);
+  const [rmpName, setRmpName] = useState('');
+  const [rmpPhone, setRmpPhone] = useState('');
   
   const [error, setError] = useState('');
 
-  // Smooth auto-scroll to patient details form after user views date & session options
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (patientFormRef.current) {
-        patientFormRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-    }, 700);
-    return () => clearTimeout(timer);
-  }, []);
 
   if (!hospital || !doctor) {
     return (
@@ -60,13 +87,7 @@ export const BookToken: React.FC = () => {
   }
 
   // Generate date pills
-  const dateOptions = [
-    { label: 'Today', dayNum: '17', month: 'Jul', dateStr: '2026-07-17' },
-    { label: 'Sat', dayNum: '18', month: 'Jul', dateStr: '2026-07-18' },
-    { label: 'Sun', dayNum: '19', month: 'Jul', dateStr: '2026-07-19' },
-    { label: 'Mon', dayNum: '20', month: 'Jul', dateStr: '2026-07-20' },
-    { label: 'Tue', dayNum: '21', month: 'Jul', dateStr: '2026-07-21' }
-  ];
+  const dateOptions = useMemo(() => generateDynamicDateOptions(), []);
 
   const handleProceedToBooking = (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,7 +109,8 @@ export const BookToken: React.FC = () => {
       phone,
       email: user?.email || 'patient@example.com',
       address: place,
-      isExisting
+      isExisting,
+      rmpReference: showRmpFields ? { name: rmpName, phone: rmpPhone } : null
     };
 
     const activeSessionObj = sessionOptions.find(s => s.id === selectedSession);
@@ -216,11 +238,6 @@ export const BookToken: React.FC = () => {
           </div>
         )}
 
-        {/* Step Guidance Banner for clear session/date identification & auto-scroll */}
-        <div className="bg-blue-50/90 border border-blue-200 p-3.5 rounded-2xl flex items-center gap-2.5 text-xs text-blue-950 font-bold shadow-2xs">
-          <Info size={18} className="text-blue-600 shrink-0" />
-          <span><b>Step 1:</b> Select your OPD <b>Date</b> & <b>Slot Session</b> below, then complete patient details.</span>
-        </div>
 
         <form onSubmit={handleProceedToBooking} className="space-y-5">
           
@@ -304,7 +321,7 @@ export const BookToken: React.FC = () => {
           </div>
 
           {/* Section 3: Patient Details Form Fields matching Image 3 */}
-          <div ref={patientFormRef} className="scroll-mt-24">
+          <div className="scroll-mt-24">
             <h4 className="text-xs font-extrabold text-slate-900 flex items-center gap-1.5 mb-2.5">
               <User size={16} className="text-blue-600" />
               <span>3. Patient Details</span>
@@ -391,18 +408,62 @@ export const BookToken: React.FC = () => {
                 </div>
               </div>
 
-              {/* Existing Patient Checkbox */}
-              <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
-                <input 
-                  type="checkbox" 
-                  id="existingPatient"
-                  checked={isExisting}
-                  onChange={(e) => setIsExisting(e.target.checked)}
-                  className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
-                />
-                <label htmlFor="existingPatient" className="text-xs font-bold text-slate-700 cursor-pointer">
-                  Existing Patient? <span className="text-[10px] font-medium text-slate-400">(Visited this hospital before)</span>
-                </label>
+              {/* Existing Patient & RMP Reference */}
+              <div className="flex flex-col gap-3 pt-2 border-t border-slate-100">
+                <div className="flex items-center gap-4 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="checkbox" 
+                      id="existingPatient"
+                      checked={isExisting}
+                      onChange={(e) => setIsExisting(e.target.checked)}
+                      className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
+                    />
+                    <label htmlFor="existingPatient" className="text-xs font-bold text-slate-700 cursor-pointer">
+                      Existing Patient? <span className="text-[10px] font-medium text-slate-400">(Visited this hospital before)</span>
+                    </label>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="checkbox" 
+                      id="addRmpReference"
+                      checked={showRmpFields}
+                      onChange={(e) => setShowRmpFields(e.target.checked)}
+                      className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
+                    />
+                    <label htmlFor="addRmpReference" className="text-xs font-bold text-slate-700 cursor-pointer">
+                      + Add RMP Reference
+                    </label>
+                  </div>
+                </div>
+
+                {showRmpFields && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 p-3.5 rounded-2xl border border-slate-150 animate-in fade-in slide-in-from-top-2 duration-200">
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-500 block mb-1 uppercase tracking-wider">RMP Name</label>
+                      <input 
+                        type="text" 
+                        value={rmpName} 
+                        onChange={(e) => setRmpName(e.target.value)}
+                        placeholder="Enter doctor/RMP name"
+                        className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-600 focus:bg-white"
+                        required={showRmpFields}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-500 block mb-1 uppercase tracking-wider">RMP Phone Number</label>
+                      <input 
+                        type="tel" 
+                        value={rmpPhone} 
+                        onChange={(e) => setRmpPhone(e.target.value)}
+                        placeholder="Enter phone number"
+                        className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-600 focus:bg-white"
+                        required={showRmpFields}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
             </div>

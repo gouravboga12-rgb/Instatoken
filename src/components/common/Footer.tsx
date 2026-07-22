@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  Activity, MapPin, Phone, Mail, ShieldCheck, 
+  MapPin, Phone, Mail, ShieldCheck, 
   CheckCircle2 
 } from 'lucide-react';
 
@@ -11,20 +11,13 @@ export const Footer: React.FC = () => {
   return (
     <footer className="hidden md:block bg-slate-900 text-slate-300 mt-16 border-t border-slate-800">
       {/* Main Footer Links */}
-      <div className="w-full px-6 md:px-10 py-14 grid grid-cols-1 md:grid-cols-12 gap-10">
+      <div className="w-full max-w-7xl mx-auto px-6 md:px-10 py-14 grid grid-cols-1 md:grid-cols-12 gap-10">
         
         {/* Brand & Slogan Column */}
         <div className="md:col-span-4 space-y-4">
-          <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
-            <div className="bg-blue-600 p-2 rounded-xl text-white">
-              <Activity size={20} />
-            </div>
-            <div>
-              <h1 className="text-lg font-black text-white tracking-tight leading-none font-heading flex items-center gap-0.5">
-                Insta<span className="inline-flex items-center justify-center bg-blue-600 text-white rounded-full w-4 h-4 text-[10px]">✓</span>Token
-              </h1>
-              <span className="text-[10px] text-slate-400 font-bold mt-0.5 block">Book Your Hospital Token in Minutes</span>
-            </div>
+          <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
+            <img src="/logo.png" className="h-10 rounded-xl object-contain shadow-md" alt="InstaToken Logo" />
+            <span className="text-[10px] text-slate-400 font-bold">Book Your Hospital Token in Minutes</span>
           </div>
 
           <p className="text-xs text-slate-400 leading-relaxed max-w-sm">
@@ -108,8 +101,9 @@ export const Footer: React.FC = () => {
             </div>
             <div className="flex items-center gap-2.5 text-xs text-slate-400 font-semibold">
               <Mail size={16} className="text-blue-400 shrink-0" />
-              <span>support@instatoken.com</span>
+              <span>token.in1999@gmail.com</span>
             </div>
+
           </div>
 
           <p className="text-[11px] text-slate-500 leading-snug">
@@ -121,7 +115,7 @@ export const Footer: React.FC = () => {
 
       {/* Bottom Copyright Strip */}
       <div className="border-t border-slate-800/80 py-6 px-6 md:px-10 text-xs text-slate-500 text-center md:text-left">
-        <div className="w-full flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="w-full max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           <p>© 2026 InstaToken Healthcare Solutions Inc. All rights reserved.</p>
         </div>
       </div>

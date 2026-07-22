@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
+import { formatLocalDate } from './TokenConfirmation';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { ArrowLeft, AlertTriangle, CheckCircle, Navigation, PhoneCall, Calendar, Building2 } from 'lucide-react';
@@ -11,6 +12,7 @@ export const LiveTokenStatus: React.FC = () => {
   const navigate = useNavigate();
 
   const appointment = appointments.find(a => a.id === appointmentId);
+  const { formattedDate, validUntilDate } = formatLocalDate(appointment?.date || '');
 
   // Find doctor and hospital associated with this booking
   const hospital = hospitals.find(h => h.id === appointment?.hospitalId);
@@ -173,7 +175,7 @@ export const LiveTokenStatus: React.FC = () => {
         <div className="bg-emerald-50 border border-emerald-150 rounded-2xl p-3 flex items-center justify-between text-xs text-emerald-900 font-bold">
           <div className="flex items-center gap-2 min-w-0">
             <Calendar size={15} className="text-emerald-600 shrink-0" />
-            <span className="truncate">Consultation Validity: {appointment.date} — 24 Jul 2026 (7 Days)</span>
+            <span className="truncate">Consultation Validity: {formattedDate} — {validUntilDate} (7 Days)</span>
           </div>
           <span className="bg-emerald-600 text-white text-[9px] font-black px-2 py-0.5 rounded-md uppercase shrink-0">7 DAYS VALID</span>
         </div>

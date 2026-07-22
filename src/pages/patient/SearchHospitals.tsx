@@ -226,56 +226,68 @@ export const SearchHospitals: React.FC<SearchHospitalsProps> = ({
                     hoverable 
                     padding="none" 
                     onClick={() => onHospitalSelect(hosp.id)}
-                    className="overflow-hidden flex flex-col justify-between h-full"
+                    className="overflow-hidden bg-white border border-slate-150 rounded-3xl shadow-2xs cursor-pointer flex flex-col justify-between h-full"
                   >
-                    <div className="flex p-4 gap-4">
-                      {/* Left Image */}
-                      <div className="w-20 h-20 rounded-2xl overflow-hidden shrink-0 border border-slate-100 bg-slate-100">
-                        <img 
-                          src={hosp.image} 
-                          alt={hosp.name} 
-                          className="w-full h-full object-cover"
-                          onError={(e) => { (e.target as HTMLImageElement).src = getHospitalSVGImage(hosp.name); }}
-                        />
+                    {/* Image Container with Badges Overlay */}
+                    <div className="h-40 sm:h-44 w-full relative bg-slate-100">
+                      <img 
+                        src={hosp.image} 
+                        alt={hosp.name} 
+                        className="w-full h-full object-cover"
+                        onError={(e) => { (e.target as HTMLImageElement).src = getHospitalSVGImage(hosp.name); }}
+                      />
+                      {/* Gradient Overlay for text readability */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-transparent" />
+                      
+                      {/* Top Row: Verified Badge (Left) & Star Rating (Right) */}
+                      <div className="absolute top-3 left-3 right-3 flex justify-between items-center">
+                        <span className="bg-white/95 backdrop-blur-md text-emerald-700 font-extrabold text-[9px] px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-sm border border-emerald-50">
+                          <span className="w-3 h-3 bg-emerald-500 text-white rounded-full text-[7px] font-black inline-flex items-center justify-center">✓</span>
+                          Verified
+                        </span>
+                        
+                        <span className="bg-black/40 backdrop-blur-md text-white font-extrabold text-[9px] px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-sm border border-white/10">
+                          <Star size={10} className="fill-amber-400 text-amber-400" />
+                          <span>{hosp.rating}</span>
+                        </span>
                       </div>
 
-                      {/* Right Info */}
-                      <div className="flex-1 min-w-0 flex flex-col justify-between">
-                        <div>
-                          <div className="flex items-start justify-between">
-                            <Badge variant="blue" className="text-[9px] px-2 py-0.5 rounded-md">
-                              {hosp.category}
-                            </Badge>
-                            <div className="flex items-center gap-0.5 text-amber-500">
-                              <Star size={12} fill="currentColor" />
-                              <span className="text-xs font-bold text-slate-700">{hosp.rating}</span>
-                            </div>
-                          </div>
-                          <h4 className="font-extrabold text-slate-800 text-sm tracking-tight mt-1 line-clamp-1">
-                            {hosp.name}
-                          </h4>
-                          <p className="text-[10px] text-slate-400 mt-0.5 line-clamp-1 leading-normal">
-                            {hosp.address}
-                          </p>
-                        </div>
+                      {/* Bottom Text Overlay: Hospital Name & Address */}
+                      <div className="absolute bottom-3 left-3 right-3 text-white">
+                        <h4 className="font-extrabold text-sm tracking-tight truncate leading-none">
+                          {hosp.name}
+                        </h4>
+                        <p className="text-[10px] text-slate-200 font-medium truncate mt-1">
+                          {hosp.address}
+                        </p>
+                      </div>
+                    </div>
 
-                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-50">
-                          <div className="flex items-center gap-2.5">
-                            <span className="flex items-center text-[10px] font-medium text-slate-500">
-                              <MapPin size={10} className="text-blue-500 mr-0.5" />
-                              {hosp.distance} km
-                            </span>
-                            <span className="flex items-center text-[10px] font-medium text-slate-500">
-                              <Clock size={10} className="text-emerald-500 mr-0.5" />
-                              {avgWait}m Wait
-                            </span>
-                          </div>
-                          {minFee > 0 && (
-                            <span className="text-slate-700 font-extrabold text-xs">
-                              ₹{minFee}+
-                            </span>
-                          )}
-                        </div>
+                    {/* Bottom Details area */}
+                    <div className="p-3.5 flex-1 flex flex-col justify-between space-y-3">
+                      
+                      {/* Category & Fee badge row */}
+                      <div className="flex items-center justify-between gap-1 flex-wrap">
+                        <span className="bg-blue-50 text-blue-700 font-extrabold text-[9px] px-2 py-0.5 rounded-lg border border-blue-100/50">
+                          {hosp.category}
+                        </span>
+                        {minFee > 0 && (
+                          <span className="text-slate-700 font-extrabold text-xs">
+                            ₹{minFee}+ Fee
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Map Pins and wait timing metrics */}
+                      <div className="flex items-center gap-3 text-[10px] text-slate-400 font-semibold border-t border-slate-50 pt-2 flex-wrap">
+                        <span className="flex items-center gap-1">
+                          <MapPin size={12} className="text-blue-500 shrink-0" />
+                          {hosp.distance} km
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Clock size={12} className="text-emerald-500 shrink-0" />
+                          {avgWait}m wait
+                        </span>
                       </div>
                     </div>
 

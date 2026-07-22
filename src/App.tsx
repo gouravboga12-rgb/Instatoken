@@ -21,7 +21,7 @@ import { HospitalLayout } from './pages/hospital/HospitalLayout';
 import { Footer } from './components/common/Footer';
 import { 
   Home as HomeIcon, Search as SearchIcon, Award, User as UserIcon, 
-  Activity, MapPin, Bell, ChevronDown, Loader2
+  MapPin, Bell, ChevronDown, Loader2
 } from 'lucide-react';
 
 const TopNavbar: React.FC = () => {
@@ -43,18 +43,11 @@ const TopNavbar: React.FC = () => {
 
   return (
     <header className="hidden md:block bg-white border-b border-slate-100 sticky top-0 z-40">
-      <div className="w-full px-6 md:px-10 h-16 flex items-center justify-between">
+      <div className="w-full max-w-7xl mx-auto px-6 md:px-10 h-16 flex items-center justify-between">
         {/* Logo */}
-        <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
-          <div className="bg-blue-600 p-2 rounded-xl text-white">
-            <Activity size={18} />
-          </div>
-          <div>
-            <h1 className="text-base font-black text-blue-600 tracking-tight leading-none font-heading flex items-center gap-0.5">
-              Insta<span className="inline-flex items-center justify-center bg-blue-600 text-white rounded-full w-4 h-4 text-[10px]">✓</span>Token
-            </h1>
-            <span className="text-[9px] text-slate-400 font-bold mt-0.5 block">Book Your Hospital Token in Minutes</span>
-          </div>
+        <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
+          <img src="/logo.png" className="h-9 rounded-xl object-contain shadow-xs" alt="InstaToken Logo" />
+          <span className="text-[10px] text-slate-400 font-bold hidden lg:inline">Book Your Hospital Token in Minutes</span>
         </div>
 
         {/* Nav Links */}
@@ -239,7 +232,7 @@ const AppContent: React.FC = () => {
       {showBottomNav && <TopNavbar />}
 
       {/* Main Page Area Container */}
-      <div className={`flex-grow w-full ${isAdminRoute ? '' : 'w-full px-0 md:px-8 md:mt-6 pb-24 md:pb-6'}`}>
+      <div className={`flex-grow w-full ${isAdminRoute ? '' : 'w-full max-w-7xl mx-auto px-0 md:px-8 md:mt-6 pb-24 md:pb-6'}`}>
         <Routes>
           <Route path="/" element={
             <Home 

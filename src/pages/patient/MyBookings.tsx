@@ -5,10 +5,10 @@ import type { Appointment } from '../../context/AppContext';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
-import { ArrowLeft, Clock, Calendar, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Clock, Calendar, CheckCircle2, XCircle, AlertCircle, Trash2 } from 'lucide-react';
 
 export const MyBookings: React.FC = () => {
-  const { appointments, cancelAppointment } = useApp();
+  const { appointments, cancelAppointment, deleteAppointment, clearPastHistory } = useApp();
   const navigate = useNavigate();
 
   const activeAppts = appointments.filter(a => a.status === 'booked');
@@ -82,19 +82,32 @@ export const MyBookings: React.FC = () => {
         ) : (
           <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-50 text-[9.5px] text-slate-400 font-extrabold uppercase">
             <span>Consultation Fee: ₹{appt.fee} (Pay at Cabin)</span>
-            <span className="flex items-center gap-1 font-bold">
-              {appt.status === 'completed' ? (
-                <>
-                  <CheckCircle2 size={12} className="text-emerald-500" />
-                  Served
-                </>
-              ) : (
-                <>
-                  <XCircle size={12} className="text-red-500" />
-                  Cancelled
-                </>
-              )}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="flex items-center gap-1 font-bold">
+                {appt.status === 'completed' ? (
+                  <>
+                    <CheckCircle2 size={12} className="text-emerald-500" />
+                    Served
+                  </>
+                ) : (
+                  <>
+                    <XCircle size={12} className="text-red-500" />
+                    Cancelled
+                  </>
+                )}
+              </span>
+              <button
+                onClick={() => {
+                  if (window.confirm("Remove this booking from your history?")) {
+                    deleteAppointment(appt.id);
+                  }
+                }}
+                className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
+                title="Delete from history"
+              >
+                <Trash2 size={13} />
+              </button>
+            </div>
           </div>
         )}
       </Card>
@@ -145,7 +158,22 @@ export const MyBookings: React.FC = () => {
 
         {/* Past History Section */}
         <div>
-          <h3 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider mb-3">Past History ({pastAppts.length})</h3>
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider">Past History ({pastAppts.length})</h3>
+            {pastAppts.length > 0 && (
+              <button
+                onClick={() => {
+                  if (window.confirm("Are you sure you want to clear all past booking history? This action cannot be undone.")) {
+                    clearPastHistory();
+                  }
+                }}
+                className="text-[10px] font-extrabold text-red-500 hover:text-red-650 flex items-center gap-1 cursor-pointer hover:underline bg-red-50/50 px-2.5 py-1 rounded-lg border border-red-100/50 transition-colors"
+              >
+                <Trash2 size={11} />
+                <span>Clear All History</span>
+              </button>
+            )}
+          </div>
           {pastAppts.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {pastAppts.map(renderCard)}

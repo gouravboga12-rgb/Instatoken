@@ -6,7 +6,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { 
   ArrowLeft, Star, MapPin, Clock, Heart, Share2, 
-  Phone, CheckCircle, Stethoscope
+  Phone, CheckCircle, Stethoscope, Navigation
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 
@@ -55,7 +55,7 @@ export const HospitalDetails: React.FC<HospitalDetailsProps> = ({ onDoctorSelect
     <div className="pb-24 bg-slate-50 min-h-screen md:bg-transparent md:min-h-0 md:pb-6 w-full">
       
       {/* Sticky Top Bar Header */}
-      <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-100 shadow-2xs md:rounded-2xl md:mb-6">
+      <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-100 shadow-2xs md:rounded-2xl md:mb-6 hidden md:block">
         <div className="flex items-center gap-3 px-4 md:px-6 py-3">
           <button
             onClick={() => navigate(-1)}
@@ -86,69 +86,80 @@ export const HospitalDetails: React.FC<HospitalDetailsProps> = ({ onDoctorSelect
         </div>
       </div>
 
-      <div className="px-5 mt-4 md:grid md:grid-cols-12 md:gap-8 items-start">
-        
-        {/* Left Column (Hospital Photo, Overview & Facilities) */}
-        <div className="md:col-span-5 space-y-4 md:sticky md:top-24 mb-6 md:mb-0">
-          {/* Real Hospital Photo Banner & Gallery */}
-          <div className="bg-white border border-slate-150 rounded-3xl overflow-hidden shadow-2xs">
-            <div className="h-48 sm:h-56 w-full relative bg-slate-100">
-              <img 
-                src={hospital.image} 
-                alt={hospital.name} 
-                className="w-full h-full object-cover"
-                onError={(e) => { (e.target as HTMLImageElement).src = getHospitalSVGImage(hospital.name); }}
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-transparent" />
-              
-              <div className="absolute bottom-4 left-4 right-4 text-white">
-                <Badge variant="blue" className="text-[9px] py-0.5 px-2 rounded-md mb-1 bg-blue-600 border-none font-bold">{hospital.category}</Badge>
+      {/* Real Hospital Photo Banner & Gallery (Always top) */}
+      <div className="px-0 md:px-5 md:mt-4 mb-4">
+        <div className="bg-white border-b border-slate-150 md:border md:rounded-3xl overflow-hidden shadow-2xs rounded-b-3xl">
+          <div className="h-72 sm:h-80 md:h-96 w-full relative bg-slate-100">
+            <img 
+              src={hospital.image} 
+              alt={hospital.name} 
+              className="w-full h-full object-cover"
+              onError={(e) => { (e.target as HTMLImageElement).src = getHospitalSVGImage(hospital.name); }}
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/75 via-transparent to-transparent" />
+            
+            {/* Mobile-only overlay navigation buttons */}
+            <div className="absolute top-4 left-4 right-4 flex items-center justify-between md:hidden">
+              <button 
+                onClick={() => navigate(-1)}
+                className="w-10 h-10 rounded-full bg-white/95 backdrop-blur-md text-slate-800 flex items-center justify-center shadow-lg active:scale-95 transition-all cursor-pointer"
+              >
+                <ArrowLeft size={18} className="stroke-[3]" />
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => toggleSaveHospital(hospital.id)}
+                  className="w-10 h-10 rounded-full bg-white/95 backdrop-blur-md text-slate-800 flex items-center justify-center shadow-lg active:scale-95 transition-all cursor-pointer"
+                >
+                  <Heart size={16} className={isSaved ? "text-red-500 fill-red-500" : "text-slate-700"} />
+                </button>
+                <button 
+                  onClick={handleShare}
+                  className="w-10 h-10 rounded-full bg-white/95 backdrop-blur-md text-slate-800 flex items-center justify-center shadow-lg active:scale-95 transition-all cursor-pointer"
+                >
+                  <Share2 size={16} className="text-slate-700" />
+                </button>
+              </div>
+            </div>
+
+            <div className="absolute bottom-4 left-4 right-4 text-white flex justify-between items-end gap-3">
+              <div>
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-blue-600 text-white mb-1 shadow-2xs">{hospital.category}</span>
                 <h2 className="text-lg sm:text-xl font-black tracking-tight leading-tight">{hospital.name}</h2>
-                <p className="text-xs text-slate-200 mt-0.5 flex items-center gap-1 font-semibold">
+                <p className="text-xs text-slate-200 mt-0.5 flex items-center gap-1.5 flex-wrap font-semibold">
                   <MapPin size={12} className="text-blue-400 shrink-0" />
                   <span>{hospital.address} • {hospital.distance} km</span>
+                  <span className="text-slate-400">•</span>
+                  <span className="text-amber-400 flex items-center gap-0.5 font-bold">
+                    <Star size={12} className="fill-amber-400 text-amber-400" />
+                    <span>{hospital.rating}</span>
+                  </span>
                 </p>
               </div>
+              <a 
+                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(hospital.name + ' ' + hospital.address)}`} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-black px-3 py-2 rounded-xl flex items-center gap-1 shrink-0 shadow-lg border border-blue-400/20 transition-all cursor-pointer hover:scale-105"
+              >
+                <Navigation size={11} className="fill-white text-white" />
+                <span>Navigate</span>
+              </a>
+            </div>
 
-              <div className="absolute top-4 right-4 flex items-center gap-1 bg-white/95 backdrop-blur-md px-2.5 py-1 rounded-xl text-amber-700 font-extrabold text-xs shadow-md">
-                <Star size={14} className="fill-amber-500 text-amber-500" />
-                <span>{hospital.rating}</span>
-              </div>
+            <div className="absolute top-4 right-4 flex items-center gap-1 bg-white/95 backdrop-blur-md px-2.5 py-1 rounded-xl text-amber-700 font-extrabold text-xs shadow-md md:flex hidden">
+              <Star size={14} className="fill-amber-500 text-amber-500" />
+              <span>{hospital.rating}</span>
             </div>
           </div>
-
-          {/* ABOUT HOSPITAL & FACILITIES SECTION */}
-          <Card className="p-5 border-none shadow-2xs bg-white rounded-3xl">
-            <h4 className="text-xs font-black text-slate-800 uppercase tracking-wide mb-2.5">About Hospital</h4>
-            <p className="text-xs text-slate-500 leading-relaxed font-medium">{hospital.about}</p>
-            
-            <div className="border-t border-slate-100 pt-3 mt-3 space-y-1.5 text-xs text-slate-600 font-semibold">
-              <div className="flex items-center gap-2">
-                <Clock size={14} className="text-blue-600 shrink-0" />
-                <span>Timings: {hospital.timings}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Phone size={14} className="text-blue-600 shrink-0" />
-                <span>Contact: {hospital.contact}</span>
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-5 border-none shadow-2xs bg-white rounded-3xl">
-            <h4 className="text-xs font-black text-slate-800 uppercase tracking-wide mb-2.5">Hospital Facilities</h4>
-            <div className="grid grid-cols-2 gap-2 text-xs text-slate-600 font-semibold">
-              {hospital.facilities.map((fac, idx) => (
-                <div key={idx} className="flex items-center gap-1.5">
-                  <CheckCircle size={14} className="text-emerald-500 shrink-0" />
-                  <span>{fac}</span>
-                </div>
-              ))}
-            </div>
-          </Card>
         </div>
+      </div>
 
-        {/* Right Column: Doctors List & Queue Booking Cards */}
-        <div className="md:col-span-7 space-y-4">
+      <div className="px-5 flex flex-col md:grid md:grid-cols-12 md:gap-8 items-start">
+        
+        {/* Right Column: Doctors List & Queue Booking Cards (Mobile: FIRST, Desktop: SECOND) */}
+        <div className="w-full md:col-span-7 space-y-4 order-first md:order-last mb-6 md:mb-0">
           <div className="flex justify-between items-center">
             <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
               <Stethoscope className="text-blue-600" size={18} />
@@ -244,13 +255,55 @@ export const HospitalDetails: React.FC<HospitalDetailsProps> = ({ onDoctorSelect
                 );
               })
             ) : (
-              <div className="text-center py-8 bg-white border border-slate-100 rounded-3xl">
+              <div className="text-center py-8 bg-white border border-slate-150 rounded-3xl">
                 <p className="text-xs font-bold text-slate-400">No doctors listed under this department</p>
               </div>
             )}
           </div>
         </div>
 
+        {/* Left Column (Overview & Facilities) (Mobile: SECOND, Desktop: FIRST) */}
+        <div className="w-full md:col-span-5 space-y-4 md:sticky md:top-24 mb-6 md:mb-0 order-last md:order-first">
+          {/* ABOUT HOSPITAL & FACILITIES SECTION */}
+          <Card className="p-5 border-none shadow-2xs bg-white rounded-3xl">
+            <h4 className="text-xs font-black text-slate-800 uppercase tracking-wide mb-2.5">About Hospital</h4>
+            <p className="text-xs text-slate-500 leading-relaxed font-medium">{hospital.about}</p>
+            
+            <div className="border-t border-slate-100 pt-3 mt-3 space-y-1.5 text-xs text-slate-600 font-semibold">
+              <div className="flex items-center gap-2">
+                <Clock size={14} className="text-blue-600 shrink-0" />
+                <span>Timings: {hospital.timings}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Phone size={14} className="text-blue-600 shrink-0" />
+                <span>Contact: {hospital.contact}</span>
+              </div>
+              <div className="flex items-center gap-2 pt-1 border-t border-slate-50">
+                <Navigation size={14} className="text-blue-600 shrink-0" />
+                <a 
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(hospital.name + ' ' + hospital.address)}`} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-blue-650 hover:underline flex items-center gap-0.5 font-bold"
+                >
+                  Navigate on Google Maps ↗
+                </a>
+              </div>
+            </div>
+          </Card>
+
+          <Card className="p-5 border-none shadow-2xs bg-white rounded-3xl">
+            <h4 className="text-xs font-black text-slate-800 uppercase tracking-wide mb-2.5">Hospital Facilities</h4>
+            <div className="grid grid-cols-2 gap-2 text-xs text-slate-600 font-semibold">
+              {hospital.facilities.map((fac, idx) => (
+                <div key={idx} className="flex items-center gap-1.5">
+                  <CheckCircle size={14} className="text-emerald-500 shrink-0" />
+                  <span>{fac}</span>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
       </div>
     </div>
   );

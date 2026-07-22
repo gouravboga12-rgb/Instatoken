@@ -30,29 +30,17 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish, duration =
   return (
     <div 
       onClick={handleDismiss}
-      className={`fixed inset-0 bg-gradient-to-b from-[#0055FE] via-[#004CF6] to-[#0038CE] flex flex-col justify-between items-center text-white z-50 overflow-hidden cursor-pointer select-none transition-opacity duration-400 ${
+      className={`fixed inset-0 bg-[#2563EB] flex flex-col justify-between items-center text-white z-50 overflow-hidden cursor-pointer select-none transition-opacity duration-400 ${
         fading ? 'opacity-0 pointer-events-none' : 'opacity-100'
       }`}
     >
-      {/* Top Mobile Status Header Mock */}
-      <div className="md:hidden w-full px-6 pt-3 flex justify-between items-center text-xs font-semibold text-white/90">
-        <span>10:47</span>
-        <div className="flex items-center gap-1 text-[10px]">
-          <span>VoLTE</span>
-          <span className="font-bold">5G</span>
-          <span className="border border-white px-1 rounded text-[9px] font-bold">48</span>
-        </div>
-      </div>
-
       {/* Center Logo & Subtitle (Matching reference splash image) */}
       <div className="flex flex-col items-center justify-center my-auto text-center px-4 animate-in fade-in zoom-in-95 duration-500">
-        <div className="flex items-center gap-1 text-4xl md:text-5xl font-black font-heading tracking-tight drop-shadow-md">
-          <span>InstaT</span>
-          <span className="relative inline-flex items-center justify-center w-9 h-9 md:w-11 md:h-11 rounded-full border-2 border-white text-white font-extrabold text-2xl mx-[-2px]">
-            <Check size={24} className="stroke-[3.5] text-white" />
-          </span>
-          <span>ken</span>
-        </div>
+        <img 
+          src="/logo.png" 
+          alt="InstaToken" 
+          className="w-48 md:w-56 h-auto object-contain drop-shadow-xl mb-4"
+        />
 
         {/* Light Glow Line Divider */}
         <div className="w-48 h-[1.5px] bg-gradient-to-r from-transparent via-cyan-300 to-transparent my-4 shadow-[0_0_12px_#38bdf8]" />

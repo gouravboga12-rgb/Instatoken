@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '../../components/ui/Button';
 import { useApp } from '../../context/AppContext';
 import { Mail, Phone, Lock, User, Activity, AlertCircle, CheckCircle2 } from 'lucide-react';
@@ -6,6 +6,16 @@ import { Mail, Phone, Lock, User, Activity, AlertCircle, CheckCircle2 } from 'lu
 interface LoginProps {
   onSuccess: () => void;
 }
+
+const specializations = [
+  { name: "Cardiology", image: "/cardiology.png" },
+  { name: "Dermatology", image: "/dermatology.png" },
+  { name: "Orthopedics", image: "/orthopedics.png" },
+  { name: "Pediatrics", image: "/pediatrics.png" },
+  { name: "Dentistry", image: "/dentistry.png" },
+  { name: "Neurology", image: "/neurology.png" },
+  { name: "Ophthalmology", image: "/ophthalmology.png" },
+];
 
 export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
   const { login, signup } = useApp();
@@ -19,6 +29,8 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,66 +85,159 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 md:p-8">
+    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row md:items-center md:justify-center p-0 md:p-8">
       {/* Split visual layout card for desktop */}
-      <div className="w-full max-w-md md:max-w-4xl bg-white rounded-3xl shadow-2xl border border-slate-100/80 overflow-hidden md:grid md:grid-cols-12 md:h-[600px]">
+      <div className="w-full max-w-md md:max-w-4xl bg-white md:rounded-3xl shadow-none md:shadow-2xl border-0 md:border border-slate-100/80 md:overflow-hidden md:grid md:grid-cols-12 md:min-h-[640px]">
         
         {/* Left Side Graphic Panel (Desktop only, col-span-5) */}
-        <div className="hidden md:flex md:col-span-5 bg-gradient-to-tr from-blue-600 to-sky-500 flex-col justify-between p-8 text-white relative">
-          {/* Decorative ambient blobs */}
-          <div className="absolute top-[-50px] left-[-50px] w-48 h-48 bg-white/10 rounded-full blur-2xl" />
-          <div className="absolute bottom-[-50px] right-[-50px] w-48 h-48 bg-white/10 rounded-full blur-2xl" />
-
-          {/* Branding logo */}
-          <div className="flex items-center gap-2 z-10">
-            <div className="bg-white p-1.5 rounded-xl flex items-center justify-center text-blue-600 shadow-sm">
-              <Activity size={20} />
+        <div className="hidden md:flex md:col-span-5 bg-gradient-to-b from-blue-50 to-slate-50 flex-col justify-between overflow-hidden border-r border-slate-100 pb-8">
+          {/* Header block with hospital backdrop */}
+          <div 
+            className="relative bg-cover bg-center text-white flex flex-col justify-between p-6 h-[220px]"
+            style={{ backgroundImage: `linear-gradient(to bottom, rgba(37, 99, 235, 0.95), rgba(29, 78, 216, 0.90)), url('https://images.unsplash.com/photo-1587351021759-3e566b6af7cc?w=600&q=80')` }}
+          >
+            <div className="absolute top-[-50px] left-[-50px] w-36 h-36 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+            <div className="flex items-center justify-between w-full z-10">
+              <img src="/logo.png" className="h-8 object-contain" alt="InstaToken logo" />
             </div>
-            <span className="font-heading font-black text-lg tracking-tight">InstaToken</span>
+            <div className="z-10">
+              <h2 className="text-lg font-black tracking-tight text-white/95">InstaToken</h2>
+              <p className="text-[10px] text-blue-100 font-bold">Book Your Hospital Token in Minutes</p>
+            </div>
           </div>
 
-          {/* Main Visual Callout */}
-          <div className="z-10 space-y-4">
-            <h2 className="text-2xl font-black font-heading leading-tight tracking-tight">Skip the waiting line. Save the time.</h2>
-            <p className="text-blue-100 text-xs leading-relaxed">Book digital OPD tokens at top clinics and hospitals near you. Monitor queues live on your screen and walk in just in time for your checkup.</p>
-            
-            <div className="space-y-2 pt-2 text-xs font-semibold">
-              <div className="flex items-center gap-2 text-blue-50">
-                <CheckCircle2 size={14} className="text-white" />
+          {/* Overlapping Carousel of Specialties */}
+          <div className="-mt-8 relative z-10 px-4 pointer-events-none">
+            <div className="w-full overflow-hidden bg-white/90 backdrop-blur-md rounded-2xl p-3 border border-slate-100 shadow-lg">
+              <div className="relative w-full overflow-hidden py-1">
+                {/* Style tag for marquee animation */}
+                <style>{`
+                  @keyframes marquee-desktop {
+                    0% { transform: translateX(0); }
+                    100% { transform: translateX(-616px); }
+                  }
+                  .animate-marquee-desktop {
+                    display: flex;
+                    gap: 16px;
+                    animation: marquee-desktop 25s linear infinite;
+                  }
+                  .animate-marquee-desktop:hover {
+                    animation-play-state: paused;
+                  }
+                `}</style>
+                <div className="animate-marquee-desktop">
+                  {/* Duplicated list to create infinite marquee effect without empty spaces */}
+                  {[...specializations, ...specializations].map((spec, index) => (
+                    <div 
+                      key={index}
+                      className="flex-shrink-0 flex flex-col items-center w-[72px] text-center"
+                    >
+                      <div className="w-[72px] h-[72px] rounded-2xl overflow-hidden shadow-sm border border-slate-100 hover:scale-105 transition-all duration-300">
+                        <img src={spec.image} alt={spec.name} className="w-full h-full object-cover" />
+                      </div>
+                      <span className="text-[10px] font-black text-slate-700 tracking-tight mt-1.5 block truncate w-full">{spec.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Feature Bullet points inside the panel */}
+          <div className="px-6 space-y-3 mt-4">
+            <h3 className="text-[11px] font-black text-slate-800 uppercase tracking-wider">Features included:</h3>
+            <div className="space-y-2 text-xs font-semibold text-slate-600">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 size={14} className="text-blue-600" />
                 <span>Real-Time Queue Countdown</span>
               </div>
-              <div className="flex items-center gap-2 text-blue-50">
-                <CheckCircle2 size={14} className="text-white" />
+              <div className="flex items-center gap-2">
+                <CheckCircle2 size={14} className="text-blue-600" />
                 <span>Instant Digital Token Generation</span>
               </div>
-              <div className="flex items-center gap-2 text-blue-50">
-                <CheckCircle2 size={14} className="text-white" />
+              <div className="flex items-center gap-2">
+                <CheckCircle2 size={14} className="text-blue-600" />
                 <span>Secure UPI & Card Merchant Payments</span>
               </div>
             </div>
           </div>
 
-          <span className="text-[10px] text-blue-100 z-10 font-mono tracking-wider">v1.2.0-STABLE</span>
+          {/* Footer Info */}
+          <div className="px-6 flex justify-between items-center text-[9px] text-slate-400 font-mono tracking-wider">
+            <span>v1.2.0-STABLE</span>
+            <span>SECURE CHECKOUT</span>
+          </div>
         </div>
 
         {/* Right Side Login form card (Col-span-7) */}
-        <div className="md:col-span-7 p-6 md:p-10 flex flex-col justify-center bg-white">
-          <div className="w-full">
-            {/* Logo header (mobile only) */}
-            <div className="flex flex-col items-center mb-6 md:hidden">
-              <div className="bg-blue-600 p-3.5 rounded-2xl shadow-lg shadow-blue-500/20 mb-3 flex items-center justify-center">
-                <Activity size={28} className="text-white" />
+        <div className="md:col-span-7 p-0 md:p-10 flex flex-col justify-center bg-white md:overflow-y-auto">
+          {/* Top visual graphic header (mobile only) */}
+          <div className="md:hidden w-full flex flex-col bg-white pb-6">
+            <div 
+              className="relative bg-cover bg-center text-white flex flex-col justify-between p-5 h-[200px]"
+              style={{ backgroundImage: `linear-gradient(to bottom, rgba(37, 99, 235, 0.95), rgba(29, 78, 216, 0.90)), url('https://images.unsplash.com/photo-1587351021759-3e566b6af7cc?w=600&q=80')` }}
+            >
+              <div className="absolute top-[-50px] left-[-50px] w-28 h-28 bg-white/10 rounded-full blur-xl pointer-events-none" />
+              <div className="flex items-center justify-between w-full z-10">
+                <img src="/logo.png" className="h-7 object-contain" alt="InstaToken logo" />
               </div>
-              <h2 className="text-xl font-black text-slate-800 tracking-tight font-heading">InstaToken</h2>
-              <p className="text-slate-400 text-xs mt-1">Skip the Line. Save the Time.</p>
+              <div className="z-10 pb-6">
+                <h2 className="text-base font-black tracking-tight text-white">InstaToken</h2>
+                <p className="text-[9px] text-blue-100 font-semibold">Book Your Hospital Token in Minutes</p>
+              </div>
             </div>
 
+            {/* Overlapping Carousel of Specialties */}
+            <div className="-mt-7 relative z-10 px-4 pointer-events-none">
+              <div className="w-full overflow-hidden bg-white/95 backdrop-blur-md rounded-2xl p-2.5 border border-slate-100 shadow-md">
+                <div className="relative w-full overflow-hidden py-0.5">
+                  <style>{`
+                    @keyframes marquee-mobile {
+                      0% { transform: translateX(0); }
+                      100% { transform: translateX(-532px); }
+                    }
+                    .animate-marquee-mobile {
+                      display: flex;
+                      gap: 12px;
+                      animation: marquee-mobile 20s linear infinite;
+                    }
+                  `}</style>
+                  <div className="animate-marquee-mobile">
+                    {/* Duplicated list to create infinite marquee effect without empty spaces */}
+                    {[...specializations, ...specializations].map((spec, index) => (
+                      <div 
+                        key={index}
+                        className="flex-shrink-0 flex flex-col items-center w-[64px] text-center"
+                      >
+                        <div className="w-[64px] h-[64px] rounded-xl overflow-hidden shadow-xs border border-slate-100">
+                          <img src={spec.image} alt={spec.name} className="w-full h-full object-cover" />
+                        </div>
+                        <span className="text-[9px] font-black text-slate-700 tracking-tight mt-1 block truncate w-full">{spec.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-6 md:p-0">
             {/* Desktop form title */}
             <div className="hidden md:block mb-6">
               <h3 className="text-xl font-black text-slate-800 tracking-tight font-heading">
                 {mode === 'login' ? 'Sign In to Account' : mode === 'otp' ? 'Login with OTP' : 'Register Patient'}
               </h3>
               <p className="text-slate-400 text-xs mt-1">Access appointments, book OPD tokens and view live statuses.</p>
+            </div>
+
+            {/* Mobile form title */}
+            <div className="md:hidden text-center mb-5">
+              <h3 className="text-base font-black text-slate-800 tracking-tight font-heading">
+                {mode === 'login' ? 'Log in or Sign up' : mode === 'otp' ? 'Login with OTP' : 'Register Patient'}
+              </h3>
+              <p className="text-slate-400 text-[10px] mt-0.5">
+                {mode === 'login' ? 'Enter credentials to continue' : 'Access your appointments pass'}
+              </p>
             </div>
 
             {error && (
@@ -360,6 +465,18 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
               )}
             </div>
 
+            {/* Terms & secure info block */}
+            <div className="mt-6 space-y-2.5 text-center">
+              <div className="flex items-center justify-center gap-2 text-[10px] text-slate-400 font-semibold">
+                <input type="checkbox" defaultChecked className="rounded border-slate-250 text-blue-600 focus:ring-blue-500 h-3 w-3" />
+                <span>I agree to the <span className="text-blue-600 underline cursor-pointer">Terms & Privacy Policy</span></span>
+              </div>
+              <div className="flex items-center justify-center gap-1.5 text-[10px] text-slate-400 font-bold">
+                <CheckCircle2 size={12} className="text-emerald-500 shrink-0" />
+                <span>Your data is encrypted and securely protected</span>
+              </div>
+            </div>
+
             {/* Demo buttons */}
             <div className="mt-6 p-3 bg-blue-50/50 border border-blue-100 rounded-2xl flex gap-2 justify-between">
               <button 
@@ -385,3 +502,4 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
     </div>
   );
 };
+
