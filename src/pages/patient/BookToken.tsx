@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Button } from '../../components/ui/Button';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -18,6 +18,27 @@ const getTodayDateStr = () => {
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const dateNum = String(d.getDate()).padStart(2, '0');
   return `${year}-${month}-${dateNum}`;
+};
+
+const formatDateOption = (dateStr: string) => {
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    const year = parseInt(parts[0], 10);
+    const monthIdx = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+    const d = new Date(year, monthIdx, day);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const isToday = d.toDateString() === today.toDateString();
+
+    return {
+      label: isToday ? 'Today' : weekdaysList[d.getDay()],
+      dayNum: String(day),
+      month: monthsList[monthIdx],
+      dateStr: dateStr
+    };
+  }
+  return null;
 };
 
 const generateDynamicDateOptions = () => {
@@ -52,13 +73,11 @@ export const BookToken: React.FC = () => {
 
   // States
   const [selectedDate, setSelectedDate] = useState<string>(getTodayDateStr());
-  const [selectedSession, setSelectedSession] = useState<'Morning' | 'Afternoon' | 'Evening' | 'Night'>('Morning');
+  const [selectedSession, setSelectedSession] = useState<'Morning' | 'Evening'>('Morning');
 
   const sessionOptions = [
-    { id: 'Morning', title: 'Morning', timing: '10:00 AM - 12:00 PM', icon: <Sun size={20} />, activeClass: 'bg-amber-50/70 border-amber-400', iconBg: 'bg-amber-100 text-amber-600' },
-    { id: 'Afternoon', title: 'Afternoon', timing: '01:00 PM - 04:00 PM', icon: <Sun size={20} className="text-orange-500" />, activeClass: 'bg-orange-50/70 border-orange-400', iconBg: 'bg-orange-100 text-orange-600' },
-    { id: 'Evening', title: 'Evening', timing: '05:00 PM - 09:00 PM', icon: <Moon size={20} />, activeClass: 'bg-blue-50/70 border-blue-500', iconBg: 'bg-blue-100 text-blue-600' },
-    { id: 'Night', title: 'Night', timing: '09:00 PM - 12:00 AM', icon: <Moon size={20} className="text-indigo-600" />, activeClass: 'bg-indigo-50/70 border-indigo-500', iconBg: 'bg-indigo-100 text-indigo-600' }
+    { id: 'Morning', title: 'Morning', timing: '10:00 AM - 04:00 PM', icon: <Sun size={20} />, activeClass: 'bg-amber-50/70 border-amber-400', iconBg: 'bg-amber-100 text-amber-600' },
+    { id: 'Evening', title: 'Evening', timing: '05:00 PM - 10:00 PM', icon: <Moon size={20} />, activeClass: 'bg-blue-50/70 border-blue-500', iconBg: 'bg-blue-100 text-blue-600' }
   ];
   
   // Patient details form
@@ -86,8 +105,30 @@ export const BookToken: React.FC = () => {
     );
   }
 
-  // Generate date pills
-  const dateOptions = useMemo(() => generateDynamicDateOptions(), []);
+  const dateInputRef = useRef<HTMLInputElement>(null);
+
+  // Generate date pills dynamically including custom selected date
+  const dateOptions = useMemo(() => {
+    const basePills = generateDynamicDateOptions();
+    const exists = basePills.some(p => p.dateStr === selectedDate);
+    if (!exists && selectedDate) {
+      const customPill = formatDateOption(selectedDate);
+      if (customPill) {
+        return [...basePills.slice(0, 4), customPill];
+      }
+    }
+    return basePills;
+  }, [selectedDate]);
+
+  const handleOpenCalendar = () => {
+    if (dateInputRef.current) {
+      if ('showPicker' in dateInputRef.current && typeof dateInputRef.current.showPicker === 'function') {
+        dateInputRef.current.showPicker();
+      } else {
+        dateInputRef.current.focus();
+      }
+    }
+  };
 
   const handleProceedToBooking = (e: React.FormEvent) => {
     e.preventDefault();
@@ -248,10 +289,28 @@ export const BookToken: React.FC = () => {
                 <CalendarIcon size={16} className="text-blue-600" />
                 <span>1. Select Date</span>
               </h4>
-              <button type="button" className="text-xs text-blue-600 font-extrabold hover:underline flex items-center gap-1">
-                <span>View Calendar</span>
-                <CalendarIcon size={12} />
-              </button>
+              <div className="relative">
+                <button 
+                  type="button" 
+                  onClick={handleOpenCalendar}
+                  className="text-xs text-blue-600 font-extrabold hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  <span>View Calendar</span>
+                  <CalendarIcon size={12} />
+                </button>
+                <input 
+                  ref={dateInputRef}
+                  type="date"
+                  min={getTodayDateStr()}
+                  value={selectedDate}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      setSelectedDate(e.target.value);
+                    }
+                  }}
+                  className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                />
+              </div>
             </div>
 
             {/* Horizontal Date Selector Pills */}

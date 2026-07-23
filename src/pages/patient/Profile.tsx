@@ -4,9 +4,9 @@ import { useApp } from '../../context/AppContext';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { 
-  Bell, Settings, Camera, Edit2, Calendar, Users, 
-  FileText, Headphones, Heart, User, MapPin, CreditCard, 
-  Globe, Info, Shield, Trash2, LogOut, ChevronRight,
+  Bell, Settings, Camera, Edit2, Calendar,
+  FileText, Heart, User,
+  Shield, Trash2, LogOut, ChevronRight,
   ArrowLeft
 } from 'lucide-react';
 
@@ -85,8 +85,8 @@ export const Profile: React.FC = () => {
   };
 
   const savedDoctorObjects = hospitals.flatMap(hosp => 
-    hosp.doctors
-      .filter(doc => user?.savedDoctors?.includes(doc.id))
+    (hosp.doctors || [])
+      .filter(doc => (user?.savedDoctors || []).includes(doc.id))
       .map(doc => ({ ...doc, hospital: hosp }))
   );
 
@@ -174,7 +174,7 @@ export const Profile: React.FC = () => {
 
       <div className="space-y-5">
 
-        {/* 2. 4 QUICK ACCESS CARDS GRID (2x2 Grid matching image copy.png) */}
+        {/* 2. QUICK ACCESS CARDS GRID */}
         <div className="grid grid-cols-2 gap-3">
           
           {/* Card 1: My Bookings */}
@@ -188,30 +188,13 @@ export const Profile: React.FC = () => {
               </div>
               <div>
                 <h4 className="text-xs font-extrabold text-slate-900 leading-tight">My Bookings</h4>
-                <p className="text-[9px] text-slate-400 font-medium mt-0.5">Upcoming & Previous Tokens</p>
+                <p className="text-[9px] text-slate-400 font-medium mt-0.5">Upcoming &amp; Previous Tokens</p>
               </div>
             </div>
             <ChevronRight size={14} className="text-slate-400 shrink-0" />
           </button>
 
-          {/* Card 2: Family Members */}
-          <button 
-            onClick={() => setIsAddFamilyOpen(true)}
-            className="bg-white border border-slate-150 rounded-2xl p-3.5 flex items-center justify-between shadow-2xs hover:border-blue-200 transition-all cursor-pointer text-left"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center shrink-0">
-                <Users size={20} />
-              </div>
-              <div>
-                <h4 className="text-xs font-extrabold text-slate-900 leading-tight">Family Members</h4>
-                <p className="text-[9px] text-slate-400 font-medium mt-0.5">Manage family profiles</p>
-              </div>
-            </div>
-            <ChevronRight size={14} className="text-slate-400 shrink-0" />
-          </button>
-
-          {/* Card 3: Medical Records */}
+          {/* Card 2: Medical Records */}
           <button 
             onClick={() => setIsMedicalRecordsOpen(true)}
             className="bg-white border border-slate-150 rounded-2xl p-3.5 flex items-center justify-between shadow-2xs hover:border-blue-200 transition-all cursor-pointer text-left"
@@ -222,24 +205,7 @@ export const Profile: React.FC = () => {
               </div>
               <div>
                 <h4 className="text-xs font-extrabold text-slate-900 leading-tight">Medical Records</h4>
-                <p className="text-[9px] text-slate-400 font-medium mt-0.5">Lab Reports, Prescriptions & Documents</p>
-              </div>
-            </div>
-            <ChevronRight size={14} className="text-slate-400 shrink-0" />
-          </button>
-
-          {/* Card 4: Help & Support */}
-          <button 
-            onClick={() => alert("Help Center: Contact support 24/7.")}
-            className="bg-white border border-slate-150 rounded-2xl p-3.5 flex items-center justify-between shadow-2xs hover:border-blue-200 transition-all cursor-pointer text-left"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center shrink-0">
-                <Headphones size={20} />
-              </div>
-              <div>
-                <h4 className="text-xs font-extrabold text-slate-900 leading-tight">Help & Support</h4>
-                <p className="text-[9px] text-slate-400 font-medium mt-0.5">Chat, Call & FAQ</p>
+                <p className="text-[9px] text-slate-400 font-medium mt-0.5">Lab Reports, Prescriptions &amp; Documents</p>
               </div>
             </div>
             <ChevronRight size={14} className="text-slate-400 shrink-0" />
@@ -250,17 +216,6 @@ export const Profile: React.FC = () => {
         {/* SETTINGS LIST MENU CARDS */}
         <div className="bg-white border border-slate-150 rounded-3xl p-2 shadow-2xs divide-y divide-slate-100">
           
-          <button 
-            onClick={() => navigate('/search?saved=true')}
-            className="w-full p-3 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer text-left rounded-xl"
-          >
-            <div className="flex items-center gap-3">
-              <Heart size={18} className="text-red-500 fill-red-500" />
-              <span className="text-xs font-extrabold text-slate-800">Saved Hospitals</span>
-            </div>
-            <span className="text-[11px] font-bold text-slate-400">({user?.savedHospitals?.length || 0})</span>
-          </button>
-
           <button 
             onClick={() => setIsFavDoctorsOpen(true)}
             className="w-full p-3 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer text-left rounded-xl"
@@ -275,68 +230,13 @@ export const Profile: React.FC = () => {
             </div>
           </button>
 
-          <button 
-            onClick={() => alert("Saved Addresses: Vijayawada, Andhra Pradesh.")}
-            className="w-full p-3 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer text-left rounded-xl"
-          >
-            <div className="flex items-center gap-3">
-              <MapPin size={18} className="text-emerald-500" />
-              <span className="text-xs font-extrabold text-slate-800">Saved Addresses</span>
-            </div>
-            <ChevronRight size={14} className="text-slate-400" />
-          </button>
-
-          <button 
-            onClick={() => navigate('/notifications')}
-            className="w-full p-3 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer text-left rounded-xl"
-          >
-            <div className="flex items-center gap-3">
-              <Bell size={18} className="text-amber-500" />
-              <span className="text-xs font-extrabold text-slate-800">Notifications</span>
-            </div>
-            <ChevronRight size={14} className="text-slate-400" />
-          </button>
-
-          <button 
-            onClick={() => alert("Payment Methods: UPI, Cards & Net Banking active.")}
-            className="w-full p-3 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer text-left rounded-xl"
-          >
-            <div className="flex items-center gap-3">
-              <CreditCard size={18} className="text-purple-600" />
-              <span className="text-xs font-extrabold text-slate-800">Payment Methods</span>
-            </div>
-            <ChevronRight size={14} className="text-slate-400" />
-          </button>
-
-          <button 
-            onClick={() => alert("Language: English (India).")}
-            className="w-full p-3 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer text-left rounded-xl"
-          >
-            <div className="flex items-center gap-3">
-              <Globe size={18} className="text-blue-500" />
-              <span className="text-xs font-extrabold text-slate-800">Language</span>
-            </div>
-            <ChevronRight size={14} className="text-slate-400" />
-          </button>
-
-          <button 
-            onClick={() => alert("InstaToken v2.4.0 — OPD Token & Healthcare Platform.")}
-            className="w-full p-3 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer text-left rounded-xl"
-          >
-            <div className="flex items-center gap-3">
-              <Info size={18} className="text-sky-500" />
-              <span className="text-xs font-extrabold text-slate-800">About InstaToken</span>
-            </div>
-            <ChevronRight size={14} className="text-slate-400" />
-          </button>
-
-          <button 
+          <button
             onClick={() => alert("Terms & Conditions loaded.")}
             className="w-full p-3 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer text-left rounded-xl"
           >
             <div className="flex items-center gap-3">
               <FileText size={18} className="text-slate-500" />
-              <span className="text-xs font-extrabold text-slate-800">Terms & Conditions</span>
+              <span className="text-xs font-extrabold text-slate-800">Terms &amp; Conditions</span>
             </div>
             <ChevronRight size={14} className="text-slate-400" />
           </button>
@@ -376,27 +276,6 @@ export const Profile: React.FC = () => {
 
         </div>
 
-        {/* 5. BOTTOM CONTACT SUPPORT BANNER (Matching image copy.png) */}
-        <div className="bg-blue-600 text-white rounded-2xl p-4 flex items-center justify-between shadow-md">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center shrink-0">
-              <Headphones size={22} />
-            </div>
-            <div>
-              <h4 className="text-xs font-black">Need Help?</h4>
-              <p className="text-[10px] text-blue-100 font-semibold mt-0.5">Customer Support available 24x7</p>
-            </div>
-          </div>
-
-          <button 
-            onClick={() => alert("Connecting to Customer Support live chat...")}
-            className="bg-white text-blue-600 hover:bg-blue-50 px-3.5 py-2 rounded-xl text-xs font-extrabold flex items-center gap-1 shadow-sm cursor-pointer shrink-0 transition-all"
-          >
-            <span>Contact Support</span>
-            <ChevronRight size={14} />
-          </button>
-        </div>
-
       </div>
 
       {/* Modal Add Family Member */}
@@ -404,10 +283,10 @@ export const Profile: React.FC = () => {
         <div className="space-y-4">
           
           {/* List of existing family members */}
-          {user.familyMembers.length > 0 && (
+          {(user?.familyMembers || []).length > 0 && (
             <div className="space-y-2 mb-4">
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Registered Family Members</p>
-              {user.familyMembers.map((member) => (
+              {(user?.familyMembers || []).map((member) => (
                 <div key={member.id} className="flex justify-between items-center p-3 bg-slate-50 rounded-2xl border border-slate-100">
                   <div>
                     <span className="text-xs font-extrabold text-slate-800 block">{member.name}</span>

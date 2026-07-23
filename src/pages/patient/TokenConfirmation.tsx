@@ -5,8 +5,8 @@ import { Button } from '../../components/ui/Button';
 import { QRCodeSVG } from 'qrcode.react';
 import { 
   Calendar, Clock, Download, Share2, CheckCircle2, 
-  Phone, Compass, Building2, User, Sun, CreditCard, ChevronRight,
-  AlertCircle
+  Phone, Compass, Building2, User, Sun, CreditCard,
+  AlertCircle, ArrowLeft
 } from 'lucide-react';
 
 const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -96,6 +96,15 @@ export const TokenConfirmation: React.FC = () => {
       
       {/* Success Banner */}
       <div className="flex flex-col items-center text-center py-6 px-5 relative overflow-hidden bg-white rounded-3xl border border-slate-100 mb-6 shadow-sm">
+        <button 
+          onClick={() => navigate(-1)}
+          className="absolute left-4 top-4 p-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs"
+          title="Go Back"
+        >
+          <ArrowLeft size={18} />
+          <span className="text-xs font-extrabold hidden sm:inline">Back</span>
+        </button>
+
         {/* Big Green Check Circle */}
         <div className="w-16 h-16 bg-emerald-500 text-white rounded-full flex items-center justify-center shadow-lg shadow-emerald-500/20 mb-3 transform hover:scale-105 transition-transform">
           <CheckCircle2 size={36} className="stroke-[2.5]" />
@@ -193,7 +202,7 @@ export const TokenConfirmation: React.FC = () => {
                   <Sun size={18} className="text-amber-500 shrink-0" />
                   <div>
                     <span className="text-[8px] font-extrabold text-emerald-800 uppercase block">SESSION</span>
-                    <span className="text-[10px] font-black text-emerald-700 block">Morning Session</span>
+                    <span className="text-[10px] font-black text-emerald-700 block">{appointment.time || 'Morning Session'}</span>
                   </div>
                 </div>
 
@@ -320,36 +329,7 @@ export const TokenConfirmation: React.FC = () => {
           </div>
         </div>
 
-        {/* TOKEN STATUS 5-Step Timeline (Matching Image 4) */}
-        <div className="bg-white border border-slate-150 rounded-3xl p-4 shadow-2xs">
-          <h4 className="text-[10px] font-black text-slate-700 uppercase tracking-wider mb-4">TOKEN STATUS</h4>
-          
-          <div className="relative flex items-center justify-between px-2">
-            {/* Horizontal Line */}
-            <div className="absolute left-6 right-6 top-3 h-0.5 bg-slate-200 z-0" />
-
-            {[
-              { label: "Token Booked", active: true },
-              { label: "Arrived at Hospital", active: false },
-              { label: "Waiting", active: false },
-              { label: "In Consultation", active: false },
-              { label: "Completed", active: false }
-            ].map((step, idx) => (
-              <div key={idx} className="relative z-10 flex flex-col items-center text-center">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                  step.active ? 'bg-emerald-500 text-white ring-4 ring-emerald-100' : 'bg-slate-200 text-slate-400'
-                }`}>
-                  {step.active ? '✓' : ''}
-                </div>
-                <span className={`text-[8.5px] font-extrabold mt-1 max-w-[50px] leading-tight ${step.active ? 'text-emerald-700' : 'text-slate-400'}`}>
-                  {step.label}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Action Buttons Grid (4 Buttons) (Matching Image 4) */}
+        {/* Action Buttons Grid */}
         <div className="grid grid-cols-2 gap-2.5">
           <Button 
             variant="primary" 
@@ -370,48 +350,7 @@ export const TokenConfirmation: React.FC = () => {
             <Share2 size={14} />
             <span>Share Ticket</span>
           </Button>
-
-          <Button 
-            variant="secondary" 
-            size="sm" 
-            onClick={() => alert("Added to device calendar!")}
-            className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 py-2.5 text-xs font-extrabold flex items-center justify-center gap-1.5 rounded-xl cursor-pointer"
-          >
-            <Calendar size={14} />
-            <span>Add to Calendar</span>
-          </Button>
-
-          <Button 
-            variant="secondary" 
-            size="sm" 
-            onClick={() => navigate('/bookings')}
-            className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 py-2.5 text-xs font-extrabold flex items-center justify-center gap-1.5 rounded-xl cursor-pointer"
-          >
-            <Clock size={14} />
-            <span>View Booking History</span>
-          </Button>
         </div>
-
-        {/* Live Token Status Green Bar Button (Matching Image 4) */}
-        <button 
-          onClick={() => navigate(`/livestatus/${appointment.id}`)}
-          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl p-3 flex items-center justify-between shadow-lg shadow-emerald-600/20 cursor-pointer transition-all"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-emerald-700 rounded-full flex flex-col items-center justify-center text-[9px] font-black tracking-widest text-emerald-100 animate-pulse">
-              ((•))
-              <span className="text-[7px]">LIVE</span>
-            </div>
-            <div className="text-left">
-              <h5 className="text-xs font-black uppercase tracking-wide">VIEW LIVE TOKEN STATUS</h5>
-              <p className="text-[9.5px] text-emerald-100 font-medium">See current token, waiting time & live updates</p>
-            </div>
-          </div>
-
-          <div className="w-8 h-8 bg-white text-emerald-600 rounded-full flex items-center justify-center shadow-inner shrink-0">
-            <ChevronRight size={18} />
-          </div>
-        </button>
 
         {/* Security Subtext */}
         <p className="text-center text-[10px] text-slate-400 font-bold pt-1">

@@ -6,8 +6,8 @@ import { Button } from '../../components/ui/Button';
 import { 
   MapPin, Bell, User, Search, Star, Clock, 
   ChevronRight, ChevronLeft, Heart, Activity, Baby, 
-  Smile, ShieldAlert, Award, Loader2, FileText,
-  Menu, ShoppingBag, BellRing, ShieldCheck, 
+  Smile, Award, Loader2, FileText,
+  Menu, BellRing, ShieldCheck, 
   Zap, ChevronDown, Building2, Share2,
   Users, ArrowRight,
   X, Home as HomeIcon, LogOut
@@ -488,7 +488,7 @@ export const Home: React.FC<HomeProps> = ({
           </div>
         )}
 
-        {/* Right Side Icons: Bell with Counter "8", Cart icon */}
+        {/* Right Side Icons: Notification Bell */}
         <div className="flex items-center gap-2">
           <button 
             onClick={onOpenNotifications}
@@ -498,13 +498,6 @@ export const Home: React.FC<HomeProps> = ({
             <span className="absolute top-1 right-1 h-4 w-4 bg-red-500 rounded-full text-[9px] font-black text-white flex items-center justify-center">
               8
             </span>
-          </button>
-
-          <button 
-            onClick={() => navigate('/bookings')}
-            className="p-2 text-slate-700 hover:text-blue-600 transition-colors cursor-pointer"
-          >
-            <ShoppingBag size={20} />
           </button>
         </div>
       </div>
@@ -881,9 +874,7 @@ export const Home: React.FC<HomeProps> = ({
                   { label: "Home Page", path: "/", icon: <HomeIcon size={18} className="text-blue-600" /> },
                   { label: "Nearby Hospitals", path: "/search", icon: <MapPin size={18} className="text-emerald-600" /> },
                   { label: "My Bookings & Tokens", path: "/bookings", icon: <Award size={18} className="text-amber-500" /> },
-                  { label: "My Profile", path: "/profile", icon: <User size={18} className="text-purple-600" /> },
-                  { label: "Notifications & Alerts", path: "/notifications", icon: <Bell size={18} className="text-rose-500" /> },
-                  { label: "Emergency Care", path: "/search?filter=emergency", icon: <ShieldAlert size={18} className="text-red-600" /> }
+                  { label: "My Profile", path: "/profile", icon: <User size={18} className="text-purple-600" /> }
                 ].map((item, idx) => {
                   const isActive = location.pathname === item.path;
                   return (

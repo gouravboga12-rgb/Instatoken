@@ -10,7 +10,7 @@ import { HospitalDetails } from './pages/patient/HospitalDetails';
 import { BookToken } from './pages/patient/BookToken';
 import { Payment } from './pages/patient/Payment';
 import { TokenConfirmation } from './pages/patient/TokenConfirmation';
-import { LiveTokenStatus } from './pages/patient/LiveTokenStatus';
+
 import { MyBookings } from './pages/patient/MyBookings';
 import { Profile } from './pages/patient/Profile';
 import { Notifications } from './pages/patient/Notifications';
@@ -214,25 +214,25 @@ const AppContent: React.FC = () => {
     );
   }
 
-  // Determine if we should show the navigation bars
-  const showBottomNav = [
-    '/',
-    '/search',
-    '/bookings',
-    '/profile',
-    '/notifications'
-  ].includes(location.pathname);
-
   // If on admin or hospital routes, do not wrap in patient responsive frame
   const isAdminRoute = location.pathname.startsWith('/admin') || isHospitalRoute || isHospitalLoginRoute;
 
+  // Show bottom nav bar on all patient routes (non-admin routes)
+  const showBottomNav = !isAdminRoute;
+
+  // Determine active nav item
+  const isHomeActive = location.pathname === '/';
+  const isSearchActive = location.pathname.startsWith('/search') || location.pathname.startsWith('/hospital');
+  const isBookingsActive = location.pathname === '/bookings' || location.pathname.startsWith('/book') || location.pathname.startsWith('/confirmation') || location.pathname === '/payment';
+  const isProfileActive = location.pathname === '/profile';
+
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col justify-between relative overflow-x-hidden">
+    <div className="min-h-screen bg-slate-50 flex flex-col justify-between relative" style={{ overflowX: 'clip' }}>
       {/* Desktop Navigation Header */}
-      {showBottomNav && <TopNavbar />}
+      {!isAdminRoute && <TopNavbar />}
 
       {/* Main Page Area Container */}
-      <div className={`flex-grow w-full ${isAdminRoute ? '' : 'w-full max-w-7xl mx-auto px-0 md:px-8 md:mt-6 pb-24 md:pb-6'}`}>
+      <div className={`flex-grow w-full ${isAdminRoute ? '' : 'w-full max-w-7xl mx-auto px-0 md:px-8 md:mt-6 pb-24 lg:pb-6'}`}>
         <Routes>
           <Route path="/" element={
             <Home 
@@ -269,7 +269,7 @@ const AppContent: React.FC = () => {
           <Route path="/book/:hospitalId/:doctorId" element={<BookToken />} />
           <Route path="/payment" element={<Payment />} />
           <Route path="/confirmation/:appointmentId" element={<TokenConfirmation />} />
-          <Route path="/livestatus/:appointmentId" element={<LiveTokenStatus />} />
+
           <Route path="/bookings" element={<MyBookings />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/notifications" element={<Notifications />} />
@@ -289,13 +289,13 @@ const AppContent: React.FC = () => {
       {/* Desktop Footer */}
       {!isAdminRoute && <Footer />}
 
-      {/* Bottom Navigation Menu (visible only on mobile) */}
+      {/* Bottom Navigation Menu (visible on mobile & tablet for all patient pages) */}
       {showBottomNav && (
-        <div className="md:hidden fixed bottom-0 left-0 w-full bg-white/95 backdrop-blur-md border-t border-slate-100 flex items-center justify-around py-2.5 z-40 shadow-lg">
+        <div className="lg:hidden fixed bottom-0 left-0 w-full bg-white/95 backdrop-blur-md border-t border-slate-100 flex items-center justify-around py-2.5 z-40 shadow-lg">
           <button 
             onClick={() => navigate('/')}
             className={`flex flex-col items-center gap-0.5 cursor-pointer transition-colors ${
-              location.pathname === '/' ? 'text-blue-600 font-extrabold scale-105' : 'text-slate-400 hover:text-slate-600'
+              isHomeActive ? 'text-blue-600 font-extrabold scale-105' : 'text-slate-400 hover:text-slate-600'
             }`}
           >
             <HomeIcon size={20} />
@@ -305,7 +305,7 @@ const AppContent: React.FC = () => {
           <button 
             onClick={() => navigate('/search')}
             className={`flex flex-col items-center gap-0.5 cursor-pointer transition-colors ${
-              location.pathname === '/search' ? 'text-blue-600 font-extrabold scale-105' : 'text-slate-400 hover:text-slate-600'
+              isSearchActive ? 'text-blue-600 font-extrabold scale-105' : 'text-slate-400 hover:text-slate-600'
             }`}
           >
             <SearchIcon size={20} />
@@ -315,7 +315,7 @@ const AppContent: React.FC = () => {
           <button 
             onClick={() => navigate('/bookings')}
             className={`flex flex-col items-center gap-0.5 cursor-pointer transition-colors ${
-              location.pathname === '/bookings' ? 'text-blue-600 font-extrabold scale-105' : 'text-slate-400 hover:text-slate-600'
+              isBookingsActive ? 'text-blue-600 font-extrabold scale-105' : 'text-slate-400 hover:text-slate-600'
             }`}
           >
             <Award size={20} />
@@ -325,7 +325,7 @@ const AppContent: React.FC = () => {
           <button 
             onClick={() => navigate('/profile')}
             className={`flex flex-col items-center gap-0.5 cursor-pointer transition-colors ${
-              location.pathname === '/profile' ? 'text-blue-600 font-extrabold scale-105' : 'text-slate-400 hover:text-slate-600'
+              isProfileActive ? 'text-blue-600 font-extrabold scale-105' : 'text-slate-400 hover:text-slate-600'
             }`}
           >
             <UserIcon size={20} />

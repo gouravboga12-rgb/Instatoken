@@ -5,7 +5,7 @@ import { HospitalDashboard } from './HospitalDashboard';
 import { TokenManagement } from './TokenManagement';
 import { DoctorManagement } from './DoctorManagement';
 import { PatientManagement } from './PatientManagement';
-import { LiveQueue } from './LiveQueue';
+
 import { ScheduleManagement } from './ScheduleManagement';
 import { CommunicationCenter } from './CommunicationCenter';
 import { BillingPayments } from './BillingPayments';
@@ -14,19 +14,19 @@ import { HospitalSettings } from './HospitalSettings';
 import {
   LayoutDashboard, Plus, List, Wifi, WifiOff, Calendar, Clock, RefreshCw, XCircle, 
   CheckSquare, Users, Stethoscope, Building2, CalendarRange, Zap, 
-  Printer, ShieldCheck, Radio, MessageSquare, BarChart2, Download, Settings,
+  Printer, ShieldCheck, MessageSquare, BarChart2, Download, Settings,
   UserCog, ChevronLeft, ChevronRight, Bell, Search, LogOut, Menu, X, Activity,
   Layers, Heart, CreditCard
 } from 'lucide-react';
 
 // ─── RBAC permission map ──────────────────────────────────────────────────────
 const ROLE_SECTIONS: Record<string, string[]> = {
-  owner:        ['dashboard','tokens','add-token','all-tokens','online-tokens','offline-tokens','today-tokens','upcoming-tokens','completed-tokens','cancelled-tokens','revisit-tokens','doctors','departments','sessions','auto-schedule','patients','token-validation','prescription','live-queue','communication','billing','reports','settings','users','general'],
-  admin:        ['dashboard','tokens','add-token','all-tokens','online-tokens','offline-tokens','today-tokens','upcoming-tokens','completed-tokens','cancelled-tokens','revisit-tokens','doctors','departments','sessions','auto-schedule','patients','token-validation','live-queue','reports'],
-  receptionist: ['dashboard','add-token','all-tokens','today-tokens','patients','token-validation','prescription','live-queue'],
-  doctor:       ['dashboard','today-tokens','live-queue','patients'],
+  owner:        ['dashboard','tokens','add-token','all-tokens','online-tokens','offline-tokens','today-tokens','upcoming-tokens','completed-tokens','cancelled-tokens','revisit-tokens','doctors','departments','sessions','auto-schedule','patients','token-validation','prescription','communication','billing','reports','settings','users','general'],
+  admin:        ['dashboard','tokens','add-token','all-tokens','online-tokens','offline-tokens','today-tokens','upcoming-tokens','completed-tokens','cancelled-tokens','revisit-tokens','doctors','departments','sessions','auto-schedule','patients','token-validation','reports'],
+  receptionist: ['dashboard','add-token','all-tokens','today-tokens','patients','token-validation','prescription'],
+  doctor:       ['dashboard','today-tokens','patients'],
   accountant:   ['dashboard','billing','reports'],
-  nurse:        ['dashboard','today-tokens','live-queue'],
+  nurse:        ['dashboard','today-tokens'],
 };
 
 interface NavItem {
@@ -37,7 +37,6 @@ interface NavItem {
 const buildNav = (): { section: string; items: NavItem[] }[] => [
   { section: '', items: [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={15} />, path: '/hospital/dashboard' },
-    { id: 'live-queue', label: 'Live Queue', icon: <Radio size={15} />, path: '/hospital/live-queue', badge: 'Live' },
   ]},
   { section: 'Token Management', items: [
     { id: 'add-token', label: 'Add Token', icon: <Plus size={15} />, path: '/hospital/tokens/add' },
@@ -317,7 +316,7 @@ export const HospitalLayout: React.FC = () => {
             <Route path="auto-schedule" element={<ScheduleManagement tab="auto" />} />
             <Route path="patients" element={<PatientManagement />} />
             <Route path="validate" element={<TokenValidationPage />} />
-            <Route path="live-queue" element={<LiveQueue />} />
+
             <Route path="communication" element={<CommunicationCenter />} />
             <Route path="billing" element={<BillingPayments />} />
             <Route path="reports" element={<ReportsAnalytics />} />
