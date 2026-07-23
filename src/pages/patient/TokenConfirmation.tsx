@@ -4,7 +4,7 @@ import { useApp } from '../../context/AppContext';
 import { Button } from '../../components/ui/Button';
 import { QRCodeSVG } from 'qrcode.react';
 import { 
-  Calendar, Clock, Download, Share2, CheckCircle2, 
+  Calendar, Download, Share2, CheckCircle2, 
   Phone, Compass, Building2, User, Sun, CreditCard,
   AlertCircle, ArrowLeft
 } from 'lucide-react';

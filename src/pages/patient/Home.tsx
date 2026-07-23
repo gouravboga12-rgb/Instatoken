@@ -6,7 +6,7 @@ import { Button } from '../../components/ui/Button';
 import { 
   MapPin, Bell, User, Search, Star, Clock, 
   ChevronRight, ChevronLeft, Heart, Activity, Baby, 
-  Smile, Award, Loader2, FileText,
+  Smile, ShieldAlert, Award, Loader2, FileText,
   Menu, BellRing, ShieldCheck, 
   Zap, ChevronDown, Building2, Share2,
   Users, ArrowRight,
