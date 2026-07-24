@@ -704,8 +704,13 @@ export const Home: React.FC<HomeProps> = ({
 
           <div className="space-y-4">
             {hospitals.slice(0, 3).map((hosp) => {
+              const totalWaitTime = hosp.doctors.reduce((acc, doc) => {
+                const ahead = Math.max(0, doc.nextAvailableToken - doc.currentQueue - 1);
+                return acc + (ahead * (doc.estimatedWaitPerPatient || 10));
+              }, 0);
+              const calculatedAvgWait = Math.round(totalWaitTime / (hosp.doctors.length || 1)) + (hosp.baseWaitingTime || 15);
+              const avgWait = isNaN(calculatedAvgWait) || calculatedAvgWait <= 0 ? 20 : calculatedAvgWait;
               const minFee = hosp.doctors.length > 0 ? Math.min(...hosp.doctors.map(d => d.consultationFee)) : 0;
-              const avgWait = hosp.doctors.length > 0 ? Math.round(hosp.doctors.reduce((acc, d) => acc + d.avgWaitTime, 0) / hosp.doctors.length) : 15;
 
               return (
                 <Card 
