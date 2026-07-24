@@ -600,13 +600,8 @@ export const Home: React.FC<HomeProps> = ({
                   <span className="truncate">{currentBanner.location}</span>
                 </p>
 
-                {/* Desktop View: Separate Wait Pill & Button */}
-                <div className="hidden md:flex items-center gap-3 pt-1 flex-wrap">
-                  <div className="bg-white/15 backdrop-blur-md border border-white/25 px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 text-xs font-bold text-white shadow-sm">
-                    <Clock size={14} className="text-emerald-300" />
-                    <span>{currentBanner.wait}</span>
-                  </div>
-
+                {/* Banner CTA Button (Only Book Token Option) */}
+                <div className="pt-1">
                   <Button 
                     variant="secondary" 
                     size="sm" 
@@ -614,27 +609,10 @@ export const Home: React.FC<HomeProps> = ({
                       e.stopPropagation();
                       onHospitalSelect(currentBanner.id);
                     }}
-                    className="bg-white text-blue-600 hover:bg-blue-50 py-2.5 px-5 rounded-xl font-extrabold text-xs flex items-center gap-2 cursor-pointer border-none shadow-lg shadow-black/30"
+                    className="bg-white text-blue-600 hover:bg-blue-50 py-2.5 px-5 rounded-xl font-black text-xs sm:text-sm flex items-center gap-2 cursor-pointer border-none shadow-lg shadow-black/30 hover:scale-105 transition-all"
                   >
                     <span>{currentBanner.cta}</span>
                     <ArrowRight size={14} />
-                  </Button>
-                </div>
-
-                {/* Mobile / Tab View: Single Streamlined Action Button */}
-                <div className="flex md:hidden pt-1">
-                  <Button 
-                    variant="secondary" 
-                    size="sm" 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onHospitalSelect(currentBanner.id);
-                    }}
-                    className="bg-white text-blue-600 hover:bg-blue-50 py-2 px-4 rounded-xl font-extrabold text-xs flex items-center gap-2 cursor-pointer border-none shadow-lg"
-                  >
-                    <span>{currentBanner.cta}</span>
-                    <span className="text-[10px] text-blue-500 font-bold border-l border-blue-200 pl-2">⏱ {currentBanner.wait}</span>
-                    <ArrowRight size={13} />
                   </Button>
                 </div>
               </div>
