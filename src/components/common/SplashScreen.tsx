@@ -36,7 +36,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish, duration =
       <img 
         src="/splash.png" 
         alt="InstaToken Splash Screen" 
-        className="w-full h-full object-cover"
+        className="w-full h-full object-contain max-h-screen p-2 md:p-6 mx-auto"
       />
     </div>
   );
