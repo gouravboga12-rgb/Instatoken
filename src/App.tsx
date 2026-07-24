@@ -299,7 +299,7 @@ const AppContent: React.FC = () => {
             }`}
           >
             <HomeIcon size={20} />
-            <span className="text-[10px] font-semibold">Home</span>
+            <span className="text-[11.5px] font-bold">Home</span>
           </button>
           
           <button 
@@ -309,7 +309,7 @@ const AppContent: React.FC = () => {
             }`}
           >
             <SearchIcon size={20} />
-            <span className="text-[10px] font-semibold">Nearby Hospitals</span>
+            <span className="text-[11.5px] font-bold">Nearby Hospitals</span>
           </button>
           
           <button 
@@ -319,7 +319,7 @@ const AppContent: React.FC = () => {
             }`}
           >
             <Award size={20} />
-            <span className="text-[10px] font-semibold">Bookings</span>
+            <span className="text-[11.5px] font-bold">Bookings</span>
           </button>
           
           <button 
@@ -329,7 +329,7 @@ const AppContent: React.FC = () => {
             }`}
           >
             <UserIcon size={20} />
-            <span className="text-[10px] font-semibold">Profile</span>
+            <span className="text-[11.5px] font-bold">Profile</span>
           </button>
         </div>
       )}
