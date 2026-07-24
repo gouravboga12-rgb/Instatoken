@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '../../components/ui/Button';
-import { Calendar, Users, Eye, CreditCard, ChevronRight, ShieldCheck, Check } from 'lucide-react';
+import { Calendar, Users, Eye, CreditCard, ChevronRight } from 'lucide-react';
 
 interface OnboardingProps {
   onComplete: () => void;
