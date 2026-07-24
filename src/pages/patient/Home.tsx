@@ -703,87 +703,100 @@ export const Home: React.FC<HomeProps> = ({
           </div>
 
           <div className="space-y-4">
-            {hospitals.slice(0, 3).map((hosp) => (
-              <Card 
-                key={hosp.id} 
-                hoverable 
-                padding="none" 
-                onClick={() => onHospitalSelect(hosp.id)}
-                className="overflow-hidden bg-white border border-slate-150 rounded-3xl shadow-2xs cursor-pointer flex flex-col"
-              >
-                {/* Image Container with Badges Overlay */}
-                <div className="h-44 sm:h-52 w-full relative bg-slate-100">
-                  <img 
-                    src={hosp.image} 
-                    alt={hosp.name} 
-                    className="w-full h-full object-cover"
-                    onError={(e) => { (e.target as HTMLImageElement).src = getHospitalSVGImage(hosp.name); }}
-                  />
-                  {/* Gradient Overlay for text readability */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-transparent" />
-                  
-                  {/* Top Row: Verified Badge (Left) & Star Rating (Right) */}
-                  <div className="absolute top-3.5 left-3.5 right-3.5 flex justify-between items-center">
-                    <span className="bg-white/95 backdrop-blur-md text-emerald-700 font-extrabold text-[9px] px-2.5 py-1 rounded-full flex items-center gap-1 shadow-sm border border-emerald-50">
-                      <span className="w-3.5 h-3.5 bg-emerald-500 text-white rounded-full text-[8px] font-black inline-flex items-center justify-center">✓</span>
-                      Verified
-                    </span>
-                    
-                    <span className="bg-black/40 backdrop-blur-md text-white font-extrabold text-[9px] px-2.5 py-1 rounded-full flex items-center gap-1 shadow-sm border border-white/10">
-                      <Star size={10} className="fill-amber-400 text-amber-400" />
-                      <span>{hosp.rating}</span>
-                    </span>
-                  </div>
+            {hospitals.slice(0, 3).map((hosp) => {
+              const minFee = hosp.doctors.length > 0 ? Math.min(...hosp.doctors.map(d => d.consultationFee)) : 0;
+              const avgWait = hosp.doctors.length > 0 ? Math.round(hosp.doctors.reduce((acc, d) => acc + d.avgWaitTime, 0) / hosp.doctors.length) : 15;
 
-                  {/* Bottom Text Overlay: Hospital Name & Address */}
-                  <div className="absolute bottom-3.5 left-3.5 right-3.5 text-white">
-                    <h4 className="font-extrabold text-sm sm:text-base tracking-tight truncate leading-none">
-                      {hosp.name}
-                    </h4>
-                    <p className="text-[10px] text-slate-200 font-medium truncate mt-1.5">
-                      {hosp.address}
-                    </p>
-                  </div>
-                </div>
+              return (
+                <Card 
+                  key={hosp.id} 
+                  hoverable 
+                  padding="none" 
+                  onClick={() => onHospitalSelect(hosp.id)}
+                  className="overflow-hidden bg-white border border-slate-150 rounded-3xl shadow-2xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between"
+                >
+                  <div>
+                    {/* Image Container with Badges Overlay */}
+                    <div className="h-44 sm:h-52 w-full relative bg-slate-100">
+                      <img 
+                        src={hosp.image} 
+                        alt={hosp.name} 
+                        className="w-full h-full object-cover"
+                        onError={(e) => { (e.target as HTMLImageElement).src = getHospitalSVGImage(hosp.name); }}
+                      />
+                      {/* Gradient Overlay for text readability */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-transparent" />
+                      
+                      {/* Top Row: Verified Badge (Left) & Star Rating (Right) */}
+                      <div className="absolute top-3.5 left-3.5 right-3.5 flex justify-between items-center">
+                        <span className="bg-white/95 backdrop-blur-md text-emerald-700 font-extrabold text-[9px] px-2.5 py-1 rounded-full flex items-center gap-1 shadow-sm border border-emerald-50">
+                          <span className="w-3.5 h-3.5 bg-emerald-500 text-white rounded-full text-[8px] font-black inline-flex items-center justify-center">✓</span>
+                          Verified
+                        </span>
+                        
+                        <span className="bg-black/40 backdrop-blur-md text-white font-extrabold text-[9px] px-2.5 py-1 rounded-full flex items-center gap-1 shadow-sm border border-white/10">
+                          <Star size={10} className="fill-amber-400 text-amber-400" />
+                          <span>{hosp.rating}</span>
+                        </span>
+                      </div>
 
-                {/* Bottom Body Details */}
-                <div className="p-4 space-y-3.5">
-                  {/* Badges and CTA Row */}
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <div className="flex gap-1.5 flex-wrap">
-                      <span className="bg-emerald-50 text-emerald-700 font-extrabold text-[9px] px-2.5 py-1.5 rounded-xl border border-emerald-100 flex items-center gap-1">
-                        <Clock size={10} /> No Waiting
-                      </span>
-                      <span className="bg-blue-50 text-blue-700 font-extrabold text-[9px] px-2.5 py-1.5 rounded-xl border border-blue-100">
-                        {hosp.category}
-                      </span>
+                      {/* Bottom Text Overlay: Hospital Name & Address */}
+                      <div className="absolute bottom-3.5 left-3.5 right-3.5 text-white">
+                        <h4 className="font-extrabold text-sm sm:text-base tracking-tight truncate leading-none">
+                          {hosp.name}
+                        </h4>
+                        <p className="text-[10px] text-slate-200 font-medium truncate mt-1.5">
+                          {hosp.address}
+                        </p>
+                      </div>
                     </div>
 
+                    {/* Body Info */}
+                    <div className="p-4 space-y-3">
+                      {/* Category & Fee Row */}
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="bg-blue-50 text-blue-700 font-extrabold text-[9px] px-2.5 py-1 rounded-lg border border-blue-100/50">
+                          {hosp.category}
+                        </span>
+                        {minFee > 0 && (
+                          <span className="text-slate-800 font-extrabold text-xs sm:text-sm">
+                            ₹{minFee}+ Fee
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Distance & Wait Badges */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50/90 text-blue-700 border border-blue-200/80 text-[11px] font-extrabold shadow-2xs">
+                          <MapPin size={13} className="text-blue-600 shrink-0" />
+                          <span>{hosp.distance} km away</span>
+                        </span>
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50/90 text-emerald-700 border border-emerald-200/80 text-[11px] font-extrabold shadow-2xs">
+                          <Clock size={13} className="text-emerald-600 shrink-0" />
+                          <span>{avgWait}m wait</span>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bottom Doctor Preview & Book OPD Token Strip */}
+                  <div className="bg-slate-50/80 px-4 py-3 border-t border-slate-100 flex items-center justify-between gap-2 mt-2">
+                    <span className="text-[10px] sm:text-xs text-slate-500 font-bold uppercase tracking-wider">
+                      {hosp.doctors.length} Doctors Available
+                    </span>
                     <button 
                       onClick={(e) => {
                         e.stopPropagation();
                         onHospitalSelect(hosp.id);
                       }}
-                      className="py-2 px-4 text-[10px] font-extrabold text-white bg-blue-600 hover:bg-blue-700 rounded-xl cursor-pointer shadow-md shadow-blue-500/20 shrink-0 transition-colors flex items-center gap-1.5"
+                      className="text-xs sm:text-sm text-white font-black bg-blue-600 hover:bg-blue-700 px-4.5 py-2.5 rounded-xl flex items-center gap-1.5 cursor-pointer shadow-md shadow-blue-500/25 hover:shadow-blue-500/40 transition-all hover:scale-105 active:scale-95 shrink-0"
                     >
                       Book OPD Token
                     </button>
                   </div>
-
-                  {/* Distance & Timing info at the very bottom */}
-                  <div className="flex items-center gap-2 border-t border-slate-50 pt-2.5 flex-wrap">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50/90 text-blue-700 border border-blue-200/80 text-[11px] font-extrabold shadow-2xs">
-                      <MapPin size={13} className="text-blue-600 shrink-0" />
-                      <span>{hosp.distance} km away</span>
-                    </span>
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50/90 text-emerald-700 border border-emerald-200/80 text-[11px] font-extrabold shadow-2xs">
-                      <Clock size={13} className="text-emerald-600 shrink-0" />
-                      <span>~15 min travel</span>
-                    </span>
-                  </div>
-                </div>
-              </Card>
-            ))}
+                </Card>
+              );
+            })}
           </div>
         </div>
 
