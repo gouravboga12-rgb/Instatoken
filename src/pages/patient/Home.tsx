@@ -793,14 +793,14 @@ export const Home: React.FC<HomeProps> = ({
                   </div>
 
                   {/* Distance & Timing info at the very bottom */}
-                  <div className="flex items-center gap-3 text-[10px] text-slate-400 font-semibold border-t border-slate-50 pt-2.5">
-                    <span className="flex items-center gap-1">
-                      <MapPin size={12} className="text-slate-400" />
-                      {hosp.distance} km
+                  <div className="flex items-center gap-2 border-t border-slate-50 pt-2.5 flex-wrap">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50/90 text-blue-700 border border-blue-200/80 text-[11px] font-extrabold shadow-2xs">
+                      <MapPin size={13} className="text-blue-600 shrink-0" />
+                      <span>{hosp.distance} km away</span>
                     </span>
-                    <span className="flex items-center gap-1">
-                      <Clock size={12} className="text-emerald-500" />
-                      ~15 min travel time
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50/90 text-emerald-700 border border-emerald-200/80 text-[11px] font-extrabold shadow-2xs">
+                      <Clock size={13} className="text-emerald-600 shrink-0" />
+                      <span>~15 min travel</span>
                     </span>
                   </div>
                 </div>

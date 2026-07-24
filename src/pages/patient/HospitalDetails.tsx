@@ -126,9 +126,12 @@ export const HospitalDetails: React.FC<HospitalDetailsProps> = ({ onDoctorSelect
               <div>
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-blue-600 text-white mb-1 shadow-2xs">{hospital.category}</span>
                 <h2 className="text-lg sm:text-xl font-black tracking-tight leading-tight">{hospital.name}</h2>
-                <p className="text-xs text-slate-200 mt-0.5 flex items-center gap-1.5 flex-wrap font-semibold">
-                  <MapPin size={12} className="text-blue-400 shrink-0" />
-                  <span>{hospital.address} • {hospital.distance} km</span>
+                <p className="text-xs text-slate-200 mt-1 flex items-center gap-2 flex-wrap font-semibold">
+                  <MapPin size={13} className="text-blue-400 shrink-0" />
+                  <span>{hospital.address}</span>
+                  <span className="bg-blue-600/90 text-white font-extrabold px-2.5 py-0.5 rounded-lg text-[10.5px] shadow-sm border border-blue-400/40 backdrop-blur-xs">
+                    {hospital.distance} km away
+                  </span>
                   <span className="text-slate-400">•</span>
                   <span className="text-amber-400 flex items-center gap-0.5 font-bold">
                     <Star size={12} className="fill-amber-400 text-amber-400" />
