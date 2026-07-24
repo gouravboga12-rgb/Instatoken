@@ -291,8 +291,8 @@ export const SearchHospitals: React.FC<SearchHospitalsProps> = ({
                     </div>
 
                     {/* Doctor preview strip */}
-                    <div className="bg-slate-50/80 px-4 py-2.5 border-t border-slate-100 flex items-center justify-between text-xs">
-                      <span className="text-[9px] text-slate-400 font-semibold uppercase">
+                    <div className="bg-slate-50/80 px-4 py-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                      <span className="text-[10px] sm:text-xs text-slate-500 font-bold uppercase tracking-wider">
                         {hosp.doctors.length} Doctors Available
                       </span>
                       <button 
@@ -300,7 +300,7 @@ export const SearchHospitals: React.FC<SearchHospitalsProps> = ({
                           e.stopPropagation();
                           onHospitalSelect(hosp.id);
                         }}
-                        className="text-[10px] text-white font-extrabold bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded-xl flex items-center gap-1 cursor-pointer shadow-sm shadow-blue-500/20 transition-colors"
+                        className="text-xs sm:text-sm text-white font-black bg-blue-600 hover:bg-blue-700 px-4.5 py-2.5 rounded-xl flex items-center gap-1.5 cursor-pointer shadow-md shadow-blue-500/25 hover:shadow-blue-500/40 transition-all hover:scale-105 active:scale-95 shrink-0"
                       >
                         Book OPD Token
                       </button>
