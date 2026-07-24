@@ -102,7 +102,7 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
             </div>
             <div className="z-10">
               <h2 className="text-lg font-black tracking-tight text-white/95">InstaToken</h2>
-              <p className="text-[10px] text-blue-100 font-bold">Book Your Hospital Token in Minutes</p>
+              <p className="text-[10px] text-blue-100 font-bold">Book Your Hospital Token in Seconds</p>
             </div>
           </div>
 
@@ -183,7 +183,7 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
               </div>
               <div className="z-10 pb-6">
                 <h2 className="text-base font-black tracking-tight text-white">InstaToken</h2>
-                <p className="text-[9px] text-blue-100 font-semibold">Book Your Hospital Token in Minutes</p>
+                <p className="text-[9px] text-blue-100 font-semibold">Book Your Hospital Token in Seconds</p>
               </div>
             </div>
 

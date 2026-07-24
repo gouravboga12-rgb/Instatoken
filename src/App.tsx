@@ -47,7 +47,7 @@ const TopNavbar: React.FC = () => {
         {/* Logo */}
         <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
           <img src="/logo.png" className="h-9 rounded-xl object-contain shadow-xs" alt="InstaToken Logo" />
-          <span className="text-[10px] text-slate-400 font-bold hidden lg:inline">Book Your Hospital Token in Minutes</span>
+          <span className="text-xs text-slate-400 font-bold hidden lg:inline">Book Your Hospital Token in Seconds</span>
         </div>
 
         {/* Nav Links */}
