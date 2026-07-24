@@ -103,9 +103,9 @@ export const Profile: React.FC = () => {
               onClick={() => navigate('/')}
               className="md:hidden p-2 rounded-full bg-white/10 text-white hover:bg-white/20 transition-all cursor-pointer"
             >
-              <ArrowLeft size={16} />
+              <ArrowLeft size={18} />
             </button>
-            <h2 className="text-lg font-black tracking-tight font-heading">My Profile</h2>
+            <h2 className="text-xl sm:text-2xl font-black tracking-tight font-heading">My Profile</h2>
           </div>
 
           <div className="flex items-center gap-2">
@@ -113,14 +113,14 @@ export const Profile: React.FC = () => {
               onClick={() => navigate('/notifications')}
               className="p-2 rounded-full bg-white/15 hover:bg-white/25 transition-all text-white cursor-pointer relative"
             >
-              <Bell size={18} />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-400 rounded-full animate-ping" />
+              <Bell size={20} />
+              <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-400 rounded-full animate-ping" />
             </button>
             <button 
               onClick={() => setIsEditProfileOpen(true)}
               className="p-2 rounded-full bg-white/15 hover:bg-white/25 transition-all text-white cursor-pointer"
             >
-              <Settings size={18} />
+              <Settings size={20} />
             </button>
           </div>
         </div>
@@ -130,7 +130,7 @@ export const Profile: React.FC = () => {
           
           {/* Avatar with Edit Camera Badge */}
           <div className="relative">
-            <div className="w-20 h-20 rounded-full border-2 border-white overflow-hidden bg-white/20 shadow-md">
+            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-2 border-white overflow-hidden bg-white/20 shadow-md">
               <img 
                 src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=300"
                 alt={user.name}
@@ -142,28 +142,28 @@ export const Profile: React.FC = () => {
             </div>
             <button 
               onClick={() => setIsEditProfileOpen(true)}
-              className="absolute bottom-0 right-0 w-6 h-6 bg-blue-600 border-2 border-white rounded-full flex items-center justify-center text-white cursor-pointer shadow-sm"
+              className="absolute bottom-0 right-0 w-7 h-7 bg-blue-600 border-2 border-white rounded-full flex items-center justify-center text-white cursor-pointer shadow-sm"
             >
-              <Camera size={12} />
+              <Camera size={13} />
             </button>
           </div>
 
           {/* User Name & Details */}
           <div className="space-y-1">
-            <h3 className="text-xl font-black tracking-tight flex items-center gap-1.5 leading-tight">
+            <h3 className="text-2xl sm:text-3xl font-black tracking-tight flex items-center gap-1.5 leading-tight">
               <span>{user.name}</span>
-              <span className="w-4 h-4 bg-white text-blue-600 rounded-full text-[10px] font-black inline-flex items-center justify-center shadow-xs">✓</span>
+              <span className="w-4.5 h-4.5 bg-white text-blue-600 rounded-full text-xs font-black inline-flex items-center justify-center shadow-xs">✓</span>
             </h3>
-            <p className="text-xs text-blue-100 font-semibold flex items-center gap-1">
+            <p className="text-sm sm:text-base text-blue-100 font-bold flex items-center gap-1">
               <span>📞</span>
               <span>{user.phone || '+91 98856 14326'}</span>
             </p>
 
             <button 
               onClick={() => setIsEditProfileOpen(true)}
-              className="mt-1 px-3 py-1 bg-white/20 hover:bg-white/30 border border-white/40 rounded-full text-[10px] font-extrabold flex items-center gap-1 transition-all cursor-pointer"
+              className="mt-1.5 px-3.5 py-1 bg-white/20 hover:bg-white/30 border border-white/40 rounded-full text-xs font-extrabold flex items-center gap-1 transition-all cursor-pointer"
             >
-              <Edit2 size={10} />
+              <Edit2 size={12} />
               <span>Edit Profile</span>
             </button>
           </div>
@@ -175,103 +175,103 @@ export const Profile: React.FC = () => {
       <div className="space-y-5">
 
         {/* 2. QUICK ACCESS CARDS GRID */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
           
           {/* Card 1: My Bookings */}
           <button 
             onClick={() => navigate('/bookings')}
-            className="bg-white border border-slate-150 rounded-2xl p-3.5 flex items-center justify-between shadow-2xs hover:border-blue-200 transition-all cursor-pointer text-left"
+            className="bg-white border border-slate-150 rounded-2xl p-4 flex items-center justify-between shadow-2xs hover:border-blue-200 transition-all cursor-pointer text-left"
           >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center shrink-0">
-                <Calendar size={20} />
+            <div className="flex items-center gap-3.5">
+              <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center shrink-0">
+                <Calendar size={22} />
               </div>
               <div>
-                <h4 className="text-xs font-extrabold text-slate-900 leading-tight">My Bookings</h4>
-                <p className="text-[9px] text-slate-400 font-medium mt-0.5">Upcoming &amp; Previous Tokens</p>
+                <h4 className="text-sm sm:text-base font-black text-slate-900 leading-tight">My Bookings</h4>
+                <p className="text-xs text-slate-400 font-semibold mt-0.5">Upcoming &amp; Previous Tokens</p>
               </div>
             </div>
-            <ChevronRight size={14} className="text-slate-400 shrink-0" />
+            <ChevronRight size={16} className="text-slate-400 shrink-0" />
           </button>
 
           {/* Card 2: Medical Records */}
           <button 
             onClick={() => setIsMedicalRecordsOpen(true)}
-            className="bg-white border border-slate-150 rounded-2xl p-3.5 flex items-center justify-between shadow-2xs hover:border-blue-200 transition-all cursor-pointer text-left"
+            className="bg-white border border-slate-150 rounded-2xl p-4 flex items-center justify-between shadow-2xs hover:border-blue-200 transition-all cursor-pointer text-left"
           >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center shrink-0">
-                <FileText size={20} />
+            <div className="flex items-center gap-3.5">
+              <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center shrink-0">
+                <FileText size={22} />
               </div>
               <div>
-                <h4 className="text-xs font-extrabold text-slate-900 leading-tight">Medical Records</h4>
-                <p className="text-[9px] text-slate-400 font-medium mt-0.5">Lab Reports, Prescriptions &amp; Documents</p>
+                <h4 className="text-sm sm:text-base font-black text-slate-900 leading-tight">Medical Records</h4>
+                <p className="text-xs text-slate-400 font-semibold mt-0.5">Lab Reports, Prescriptions &amp; Documents</p>
               </div>
             </div>
-            <ChevronRight size={14} className="text-slate-400 shrink-0" />
+            <ChevronRight size={16} className="text-slate-400 shrink-0" />
           </button>
 
         </div>
 
         {/* SETTINGS LIST MENU CARDS */}
-        <div className="bg-white border border-slate-150 rounded-3xl p-2 shadow-2xs divide-y divide-slate-100">
+        <div className="bg-white border border-slate-150 rounded-3xl p-2.5 shadow-2xs divide-y divide-slate-100">
           
           <button 
             onClick={() => setIsFavDoctorsOpen(true)}
-            className="w-full p-3 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer text-left rounded-xl"
+            className="w-full p-3.5 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer text-left rounded-xl"
           >
-            <div className="flex items-center gap-3">
-              <User size={18} className="text-blue-600" />
-              <span className="text-xs font-extrabold text-slate-800">Favourite Doctors</span>
+            <div className="flex items-center gap-3.5">
+              <User size={20} className="text-blue-600" />
+              <span className="text-sm sm:text-base font-black text-slate-800">Favourite Doctors</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-[11px] font-bold text-slate-400">({savedDoctorObjects.length})</span>
-              <ChevronRight size={14} className="text-slate-400" />
+              <span className="text-xs sm:text-sm font-bold text-slate-400">({savedDoctorObjects.length})</span>
+              <ChevronRight size={16} className="text-slate-400" />
             </div>
           </button>
 
           <button
             onClick={() => alert("Terms & Conditions loaded.")}
-            className="w-full p-3 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer text-left rounded-xl"
+            className="w-full p-3.5 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer text-left rounded-xl"
           >
-            <div className="flex items-center gap-3">
-              <FileText size={18} className="text-slate-500" />
-              <span className="text-xs font-extrabold text-slate-800">Terms &amp; Conditions</span>
+            <div className="flex items-center gap-3.5">
+              <FileText size={20} className="text-slate-500" />
+              <span className="text-sm sm:text-base font-black text-slate-800">Terms &amp; Conditions</span>
             </div>
-            <ChevronRight size={14} className="text-slate-400" />
+            <ChevronRight size={16} className="text-slate-400" />
           </button>
 
           <button 
             onClick={() => alert("Privacy Policy loaded.")}
-            className="w-full p-3 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer text-left rounded-xl"
+            className="w-full p-3.5 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer text-left rounded-xl"
           >
-            <div className="flex items-center gap-3">
-              <Shield size={18} className="text-emerald-600" />
-              <span className="text-xs font-extrabold text-slate-800">Privacy Policy</span>
+            <div className="flex items-center gap-3.5">
+              <Shield size={20} className="text-emerald-600" />
+              <span className="text-sm sm:text-base font-black text-slate-800">Privacy Policy</span>
             </div>
-            <ChevronRight size={14} className="text-slate-400" />
+            <ChevronRight size={16} className="text-slate-400" />
           </button>
 
           <button 
             onClick={() => alert("Account deletion request initiated.")}
-            className="w-full p-3 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer text-left rounded-xl"
+            className="w-full p-3.5 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer text-left rounded-xl"
           >
-            <div className="flex items-center gap-3">
-              <Trash2 size={18} className="text-red-500" />
-              <span className="text-xs font-extrabold text-slate-800">Delete Account</span>
+            <div className="flex items-center gap-3.5">
+              <Trash2 size={20} className="text-red-500" />
+              <span className="text-sm sm:text-base font-black text-slate-800">Delete Account</span>
             </div>
-            <ChevronRight size={14} className="text-slate-400" />
+            <ChevronRight size={16} className="text-slate-400" />
           </button>
 
           <button 
             onClick={handleLogout}
-            className="w-full p-3 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer text-left rounded-xl"
+            className="w-full p-3.5 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer text-left rounded-xl"
           >
-            <div className="flex items-center gap-3">
-              <LogOut size={18} className="text-slate-600" />
-              <span className="text-xs font-extrabold text-slate-800">Logout</span>
+            <div className="flex items-center gap-3.5">
+              <LogOut size={20} className="text-slate-600" />
+              <span className="text-sm sm:text-base font-black text-slate-800">Logout</span>
             </div>
-            <ChevronRight size={14} className="text-slate-400" />
+            <ChevronRight size={16} className="text-slate-400" />
           </button>
 
         </div>
