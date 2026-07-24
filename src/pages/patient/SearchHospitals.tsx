@@ -267,7 +267,7 @@ export const SearchHospitals: React.FC<SearchHospitalsProps> = ({
                       
                       {/* Category & Fee badge row */}
                       <div className="flex items-center justify-between gap-1 flex-wrap">
-                        <span className="bg-blue-50 text-blue-700 font-extrabold text-[9px] px-2 py-0.5 rounded-lg border border-blue-100/50">
+                        <span className="bg-blue-50/90 text-blue-700 font-black text-[11.5px] sm:text-xs px-3 py-1 rounded-xl border border-blue-200/80 shadow-2xs">
                           {hosp.category}
                         </span>
                         {minFee > 0 && (
