@@ -9,20 +9,20 @@
   --color-accent: #22C55E;
 }
 
-/* Responsive font scaling: Increase font sizes slightly on mobile (<640px) and tablet (640px-1023px) views */
+/* Increased font scaling across all pages and viewports (mobile, tablet, desktop) for maximum readability */
 html {
-  font-size: 17px;
+  font-size: 18px;
 }
 
 @media (min-width: 640px) {
   html {
-    font-size: 17.5px;
+    font-size: 18.5px;
   }
 }
 
 @media (min-width: 1024px) {
   html {
-    font-size: 16px;
+    font-size: 17.5px;
   }
 }
 
