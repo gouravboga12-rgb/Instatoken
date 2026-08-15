@@ -61,8 +61,7 @@ export const AdminDashboard: React.FC = () => {
   const allCustomerBookings = safeCustomers.flatMap(c => c?.bookings || []);
   const customerRevenueSum = allCustomerBookings.reduce((sum, b) => sum + (b?.fee || 0), 0);
   const apptRevenueSum = safeAppointments.reduce((sum, a) => sum + (a?.fee || 500), 0);
-  const totalRevenueGenerated = customerRevenueSum + apptRevenueSum + 185000;
-  const platformCommissionEarned = Math.round(totalRevenueGenerated * 0.10);
+  const totalRevenueGenerated = customerRevenueSum + apptRevenueSum;
   const activeHospitalsCount = safeHospitals.filter(h => h?.status !== 'disabled').length;
   const disabledHospitalsCount = safeHospitals.filter(h => h?.status === 'disabled').length;
 
@@ -147,11 +146,11 @@ export const AdminDashboard: React.FC = () => {
   // CSV Revenue Report Export Handler
   const exportFinancialCSV = () => {
     const csvRows = [
-      ["Customer Name", "Phone", "Email", "Hospital", "Doctor", "Token #", "Consultation Fee (INR)", "Admin Fee 10% (INR)", "Payment Method", "Date", "Status"]
+      ["Customer Name", "Phone", "Email", "Hospital", "Doctor", "Token #", "Token Fee (INR)", "Payment Method", "Date", "Status"]
     ];
 
-    customers.forEach(cust => {
-      cust.bookings.forEach(b => {
+    (customers || []).forEach(cust => {
+      (cust.bookings || []).forEach(b => {
         csvRows.push([
           `"${cust.name}"`,
           `"${cust.phone}"`,
@@ -160,7 +159,6 @@ export const AdminDashboard: React.FC = () => {
           `"${b.doctorName}"`,
           `"${b.tokenNumber}"`,
           `"${b.fee}"`,
-          `"${Math.round(b.fee * 0.10)}"`,
           `"${b.paymentMethod}"`,
           `"${b.date}"`,
           `"${b.status}"`
@@ -348,13 +346,13 @@ export const AdminDashboard: React.FC = () => {
               <Card className="p-4 border-none shadow-xs text-center flex flex-col justify-between bg-white hover:shadow-md transition-shadow">
                 <span className="text-[10px] text-slate-400 font-black uppercase tracking-wider block">Total Customer Revenue</span>
                 <span className="text-3xl font-black text-blue-600 font-heading block mt-1">₹{totalRevenueGenerated.toLocaleString()}</span>
-                <span className="text-[9px] text-emerald-600 font-extrabold block mt-1">↑ 18% vs last month</span>
+                <span className="text-[9px] text-slate-400 font-semibold block mt-1">From token booking fees</span>
               </Card>
 
               <Card className="p-4 border-none shadow-xs text-center flex flex-col justify-between bg-white hover:shadow-md transition-shadow">
-                <span className="text-[10px] text-slate-400 font-black uppercase tracking-wider block">Admin Commission (10%)</span>
-                <span className="text-3xl font-black text-emerald-600 font-heading block mt-1">₹{platformCommissionEarned.toLocaleString()}</span>
-                <span className="text-[9px] text-slate-400 font-semibold block mt-1">Net platform earnings</span>
+                <span className="text-[10px] text-slate-400 font-black uppercase tracking-wider block">Total Tokens Booked</span>
+                <span className="text-3xl font-black text-emerald-600 font-heading block mt-1">{totalCustomerTokens}</span>
+                <span className="text-[9px] text-slate-400 font-semibold block mt-1">Online & Walk-in patient tokens</span>
               </Card>
 
               <Card className="p-4 border-none shadow-xs text-center flex flex-col justify-between bg-white hover:shadow-md transition-shadow">
@@ -366,7 +364,7 @@ export const AdminDashboard: React.FC = () => {
               <Card className="p-4 border-none shadow-xs text-center flex flex-col justify-between bg-white hover:shadow-md transition-shadow">
                 <span className="text-[10px] text-slate-400 font-black uppercase tracking-wider block">Registered Customers</span>
                 <span className="text-3xl font-black text-purple-600 font-heading block mt-1">{customers.length}</span>
-                <span className="text-[9px] text-slate-400 font-semibold block mt-1">{totalCustomerTokens} Tokens Booked</span>
+                <span className="text-[9px] text-slate-400 font-semibold block mt-1">Across all locations</span>
               </Card>
             </div>
 
@@ -828,7 +826,7 @@ export const AdminDashboard: React.FC = () => {
             </div>
 
             {/* Financial Headline Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-2xl p-5 shadow-lg shadow-blue-500/20 space-y-2">
                 <p className="text-xs font-bold text-blue-200 uppercase tracking-wider">Gross Customer Revenue</p>
                 <div className="text-3xl font-black font-heading">₹{totalRevenueGenerated.toLocaleString()}</div>
@@ -836,15 +834,9 @@ export const AdminDashboard: React.FC = () => {
               </div>
 
               <div className="bg-gradient-to-br from-emerald-600 to-teal-700 text-white rounded-2xl p-5 shadow-lg shadow-emerald-500/20 space-y-2">
-                <p className="text-xs font-bold text-emerald-200 uppercase tracking-wider">Super Admin Net Earnings</p>
-                <div className="text-3xl font-black font-heading">₹{platformCommissionEarned.toLocaleString()}</div>
-                <p className="text-[10px] text-emerald-200">10% Platform fee on token transactions</p>
-              </div>
-
-              <div className="bg-gradient-to-br from-slate-800 to-slate-900 text-white rounded-2xl p-5 shadow-lg shadow-slate-900/20 space-y-2">
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Hospital Payout Settlements</p>
-                <div className="text-3xl font-black font-heading">₹{(totalRevenueGenerated - platformCommissionEarned).toLocaleString()}</div>
-                <p className="text-[10px] text-slate-400">90% transferred to partner hospital bank accounts</p>
+                <p className="text-xs font-bold text-emerald-200 uppercase tracking-wider">Total Customer Tokens</p>
+                <div className="text-3xl font-black font-heading">{totalCustomerTokens}</div>
+                <p className="text-[10px] text-emerald-200">Total patient consultation tokens issued</p>
               </div>
 
               <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-xs space-y-2">
@@ -854,92 +846,57 @@ export const AdminDashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* Split Tables: Top Customer Spenders + Hospital Revenue Ledger */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              {/* Customer Revenue Breakdown Table (6 cols) */}
-              <div className="lg:col-span-6 bg-white rounded-2xl border border-slate-100 shadow-xs p-5 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-xs font-black text-slate-800 uppercase tracking-wide">Revenue Generated Per Customer</h3>
-                    <p className="text-[10px] text-slate-400 font-semibold">Top spending patients on InstaToken platform</p>
-                  </div>
-                  <Users size={16} className="text-blue-600" />
+            {/* Customer Revenue Breakdown Table (Full Width) */}
+            <div className="w-full bg-white rounded-2xl border border-slate-100 shadow-xs p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-xs font-black text-slate-800 uppercase tracking-wide">Revenue Generated Per Customer</h3>
+                  <p className="text-[10px] text-slate-400 font-semibold">Tracking customer token booking payments across all registered patients</p>
                 </div>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs text-left border-collapse">
-                    <thead className="bg-slate-50 border-b border-slate-100 text-[10px] font-black text-slate-500 uppercase">
-                      <tr>
-                        <th className="py-2.5 px-3">Customer</th>
-                        <th className="py-2.5 px-3">Tokens</th>
-                        <th className="py-2.5 px-3">Gross Revenue</th>
-                        <th className="py-2.5 px-3">Admin Fee (10%)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {customers.map((cust) => {
-                        const totalSpent = (cust.bookings || []).reduce((sum, b) => sum + (b?.fee || 0), 0);
-                        const adminEarned = Math.round(totalSpent * 0.10);
-                        return (
-                          <tr key={cust.id} className="border-b border-slate-50 hover:bg-slate-50/50">
-                            <td className="py-2.5 px-3 font-bold text-slate-800">
-                              {cust.name}
-                              <span className="block text-[9px] text-slate-400 font-medium">{cust.phone}</span>
-                            </td>
-                            <td className="py-2.5 px-3 font-extrabold text-blue-600">{cust.bookings?.length || 0} Tokens</td>
-                            <td className="py-2.5 px-3 font-black text-slate-800">₹{totalSpent.toLocaleString()}</td>
-                            <td className="py-2.5 px-3 font-extrabold text-emerald-600">₹{adminEarned.toLocaleString()}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                <Users size={16} className="text-blue-600" />
               </div>
 
-              {/* Hospital Settlement Ledger (6 cols) */}
-              <div className="lg:col-span-6 bg-white rounded-2xl border border-slate-100 shadow-xs p-5 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-xs font-black text-slate-800 uppercase tracking-wide">Hospital Revenue & Payout Ledger</h3>
-                    <p className="text-[10px] text-slate-400 font-semibold">Volume & 10% platform fee breakdown by hospital</p>
-                  </div>
-                  <Building2 size={16} className="text-emerald-600" />
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs text-left border-collapse">
-                    <thead className="bg-slate-50 border-b border-slate-100 text-[10px] font-black text-slate-500 uppercase">
-                      <tr>
-                        <th className="py-2.5 px-3">Hospital</th>
-                        <th className="py-2.5 px-3">Gross Volume</th>
-                        <th className="py-2.5 px-3">Admin Fee (10%)</th>
-                        <th className="py-2.5 px-3">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {hospitals.map((hosp, idx) => {
-                        const baseVol = 35000 + (idx * 12500);
-                        const adminFee = Math.round(baseVol * 0.10);
-                        return (
-                          <tr key={hosp.id} className="border-b border-slate-50 hover:bg-slate-50/50">
-                            <td className="py-2.5 px-3 font-bold text-slate-800">
-                              {hosp.name}
-                              <span className="block text-[9px] text-slate-400 font-medium">{hosp.category}</span>
-                            </td>
-                            <td className="py-2.5 px-3 font-black text-slate-800">₹{baseVol.toLocaleString()}</td>
-                            <td className="py-2.5 px-3 font-extrabold text-emerald-600">₹{adminFee.toLocaleString()}</td>
-                            <td className="py-2.5 px-3">
-                              <span className="bg-emerald-100 text-emerald-700 text-[9px] font-extrabold px-2 py-0.5 rounded-full">
-                                Settled
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-left border-collapse">
+                  <thead className="bg-slate-50 border-b border-slate-100 text-[10px] font-black text-slate-500 uppercase">
+                    <tr>
+                      <th className="py-2.5 px-3">Customer Account</th>
+                      <th className="py-2.5 px-3">Contact & Location</th>
+                      <th className="py-2.5 px-3">Tokens Booked</th>
+                      <th className="py-2.5 px-3">Hospitals Visited</th>
+                      <th className="py-2.5 px-3">Gross Customer Spend</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {customers.map((cust) => {
+                      const totalSpent = (cust.bookings || []).reduce((sum, b) => sum + (b?.fee || 0), 0);
+                      const uniqueHospitals = new Set((cust.bookings || []).map(b => b.hospitalId)).size;
+                      return (
+                        <tr key={cust.id} className="border-b border-slate-50 hover:bg-slate-50/50">
+                          <td className="py-2.5 px-3 font-bold text-slate-800">
+                            {cust.name}
+                            <span className="block text-[9px] text-slate-400 font-medium">{cust.email}</span>
+                          </td>
+                          <td className="py-2.5 px-3 text-slate-700">
+                            <span className="font-bold">{cust.phone}</span>
+                            <span className="block text-[9px] text-slate-400 font-medium">{cust.location}</span>
+                          </td>
+                          <td className="py-2.5 px-3 font-extrabold text-blue-600">
+                            <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded-lg">
+                              {cust.bookings?.length || 0} Tokens
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 font-extrabold text-purple-600">
+                            <span className="bg-purple-50 text-purple-700 px-2 py-0.5 rounded-lg">
+                              🏥 {uniqueHospitals} Hospitals
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 font-black text-emerald-600">₹{totalSpent.toLocaleString()}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
