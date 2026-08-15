@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useHospital } from '../../context/HospitalContext';
 import type { HospitalDoctor, HospitalDepartment } from '../../context/HospitalContext';
-import { Plus, Edit3, Trash2, Eye, EyeOff, Search } from 'lucide-react';
+import { Plus, Edit3, Trash2, Eye, EyeOff, Search, Upload, User } from 'lucide-react';
 
 interface DoctorManagementProps {
   tab?: 'doctors' | 'departments';
@@ -52,6 +52,17 @@ export const DoctorManagement: React.FC<DoctorManagementProps> = ({ tab: initial
     offlineConsult: true,
     active: true
   });
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setDocForm(prev => ({ ...prev, photo: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   // Form Fields for Department
   const [deptForm, setDeptForm] = useState({
@@ -358,6 +369,48 @@ export const DoctorManagement: React.FC<DoctorManagementProps> = ({ tab: initial
               <button onClick={() => setShowDocModal(false)} className="p-1 rounded-lg hover:bg-slate-50 cursor-pointer border-none text-slate-400">✕</button>
             </div>
             <form onSubmit={handleDocSubmit} className="p-6 space-y-4">
+              {/* Doctor Photo Upload Section */}
+              <div className="flex flex-col sm:flex-row items-center gap-4 p-4 bg-slate-50 border border-slate-100 rounded-2xl">
+                <div className="w-16 h-16 rounded-2xl bg-white border border-slate-200 shadow-xs overflow-hidden shrink-0 flex items-center justify-center text-slate-400 font-extrabold text-lg">
+                  {docForm.photo ? (
+                    <img src={docForm.photo} alt="Doctor preview" className="w-full h-full object-cover" />
+                  ) : (
+                    <User size={28} className="text-slate-300" />
+                  )}
+                </div>
+                <div className="flex-1 space-y-1.5 text-center sm:text-left">
+                  <label className="text-xs font-extrabold text-slate-700 block">Doctor Profile Photo</label>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold px-3 py-1.5 rounded-xl cursor-pointer inline-flex items-center gap-1.5 transition-colors shadow-xs">
+                      <Upload size={13} />
+                      <span>Upload Photo</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handlePhotoUpload}
+                        className="hidden"
+                      />
+                    </label>
+                    {docForm.photo && (
+                      <button
+                        type="button"
+                        onClick={() => setDocForm(prev => ({ ...prev, photo: '' }))}
+                        className="text-xs font-bold text-red-600 hover:bg-red-50 px-2.5 py-1.5 rounded-xl border border-red-200 cursor-pointer transition-colors"
+                      >
+                        Remove Photo
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    value={docForm.photo}
+                    onChange={e => setDocForm(prev => ({ ...prev, photo: e.target.value }))}
+                    placeholder="Or paste image URL (https://...)"
+                    className="w-full mt-1 px-3 py-1.5 border border-slate-200 rounded-xl text-[11px] outline-none focus:border-blue-500 bg-white"
+                  />
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2 sm:col-span-1">
                   <label className="text-xs font-bold text-slate-700 block mb-1.5">Doctor Name</label>

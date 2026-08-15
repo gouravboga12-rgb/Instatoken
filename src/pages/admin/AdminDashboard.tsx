@@ -10,7 +10,7 @@ import {
   TrendingUp, ShieldCheck, Activity, Bell,
   DollarSign, Building2, CheckCircle2, Search, Plus,
   Users, UserCheck, UserX,
-  AlertTriangle, Download, X, Calendar
+  AlertTriangle, Download, X, Calendar, Upload, User
 } from 'lucide-react';
 
 export const AdminDashboard: React.FC = () => {
@@ -36,11 +36,23 @@ export const AdminDashboard: React.FC = () => {
   // --- Add Doctor Form State ---
   const [selectedHospId, setSelectedHospId] = useState(hospitals[0]?.id || '');
   const [docName, setDocName] = useState('');
+  const [docPhoto, setDocPhoto] = useState('');
   const [docSpecialty, setDocSpecialty] = useState('');
   const [docDeptId, setDocDeptId] = useState('dept-general');
   const [docQual, setDocQual] = useState('MBBS, MD');
   const [docExp, setDocExp] = useState('10');
   const [docFee, setDocFee] = useState('500');
+
+  const handleDocPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setDocPhoto(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
   
   // --- Hospital Management State ---
   const [hospitalSearch, setHospitalSearch] = useState('');
@@ -124,7 +136,7 @@ export const AdminDashboard: React.FC = () => {
       experience: parseInt(docExp),
       consultationFee: parseInt(docFee),
       estimatedWaitPerPatient: 10,
-      image: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?auto=format&fit=crop&q=80&w=400",
+      image: docPhoto || "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?auto=format&fit=crop&q=80&w=400",
       availability: {
         days: ["Mon", "Tue", "Wed", "Thu", "Fri"],
         slots: ["09:00 AM", "10:00 AM", "11:00 AM", "02:00 PM", "03:00 PM", "04:00 PM"]
@@ -139,6 +151,7 @@ export const AdminDashboard: React.FC = () => {
 
     // Reset Form
     setDocName('');
+    setDocPhoto('');
     setDocSpecialty('');
     setAdminTab('hospitals');
   };
@@ -1009,6 +1022,48 @@ export const AdminDashboard: React.FC = () => {
             </div>
 
             <form onSubmit={handleCreateDoctor} className="space-y-4 text-left">
+              {/* Doctor Photo Upload Header */}
+              <div className="flex flex-col sm:flex-row items-center gap-4 p-4 bg-slate-50 border border-slate-100 rounded-2xl">
+                <div className="w-14 h-14 rounded-2xl bg-white border border-slate-200 shadow-xs overflow-hidden shrink-0 flex items-center justify-center text-slate-400 font-extrabold text-lg">
+                  {docPhoto ? (
+                    <img src={docPhoto} alt="Doctor preview" className="w-full h-full object-cover" />
+                  ) : (
+                    <User size={24} className="text-slate-300" />
+                  )}
+                </div>
+                <div className="flex-1 space-y-1.5 text-center sm:text-left">
+                  <label className="text-xs font-extrabold text-slate-700 block">Doctor Profile Photo</label>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold px-3 py-1.5 rounded-xl cursor-pointer inline-flex items-center gap-1.5 transition-colors shadow-xs">
+                      <Upload size={13} />
+                      <span>Upload Photo</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleDocPhotoUpload}
+                        className="hidden"
+                      />
+                    </label>
+                    {docPhoto && (
+                      <button
+                        type="button"
+                        onClick={() => setDocPhoto('')}
+                        className="text-xs font-bold text-red-600 hover:bg-red-50 px-2 py-1 rounded-xl border border-red-200 cursor-pointer transition-colors"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    value={docPhoto}
+                    onChange={e => setDocPhoto(e.target.value)}
+                    placeholder="Or paste image URL (https://...)"
+                    className="w-full mt-1 px-3 py-1.5 border border-slate-200 rounded-xl text-[11px] outline-none focus:border-blue-500 bg-white"
+                  />
+                </div>
+              </div>
+
               <div className="space-y-1">
                 <label className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wide">Assign Hospital</label>
                 <select 
