@@ -55,17 +55,20 @@ export const AdminDashboard: React.FC = () => {
   const [revenueDateFilter, setRevenueDateFilter] = useState<'all' | 'month' | 'today'>('all');
 
   // Calculate gross customer revenue across mock customers & live appointments
-  const allCustomerBookings = customers.flatMap(c => c.bookings);
-  const customerRevenueSum = allCustomerBookings.reduce((sum, b) => sum + b.fee, 0);
-  const apptRevenueSum = appointments.reduce((sum, a) => sum + (a.fee || 500), 0);
+  const safeCustomers = customers || [];
+  const safeAppointments = appointments || [];
+  const safeHospitals = hospitals || [];
+  const allCustomerBookings = safeCustomers.flatMap(c => c?.bookings || []);
+  const customerRevenueSum = allCustomerBookings.reduce((sum, b) => sum + (b?.fee || 0), 0);
+  const apptRevenueSum = safeAppointments.reduce((sum, a) => sum + (a?.fee || 500), 0);
   const totalRevenueGenerated = customerRevenueSum + apptRevenueSum + 185000;
   const platformCommissionEarned = Math.round(totalRevenueGenerated * 0.10);
-  const activeHospitalsCount = hospitals.filter(h => h.status !== 'disabled').length;
-  const disabledHospitalsCount = hospitals.filter(h => h.status === 'disabled').length;
+  const activeHospitalsCount = safeHospitals.filter(h => h?.status !== 'disabled').length;
+  const disabledHospitalsCount = safeHospitals.filter(h => h?.status === 'disabled').length;
 
   // Customer aggregates
-  const totalCustomerTokens = allCustomerBookings.length + appointments.length;
-  const avgRevenuePerCustomer = customers.length > 0 ? Math.round(totalRevenueGenerated / customers.length) : 0;
+  const totalCustomerTokens = allCustomerBookings.length + safeAppointments.length;
+  const avgRevenuePerCustomer = safeCustomers.length > 0 ? Math.round(totalRevenueGenerated / safeCustomers.length) : 0;
 
   const handleCreateHospital = (e: React.FormEvent) => {
     e.preventDefault();
@@ -710,8 +713,8 @@ export const AdminDashboard: React.FC = () => {
                         return matchesSearch;
                       })
                       .map((cust) => {
-                        const uniqueHospitalsCount = new Set(cust.bookings.map(b => b.hospitalId)).size;
-                        const customerSpendTotal = cust.bookings.reduce((sum, b) => sum + b.fee, 0);
+                        const uniqueHospitalsCount = new Set((cust.bookings || []).map(b => b.hospitalId)).size;
+                        const customerSpendTotal = (cust.bookings || []).reduce((sum, b) => sum + (b?.fee || 0), 0);
 
                         return (
                           <tr key={cust.id} className="border-b border-slate-50 hover:bg-slate-50/60 transition-colors">
@@ -875,7 +878,7 @@ export const AdminDashboard: React.FC = () => {
                     </thead>
                     <tbody>
                       {customers.map((cust) => {
-                        const totalSpent = cust.bookings.reduce((sum, b) => sum + b.fee, 0);
+                        const totalSpent = (cust.bookings || []).reduce((sum, b) => sum + (b?.fee || 0), 0);
                         const adminEarned = Math.round(totalSpent * 0.10);
                         return (
                           <tr key={cust.id} className="border-b border-slate-50 hover:bg-slate-50/50">
@@ -883,7 +886,7 @@ export const AdminDashboard: React.FC = () => {
                               {cust.name}
                               <span className="block text-[9px] text-slate-400 font-medium">{cust.phone}</span>
                             </td>
-                            <td className="py-2.5 px-3 font-extrabold text-blue-600">{cust.bookings.length} Tokens</td>
+                            <td className="py-2.5 px-3 font-extrabold text-blue-600">{cust.bookings?.length || 0} Tokens</td>
                             <td className="py-2.5 px-3 font-black text-slate-800">₹{totalSpent.toLocaleString()}</td>
                             <td className="py-2.5 px-3 font-extrabold text-emerald-600">₹{adminEarned.toLocaleString()}</td>
                           </tr>

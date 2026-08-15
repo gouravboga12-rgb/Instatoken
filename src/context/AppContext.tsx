@@ -216,7 +216,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [customers, setCustomers] = useState<CustomerAccount[]>(() => {
     const saved = localStorage.getItem('insta_customers');
-    return saved ? JSON.parse(saved) : MOCK_CUSTOMERS;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0 && Array.isArray(parsed[0]?.bookings)) {
+          return parsed;
+        }
+      } catch (e) {}
+    }
+    return MOCK_CUSTOMERS;
   });
 
   const [currentLocation, setCurrentLocation] = useState<string>(() => {
