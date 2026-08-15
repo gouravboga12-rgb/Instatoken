@@ -275,7 +275,7 @@ const INITIAL_DEPARTMENTS: HospitalDepartment[] = [
 
 const INITIAL_DOCTORS: HospitalDoctor[] = [
   {
-    id: 'doc-arvind', name: 'Dr. Arvind Sharma', photo: '',
+    id: 'doc-arvind', name: 'Dr. Arvind Sharma', photo: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=400&auto=format&fit=crop&q=80',
     qualification: 'MD, DM (Cardiology), FACC', specialization: 'Interventional Cardiologist',
     departmentId: 'dept-cardio', departmentName: 'Cardiology', experience: 16,
     consultationFee: 800, languages: ['Hindi', 'English', 'Kannada'], gender: 'Male',
@@ -286,7 +286,7 @@ const INITIAL_DOCTORS: HospitalDoctor[] = [
     onlineConsult: true, offlineConsult: true, active: true, rating: 4.9, totalPatients: 4820,
   },
   {
-    id: 'doc-sarah', name: 'Dr. Sarah Jenkins', photo: '',
+    id: 'doc-sarah', name: 'Dr. Sarah Jenkins', photo: 'https://images.unsplash.com/photo-1594824813573-246434de83fb?w=400&auto=format&fit=crop&q=80',
     qualification: 'MBBS, DM (Neurology)', specialization: 'Consultant Neurologist',
     departmentId: 'dept-neuro', departmentName: 'Neurology', experience: 12,
     consultationFee: 1000, languages: ['English', 'Hindi'], gender: 'Female',
@@ -297,7 +297,7 @@ const INITIAL_DOCTORS: HospitalDoctor[] = [
     onlineConsult: true, offlineConsult: true, active: true, rating: 4.7, totalPatients: 2140,
   },
   {
-    id: 'doc-ramesh', name: 'Dr. Ramesh Patel', photo: '',
+    id: 'doc-ramesh', name: 'Dr. Ramesh Patel', photo: 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&auto=format&fit=crop&q=80',
     qualification: 'MS (Ortho), MCh (Ortho)', specialization: 'Joint Replacement Specialist',
     departmentId: 'dept-ortho', departmentName: 'Orthopedics', experience: 18,
     consultationFee: 900, languages: ['Gujarati', 'Hindi', 'English'], gender: 'Male',
@@ -308,7 +308,7 @@ const INITIAL_DOCTORS: HospitalDoctor[] = [
     onlineConsult: false, offlineConsult: true, active: true, rating: 4.8, totalPatients: 3300,
   },
   {
-    id: 'doc-anjali', name: 'Dr. Anjali Sharma', photo: '',
+    id: 'doc-anjali', name: 'Dr. Anjali Sharma', photo: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=400&auto=format&fit=crop&q=80',
     qualification: 'MD (Pediatrics), Fellowship in Neonatology', specialization: 'Pediatrician',
     departmentId: 'dept-pedia', departmentName: 'Pediatrics', experience: 10,
     consultationFee: 700, languages: ['Hindi', 'English', 'Telugu'], gender: 'Female',
@@ -319,7 +319,7 @@ const INITIAL_DOCTORS: HospitalDoctor[] = [
     onlineConsult: true, offlineConsult: true, active: true, rating: 4.8, totalPatients: 5600,
   },
   {
-    id: 'doc-vivek', name: 'Dr. Vivek Singh', photo: '',
+    id: 'doc-vivek', name: 'Dr. Vivek Singh', photo: 'https://images.unsplash.com/photo-1537368910025-700350fe46c7?w=400&auto=format&fit=crop&q=80',
     qualification: 'MBBS, MS - Orthopedics', specialization: 'Orthopedic Surgeon',
     departmentId: 'dept-ortho', departmentName: 'Orthopedics', experience: 12,
     consultationFee: 600, languages: ['Hindi', 'English'], gender: 'Male',

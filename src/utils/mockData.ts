@@ -242,6 +242,44 @@ export const HOSPITALS: Hospital[] = [
         currentQueue: 8,
         nextAvailableToken: 12,
         estimatedWaitPerPatient: 10
+      },
+      {
+        id: "doc-anjali",
+        name: "Dr. Anjali Sharma",
+        specialty: "Pediatrician",
+        departmentId: "dept-pedia",
+        qualification: "MD (Pediatrics), Fellowship in Neonatology",
+        experience: 10,
+        consultationFee: 700,
+        rating: 4.8,
+        reviewsCount: 195,
+        image: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=400&auto=format&fit=crop&q=80",
+        availability: {
+          days: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+          slots: ["09:00 AM", "09:30 AM", "10:00 AM", "10:30 AM", "11:00 AM", "02:00 PM"]
+        },
+        currentQueue: 3,
+        nextAvailableToken: 7,
+        estimatedWaitPerPatient: 12
+      },
+      {
+        id: "doc-vivek",
+        name: "Dr. Vivek Singh",
+        specialty: "Orthopedic Surgeon",
+        departmentId: "dept-ortho",
+        qualification: "MBBS, MS - Orthopedics",
+        experience: 12,
+        consultationFee: 600,
+        rating: 4.6,
+        reviewsCount: 140,
+        image: "https://images.unsplash.com/photo-1537368910025-700350fe46c7?w=400&auto=format&fit=crop&q=80",
+        availability: {
+          days: ["Mon", "Wed", "Fri"],
+          slots: ["05:00 PM", "05:30 PM", "06:00 PM", "06:30 PM", "07:00 PM"]
+        },
+        currentQueue: 1,
+        nextAvailableToken: 4,
+        estimatedWaitPerPatient: 15
       }
     ]
   },
