@@ -17,6 +17,10 @@ const specializations = [
   { name: "Ophthalmology", image: "/ophthalmology.png" },
 ];
 
+import { useGoogleLogin } from '@react-oauth/google';
+import { OTPModal } from '../../components/common/OTPModal';
+import { ForgotPasswordModal } from '../../components/common/ForgotPasswordModal';
+
 export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
   const { login, signup } = useApp();
   const [mode, setMode] = useState<'login' | 'signup' | 'otp'>('login');
@@ -30,59 +34,79 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-
+  // OTP & Forgot Password Modals
+  const [showOtpModal, setShowOtpModal] = useState(false);
+  const [showForgotModal, setShowForgotModal] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setLoading(true);
 
-    setTimeout(() => {
-      if (mode === 'login') {
-        if (!emailOrPhone || !password) {
-          setError('Please fill in all fields');
-          setLoading(false);
-          return;
-        }
-        login(emailOrPhone, password);
-        onSuccess();
-      } else if (mode === 'otp') {
-        if (!emailOrPhone || !otp) {
-          setError('Please enter mobile number and 4-digit OTP');
-          setLoading(false);
-          return;
-        }
-        login(emailOrPhone, otp);
-        onSuccess();
-      } else {
-        if (!name || !email || !phone || !password || !confirmPassword) {
-          setError('Please fill in all fields');
-          setLoading(false);
-          return;
-        }
-        if (password !== confirmPassword) {
-          setError('Passwords do not match');
-          setLoading(false);
-          return;
-        }
-        signup(name, email, phone);
-        onSuccess();
+    if (mode === 'login') {
+      if (!emailOrPhone || !password) {
+        setError('Please fill in all fields');
+        return;
       }
-      setLoading(false);
-    }, 800);
-  };
-
-  const fillDemoCreds = (role: 'patient' | 'admin') => {
-    if (role === 'admin') {
-      setEmailOrPhone('admin@instatoken.com');
-      setPassword('admin');
-      setMode('login');
+      setLoading(true);
+      setTimeout(() => {
+        login(emailOrPhone, password);
+        setLoading(false);
+        onSuccess();
+      }, 500);
+    } else if (mode === 'otp') {
+      if (!emailOrPhone || !otp) {
+        setError('Please enter mobile number and 4-digit OTP');
+        return;
+      }
+      setLoading(true);
+      setTimeout(() => {
+        login(emailOrPhone, otp);
+        setLoading(false);
+        onSuccess();
+      }, 500);
     } else {
-      setEmailOrPhone('patient@example.com');
-      setPassword('password');
-      setMode('login');
+      // Signup flow -> Require OTP verification
+      if (!name || !email || !phone || !password || !confirmPassword) {
+        setError('Please fill in all fields');
+        return;
+      }
+      if (password !== confirmPassword) {
+        setError('Passwords do not match');
+        return;
+      }
+      setShowOtpModal(true);
     }
   };
+
+  const handleOtpSuccess = () => {
+    setShowOtpModal(false);
+    signup(name, email, phone);
+    onSuccess();
+  };
+
+  const handleGoogleAuth = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      setLoading(true);
+      try {
+        const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+        });
+        const profile = await res.json();
+        setLoading(false);
+        if (profile.email) {
+          login(profile.email, 'google');
+          onSuccess();
+        }
+      } catch (err) {
+        setLoading(false);
+        login('google-user@gmail.com', 'google');
+        onSuccess();
+      }
+    },
+    onError: () => {
+      setError('Google Sign-In was cancelled or failed.');
+    },
+  });
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row md:items-center md:justify-center p-0 md:p-8">
@@ -325,10 +349,10 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
                     {mode === 'login' && (
                       <button 
                         type="button"
-                        className="text-[10px] text-blue-600 font-bold hover:underline cursor-pointer"
-                        onClick={() => alert("Verification code sent to email/mobile.")}
+                        className="text-[11px] text-blue-600 font-extrabold hover:underline cursor-pointer border-none bg-transparent"
+                        onClick={() => setShowForgotModal(true)}
                       >
-                        Forgot?
+                        Forgot Password?
                       </button>
                     )}
                   </div>
@@ -405,8 +429,9 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
             {/* Social Logins */}
             <div className="mb-4">
               <button 
-                onClick={() => { login('google-user@gmail.com', 'google'); onSuccess(); }}
-                className="flex w-full items-center justify-center gap-2 py-2 px-3 border border-slate-150 rounded-xl bg-white text-slate-600 text-xs font-semibold hover:bg-slate-50 transition-colors cursor-pointer"
+                type="button"
+                onClick={() => handleGoogleAuth()}
+                className="flex w-full items-center justify-center gap-2 py-2.5 px-3 border border-slate-200 rounded-xl bg-white text-slate-700 text-xs font-bold hover:bg-slate-50 transition-all cursor-pointer shadow-xs"
               >
                 <svg className="w-3.5 h-3.5" viewBox="0 0 24 24">
                   <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.67 1.64 15.04 1 12 1 7.35 1 3.37 3.65 1.39 7.56l3.85 2.99c.9-2.7 3.42-4.51 6.76-4.51z"/>
@@ -477,28 +502,28 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
               </div>
             </div>
 
-            {/* Demo buttons */}
-            <div className="mt-6 p-3 bg-blue-50/50 border border-blue-100 rounded-2xl flex gap-2 justify-between">
-              <button 
-                type="button"
-                onClick={() => fillDemoCreds('patient')}
-                className="flex-1 text-center py-1.5 px-2 bg-blue-600 text-white rounded-lg text-[10px] font-bold hover:bg-blue-700 cursor-pointer"
-              >
-                Patient Demo
-              </button>
-              <button 
-                type="button"
-                onClick={() => fillDemoCreds('admin')}
-                className="flex-1 text-center py-1.5 px-2 bg-slate-800 text-white rounded-lg text-[10px] font-bold hover:bg-slate-900 cursor-pointer"
-              >
-                Admin Demo
-              </button>
-            </div>
-
           </div>
         </div>
 
       </div>
+
+      {/* Customer Signup OTP Verification Modal */}
+      <OTPModal
+        isOpen={showOtpModal}
+        email={email}
+        type="customer_signup"
+        recipientName={name}
+        onSuccess={handleOtpSuccess}
+        onClose={() => setShowOtpModal(false)}
+        title="Customer Signup Verification"
+      />
+
+      {/* Customer Forgot Password Reset Modal */}
+      <ForgotPasswordModal
+        isOpen={showForgotModal}
+        onClose={() => setShowForgotModal(false)}
+        userType="customer"
+      />
     </div>
   );
 };

@@ -16,7 +16,7 @@ import {
   CheckSquare, Users, Stethoscope, Building2, CalendarRange, Zap, 
   Printer, ShieldCheck, MessageSquare, BarChart2, Download, Settings,
   UserCog, ChevronLeft, ChevronRight, Bell, Search, LogOut, Menu, X, Activity,
-  Layers, Heart, CreditCard
+  Layers, CreditCard
 } from 'lucide-react';
 
 // ─── RBAC permission map ──────────────────────────────────────────────────────
@@ -148,19 +148,6 @@ const Sidebar: React.FC<{ collapsed: boolean; onToggle: () => void }> = ({ colla
         })}
       </nav>
 
-      {/* Premium Banner */}
-      {!collapsed && (
-        <div className="mx-2 mb-3 bg-gradient-to-br from-blue-600/20 to-indigo-600/20 border border-blue-500/20 rounded-2xl p-3">
-          <div className="flex items-center gap-1.5 mb-1">
-            <Heart size={10} className="text-blue-400" />
-            <span className="text-[9px] font-black text-blue-400">InstaToken Premium</span>
-          </div>
-          <p className="text-[9px] text-slate-400 mb-2 leading-snug">Manage your hospital smarter & faster</p>
-          <button className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-[10px] font-black py-1.5 rounded-lg cursor-pointer border-none">
-            Upgrade Now
-          </button>
-        </div>
-      )}
     </aside>
   );
 };
@@ -269,13 +256,11 @@ const TopHeader: React.FC<{ onMenuToggle: () => void }> = ({ onMenuToggle }) => 
 // ─── Layout Shell ─────────────────────────────────────────────────────────────
 export const HospitalLayout: React.FC = () => {
   const { hospitalUser } = useHospital();
-  const navigate = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   if (!hospitalUser) {
-    navigate('/hospital-login');
-    return null;
+    return <Navigate to="/hospital-login" replace />;
   }
 
   return (

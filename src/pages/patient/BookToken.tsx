@@ -105,6 +105,19 @@ export const BookToken: React.FC = () => {
     );
   }
 
+  if (hospital.status === 'disabled') {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6 bg-white max-w-md mx-auto">
+        <div className="text-center space-y-3">
+          <div className="w-12 h-12 bg-amber-100 text-amber-700 rounded-full flex items-center justify-center mx-auto font-black text-xl">⚠️</div>
+          <h3 className="text-base font-black text-slate-800">Hospital Account Disabled</h3>
+          <p className="text-xs font-semibold text-slate-500">Token booking for {hospital.name} is currently suspended by administration.</p>
+          <Button onClick={() => navigate('/')} className="mt-2">Back to Home</Button>
+        </div>
+      </div>
+    );
+  }
+
   const dateInputRef = useRef<HTMLInputElement>(null);
 
   // Generate date pills dynamically including custom selected date

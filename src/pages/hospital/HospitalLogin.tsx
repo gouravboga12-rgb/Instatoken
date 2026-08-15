@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useHospital } from '../../context/HospitalContext';
 import { Activity, Eye, EyeOff, AlertCircle, ArrowRight, Building2, Shield } from 'lucide-react';
+import { ForgotPasswordModal } from '../../components/common/ForgotPasswordModal';
 
 export const HospitalLogin: React.FC = () => {
   const { hospitalLogin } = useHospital();
@@ -11,6 +12,7 @@ export const HospitalLogin: React.FC = () => {
   const [showPass, setShowPass] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showForgotModal, setShowForgotModal] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -151,7 +153,16 @@ export const HospitalLogin: React.FC = () => {
 
             {/* Password */}
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1.5">Password</label>
+              <div className="flex justify-between items-center mb-1.5">
+                <label className="text-xs font-bold text-slate-700 block">Password</label>
+                <button
+                  type="button"
+                  onClick={() => setShowForgotModal(true)}
+                  className="text-xs text-blue-600 font-bold hover:underline cursor-pointer border-none bg-transparent"
+                >
+                  Forgot Password?
+                </button>
+              </div>
               <div className="relative">
                 <input
                   type={showPass ? 'text' : 'password'}
@@ -164,7 +175,7 @@ export const HospitalLogin: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowPass(!showPass)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer border-none bg-transparent"
                 >
                   {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
@@ -193,7 +204,17 @@ export const HospitalLogin: React.FC = () => {
             </button>
           </form>
 
-          <div className="mt-6 text-center">
+          <div className="mt-6 pt-4 border-t border-slate-100 text-center text-xs">
+            <span className="text-slate-500 font-semibold">New Hospital? </span>
+            <button
+              onClick={() => navigate('/hospital-signup')}
+              className="text-blue-600 font-extrabold hover:underline cursor-pointer border-none bg-transparent"
+            >
+              Register Your Hospital
+            </button>
+          </div>
+
+          <div className="mt-4 text-center">
             <a href="/#/" className="text-xs text-slate-400 hover:text-blue-600 transition-colors">
               ← Back to Patient Portal
             </a>
@@ -206,6 +227,13 @@ export const HospitalLogin: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Hospital Forgot Password Reset Modal */}
+      <ForgotPasswordModal
+        isOpen={showForgotModal}
+        onClose={() => setShowForgotModal(false)}
+        userType="hospital"
+      />
     </div>
   );
 };

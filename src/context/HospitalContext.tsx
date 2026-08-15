@@ -392,7 +392,7 @@ export const useHospital = () => {
 };
 
 export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [hospitalUser, setHospitalUser] = useState<HospitalUser | null>(null);
+  const [hospitalUser, setHospitalUser] = useState<HospitalUser | null>(MOCK_USERS[0]);
   const [hospitalProfile, setHospitalProfile] = useState<HospitalProfile>(INITIAL_PROFILE);
   const [departments, setDepartments] = useState<HospitalDepartment[]>(INITIAL_DEPARTMENTS);
   const [doctors, setDoctors] = useState<HospitalDoctor[]>(INITIAL_DOCTORS);

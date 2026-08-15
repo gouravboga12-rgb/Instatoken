@@ -17,6 +17,7 @@ import { Notifications } from './pages/patient/Notifications';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { HospitalProvider } from './context/HospitalContext';
 import { HospitalLogin } from './pages/hospital/HospitalLogin';
+import { HospitalSignup } from './pages/hospital/HospitalSignup';
 import { HospitalLayout } from './pages/hospital/HospitalLayout';
 import { Footer } from './components/common/Footer';
 import { 
@@ -191,8 +192,8 @@ const AppContent: React.FC = () => {
     localStorage.setItem('insta_onboarded', String(onboarded));
   }, [onboarded]);
 
-  const isHospitalRoute = location.pathname.startsWith('/hospital');
-  const isHospitalLoginRoute = location.pathname === '/hospital-login';
+  const isHospitalRoute = location.pathname.startsWith('/hospital') && !location.pathname.startsWith('/hospital-login') && !location.pathname.startsWith('/hospital-signup') && location.pathname !== '/hospital/login' && location.pathname !== '/hospital/signup';
+  const isHospitalLoginRoute = location.pathname === '/hospital-login' || location.pathname === '/hospital-signup' || location.pathname === '/hospital/login' || location.pathname === '/hospital/signup';
 
   // Always show Splash Screen first when opening website or logging in
   if (showSplash && !isHospitalRoute && !isHospitalLoginRoute) {
@@ -251,17 +252,22 @@ const AppContent: React.FC = () => {
                   navigate('/search');
                 }
               }} 
-              onHospitalSelect={(hospId) => navigate(`/hospital/${hospId}`)}
+              onHospitalSelect={(hospId) => navigate(`/hospital-details/${hospId}`)}
               onDoctorSelect={(hospId, docId) => navigate(`/book/${hospId}/${docId}`)}
               onOpenNotifications={() => navigate('/notifications')}
             />
           } />
           <Route path="/search" element={
             <SearchHospitals 
-              onHospitalSelect={(hospId) => navigate(`/hospital/${hospId}`)} 
+              onHospitalSelect={(hospId) => navigate(`/hospital-details/${hospId}`)} 
             />
           } />
-          <Route path="/hospital/:id" element={
+          <Route path="/hospital-details/:id" element={
+            <HospitalDetails 
+              onDoctorSelect={(hospId, docId) => navigate(`/book/${hospId}/${docId}`)} 
+            />
+          } />
+          <Route path="/hospitals/:id" element={
             <HospitalDetails 
               onDoctorSelect={(hospId, docId) => navigate(`/book/${hospId}/${docId}`)} 
             />
@@ -279,6 +285,9 @@ const AppContent: React.FC = () => {
 
           {/* Hospital Panel routes */}
           <Route path="/hospital-login" element={<HospitalLogin />} />
+          <Route path="/hospital-signup" element={<HospitalSignup />} />
+          <Route path="/hospital/login" element={<HospitalLogin />} />
+          <Route path="/hospital/signup" element={<HospitalSignup />} />
           <Route path="/hospital/*" element={<HospitalLayout />} />
 
           {/* Fallback route */}

@@ -1,22 +1,28 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
-import type { Appointment } from '../../context/AppContext';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import type { CustomerAccount } from '../../utils/mockData';
 import { 
-  ArrowLeft, LayoutDashboard, Compass, Stethoscope, 
-  TrendingUp, Volume2, ShieldCheck, Activity, Bell
+  ArrowLeft, LayoutDashboard, Stethoscope, 
+  TrendingUp, Volume2, ShieldCheck, Activity, Bell,
+  DollarSign, Building2, CheckCircle2, Search, Plus,
+  Server, Key, Lock, Globe, Users, UserCheck, UserX,
+  AlertTriangle, Download, X, Calendar
 } from 'lucide-react';
 
 export const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { 
-    hospitals, appointments, advanceQueue, addHospital, addDoctor, notifications, addNotification 
+    hospitals, appointments, customers, advanceQueue, addHospital, addDoctor, 
+    toggleDisableHospital, toggleCustomerStatus, notifications, addNotification 
   } = useApp();
 
-  const [adminTab, setAdminTab] = useState<'stats' | 'queue' | 'hospital' | 'doctor'>('stats');
+  const [adminTab, setAdminTab] = useState<
+    'stats' | 'hospitals' | 'customers' | 'doctors' | 'financials' | 'queue' | 'add-hospital' | 'add-doctor' | 'aws-setup'
+  >('stats');
 
   // --- Add Hospital Form State ---
   const [hospName, setHospName] = useState('');
@@ -24,6 +30,7 @@ export const AdminDashboard: React.FC = () => {
   const [hospAddress, setHospAddress] = useState('');
   const [hospAbout, setHospAbout] = useState('');
   const [hospContact, setHospContact] = useState('');
+  const [hospCommission, setHospCommission] = useState('10');
   const hospTimings = '09:00 AM - 05:00 PM';
   
   // --- Add Doctor Form State ---
@@ -39,6 +46,18 @@ export const AdminDashboard: React.FC = () => {
   const [operatorHospId, setOperatorHospId] = useState(hospitals[0]?.id || '');
   const [operatorDocId, setOperatorDocId] = useState(hospitals[0]?.doctors[0]?.id || '');
 
+  // --- Hospital Management State ---
+  const [hospitalSearch, setHospitalSearch] = useState('');
+  const [hospitalStatusFilter, setHospitalStatusFilter] = useState<'all' | 'active' | 'disabled'>('all');
+
+  // --- Customer Management State ---
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [customerStatusFilter, setCustomerStatusFilter] = useState<'all' | 'active' | 'suspended'>('all');
+  const [selectedCustomerModal, setSelectedCustomerModal] = useState<CustomerAccount | null>(null);
+
+  // --- Financials State ---
+  const [revenueDateFilter, setRevenueDateFilter] = useState<'all' | 'month' | 'today'>('all');
+
   const operatorHosp = hospitals.find(h => h.id === operatorHospId);
   const operatorDoc = operatorHosp?.doctors.find(d => d.id === operatorDocId);
 
@@ -47,13 +66,19 @@ export const AdminDashboard: React.FC = () => {
     appt => appt.hospitalId === operatorHospId && appt.doctorId === operatorDocId && appt.status === 'booked'
   ).sort((a, b) => a.tokenNumber - b.tokenNumber);
 
-  // --- Aggregates for Dashboard ---
-  const todayBookingsCount = appointments.filter(a => a.status === 'booked').length;
-  const todayRevenue = appointments
-    .filter(a => a.status === 'completed' || a.status === 'booked')
-    .reduce((sum, a) => sum + a.fee, 0);
-  const totalPatientsRegistered = 482; // Static mock baseline
-  const activeHospitalsCount = hospitals.length;
+  // Calculate gross customer revenue across mock customers & live appointments
+  const allCustomerBookings = customers.flatMap(c => c.bookings);
+  const customerRevenueSum = allCustomerBookings.reduce((sum, b) => sum + b.fee, 0);
+  const apptRevenueSum = appointments.reduce((sum, a) => sum + (a.fee || 500), 0);
+  const totalRevenueGenerated = customerRevenueSum + apptRevenueSum + 185000;
+  const platformCommissionEarned = Math.round(totalRevenueGenerated * 0.10);
+  const activeHospitalsCount = hospitals.filter(h => h.status !== 'disabled').length;
+  const disabledHospitalsCount = hospitals.filter(h => h.status === 'disabled').length;
+  const totalDoctorsCount = hospitals.reduce((sum, h) => sum + h.doctors.length, 0);
+
+  // Customer aggregates
+  const totalCustomerTokens = allCustomerBookings.length + appointments.length;
+  const avgRevenuePerCustomer = customers.length > 0 ? Math.round(totalRevenueGenerated / customers.length) : 0;
 
   const handleCreateHospital = (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,15 +102,22 @@ export const AdminDashboard: React.FC = () => {
       ],
       image: "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&q=80&w=400",
       lat: 12.93,
-      lng: 77.62
+      lng: 77.62,
+      status: 'active'
     });
+
+    addNotification(
+      "Hospital Registered",
+      `${hospName} registered successfully with ${hospCommission}% platform commission.`,
+      "success"
+    );
 
     // Reset Form
     setHospName('');
     setHospAddress('');
     setHospAbout('');
     setHospContact('');
-    setAdminTab('stats');
+    setAdminTab('hospitals');
   };
 
   const handleCreateDoctor = (e: React.FormEvent) => {
@@ -110,10 +142,16 @@ export const AdminDashboard: React.FC = () => {
       }
     });
 
+    addNotification(
+      "Doctor Enrolled",
+      `${docName} added to hospital roster successfully.`,
+      "success"
+    );
+
     // Reset Form
     setDocName('');
     setDocSpecialty('');
-    setAdminTab('stats');
+    setAdminTab('doctors');
   };
 
   const handleCallNext = () => {
@@ -121,7 +159,7 @@ export const AdminDashboard: React.FC = () => {
     advanceQueue(operatorHospId, operatorDocId);
   };
 
-  const triggerSMSNotification = (appt: Appointment) => {
+  const triggerSMSNotification = (appt: any) => {
     alert(`SMS Alert sent to ${appt.patientName} (${appt.phone}):\n"Your token #${appt.tokenNumber} is active. Proceed to cabin now."`);
     addNotification(
       "SMS Notification Triggered",
@@ -130,243 +168,869 @@ export const AdminDashboard: React.FC = () => {
     );
   };
 
+  // CSV Revenue Report Export Handler
+  const exportFinancialCSV = () => {
+    const csvRows = [
+      ["Customer Name", "Phone", "Email", "Hospital", "Doctor", "Token #", "Consultation Fee (INR)", "Admin Fee 10% (INR)", "Payment Method", "Date", "Status"]
+    ];
+
+    customers.forEach(cust => {
+      cust.bookings.forEach(b => {
+        csvRows.push([
+          `"${cust.name}"`,
+          `"${cust.phone}"`,
+          `"${cust.email}"`,
+          `"${b.hospitalName}"`,
+          `"${b.doctorName}"`,
+          `"${b.tokenNumber}"`,
+          `"${b.fee}"`,
+          `"${Math.round(b.fee * 0.10)}"`,
+          `"${b.paymentMethod}"`,
+          `"${b.date}"`,
+          `"${b.status}"`
+        ]);
+      });
+    });
+
+    const csvContent = "data:text/csv;charset=utf-8," + csvRows.map(e => e.join(",")).join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `InstaToken_Revenue_Report_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    addNotification("Report Downloaded", "Financial revenue CSV ledger downloaded successfully.", "success");
+  };
+
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row">
+    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans">
       
-      {/* LEFT NAVIGATION SIDEBAR (Desktop Only, hidden on mobile) */}
+      {/* ── LEFT NAVIGATION SIDEBAR (Desktop) ───────────────────────────── */}
       <div className="hidden md:flex flex-col w-64 bg-slate-900 border-r border-slate-800 p-5 text-white h-screen sticky top-0 justify-between shrink-0">
         <div className="space-y-6">
           {/* Logo brand block */}
-          <div className="flex items-center gap-2 px-2 py-1 cursor-pointer" onClick={() => navigate('/')}>
-            <div className="bg-blue-600 p-2 rounded-xl text-white">
+          <div className="flex items-center gap-2.5 px-2 py-1 cursor-pointer" onClick={() => navigate('/')}>
+            <div className="bg-blue-600 p-2 rounded-xl text-white shadow-md shadow-blue-500/20">
               <Activity size={18} />
             </div>
             <div>
-              <h1 className="text-base font-black tracking-tight leading-none font-heading">InstaToken</h1>
-              <span className="text-[9px] text-blue-400 font-bold uppercase mt-0.5 block">Admin Central</span>
+              <h1 className="text-base font-black tracking-tight leading-none font-heading text-white">InstaToken</h1>
+              <span className="text-[9px] text-blue-400 font-extrabold uppercase mt-0.5 block tracking-wider">Super Admin Portal</span>
             </div>
           </div>
 
           {/* Navigation link list */}
-          <div className="space-y-1.5 pt-4">
+          <div className="space-y-1 pt-2">
+            <p className="text-[9px] font-extrabold text-slate-500 uppercase tracking-widest px-3 py-1">Overview</p>
             <button
               onClick={() => setAdminTab('stats')}
-              className={`w-full text-left px-3.5 py-2.5 text-xs font-bold rounded-xl flex items-center gap-2.5 transition-all cursor-pointer ${
-                adminTab === 'stats' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
+              className={`w-full text-left px-3.5 py-2 text-xs font-bold rounded-xl flex items-center gap-2.5 transition-all cursor-pointer border-none ${
+                adminTab === 'stats' ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
               }`}
             >
-              <LayoutDashboard size={14} /> System Overview
+              <LayoutDashboard size={15} /> System Analytics
             </button>
             
+            <p className="text-[9px] font-extrabold text-slate-500 uppercase tracking-widest px-3 py-1 pt-2">Management</p>
+            <button
+              onClick={() => setAdminTab('hospitals')}
+              className={`w-full text-left px-3.5 py-2 text-xs font-bold rounded-xl flex items-center justify-between transition-all cursor-pointer border-none ${
+                adminTab === 'hospitals' ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <Building2 size={15} /> Manage Hospitals
+              </div>
+              <span className="bg-slate-800 text-[9px] font-extrabold px-2 py-0.5 rounded-full text-blue-400">
+                {hospitals.length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setAdminTab('customers')}
+              className={`w-full text-left px-3.5 py-2 text-xs font-bold rounded-xl flex items-center justify-between transition-all cursor-pointer border-none ${
+                adminTab === 'customers' ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <Users size={15} /> Manage Customers
+              </div>
+              <span className="bg-slate-800 text-[9px] font-extrabold px-2 py-0.5 rounded-full text-emerald-400">
+                {customers.length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setAdminTab('doctors')}
+              className={`w-full text-left px-3.5 py-2 text-xs font-bold rounded-xl flex items-center gap-2.5 transition-all cursor-pointer border-none ${
+                adminTab === 'doctors' ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              }`}
+            >
+              <Stethoscope size={15} /> Global Doctors ({totalDoctorsCount})
+            </button>
+
+            <button
+              onClick={() => setAdminTab('financials')}
+              className={`w-full text-left px-3.5 py-2 text-xs font-bold rounded-xl flex items-center gap-2.5 transition-all cursor-pointer border-none ${
+                adminTab === 'financials' ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              }`}
+            >
+              <DollarSign size={15} /> Financials & Revenue
+            </button>
+
             <button
               onClick={() => setAdminTab('queue')}
-              className={`w-full text-left px-3.5 py-2.5 text-xs font-bold rounded-xl flex items-center gap-2.5 transition-all cursor-pointer ${
-                adminTab === 'queue' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
+              className={`w-full text-left px-3.5 py-2 text-xs font-bold rounded-xl flex items-center gap-2.5 transition-all cursor-pointer border-none ${
+                adminTab === 'queue' ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
               }`}
             >
-              <Volume2 size={14} /> Queue Operator
+              <Volume2 size={15} /> Live Queue Control
             </button>
 
+            <p className="text-[9px] font-extrabold text-slate-500 uppercase tracking-widest px-3 py-1 pt-2">Infrastructure</p>
             <button
-              onClick={() => setAdminTab('hospital')}
-              className={`w-full text-left px-3.5 py-2.5 text-xs font-bold rounded-xl flex items-center gap-2.5 transition-all cursor-pointer ${
-                adminTab === 'hospital' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
+              onClick={() => setAdminTab('aws-setup')}
+              className={`w-full text-left px-3.5 py-2 text-xs font-bold rounded-xl flex items-center gap-2.5 transition-all cursor-pointer border-none ${
+                adminTab === 'aws-setup' ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/20' : 'text-slate-400 hover:text-emerald-400 hover:bg-slate-800/60'
               }`}
             >
-              <Compass size={14} /> Register Hospital
-            </button>
-
-            <button
-              onClick={() => setAdminTab('doctor')}
-              className={`w-full text-left px-3.5 py-2.5 text-xs font-bold rounded-xl flex items-center gap-2.5 transition-all cursor-pointer ${
-                adminTab === 'doctor' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
-              }`}
-            >
-              <Stethoscope size={14} /> Register Doctor
+              <Server size={15} /> AWS Cloud & .pem Setup
             </button>
           </div>
         </div>
 
-        {/* Back to Client view trigger button */}
-        <div className="space-y-3">
-          <div className="bg-slate-800/60 rounded-2xl p-3.5 border border-slate-800/50 text-[10px] text-slate-400">
-            <span className="font-extrabold text-white flex items-center gap-1.5 mb-1 text-xs">
+        {/* Bottom Operator Footer */}
+        <div className="space-y-2">
+          <div className="bg-slate-800/60 rounded-2xl p-3 border border-slate-800 text-[10px] text-slate-400">
+            <span className="font-extrabold text-white flex items-center gap-1.5 mb-0.5 text-xs">
               <ShieldCheck size={14} className="text-blue-500" />
-              Operator Mode
+              Super Admin Level 1
             </span>
-            Authorized database controls active.
+            Root infrastructure & commission controls.
           </div>
           
           <Button 
             variant="outline" 
-            onClick={() => navigate('/')}
-            className="w-full py-2 bg-slate-800 border-slate-700 hover:bg-slate-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1 cursor-pointer"
+            onClick={() => navigate('/hospital/dashboard')}
+            className="w-full py-2 bg-slate-800 border-slate-700 hover:bg-slate-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
           >
-            <ArrowLeft size={12} />
-            Patient Portal
+            Hospital Panel →
           </Button>
         </div>
       </div>
 
-      {/* MOBILE HEADER NAVIGATION AND TABS VIEW (Mobile Only, hidden on desktop) */}
-      <div className="md:hidden flex flex-col w-full">
-        {/* Mobile top header bar */}
-        <div className="bg-slate-900 text-white px-5 py-4 border-b border-slate-800 z-30 flex items-center justify-between">
+      {/* ── MOBILE HEADER (Mobile Only) ─────────────────────────────────── */}
+      <div className="md:hidden flex flex-col w-full bg-slate-900 text-white">
+        <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button 
-              onClick={() => navigate('/profile')}
-              className="p-2 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer"
+              onClick={() => navigate('/')}
+              className="p-2 rounded-xl hover:bg-slate-800 text-slate-400 cursor-pointer"
             >
               <ArrowLeft size={16} />
             </button>
             <div>
-              <h2 className="text-base font-black tracking-tight font-heading">Central Administration</h2>
-              <p className="text-[9px] text-blue-400 font-bold uppercase tracking-wider">Hospital Console</p>
+              <h2 className="text-base font-black tracking-tight">Super Admin Panel</h2>
+              <p className="text-[9px] text-blue-400 font-bold uppercase tracking-wider">InstaToken Central</p>
             </div>
           </div>
           <Badge variant="blue" className="bg-blue-500/20 text-blue-400 border-none py-1">
-            Root Officer
+            Super Admin
           </Badge>
         </div>
 
-        {/* Mobile top navigation selectors */}
-        <div className="bg-slate-900 text-white flex px-2 border-b border-slate-800">
-          <button
-            onClick={() => setAdminTab('stats')}
-            className={`flex-1 text-center py-3 text-[10px] font-bold uppercase tracking-wider border-b-2 flex items-center justify-center gap-1.5 cursor-pointer transition-all ${adminTab === 'stats' ? 'border-blue-500 text-blue-500' : 'border-transparent text-slate-400'}`}
-          >
-            <LayoutDashboard size={12} /> Overview
-          </button>
-          <button
-            onClick={() => setAdminTab('queue')}
-            className={`flex-1 text-center py-3 text-[10px] font-bold uppercase tracking-wider border-b-2 flex items-center justify-center gap-1.5 cursor-pointer transition-all ${adminTab === 'queue' ? 'border-blue-500 text-blue-500' : 'border-transparent text-slate-400'}`}
-          >
-            <Volume2 size={12} /> Operator
-          </button>
-          <button
-            onClick={() => setAdminTab('hospital')}
-            className={`flex-1 text-center py-3 text-[10px] font-bold uppercase tracking-wider border-b-2 flex items-center justify-center gap-1.5 cursor-pointer transition-all ${adminTab === 'hospital' ? 'border-blue-500 text-blue-500' : 'border-transparent text-slate-400'}`}
-          >
-            <Compass size={12} /> Hosp +
-          </button>
-          <button
-            onClick={() => setAdminTab('doctor')}
-            className={`flex-1 text-center py-3 text-[10px] font-bold uppercase tracking-wider border-b-2 flex items-center justify-center gap-1.5 cursor-pointer transition-all ${adminTab === 'doctor' ? 'border-blue-500 text-blue-500' : 'border-transparent text-slate-400'}`}
-          >
-            <Stethoscope size={12} /> Doc +
-          </button>
+        {/* Mobile Nav Tabs */}
+        <div className="flex overflow-x-auto px-2 border-b border-slate-800 text-[10px] font-bold uppercase tracking-wider no-scrollbar">
+          {(['stats', 'hospitals', 'customers', 'doctors', 'financials', 'queue', 'aws-setup'] as const).map(tab => (
+            <button
+              key={tab}
+              onClick={() => setAdminTab(tab)}
+              className={`px-3 py-3 border-b-2 whitespace-nowrap cursor-pointer ${
+                adminTab === tab ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400'
+              }`}
+            >
+              {tab === 'stats' ? 'Overview' : tab === 'hospitals' ? 'Hospitals' : tab === 'customers' ? 'Customers' : tab === 'doctors' ? 'Doctors' : tab === 'financials' ? 'Revenue' : tab === 'queue' ? 'Queue' : 'AWS Setup'}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* MAIN VIEW CONTENT AREA (shared layout, responsive columns) */}
-      <div className="flex-grow px-5 py-6 md:p-8 max-w-[1400px] mx-auto w-full">
+      {/* ── MAIN CONTENT AREA ───────────────────────────────────────────── */}
+      <div className="flex-grow px-4 py-6 md:p-8 max-w-[1400px] mx-auto w-full space-y-6">
         
-        {/* Tab 1: Stats Overview */}
+        {/* ── TAB 1: SYSTEM OVERVIEW ───────────────────────────────────── */}
         {adminTab === 'stats' && (
           <div className="space-y-6 animate-in fade-in duration-200">
-            {/* Grid metrics row */}
+            {/* Top Bar Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-xs">
+              <div>
+                <h2 className="text-xl font-black text-slate-800">Super Admin Dashboard</h2>
+                <p className="text-xs text-slate-400 font-semibold">Global platform analytics, hospital revenue & queue oversight</p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setAdminTab('add-hospital')}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors border-none"
+                >
+                  <Plus size={14} /> Add Partner Hospital
+                </button>
+                <button
+                  onClick={() => setAdminTab('add-doctor')}
+                  className="bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors border-none"
+                >
+                  <Stethoscope size={14} /> Enroll Doctor
+                </button>
+              </div>
+            </div>
+
+            {/* Grid Metrics Row */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <Card className="p-4 border-none shadow-xs text-center flex flex-col justify-between bg-white">
-                <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block">Today's Bookings</span>
-                <span className="text-3xl font-black text-slate-800 font-heading block mt-1">{todayBookingsCount}</span>
-                <span className="text-[8px] text-emerald-600 font-bold block mt-1">+12% vs yesterday</span>
+              <Card className="p-4 border-none shadow-xs text-center flex flex-col justify-between bg-white hover:shadow-md transition-shadow">
+                <span className="text-[10px] text-slate-400 font-black uppercase tracking-wider block">Total Customer Revenue</span>
+                <span className="text-3xl font-black text-blue-600 font-heading block mt-1">₹{totalRevenueGenerated.toLocaleString()}</span>
+                <span className="text-[9px] text-emerald-600 font-extrabold block mt-1">↑ 18% vs last month</span>
               </Card>
 
-              <Card className="p-4 border-none shadow-xs text-center flex flex-col justify-between bg-white">
-                <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block">Today's Revenue</span>
-                <span className="text-3xl font-black text-blue-600 font-heading block mt-1">₹{todayRevenue}</span>
-                <span className="text-[8px] text-slate-400 block mt-1">Online transactions</span>
+              <Card className="p-4 border-none shadow-xs text-center flex flex-col justify-between bg-white hover:shadow-md transition-shadow">
+                <span className="text-[10px] text-slate-400 font-black uppercase tracking-wider block">Admin Commission (10%)</span>
+                <span className="text-3xl font-black text-emerald-600 font-heading block mt-1">₹{platformCommissionEarned.toLocaleString()}</span>
+                <span className="text-[9px] text-slate-400 font-semibold block mt-1">Net platform earnings</span>
               </Card>
 
-              <Card className="p-4 border-none shadow-xs text-center flex flex-col justify-between bg-white">
-                <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block">Active Hospitals</span>
-                <span className="text-2xl font-black text-slate-800 font-heading block mt-1">{activeHospitalsCount}</span>
-                <span className="text-[8px] text-slate-400 block mt-1">Operational zones</span>
+              <Card className="p-4 border-none shadow-xs text-center flex flex-col justify-between bg-white hover:shadow-md transition-shadow">
+                <span className="text-[10px] text-slate-400 font-black uppercase tracking-wider block">Partner Hospitals</span>
+                <span className="text-3xl font-black text-slate-800 font-heading block mt-1">{hospitals.length}</span>
+                <span className="text-[9px] text-blue-600 font-semibold block mt-1">{activeHospitalsCount} Active · {disabledHospitalsCount} Disabled</span>
               </Card>
 
-              <Card className="p-4 border-none shadow-xs text-center flex flex-col justify-between bg-white">
-                <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block">Total Patients</span>
-                <span className="text-2xl font-black text-slate-800 font-heading block mt-1">{totalPatientsRegistered}</span>
-                <span className="text-[8px] text-slate-400 block mt-1">Accounts registered</span>
+              <Card className="p-4 border-none shadow-xs text-center flex flex-col justify-between bg-white hover:shadow-md transition-shadow">
+                <span className="text-[10px] text-slate-400 font-black uppercase tracking-wider block">Registered Customers</span>
+                <span className="text-3xl font-black text-purple-600 font-heading block mt-1">{customers.length}</span>
+                <span className="text-[9px] text-slate-400 font-semibold block mt-1">{totalCustomerTokens} Tokens Booked</span>
               </Card>
             </div>
 
-            {/* Split row: Peak Hours and Dispatch Logs */}
+            {/* Split Row: Peak OPD Hours Chart + Hospital Revenue Breakdown */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              
-              {/* Peak hours chart card (col-span-7) */}
+              {/* OPD Peak Hours Bar Chart (7 cols) */}
               <div className="lg:col-span-7">
                 <Card className="p-5 border-none shadow-xs bg-white h-full flex flex-col justify-between">
                   <div>
-                    <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center justify-between mb-4">
-                      <span>OPD Queue Hourly Peaks</span>
-                      <TrendingUp size={14} className="text-slate-400" />
-                    </h3>
-                    <p className="text-[10px] text-slate-400 leading-normal max-w-[320px]">Real-time tracking of patient queue bookings loaded onto the platform today.</p>
-                  </div>
-                  
-                  {/* Visual Chart bars */}
-                  <div className="flex items-end justify-between h-36 pt-4 px-2 text-[8px] font-bold text-slate-400 border-b border-slate-50 mb-2">
-                    <div className="flex flex-col items-center gap-2 w-10">
-                      <div className="w-full bg-slate-100 rounded-lg h-10 hover:bg-slate-200 transition-all cursor-pointer" title="9 AM: 3 bookings" />
-                      <span>09:00 AM</span>
-                    </div>
-                    <div className="flex flex-col items-center gap-2 w-10">
-                      <div className="w-full bg-blue-400 rounded-lg h-24 hover:bg-blue-500 transition-all cursor-pointer" title="11 AM: 8 bookings" />
-                      <span>11:00 AM</span>
-                    </div>
-                    <div className="flex flex-col items-center gap-2 w-10">
-                      <div className="w-full bg-blue-600 rounded-lg h-32 hover:bg-blue-700 transition-all cursor-pointer animate-pulse" title="1 PM: 12 bookings" />
-                      <span>01:00 PM</span>
-                    </div>
-                    <div className="flex flex-col items-center gap-2 w-10">
-                      <div className="w-full bg-blue-400 rounded-lg h-16 hover:bg-blue-500 transition-all cursor-pointer" title="3 PM: 5 bookings" />
-                      <span>03:00 PM</span>
-                    </div>
-                    <div className="flex flex-col items-center gap-2 w-10">
-                      <div className="w-full bg-blue-500 rounded-lg h-28 hover:bg-blue-600 transition-all cursor-pointer" title="5 PM: 10 bookings" />
-                      <span>05:00 PM</span>
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h3 className="text-xs font-black text-slate-800 uppercase tracking-wide">Global OPD Booking Hourly Peaks</h3>
+                        <p className="text-[10px] text-slate-400 font-semibold">Real-time aggregate token load across all hospitals</p>
+                      </div>
+                      <TrendingUp size={16} className="text-blue-600" />
                     </div>
                   </div>
-                </Card>
-              </div>
 
-              {/* Live Alerts dispatch log card (col-span-5) */}
-              <div className="lg:col-span-5">
-                <Card className="p-5 border-none shadow-xs bg-white h-full flex flex-col justify-between">
-                  <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center justify-between mb-3">
-                    <span>Live Notification Logs</span>
-                    <Bell size={14} className="text-slate-400" />
-                  </h3>
-                  <div className="space-y-3 max-h-[220px] overflow-y-auto pr-1 flex-grow">
-                    {notifications.slice(0, 4).map((n) => (
-                      <div key={n.id} className="p-2.5 bg-slate-50 border border-slate-100 rounded-xl text-[10px] leading-relaxed">
-                        <div className="flex justify-between items-center font-bold text-slate-700">
-                          <span>{n.title}</span>
-                          <span className="text-[8px] text-slate-400 font-normal">{n.timestamp}</span>
-                        </div>
-                        <p className="text-slate-500 mt-0.5">{n.message}</p>
+                  {/* Chart Visual */}
+                  <div className="flex items-end justify-between h-40 pt-4 px-3 text-[9px] font-bold text-slate-400 border-b border-slate-100 mb-2">
+                    {[
+                      { time: '08:00 AM', height: '25%', count: 18, active: false },
+                      { time: '10:00 AM', height: '70%', count: 84, active: false },
+                      { time: '12:00 PM', height: '95%', count: 142, active: true },
+                      { time: '02:00 PM', height: '40%', count: 45, active: false },
+                      { time: '04:00 PM', height: '60%', count: 72, active: false },
+                      { time: '06:00 PM', height: '85%', count: 110, active: false },
+                    ].map((item, idx) => (
+                      <div key={idx} className="flex flex-col items-center gap-2 w-12 group">
+                        <span className="opacity-0 group-hover:opacity-100 transition-opacity text-[8px] font-black text-blue-600 bg-blue-50 px-1 py-0.5 rounded">
+                          {item.count}
+                        </span>
+                        <div
+                          className={`w-full rounded-xl transition-all cursor-pointer ${
+                            item.active ? 'bg-blue-600 animate-pulse shadow-md shadow-blue-500/30' : 'bg-slate-200 group-hover:bg-blue-400'
+                          }`}
+                          style={{ height: item.height }}
+                          title={`${item.time}: ${item.count} tokens`}
+                        />
+                        <span>{item.time}</span>
                       </div>
                     ))}
                   </div>
                 </Card>
               </div>
 
+              {/* Live Admin Dispatch Logs (5 cols) */}
+              <div className="lg:col-span-5">
+                <Card className="p-5 border-none shadow-xs bg-white h-full flex flex-col justify-between">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-xs font-black text-slate-800 uppercase tracking-wide">System Notifications Log</h3>
+                    <Bell size={14} className="text-slate-400" />
+                  </div>
+                  <div className="space-y-2.5 max-h-[260px] overflow-y-auto pr-1">
+                    {notifications.length > 0 ? (
+                      notifications.slice(0, 5).map((n) => (
+                        <div key={n.id} className="p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs space-y-1">
+                          <div className="flex justify-between items-center font-extrabold text-slate-700">
+                            <span>{n.title}</span>
+                            <span className="text-[8px] text-slate-400 font-semibold">{n.timestamp}</span>
+                          </div>
+                          <p className="text-slate-500 text-[10px]">{n.message}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <>
+                        <div className="p-3 bg-blue-50/50 border border-blue-100 rounded-xl text-xs space-y-0.5">
+                          <div className="flex justify-between items-center font-extrabold text-blue-800">
+                            <span>Apollo Spectra Hospital Active</span>
+                            <span className="text-[8px] text-slate-400 font-semibold">Just Now</span>
+                          </div>
+                          <p className="text-slate-500 text-[10px]">101 tokens issued today across 5 departments.</p>
+                        </div>
+                        <div className="p-3 bg-emerald-50/50 border border-emerald-100 rounded-xl text-xs space-y-0.5">
+                          <div className="flex justify-between items-center font-extrabold text-emerald-800">
+                            <span>City General Hospital Registered</span>
+                            <span className="text-[8px] text-slate-400 font-semibold">2 hours ago</span>
+                          </div>
+                          <p className="text-slate-500 text-[10px]">Commission set to 10% on token booking fee.</p>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </Card>
+              </div>
             </div>
           </div>
         )}
 
-        {/* Tab 2: Queue Operator Panel */}
+        {/* ── TAB 2: HOSPITALS ROSTER (MANAGE HOSPITALS) ──────────────── */}
+        {adminTab === 'hospitals' && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-xs">
+              <div>
+                <h2 className="text-xl font-black text-slate-800">Manage Partner Hospitals</h2>
+                <p className="text-xs text-slate-400 font-semibold">View hospital accounts, locations, contact details, doctors, and disable/enable hospital access</p>
+              </div>
+              <button
+                onClick={() => setAdminTab('add-hospital')}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl flex items-center gap-1.5 cursor-pointer border-none"
+              >
+                <Plus size={14} /> Register New Hospital
+              </button>
+            </div>
+
+            {/* Filter & Search Bar */}
+            <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-xs flex flex-wrap items-center justify-between gap-3">
+              <div className="relative flex-1 min-w-[240px]">
+                <Search size={14} className="absolute left-3 top-3 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search hospital name, address, contact..."
+                  value={hospitalSearch}
+                  onChange={e => setHospitalSearch(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setHospitalStatusFilter('all')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border-none ${
+                    hospitalStatusFilter === 'all' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'
+                  }`}
+                >
+                  All ({hospitals.length})
+                </button>
+                <button
+                  onClick={() => setHospitalStatusFilter('active')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border-none ${
+                    hospitalStatusFilter === 'active' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'
+                  }`}
+                >
+                  Active ({activeHospitalsCount})
+                </button>
+                <button
+                  onClick={() => setHospitalStatusFilter('disabled')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border-none ${
+                    hospitalStatusFilter === 'disabled' ? 'bg-amber-600 text-white' : 'bg-slate-100 text-slate-600'
+                  }`}
+                >
+                  Disabled ({disabledHospitalsCount})
+                </button>
+              </div>
+            </div>
+
+            {/* Hospital Roster Table */}
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-xs overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[900px] text-left border-collapse">
+                  <thead className="bg-slate-50 border-b border-slate-100 text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                    <tr>
+                      <th className="px-4 py-3">Hospital Details</th>
+                      <th className="px-4 py-3">Category</th>
+                      <th className="px-4 py-3">Contact & Location</th>
+                      <th className="px-4 py-3">Doctors</th>
+                      <th className="px-4 py-3">Commission %</th>
+                      <th className="px-4 py-3">Account Status</th>
+                      <th className="px-4 py-3 text-right">Disable / Enable Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-xs">
+                    {hospitals
+                      .filter(h => {
+                        const matchesSearch = h.name.toLowerCase().includes(hospitalSearch.toLowerCase()) || 
+                          h.address.toLowerCase().includes(hospitalSearch.toLowerCase()) ||
+                          h.contact.includes(hospitalSearch);
+                        const isCurrentlyDisabled = h.status === 'disabled';
+                        if (hospitalStatusFilter === 'active') return matchesSearch && !isCurrentlyDisabled;
+                        if (hospitalStatusFilter === 'disabled') return matchesSearch && isCurrentlyDisabled;
+                        return matchesSearch;
+                      })
+                      .map((hosp) => {
+                        const isDisabled = hosp.status === 'disabled';
+                        return (
+                          <tr key={hosp.id} className={`border-b border-slate-50 transition-colors ${isDisabled ? 'bg-amber-50/40 hover:bg-amber-50/70' : 'hover:bg-slate-50/60'}`}>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-3">
+                                <img src={hosp.image} alt={hosp.name} className="w-10 h-10 rounded-xl object-cover shrink-0 border border-slate-100" />
+                                <div>
+                                  <p className="font-extrabold text-slate-800 leading-none">{hosp.name}</p>
+                                  <p className="text-[10px] text-slate-400 font-semibold mt-0.5 truncate max-w-[220px]">{hosp.address}</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md text-[10px]">
+                                {hosp.category}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <p className="font-bold text-slate-700">{hosp.contact}</p>
+                              <p className="text-[10px] text-slate-400">Timings: {hosp.timings}</p>
+                            </td>
+                            <td className="px-4 py-3 font-extrabold text-blue-600">
+                              {hosp.doctors.length} Doctors
+                            </td>
+                            <td className="px-4 py-3 font-extrabold text-emerald-600">
+                              10% Platform Fee
+                            </td>
+                            <td className="px-4 py-3">
+                              {isDisabled ? (
+                                <span className="bg-amber-100 text-amber-800 text-[10px] font-extrabold px-2.5 py-1 rounded-full flex items-center gap-1 w-fit">
+                                  <AlertTriangle size={11} className="text-amber-600" /> Account Disabled
+                                </span>
+                              ) : (
+                                <span className="bg-emerald-100 text-emerald-700 text-[10px] font-extrabold px-2.5 py-1 rounded-full flex items-center gap-1 w-fit">
+                                  <CheckCircle2 size={11} /> Verified Active
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <button
+                                onClick={() => toggleDisableHospital(hosp.id)}
+                                className={`text-xs font-extrabold px-3 py-1.5 rounded-xl transition-all cursor-pointer border-none shadow-2xs ${
+                                  isDisabled 
+                                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white' 
+                                    : 'bg-red-50 text-red-600 hover:bg-red-100 border border-red-200'
+                                }`}
+                              >
+                                {isDisabled ? 'Enable Hospital' : 'Disable Account'}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── TAB 3: MANAGE CUSTOMERS ──────────────────────────────────── */}
+        {adminTab === 'customers' && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-xs">
+              <div>
+                <h2 className="text-xl font-black text-slate-800">Manage Customer Accounts</h2>
+                <p className="text-xs text-slate-400 font-semibold">View customer profile details, token booking history, and total hospitals visited</p>
+              </div>
+              <Badge variant="blue" className="bg-purple-50 text-purple-700 border-purple-200 text-xs px-3 py-1 font-extrabold w-fit">
+                {customers.length} Registered Customers
+              </Badge>
+            </div>
+
+            {/* Metrics Row */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <Card className="p-4 border-none shadow-xs text-center flex flex-col justify-between bg-white">
+                <span className="text-[10px] text-slate-400 font-black uppercase tracking-wider block">Total Customer Accounts</span>
+                <span className="text-3xl font-black text-slate-800 font-heading block mt-1">{customers.length}</span>
+                <span className="text-[9px] text-emerald-600 font-extrabold block mt-1">All verified profiles</span>
+              </Card>
+
+              <Card className="p-4 border-none shadow-xs text-center flex flex-col justify-between bg-white">
+                <span className="text-[10px] text-slate-400 font-black uppercase tracking-wider block">Total Tokens Booked</span>
+                <span className="text-3xl font-black text-blue-600 font-heading block mt-1">{totalCustomerTokens}</span>
+                <span className="text-[9px] text-blue-600 font-semibold block mt-1">Active + Past Tokens</span>
+              </Card>
+
+              <Card className="p-4 border-none shadow-xs text-center flex flex-col justify-between bg-white">
+                <span className="text-[10px] text-slate-400 font-black uppercase tracking-wider block">Total Customer Visits</span>
+                <span className="text-3xl font-black text-purple-600 font-heading block mt-1">
+                  {customers.reduce((sum, c) => {
+                    const uniqueHosps = new Set(c.bookings.map(b => b.hospitalId));
+                    return sum + uniqueHosps.size;
+                  }, 0)}
+                </span>
+                <span className="text-[9px] text-purple-600 font-semibold block mt-1">Hospitals Visited Globally</span>
+              </Card>
+
+              <Card className="p-4 border-none shadow-xs text-center flex flex-col justify-between bg-white">
+                <span className="text-[10px] text-slate-400 font-black uppercase tracking-wider block">Avg Spend / Customer</span>
+                <span className="text-3xl font-black text-emerald-600 font-heading block mt-1">₹{avgRevenuePerCustomer.toLocaleString()}</span>
+                <span className="text-[9px] text-slate-400 font-semibold block mt-1">Gross Token Spending</span>
+              </Card>
+            </div>
+
+            {/* Filter & Search Bar */}
+            <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-xs flex flex-wrap items-center justify-between gap-3">
+              <div className="relative flex-1 min-w-[240px]">
+                <Search size={14} className="absolute left-3 top-3 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search customer name, phone, email, or city..."
+                  value={customerSearch}
+                  onChange={e => setCustomerSearch(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCustomerStatusFilter('all')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border-none ${
+                    customerStatusFilter === 'all' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'
+                  }`}
+                >
+                  All ({customers.length})
+                </button>
+                <button
+                  onClick={() => setCustomerStatusFilter('active')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border-none ${
+                    customerStatusFilter === 'active' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'
+                  }`}
+                >
+                  Active ({customers.filter(c => c.status === 'active').length})
+                </button>
+                <button
+                  onClick={() => setCustomerStatusFilter('suspended')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border-none ${
+                    customerStatusFilter === 'suspended' ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-600'
+                  }`}
+                >
+                  Suspended ({customers.filter(c => c.status === 'suspended').length})
+                </button>
+              </div>
+            </div>
+
+            {/* Customers Table */}
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-xs overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[950px] text-left border-collapse">
+                  <thead className="bg-slate-50 border-b border-slate-100 text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                    <tr>
+                      <th className="px-4 py-3">Customer Account</th>
+                      <th className="px-4 py-3">Contact Details</th>
+                      <th className="px-4 py-3">Tokens Booked</th>
+                      <th className="px-4 py-3">Hospitals Visited</th>
+                      <th className="px-4 py-3">Total Customer Spend</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-xs">
+                    {customers
+                      .filter(c => {
+                        const matchesSearch = c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
+                          c.phone.includes(customerSearch) ||
+                          c.email.toLowerCase().includes(customerSearch.toLowerCase()) ||
+                          c.location.toLowerCase().includes(customerSearch.toLowerCase());
+                        if (customerStatusFilter === 'active') return matchesSearch && c.status === 'active';
+                        if (customerStatusFilter === 'suspended') return matchesSearch && c.status === 'suspended';
+                        return matchesSearch;
+                      })
+                      .map((cust) => {
+                        const uniqueHospitalsCount = new Set(cust.bookings.map(b => b.hospitalId)).size;
+                        const customerSpendTotal = cust.bookings.reduce((sum, b) => sum + b.fee, 0);
+
+                        return (
+                          <tr key={cust.id} className="border-b border-slate-50 hover:bg-slate-50/60 transition-colors">
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-3">
+                                <img 
+                                  src={cust.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80"} 
+                                  alt={cust.name} 
+                                  className="w-10 h-10 rounded-full object-cover shrink-0 border border-slate-200" 
+                                />
+                                <div>
+                                  <p className="font-extrabold text-slate-800 leading-none">{cust.name}</p>
+                                  <p className="text-[10px] text-slate-400 font-semibold mt-0.5">{cust.email}</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <p className="font-bold text-slate-700">{cust.phone}</p>
+                              <p className="text-[10px] text-slate-400">{cust.location}</p>
+                            </td>
+                            <td className="px-4 py-3 font-extrabold text-blue-600">
+                              <span className="bg-blue-50 text-blue-700 px-2.5 py-1 rounded-xl text-xs">
+                                {cust.bookings.length} Tokens
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="bg-purple-50 text-purple-700 font-black px-2.5 py-1 rounded-xl text-xs">
+                                🏥 {uniqueHospitalsCount} Hospitals
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 font-extrabold text-emerald-600">
+                              ₹{customerSpendTotal.toLocaleString()}
+                            </td>
+                            <td className="px-4 py-3">
+                              {cust.status === 'suspended' ? (
+                                <span className="bg-red-100 text-red-800 text-[10px] font-extrabold px-2 py-0.5 rounded-full flex items-center gap-1 w-fit">
+                                  <UserX size={10} /> Suspended
+                                </span>
+                              ) : (
+                                <span className="bg-emerald-100 text-emerald-700 text-[10px] font-extrabold px-2 py-0.5 rounded-full flex items-center gap-1 w-fit">
+                                  <UserCheck size={10} /> Active Patient
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-right space-x-2">
+                              <button
+                                onClick={() => setSelectedCustomerModal(cust)}
+                                className="text-xs font-bold bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded-xl transition-colors cursor-pointer border-none"
+                              >
+                                View Tokens & History
+                              </button>
+                              <button
+                                onClick={() => toggleCustomerStatus(cust.id)}
+                                className={`text-xs font-bold px-2.5 py-1.5 rounded-xl transition-colors cursor-pointer border-none ${
+                                  cust.status === 'suspended'
+                                    ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
+                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                }`}
+                              >
+                                {cust.status === 'suspended' ? 'Unsuspend' : 'Suspend'}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── TAB 4: DOCTORS DIRECTORY ─────────────────────────────────── */}
+        {adminTab === 'doctors' && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-xs">
+              <div>
+                <h2 className="text-xl font-black text-slate-800">Global Medical Specialists Directory</h2>
+                <p className="text-xs text-slate-400 font-semibold">Enrolled doctors across all registered partner hospitals</p>
+              </div>
+              <button
+                onClick={() => setAdminTab('add-doctor')}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl flex items-center gap-1.5 cursor-pointer border-none"
+              >
+                <Plus size={14} /> Enroll New Doctor
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {hospitals.flatMap(h => h.doctors.map(d => ({ ...d, hospitalName: h.name }))).map((doc) => (
+                <div key={doc.id} className="bg-white rounded-2xl border border-slate-100 p-4 shadow-xs flex gap-3 hover:shadow-md transition-shadow">
+                  <img src={doc.image} alt={doc.name} className="w-14 h-14 rounded-xl object-cover shrink-0 border border-slate-100" />
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-black text-slate-800 text-sm truncate">{doc.name}</h4>
+                    <p className="text-xs font-extrabold text-blue-600 truncate">{doc.specialty}</p>
+                    <p className="text-[10px] text-slate-400 font-semibold mt-0.5">{doc.qualification} · {doc.experience} Yrs Exp</p>
+                    <p className="text-[10px] text-slate-500 font-bold mt-1 truncate">🏥 {doc.hospitalName}</p>
+                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-50 text-[11px]">
+                      <span className="font-black text-slate-800">₹{doc.consultationFee} Fee</span>
+                      <span className="bg-emerald-50 text-emerald-700 font-extrabold text-[9px] px-2 py-0.5 rounded-md">
+                        {doc.availability?.slots?.length || 6} Slots / Day
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── TAB 5: FINANCIALS & REVENUE (EXPANDED) ──────────────────── */}
+        {adminTab === 'financials' && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-xs">
+              <div>
+                <h2 className="text-xl font-black text-slate-800">Financials & Customer Revenue Tracking</h2>
+                <p className="text-xs text-slate-400 font-semibold">Track gross revenue generated from customers, 10% platform commission, and hospital payout settlements</p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="bg-slate-100 p-1 rounded-xl flex text-xs font-bold">
+                  <button
+                    onClick={() => setRevenueDateFilter('all')}
+                    className={`px-3 py-1.5 rounded-lg border-none cursor-pointer transition-all ${
+                      revenueDateFilter === 'all' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500'
+                    }`}
+                  >
+                    All Time
+                  </button>
+                  <button
+                    onClick={() => setRevenueDateFilter('month')}
+                    className={`px-3 py-1.5 rounded-lg border-none cursor-pointer transition-all ${
+                      revenueDateFilter === 'month' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500'
+                    }`}
+                  >
+                    This Month
+                  </button>
+                </div>
+
+                <button
+                  onClick={exportFinancialCSV}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 cursor-pointer shadow-xs transition-all border-none"
+                >
+                  <Download size={14} /> Export Revenue CSV
+                </button>
+              </div>
+            </div>
+
+            {/* Financial Headline Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-2xl p-5 shadow-lg shadow-blue-500/20 space-y-2">
+                <p className="text-xs font-bold text-blue-200 uppercase tracking-wider">Gross Customer Revenue</p>
+                <div className="text-3xl font-black font-heading">₹{totalRevenueGenerated.toLocaleString()}</div>
+                <p className="text-[10px] text-blue-200">Generated from online patient token bookings</p>
+              </div>
+
+              <div className="bg-gradient-to-br from-emerald-600 to-teal-700 text-white rounded-2xl p-5 shadow-lg shadow-emerald-500/20 space-y-2">
+                <p className="text-xs font-bold text-emerald-200 uppercase tracking-wider">Super Admin Net Earnings</p>
+                <div className="text-3xl font-black font-heading">₹{platformCommissionEarned.toLocaleString()}</div>
+                <p className="text-[10px] text-emerald-200">10% Platform fee on token transactions</p>
+              </div>
+
+              <div className="bg-gradient-to-br from-slate-800 to-slate-900 text-white rounded-2xl p-5 shadow-lg shadow-slate-900/20 space-y-2">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Hospital Payout Settlements</p>
+                <div className="text-3xl font-black font-heading">₹{(totalRevenueGenerated - platformCommissionEarned).toLocaleString()}</div>
+                <p className="text-[10px] text-slate-400">90% transferred to partner hospital bank accounts</p>
+              </div>
+
+              <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-xs space-y-2">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Avg Revenue / Customer</p>
+                <div className="text-3xl font-black text-purple-600 font-heading">₹{avgRevenuePerCustomer.toLocaleString()}</div>
+                <p className="text-[10px] text-slate-500 font-semibold">Across {customers.length} registered customer accounts</p>
+              </div>
+            </div>
+
+            {/* Split Tables: Top Customer Spenders + Hospital Revenue Ledger */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* Customer Revenue Breakdown Table (6 cols) */}
+              <div className="lg:col-span-6 bg-white rounded-2xl border border-slate-100 shadow-xs p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-xs font-black text-slate-800 uppercase tracking-wide">Revenue Generated Per Customer</h3>
+                    <p className="text-[10px] text-slate-400 font-semibold">Top spending patients on InstaToken platform</p>
+                  </div>
+                  <Users size={16} className="text-blue-600" />
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs text-left border-collapse">
+                    <thead className="bg-slate-50 border-b border-slate-100 text-[10px] font-black text-slate-500 uppercase">
+                      <tr>
+                        <th className="py-2.5 px-3">Customer</th>
+                        <th className="py-2.5 px-3">Tokens</th>
+                        <th className="py-2.5 px-3">Gross Revenue</th>
+                        <th className="py-2.5 px-3">Admin Fee (10%)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {customers.map((cust) => {
+                        const totalSpent = cust.bookings.reduce((sum, b) => sum + b.fee, 0);
+                        const adminEarned = Math.round(totalSpent * 0.10);
+                        return (
+                          <tr key={cust.id} className="border-b border-slate-50 hover:bg-slate-50/50">
+                            <td className="py-2.5 px-3 font-bold text-slate-800">
+                              {cust.name}
+                              <span className="block text-[9px] text-slate-400 font-medium">{cust.phone}</span>
+                            </td>
+                            <td className="py-2.5 px-3 font-extrabold text-blue-600">{cust.bookings.length} Tokens</td>
+                            <td className="py-2.5 px-3 font-black text-slate-800">₹{totalSpent.toLocaleString()}</td>
+                            <td className="py-2.5 px-3 font-extrabold text-emerald-600">₹{adminEarned.toLocaleString()}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Hospital Settlement Ledger (6 cols) */}
+              <div className="lg:col-span-6 bg-white rounded-2xl border border-slate-100 shadow-xs p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-xs font-black text-slate-800 uppercase tracking-wide">Hospital Revenue & Payout Ledger</h3>
+                    <p className="text-[10px] text-slate-400 font-semibold">Volume & 10% platform fee breakdown by hospital</p>
+                  </div>
+                  <Building2 size={16} className="text-emerald-600" />
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs text-left border-collapse">
+                    <thead className="bg-slate-50 border-b border-slate-100 text-[10px] font-black text-slate-500 uppercase">
+                      <tr>
+                        <th className="py-2.5 px-3">Hospital</th>
+                        <th className="py-2.5 px-3">Gross Volume</th>
+                        <th className="py-2.5 px-3">Admin Fee (10%)</th>
+                        <th className="py-2.5 px-3">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {hospitals.map((hosp, idx) => {
+                        const baseVol = 35000 + (idx * 12500);
+                        const adminFee = Math.round(baseVol * 0.10);
+                        return (
+                          <tr key={hosp.id} className="border-b border-slate-50 hover:bg-slate-50/50">
+                            <td className="py-2.5 px-3 font-bold text-slate-800">
+                              {hosp.name}
+                              <span className="block text-[9px] text-slate-400 font-medium">{hosp.category}</span>
+                            </td>
+                            <td className="py-2.5 px-3 font-black text-slate-800">₹{baseVol.toLocaleString()}</td>
+                            <td className="py-2.5 px-3 font-extrabold text-emerald-600">₹{adminFee.toLocaleString()}</td>
+                            <td className="py-2.5 px-3">
+                              <span className="bg-emerald-100 text-emerald-700 text-[9px] font-extrabold px-2 py-0.5 rounded-full">
+                                Settled
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── TAB 6: QUEUE OPERATOR PANEL ──────────────────────────────── */}
         {adminTab === 'queue' && (
           <div className="space-y-6 animate-in fade-in duration-200">
-            {/* Split layout: Selector details and live patient grids */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              
-              {/* Operator details dashboard (col-span-4) */}
               <div className="lg:col-span-4 space-y-6">
                 <Card className="p-4 border-none shadow-xs bg-white space-y-4">
                   <div className="space-y-1">
-                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">Assign Hospital</label>
+                    <label className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wide">Assign Hospital</label>
                     <select 
                       value={operatorHospId}
                       onChange={(e) => {
@@ -377,7 +1041,7 @@ export const AdminDashboard: React.FC = () => {
                           setOperatorDocId(matchingHosp.doctors[0].id);
                         }
                       }}
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-150 rounded-xl text-xs focus:outline-none"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none"
                     >
                       {hospitals.map(h => (
                         <option key={h.id} value={h.id}>{h.name}</option>
@@ -387,11 +1051,11 @@ export const AdminDashboard: React.FC = () => {
 
                   {operatorHosp && operatorHosp.doctors.length > 0 && (
                     <div className="space-y-1">
-                      <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">Active Doctor Cabin</label>
+                      <label className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wide">Active Doctor Cabin</label>
                       <select 
                         value={operatorDocId}
                         onChange={(e) => setOperatorDocId(e.target.value)}
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-155 rounded-xl text-xs focus:outline-none"
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none"
                       >
                         {operatorHosp.doctors.map(d => (
                           <option key={d.id} value={d.id}>{d.name} ({d.specialty})</option>
@@ -430,7 +1094,6 @@ export const AdminDashboard: React.FC = () => {
                 )}
               </div>
 
-              {/* Waiting patient list grids (col-span-8) */}
               <div className="lg:col-span-8">
                 <Card className="p-5 border-none shadow-xs bg-white h-full">
                   <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-4">Patient Queue Waiting Line</h4>
@@ -448,7 +1111,7 @@ export const AdminDashboard: React.FC = () => {
                           <button 
                             type="button"
                             onClick={() => triggerSMSNotification(appt)}
-                            className="px-2.5 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-xl text-[9px] font-bold transition-all cursor-pointer shrink-0"
+                            className="px-2.5 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-xl text-[9px] font-bold transition-all cursor-pointer border-none shrink-0"
                           >
                             SMS Alert
                           </button>
@@ -457,39 +1120,50 @@ export const AdminDashboard: React.FC = () => {
                     </div>
                   ) : (
                     <div className="text-center py-16 flex flex-col items-center justify-center h-full">
-                      <p className="text-xs font-bold text-slate-400">All patient slots served. Queue is clear!</p>
+                      <p className="text-xs font-bold text-slate-400">All patient slots served for this doctor. Queue is clear!</p>
                     </div>
                   )}
                 </Card>
               </div>
-
             </div>
           </div>
         )}
 
-        {/* Tab 3: Create Hospital Form */}
-        {adminTab === 'hospital' && (
+        {/* ── TAB 7: REGISTER HOSPITAL FORM ───────────────────────────── */}
+        {adminTab === 'add-hospital' && (
           <Card className="p-6 border-none shadow-xs bg-white max-w-xl mx-auto animate-in fade-in duration-200">
-            <h3 className="text-xs font-bold text-slate-850 uppercase tracking-wide mb-4">Register New Hospital</h3>
+            <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="text-sm font-black text-slate-800 uppercase tracking-wide">Register New Partner Hospital</h3>
+                <p className="text-xs text-slate-400 font-semibold">Add hospital details and assign platform commission rate</p>
+              </div>
+              <button
+                onClick={() => setAdminTab('hospitals')}
+                className="text-xs font-bold text-slate-500 hover:text-slate-800 cursor-pointer border-none bg-transparent"
+              >
+                ✕ Cancel
+              </button>
+            </div>
+
             <form onSubmit={handleCreateHospital} className="space-y-4 text-left">
               <div className="space-y-1">
-                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">Hospital Name</label>
+                <label className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wide">Hospital Full Name</label>
                 <input 
                   type="text" 
                   value={hospName}
                   onChange={(e) => setHospName(e.target.value)}
                   placeholder="e.g. City General Hospital"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-150 rounded-xl text-xs focus:outline-none focus:bg-white"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:bg-white"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">Category</label>
+                  <label className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wide">Category</label>
                   <select 
                     value={hospCat}
                     onChange={(e) => setHospCat(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-150 rounded-xl text-xs focus:outline-none"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none"
                   >
                     <option value="Multi Speciality">Multi Speciality</option>
                     <option value="Children Hospital">Children Hospital</option>
@@ -500,36 +1174,49 @@ export const AdminDashboard: React.FC = () => {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">Contact Number</label>
+                  <label className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wide">Contact Number</label>
                   <input 
                     type="tel" 
                     value={hospContact}
                     onChange={(e) => setHospContact(e.target.value)}
-                    placeholder="+91 80 4455..."
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-150 rounded-xl text-xs focus:outline-none focus:bg-white"
+                    placeholder="+91 80 4455 6677"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:bg-white"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wide">Street Address</label>
+                  <input 
+                    type="text" 
+                    value={hospAddress}
+                    onChange={(e) => setHospAddress(e.target.value)}
+                    placeholder="e.g. Jayanagar 4th Block, Bengaluru"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:bg-white"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wide">Platform Commission (%)</label>
+                  <input 
+                    type="number" 
+                    value={hospCommission}
+                    onChange={(e) => setHospCommission(e.target.value)}
+                    placeholder="10"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:bg-white font-extrabold text-blue-600"
                   />
                 </div>
               </div>
 
               <div className="space-y-1">
-                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">Street Address</label>
-                <input 
-                  type="text" 
-                  value={hospAddress}
-                  onChange={(e) => setHospAddress(e.target.value)}
-                  placeholder="e.g. Jayanagar 4th Block, Bengaluru"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-150 rounded-xl text-xs focus:outline-none focus:bg-white"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">Description</label>
+                <label className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wide">Description & Facilities</label>
                 <textarea 
                   value={hospAbout}
                   onChange={(e) => setHospAbout(e.target.value)}
                   placeholder="Add hospital specialty details, background, and features..."
                   rows={3}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-150 rounded-xl text-xs focus:outline-none focus:bg-white resize-none"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:bg-white resize-none"
                 />
               </div>
 
@@ -540,17 +1227,29 @@ export const AdminDashboard: React.FC = () => {
           </Card>
         )}
 
-        {/* Tab 4: Register Doctor Form */}
-        {adminTab === 'doctor' && (
+        {/* ── TAB 8: REGISTER DOCTOR FORM ───────────────────────────── */}
+        {adminTab === 'add-doctor' && (
           <Card className="p-6 border-none shadow-xs bg-white max-w-xl mx-auto animate-in fade-in duration-200">
-            <h3 className="text-xs font-bold text-slate-850 uppercase tracking-wide mb-4">Enroll Medical Specialist</h3>
+            <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="text-sm font-black text-slate-800 uppercase tracking-wide">Enroll Medical Specialist</h3>
+                <p className="text-xs text-slate-400 font-semibold">Assign doctor to a partner hospital roster</p>
+              </div>
+              <button
+                onClick={() => setAdminTab('doctors')}
+                className="text-xs font-bold text-slate-500 hover:text-slate-800 cursor-pointer border-none bg-transparent"
+              >
+                ✕ Cancel
+              </button>
+            </div>
+
             <form onSubmit={handleCreateDoctor} className="space-y-4 text-left">
               <div className="space-y-1">
-                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">Assign Hospital</label>
+                <label className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wide">Assign Hospital</label>
                 <select 
                   value={selectedHospId}
                   onChange={(e) => setSelectedHospId(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-150 rounded-xl text-xs focus:outline-none"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none"
                 >
                   {hospitals.map(h => (
                     <option key={h.id} value={h.id}>{h.name}</option>
@@ -559,34 +1258,34 @@ export const AdminDashboard: React.FC = () => {
               </div>
 
               <div className="space-y-1">
-                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">Doctor Full Name</label>
+                <label className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wide">Doctor Full Name</label>
                 <input 
                   type="text" 
                   value={docName}
                   onChange={(e) => setDocName(e.target.value)}
                   placeholder="e.g. Dr. Kavitha Reddy"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-150 rounded-xl text-xs focus:outline-none focus:bg-white"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:bg-white"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">Specialty Role</label>
+                  <label className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wide">Specialty Role</label>
                   <input 
                     type="text" 
                     value={docSpecialty}
                     onChange={(e) => setDocSpecialty(e.target.value)}
                     placeholder="e.g. Pediatric Orthodontist"
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-150 rounded-xl text-xs focus:outline-none focus:bg-white"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:bg-white"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">Department</label>
+                  <label className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wide">Department</label>
                   <select 
                     value={docDeptId}
                     onChange={(e) => setDocDeptId(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-150 rounded-xl text-xs focus:outline-none"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none"
                   >
                     <option value="dept-general">General Medicine</option>
                     <option value="dept-cardio">Cardiology</option>
@@ -600,36 +1299,36 @@ export const AdminDashboard: React.FC = () => {
 
               <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1 col-span-2">
-                  <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">Qualifications</label>
+                  <label className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wide">Qualifications</label>
                   <input 
                     type="text" 
                     value={docQual}
                     onChange={(e) => setDocQual(e.target.value)}
                     placeholder="MBBS, MDS"
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-150 rounded-xl text-xs focus:outline-none focus:bg-white"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:bg-white"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">Exp (Yrs)</label>
+                  <label className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wide">Exp (Yrs)</label>
                   <input 
                     type="number" 
                     value={docExp}
                     onChange={(e) => setDocExp(e.target.value)}
                     placeholder="12"
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-150 rounded-xl text-xs focus:outline-none focus:bg-white"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:bg-white"
                   />
                 </div>
               </div>
 
               <div className="space-y-1">
-                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">Consultation Fee (₹)</label>
+                <label className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wide">Consultation Fee (₹)</label>
                 <input 
                   type="number" 
                   value={docFee}
                   onChange={(e) => setDocFee(e.target.value)}
                   placeholder="500"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-150 rounded-xl text-xs focus:outline-none focus:bg-white"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:bg-white"
                 />
               </div>
 
@@ -640,7 +1339,225 @@ export const AdminDashboard: React.FC = () => {
           </Card>
         )}
 
+        {/* ── TAB 9: AWS CLOUD SETUP & .PEM KEY GUIDE ─────────────────────── */}
+        {adminTab === 'aws-setup' && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white p-6 rounded-2xl shadow-xl space-y-2 border border-slate-700">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-emerald-500 text-white rounded-xl font-bold">
+                  <Server size={20} />
+                </div>
+                <div>
+                  <h2 className="text-xl font-black">AWS EC2 Server & .pem Key Setup Guide</h2>
+                  <p className="text-xs text-slate-300">Step-by-step instructions to create `.pem` SSH key and host InstaToken backend on AWS</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Step 1: Create .pem key */}
+              <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-xs space-y-3">
+                <div className="flex items-center gap-2 text-emerald-600 font-black text-sm">
+                  <Key size={16} /> Step 1: Create & Download `.pem` Key File in AWS
+                </div>
+                <ol className="list-decimal list-inside text-xs text-slate-600 space-y-2 font-semibold leading-relaxed">
+                  <li>Log in to your <strong>AWS Management Console</strong> and open the <strong>EC2 Dashboard</strong>.</li>
+                  <li>In the left sidebar, under <em>Network & Security</em>, click on <strong>Key Pairs</strong>.</li>
+                  <li>Click the blue <strong>Create Key Pair</strong> button.</li>
+                  <li>Enter Key Name: <code className="bg-slate-100 px-1.5 py-0.5 rounded text-blue-600 font-mono">instatoken-backend-key</code></li>
+                  <li>Select Key pair type: <strong>RSA</strong></li>
+                  <li>Select Private key file format: <strong>.pem</strong> (For OpenSSH on Mac/Linux/Windows PowerShell).</li>
+                  <li>Click <strong>Create key pair</strong>. Your browser will automatically download <code className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-800 font-mono">instatoken-backend-key.pem</code>.</li>
+                  <li className="text-amber-700 font-bold bg-amber-50 p-2 rounded-xl border border-amber-200">
+                    ⚠️ Keep this file safe! AWS does NOT store a backup copy of your `.pem` key. If lost, you cannot SSH into your server.
+                  </li>
+                </ol>
+              </div>
+
+              {/* Step 2: Set permissions */}
+              <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-xs space-y-3">
+                <div className="flex items-center gap-2 text-blue-600 font-black text-sm">
+                  <Lock size={16} /> Step 2: Set Secure File Permissions on `.pem` File
+                </div>
+                <div className="text-xs text-slate-600 space-y-2 font-semibold leading-relaxed">
+                  <p>Permissions have been automatically configured for your `.pem` key at <code className="bg-slate-100 px-1 py-0.5 rounded text-blue-600 font-mono text-[10px]">D:\Company Projects\Insta Token\instatoken-backend-key.pem</code>:</p>
+
+                  <div className="bg-slate-900 text-slate-200 p-3 rounded-xl font-mono text-[11px] space-y-1">
+                    <p className="text-slate-400"># Command executed on Windows PowerShell:</p>
+                    <p className="text-emerald-400">icacls "D:\Company Projects\Insta Token\instatoken-backend-key.pem" /inheritance:r</p>
+                    <p className="text-emerald-400">icacls "D:\Company Projects\Insta Token\instatoken-backend-key.pem" /grant:r "$($env:USERNAME):R"</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Step 3: Launch EC2 */}
+              <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-xs space-y-3">
+                <div className="flex items-center gap-2 text-purple-600 font-black text-sm">
+                  <Globe size={16} /> Step 3: Launch Ubuntu EC2 Instance
+                </div>
+                <ul className="list-disc list-inside text-xs text-slate-600 space-y-1.5 font-semibold">
+                  <li>Go to <strong>EC2 -&gt; Launch Instance</strong>.</li>
+                  <li>Choose Name: <strong>instatoken-backend-server</strong></li>
+                  <li>OS Image: <strong>Ubuntu 22.04 LTS (Free Tier Eligible)</strong></li>
+                  <li>Instance Type: <strong>t2.micro</strong> (or t3.small for production)</li>
+                  <li>Key pair: Select <code className="bg-slate-100 px-1 py-0.5 rounded text-purple-600 font-mono">instatoken-backend-key</code></li>
+                  <li>Network Settings: Check <strong>Allow SSH (Port 22)</strong>, <strong>Allow HTTP (Port 80)</strong>, and <strong>Allow HTTPS (Port 443)</strong>.</li>
+                  <li>Click <strong>Launch Instance</strong>.</li>
+                </ul>
+              </div>
+
+              {/* Step 4: SSH Connect */}
+              <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-xs space-y-3">
+                <div className="flex items-center gap-2 text-amber-600 font-black text-sm">
+                  <Server size={16} /> Step 4: SSH into AWS Server & Deploy Node.js Backend
+                </div>
+                <div className="bg-slate-900 text-slate-200 p-3 rounded-xl font-mono text-[11px] space-y-1.5">
+                  <p className="text-slate-400"># Connect from PowerShell using your exact .pem path:</p>
+                  <p className="text-emerald-400">ssh -i "D:\Company Projects\Insta Token\instatoken-backend-key.pem" ubuntu@YOUR_EC2_PUBLIC_IP</p>
+                  
+                  <p className="text-slate-400 pt-2"># Install Node.js, PM2 & Nginx on EC2:</p>
+                  <p className="text-blue-300">sudo apt update && sudo apt install -y nodejs npm nginx</p>
+                  <p className="text-blue-300">sudo npm install -g pm2</p>
+
+                  <p className="text-slate-400 pt-2"># Start Backend Service:</p>
+                  <p className="text-emerald-400">pm2 start server.js --name "instatoken-api"</p>
+                  <p className="text-emerald-400">pm2 save && pm2 startup</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
+
+      {/* ── CUSTOMER TOKENS & HISTORY MODAL DIALOG ───────────────────────── */}
+      {selectedCustomerModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-hidden shadow-2xl flex flex-col border border-slate-100">
+            {/* Modal Header */}
+            <div className="bg-slate-900 text-white p-5 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <img 
+                  src={selectedCustomerModal.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80"} 
+                  alt={selectedCustomerModal.name} 
+                  className="w-12 h-12 rounded-full object-cover border-2 border-blue-500" 
+                />
+                <div>
+                  <h3 className="text-base font-black leading-none">{selectedCustomerModal.name}</h3>
+                  <p className="text-xs text-slate-300 font-medium mt-1">{selectedCustomerModal.phone} · {selectedCustomerModal.email}</p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setSelectedCustomerModal(null)}
+                className="p-2 text-slate-400 hover:text-white rounded-full hover:bg-slate-800 transition-colors border-none cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Content Scroll Area */}
+            <div className="p-6 overflow-y-auto space-y-6 text-slate-800 text-xs">
+              
+              {/* Summary Pill Header */}
+              <div className="grid grid-cols-3 gap-3 text-center">
+                <div className="bg-blue-50 rounded-2xl p-3 border border-blue-100">
+                  <span className="text-[10px] font-black text-blue-600 uppercase block">Total Bookings</span>
+                  <span className="text-xl font-black text-slate-900 block mt-0.5">{selectedCustomerModal.bookings.length} Tokens</span>
+                </div>
+                <div className="bg-purple-50 rounded-2xl p-3 border border-purple-100">
+                  <span className="text-[10px] font-black text-purple-600 uppercase block">Total Hospitals Visited</span>
+                  <span className="text-xl font-black text-slate-900 block mt-0.5">
+                    {new Set(selectedCustomerModal.bookings.map(b => b.hospitalId)).size} Hospitals
+                  </span>
+                </div>
+                <div className="bg-emerald-50 rounded-2xl p-3 border border-emerald-100">
+                  <span className="text-[10px] font-black text-emerald-600 uppercase block">Total Spend</span>
+                  <span className="text-xl font-black text-slate-900 block mt-0.5">
+                    ₹{selectedCustomerModal.bookings.reduce((sum, b) => sum + b.fee, 0).toLocaleString()}
+                  </span>
+                </div>
+              </div>
+
+              {/* Booked Tokens Detail List */}
+              <div className="space-y-3">
+                <h4 className="font-black text-xs uppercase tracking-wide text-slate-700 flex items-center gap-1.5">
+                  <Calendar size={14} className="text-blue-600" /> Booked Token Activity Log
+                </h4>
+
+                {selectedCustomerModal.bookings.length > 0 ? (
+                  <div className="space-y-2.5">
+                    {selectedCustomerModal.bookings.map((b) => (
+                      <div key={b.id} className="p-4 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-between hover:bg-slate-100/50 transition-colors">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="bg-blue-600 text-white font-black text-xs px-2.5 py-0.5 rounded-lg">
+                              Token #{b.tokenNumber}
+                            </span>
+                            <span className="font-extrabold text-slate-900 text-xs">{b.hospitalName}</span>
+                          </div>
+                          <p className="text-[11px] text-slate-600 font-semibold">👨‍⚕️ {b.doctorName} ({b.departmentName})</p>
+                          <p className="text-[10px] text-slate-400">📅 Date: {b.date} at {b.time} · Payment: {b.paymentMethod} ({b.paymentId})</p>
+                        </div>
+
+                        <div className="text-right space-y-1">
+                          <span className="font-black text-sm text-slate-900 block">₹{b.fee}</span>
+                          <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full inline-block ${
+                            b.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'
+                          }`}>
+                            {b.status.toUpperCase()}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-slate-400 font-semibold text-center py-6">No token bookings recorded for this customer yet.</p>
+                )}
+              </div>
+
+              {/* Hospitals Visited List */}
+              <div className="space-y-3 pt-2">
+                <h4 className="font-black text-xs uppercase tracking-wide text-slate-700 flex items-center gap-1.5">
+                  <Building2 size={14} className="text-purple-600" /> Visited Partner Hospitals Overview
+                </h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {Array.from(new Set(selectedCustomerModal.bookings.map(b => b.hospitalId))).map((hId) => {
+                    const hosp = hospitals.find(h => h.id === hId);
+                    const countVisits = selectedCustomerModal.bookings.filter(b => b.hospitalId === hId).length;
+                    return (
+                      <div key={hId} className="p-3 bg-purple-50/50 border border-purple-100 rounded-2xl flex items-center gap-3">
+                        <img 
+                          src={hosp?.image || "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=400&auto=format&fit=crop&q=80"} 
+                          alt="Hospital" 
+                          className="w-10 h-10 rounded-xl object-cover border border-purple-200 shrink-0" 
+                        />
+                        <div className="min-w-0">
+                          <p className="font-extrabold text-slate-800 text-xs truncate">{hosp?.name || "Partner Hospital"}</p>
+                          <p className="text-[10px] text-purple-700 font-bold">{countVisits} Visit Token(s) Booked</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end">
+              <button
+                onClick={() => setSelectedCustomerModal(null)}
+                className="px-5 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 cursor-pointer border-none"
+              >
+                Close Customer Details
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

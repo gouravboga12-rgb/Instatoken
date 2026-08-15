@@ -43,6 +43,35 @@ export interface Hospital {
   contact: string;
   lat: number;
   lng: number;
+  status?: 'active' | 'disabled';
+}
+
+export interface CustomerBooking {
+  id: string;
+  tokenNumber: number;
+  hospitalId: string;
+  hospitalName: string;
+  doctorId: string;
+  doctorName: string;
+  departmentName: string;
+  date: string;
+  time: string;
+  fee: number;
+  status: 'booked' | 'completed' | 'cancelled';
+  paymentId: string;
+  paymentMethod: string;
+}
+
+export interface CustomerAccount {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  location: string;
+  joinedDate: string;
+  status: 'active' | 'suspended';
+  avatar?: string;
+  bookings: CustomerBooking[];
 }
 
 export interface HealthArticle {
@@ -557,5 +586,218 @@ export const HEALTH_ARTICLES: HealthArticle[] = [
     image: "https://images.unsplash.com/photo-1471864190281-a93a3070b6de?w=400&auto=format&fit=crop&q=80",
     content: "Good dental habits start early. Make brushing fun for children using soft-bristled, colorful brushes. Monitor sugar intake and schedule their first dentist visit by their first birthday to screen for early cavities.",
     date: "July 08, 2026"
+  }
+];
+
+export const MOCK_CUSTOMERS: CustomerAccount[] = [
+  {
+    id: "cust-1",
+    name: "Guest Patient",
+    email: "patient@example.com",
+    phone: "+91 9876543210",
+    location: "Koramangala, Bengaluru",
+    joinedDate: "15 Jan 2026",
+    status: "active",
+    avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+    bookings: [
+      {
+        id: "tok-1001",
+        tokenNumber: 4,
+        hospitalId: "hosp-apollo",
+        hospitalName: "Apollo Spectra Hospital",
+        doctorId: "doc-arvind",
+        doctorName: "Dr. Arvind Sharma",
+        departmentName: "Cardiology",
+        date: "2026-08-14",
+        time: "10:30 AM",
+        fee: 800,
+        status: "completed",
+        paymentId: "PAYID-7849204",
+        paymentMethod: "UPI"
+      },
+      {
+        id: "tok-1008",
+        tokenNumber: 12,
+        hospitalId: "hosp-rainbow",
+        hospitalName: "Rainbow Children's Hospital",
+        doctorId: "doc-carter",
+        doctorName: "Dr. John Carter",
+        departmentName: "Pediatrics",
+        date: "2026-08-10",
+        time: "11:15 AM",
+        fee: 600,
+        status: "completed",
+        paymentId: "PAYID-6639102",
+        paymentMethod: "Card"
+      },
+      {
+        id: "tok-1015",
+        tokenNumber: 15,
+        hospitalId: "hosp-nethra",
+        hospitalName: "Narayana Nethralaya",
+        doctorId: "doc-shalini",
+        doctorName: "Dr. Shalini Sen",
+        departmentName: "Ophthalmology",
+        date: "2026-08-02",
+        time: "09:30 AM",
+        fee: 650,
+        status: "completed",
+        paymentId: "PAYID-5510293",
+        paymentMethod: "UPI"
+      }
+    ]
+  },
+  {
+    id: "cust-2",
+    name: "Ananya Sharma",
+    email: "ananya.s@gmail.com",
+    phone: "+91 9820011223",
+    location: "HSR Layout, Bengaluru",
+    joinedDate: "02 Feb 2026",
+    status: "active",
+    avatar: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&auto=format&fit=crop&q=80",
+    bookings: [
+      {
+        id: "tok-1020",
+        tokenNumber: 6,
+        hospitalId: "hosp-apollo",
+        hospitalName: "Apollo Spectra Hospital",
+        doctorId: "doc-sarah",
+        doctorName: "Dr. Sarah Jenkins",
+        departmentName: "Neurology",
+        date: "2026-08-12",
+        time: "11:00 AM",
+        fee: 1000,
+        status: "completed",
+        paymentId: "PAYID-9920182",
+        paymentMethod: "UPI"
+      },
+      {
+        id: "tok-1024",
+        tokenNumber: 3,
+        hospitalId: "hosp-fortis",
+        hospitalName: "Fortis Hospital",
+        doctorId: "doc-meera-gyn",
+        doctorName: "Dr. Meera Nair",
+        departmentName: "Gynecology",
+        date: "2026-08-05",
+        time: "10:30 AM",
+        fee: 700,
+        status: "completed",
+        paymentId: "PAYID-8849102",
+        paymentMethod: "Card"
+      }
+    ]
+  },
+  {
+    id: "cust-3",
+    name: "Vikram Malhotra",
+    email: "vikram.m@yahoo.com",
+    phone: "+91 9711223344",
+    location: "Gachibowli, Hyderabad",
+    joinedDate: "18 Mar 2026",
+    status: "active",
+    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
+    bookings: [
+      {
+        id: "tok-1031",
+        tokenNumber: 2,
+        hospitalId: "hosp-continental",
+        hospitalName: "Continental Hospitals",
+        doctorId: "doc-raghava-neuro",
+        doctorName: "Dr. Raghava Rao",
+        departmentName: "Neurology",
+        date: "2026-08-14",
+        time: "10:00 AM",
+        fee: 900,
+        status: "completed",
+        paymentId: "PAYID-1102948",
+        paymentMethod: "Net Banking"
+      },
+      {
+        id: "tok-1035",
+        tokenNumber: 5,
+        hospitalId: "hosp-ramesh",
+        hospitalName: "Ramesh Hospitals",
+        doctorId: "doc-ramesh-babu",
+        doctorName: "Dr. Ramesh Babu",
+        departmentName: "Cardiology",
+        date: "2026-07-28",
+        time: "11:00 AM",
+        fee: 800,
+        status: "completed",
+        paymentId: "PAYID-7729104",
+        paymentMethod: "UPI"
+      }
+    ]
+  },
+  {
+    id: "cust-4",
+    name: "Priya Sundaram",
+    email: "priya.sun@outlook.com",
+    phone: "+91 9445566778",
+    location: "ITI Road, Vijayawada",
+    joinedDate: "10 Apr 2026",
+    status: "active",
+    avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80",
+    bookings: [
+      {
+        id: "tok-1042",
+        tokenNumber: 8,
+        hospitalId: "hosp-ramesh",
+        hospitalName: "Ramesh Hospitals",
+        doctorId: "doc-ramesh-babu",
+        doctorName: "Dr. Ramesh Babu",
+        departmentName: "Cardiology",
+        date: "2026-08-11",
+        time: "03:30 PM",
+        fee: 800,
+        status: "completed",
+        paymentId: "PAYID-4402918",
+        paymentMethod: "UPI"
+      }
+    ]
+  },
+  {
+    id: "cust-5",
+    name: "Suresh K. Varma",
+    email: "suresh.v@gmail.com",
+    phone: "+91 9988776655",
+    location: "Ram Nagar, Visakhapatnam",
+    joinedDate: "25 May 2026",
+    status: "active",
+    avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80",
+    bookings: [
+      {
+        id: "tok-1050",
+        tokenNumber: 4,
+        hospitalId: "hosp-care-vizag",
+        hospitalName: "Care Hospitals",
+        doctorId: "doc-patnaik-ortho",
+        doctorName: "Dr. Prasad Patnaik",
+        departmentName: "Orthopedic",
+        date: "2026-08-13",
+        time: "10:30 AM",
+        fee: 700,
+        status: "completed",
+        paymentId: "PAYID-3310928",
+        paymentMethod: "Card"
+      },
+      {
+        id: "tok-1054",
+        tokenNumber: 9,
+        hospitalId: "hosp-apollo",
+        hospitalName: "Apollo Spectra Hospital",
+        doctorId: "doc-ramesh",
+        doctorName: "Dr. Ramesh Patel",
+        departmentName: "Orthopedic",
+        date: "2026-07-20",
+        time: "11:30 AM",
+        fee: 900,
+        status: "completed",
+        paymentId: "PAYID-2201948",
+        paymentMethod: "UPI"
+      }
+    ]
   }
 ];

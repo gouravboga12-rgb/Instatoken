@@ -5,7 +5,7 @@ import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { 
   ArrowLeft, Star, MapPin, Clock, Heart, Share2, 
-  Phone, CheckCircle, Stethoscope, Navigation
+  Phone, CheckCircle, Stethoscope, Navigation, AlertTriangle
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 
@@ -158,6 +158,16 @@ export const HospitalDetails: React.FC<HospitalDetailsProps> = ({ onDoctorSelect
         </div>
       </div>
 
+      {hospital.status === 'disabled' && (
+        <div className="mx-5 mb-4 p-4 bg-amber-50 border border-amber-200 rounded-2xl text-amber-800 text-xs font-extrabold flex items-center gap-3 shadow-2xs">
+          <AlertTriangle size={20} className="text-amber-600 shrink-0" />
+          <div>
+            <p className="text-sm font-black text-amber-900 leading-none">Hospital Account Temporarily Disabled</p>
+            <p className="text-[11px] font-semibold text-amber-700 mt-1">This hospital is currently suspended by central administration. Token bookings are temporarily unavailable.</p>
+          </div>
+        </div>
+      )}
+
       <div className="px-5 flex flex-col md:grid md:grid-cols-12 md:gap-8 items-start">
         
         {/* Right Column: Doctors List & Queue Booking Cards (Mobile: FIRST, Desktop: SECOND) */}
@@ -247,10 +257,15 @@ export const HospitalDetails: React.FC<HospitalDetailsProps> = ({ onDoctorSelect
                       <Button 
                         variant="primary" 
                         size="sm"
+                        disabled={hospital.status === 'disabled'}
                         onClick={() => onDoctorSelect(hospital.id, doc.id)}
-                        className="py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-extrabold cursor-pointer"
+                        className={`py-2 px-4 rounded-xl text-xs font-extrabold cursor-pointer ${
+                          hospital.status === 'disabled' 
+                            ? 'bg-slate-300 text-slate-500 cursor-not-allowed' 
+                            : 'bg-blue-600 hover:bg-blue-700 text-white'
+                        }`}
                       >
-                        Book Token
+                        {hospital.status === 'disabled' ? 'Account Disabled' : 'Book Token'}
                       </Button>
                     </div>
                   </Card>

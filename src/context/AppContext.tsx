@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { HOSPITALS, DEPARTMENTS, HEALTH_ARTICLES } from '../utils/mockData';
-import type { Hospital, Doctor, HealthArticle } from '../utils/mockData';
+import { HOSPITALS, DEPARTMENTS, HEALTH_ARTICLES, MOCK_CUSTOMERS } from '../utils/mockData';
+import type { Hospital, Doctor, HealthArticle, CustomerAccount } from '../utils/mockData';
 
 export interface FamilyMember {
   id: string;
@@ -65,6 +65,7 @@ interface AppContextType {
   hospitals: Hospital[];
   articles: HealthArticle[];
   appointments: Appointment[];
+  customers: CustomerAccount[];
   notifications: AppNotification[];
   currentLocation: string;
   setCurrentLocation: (loc: string) => void;
@@ -75,6 +76,8 @@ interface AppContextType {
   removeFamilyMember: (id: string) => void;
   toggleSaveHospital: (hospitalId: string) => void;
   toggleSaveDoctor: (doctorId: string) => void;
+  toggleDisableHospital: (hospitalId: string) => void;
+  toggleCustomerStatus: (customerId: string) => void;
   bookToken: (
     patientDetails: { name: string; age: number; gender: string; phone: string; email: string; address: string },
     hospitalId: string,
@@ -211,6 +214,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     ];
   });
 
+  const [customers, setCustomers] = useState<CustomerAccount[]>(() => {
+    const saved = localStorage.getItem('insta_customers');
+    return saved ? JSON.parse(saved) : MOCK_CUSTOMERS;
+  });
+
   const [currentLocation, setCurrentLocation] = useState<string>(() => {
     return localStorage.getItem('insta_location') || "Koramangala, Bengaluru";
   });
@@ -223,6 +231,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     localStorage.setItem('insta_hospitals', JSON.stringify(hospitals));
   }, [hospitals]);
+
+  useEffect(() => {
+    localStorage.setItem('insta_customers', JSON.stringify(customers));
+  }, [customers]);
 
   useEffect(() => {
     localStorage.setItem('insta_appointments', JSON.stringify(appointments));
@@ -403,6 +415,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       throw new Error("Hospital or Doctor not found");
     }
 
+    if (targetHosp.status === 'disabled') {
+      throw new Error("Token booking is currently unavailable. This hospital account has been temporarily disabled by administration.");
+    }
+
     const tokenAssigned = targetDoc.nextAvailableToken;
     const patientsAhead = tokenAssigned - targetDoc.currentQueue - 1;
     const computedWaitTime = Math.max(0, patientsAhead * targetDoc.estimatedWaitPerPatient);
@@ -547,6 +563,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addNotification("Doctor Registered", `Dr. ${doc.name} assigned to hospital.`, "success");
   };
 
+  const toggleDisableHospital = (hospitalId: string) => {
+    setHospitals(prev => prev.map(h => {
+      if (h.id === hospitalId) {
+        const nextStatus = h.status === 'disabled' ? 'active' : 'disabled';
+        const msg = nextStatus === 'disabled'
+          ? `${h.name} account is now DISABLED. Token bookings suspended.`
+          : `${h.name} account is now ACTIVE. Token bookings resumed.`;
+        addNotification(
+          nextStatus === 'disabled' ? "Hospital Account Disabled" : "Hospital Account Enabled",
+          msg,
+          nextStatus === 'disabled' ? "warning" : "success"
+        );
+        return { ...h, status: nextStatus };
+      }
+      return h;
+    }));
+  };
+
+  const toggleCustomerStatus = (customerId: string) => {
+    setCustomers(prev => prev.map(c => {
+      if (c.id === customerId) {
+        const nextStatus = c.status === 'suspended' ? 'active' : 'suspended';
+        addNotification(
+          nextStatus === 'suspended' ? "Customer Suspended" : "Customer Activated",
+          `Customer ${c.name} account is now ${nextStatus.toUpperCase()}.`,
+          nextStatus === 'suspended' ? "warning" : "success"
+        );
+        return { ...c, status: nextStatus };
+      }
+      return c;
+    }));
+  };
+
   // --- Notification Helpers ---
   const addNotification = (title: string, message: string, type: 'success' | 'info' | 'warning') => {
     const newNotif: AppNotification = {
@@ -667,6 +716,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       hospitals,
       articles,
       appointments,
+      customers,
       notifications,
       currentLocation,
       setCurrentLocation,
@@ -677,6 +727,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       removeFamilyMember,
       toggleSaveHospital,
       toggleSaveDoctor,
+      toggleDisableHospital,
+      toggleCustomerStatus,
       bookToken,
       cancelAppointment,
       advanceQueue,
