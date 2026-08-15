@@ -9,7 +9,7 @@ import {
   ArrowLeft, LayoutDashboard, Stethoscope, 
   TrendingUp, ShieldCheck, Activity, Bell,
   DollarSign, Building2, CheckCircle2, Search, Plus,
-  Server, Key, Lock, Globe, Users, UserCheck, UserX,
+  Users, UserCheck, UserX,
   AlertTriangle, Download, X, Calendar
 } from 'lucide-react';
 
@@ -21,7 +21,7 @@ export const AdminDashboard: React.FC = () => {
   } = useApp();
 
   const [adminTab, setAdminTab] = useState<
-    'stats' | 'hospitals' | 'customers' | 'financials' | 'add-hospital' | 'add-doctor' | 'aws-setup'
+    'stats' | 'hospitals' | 'customers' | 'financials' | 'add-hospital' | 'add-doctor'
   >('stats');
 
   // --- Add Hospital Form State ---
@@ -244,16 +244,6 @@ export const AdminDashboard: React.FC = () => {
             >
               <DollarSign size={15} /> Financials & Revenue
             </button>
-
-            <p className="text-[9px] font-extrabold text-slate-500 uppercase tracking-widest px-3 py-1 pt-2">Infrastructure</p>
-            <button
-              onClick={() => setAdminTab('aws-setup')}
-              className={`w-full text-left px-3.5 py-2 text-xs font-bold rounded-xl flex items-center gap-2.5 transition-all cursor-pointer border-none ${
-                adminTab === 'aws-setup' ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/20' : 'text-slate-400 hover:text-emerald-400 hover:bg-slate-800/60'
-              }`}
-            >
-              <Server size={15} /> AWS Cloud & .pem Setup
-            </button>
           </div>
         </div>
 
@@ -299,7 +289,7 @@ export const AdminDashboard: React.FC = () => {
 
         {/* Mobile Nav Tabs */}
         <div className="flex overflow-x-auto px-2 border-b border-slate-800 text-[10px] font-bold uppercase tracking-wider no-scrollbar">
-          {(['stats', 'hospitals', 'customers', 'financials', 'aws-setup'] as const).map(tab => (
+          {(['stats', 'hospitals', 'customers', 'financials'] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setAdminTab(tab)}
@@ -307,7 +297,7 @@ export const AdminDashboard: React.FC = () => {
                 adminTab === tab ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400'
               }`}
             >
-              {tab === 'stats' ? 'Overview' : tab === 'hospitals' ? 'Hospitals' : tab === 'customers' ? 'Customers' : tab === 'financials' ? 'Revenue' : 'AWS Setup'}
+              {tab === 'stats' ? 'Overview' : tab === 'hospitals' ? 'Hospitals' : tab === 'customers' ? 'Customers' : 'Revenue'}
             </button>
           ))}
         </div>
@@ -1114,94 +1104,7 @@ export const AdminDashboard: React.FC = () => {
           </Card>
         )}
 
-        {/* ── TAB 9: AWS CLOUD SETUP & .PEM KEY GUIDE ─────────────────────── */}
-        {adminTab === 'aws-setup' && (
-          <div className="space-y-6 animate-in fade-in duration-200">
-            <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white p-6 rounded-2xl shadow-xl space-y-2 border border-slate-700">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-emerald-500 text-white rounded-xl font-bold">
-                  <Server size={20} />
-                </div>
-                <div>
-                  <h2 className="text-xl font-black">AWS EC2 Server & .pem Key Setup Guide</h2>
-                  <p className="text-xs text-slate-300">Step-by-step instructions to create `.pem` SSH key and host InstaToken backend on AWS</p>
-                </div>
-              </div>
-            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Step 1: Create .pem key */}
-              <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-xs space-y-3">
-                <div className="flex items-center gap-2 text-emerald-600 font-black text-sm">
-                  <Key size={16} /> Step 1: Create & Download `.pem` Key File in AWS
-                </div>
-                <ol className="list-decimal list-inside text-xs text-slate-600 space-y-2 font-semibold leading-relaxed">
-                  <li>Log in to your <strong>AWS Management Console</strong> and open the <strong>EC2 Dashboard</strong>.</li>
-                  <li>In the left sidebar, under <em>Network & Security</em>, click on <strong>Key Pairs</strong>.</li>
-                  <li>Click the blue <strong>Create Key Pair</strong> button.</li>
-                  <li>Enter Key Name: <code className="bg-slate-100 px-1.5 py-0.5 rounded text-blue-600 font-mono">instatoken-backend-key</code></li>
-                  <li>Select Key pair type: <strong>RSA</strong></li>
-                  <li>Select Private key file format: <strong>.pem</strong> (For OpenSSH on Mac/Linux/Windows PowerShell).</li>
-                  <li>Click <strong>Create key pair</strong>. Your browser will automatically download <code className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-800 font-mono">instatoken-backend-key.pem</code>.</li>
-                  <li className="text-amber-700 font-bold bg-amber-50 p-2 rounded-xl border border-amber-200">
-                    ⚠️ Keep this file safe! AWS does NOT store a backup copy of your `.pem` key. If lost, you cannot SSH into your server.
-                  </li>
-                </ol>
-              </div>
-
-              {/* Step 2: Set permissions */}
-              <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-xs space-y-3">
-                <div className="flex items-center gap-2 text-blue-600 font-black text-sm">
-                  <Lock size={16} /> Step 2: Set Secure File Permissions on `.pem` File
-                </div>
-                <div className="text-xs text-slate-600 space-y-2 font-semibold leading-relaxed">
-                  <p>Permissions have been automatically configured for your `.pem` key at <code className="bg-slate-100 px-1 py-0.5 rounded text-blue-600 font-mono text-[10px]">D:\Company Projects\Insta Token\instatoken-backend-key.pem</code>:</p>
-
-                  <div className="bg-slate-900 text-slate-200 p-3 rounded-xl font-mono text-[11px] space-y-1">
-                    <p className="text-slate-400"># Command executed on Windows PowerShell:</p>
-                    <p className="text-emerald-400">icacls "D:\Company Projects\Insta Token\instatoken-backend-key.pem" /inheritance:r</p>
-                    <p className="text-emerald-400">icacls "D:\Company Projects\Insta Token\instatoken-backend-key.pem" /grant:r "$($env:USERNAME):R"</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Step 3: Launch EC2 */}
-              <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-xs space-y-3">
-                <div className="flex items-center gap-2 text-purple-600 font-black text-sm">
-                  <Globe size={16} /> Step 3: Launch Ubuntu EC2 Instance
-                </div>
-                <ul className="list-disc list-inside text-xs text-slate-600 space-y-1.5 font-semibold">
-                  <li>Go to <strong>EC2 -&gt; Launch Instance</strong>.</li>
-                  <li>Choose Name: <strong>instatoken-backend-server</strong></li>
-                  <li>OS Image: <strong>Ubuntu 22.04 LTS (Free Tier Eligible)</strong></li>
-                  <li>Instance Type: <strong>t2.micro</strong> (or t3.small for production)</li>
-                  <li>Key pair: Select <code className="bg-slate-100 px-1 py-0.5 rounded text-purple-600 font-mono">instatoken-backend-key</code></li>
-                  <li>Network Settings: Check <strong>Allow SSH (Port 22)</strong>, <strong>Allow HTTP (Port 80)</strong>, and <strong>Allow HTTPS (Port 443)</strong>.</li>
-                  <li>Click <strong>Launch Instance</strong>.</li>
-                </ul>
-              </div>
-
-              {/* Step 4: SSH Connect */}
-              <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-xs space-y-3">
-                <div className="flex items-center gap-2 text-amber-600 font-black text-sm">
-                  <Server size={16} /> Step 4: SSH into AWS Server & Deploy Node.js Backend
-                </div>
-                <div className="bg-slate-900 text-slate-200 p-3 rounded-xl font-mono text-[11px] space-y-1.5">
-                  <p className="text-slate-400"># Connect from PowerShell using your exact .pem path:</p>
-                  <p className="text-emerald-400">ssh -i "D:\Company Projects\Insta Token\instatoken-backend-key.pem" ubuntu@YOUR_EC2_PUBLIC_IP</p>
-                  
-                  <p className="text-slate-400 pt-2"># Install Node.js, PM2 & Nginx on EC2:</p>
-                  <p className="text-blue-300">sudo apt update && sudo apt install -y nodejs npm nginx</p>
-                  <p className="text-blue-300">sudo npm install -g pm2</p>
-
-                  <p className="text-slate-400 pt-2"># Start Backend Service:</p>
-                  <p className="text-emerald-400">pm2 start server.js --name "instatoken-api"</p>
-                  <p className="text-emerald-400">pm2 save && pm2 startup</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
       </div>
 
