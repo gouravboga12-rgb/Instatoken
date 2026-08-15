@@ -23,10 +23,9 @@ import { ForgotPasswordModal } from '../../components/common/ForgotPasswordModal
 
 export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
   const { login, signup } = useApp();
-  const [mode, setMode] = useState<'login' | 'signup' | 'otp'>('login');
+  const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [emailOrPhone, setEmailOrPhone] = useState('');
   const [password, setPassword] = useState('');
-  const [otp, setOtp] = useState('');
   const [name, setName] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [phone, setPhone] = useState('');
@@ -50,17 +49,6 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
       setLoading(true);
       setTimeout(() => {
         login(emailOrPhone, password);
-        setLoading(false);
-        onSuccess();
-      }, 500);
-    } else if (mode === 'otp') {
-      if (!emailOrPhone || !otp) {
-        setError('Please enter mobile number and 4-digit OTP');
-        return;
-      }
-      setLoading(true);
-      setTimeout(() => {
-        login(emailOrPhone, otp);
         setLoading(false);
         onSuccess();
       }, 500);
@@ -249,7 +237,7 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
             {/* Desktop form title */}
             <div className="hidden md:block mb-6">
               <h3 className="text-xl font-black text-slate-800 tracking-tight font-heading">
-                {mode === 'login' ? 'Sign In to Account' : mode === 'otp' ? 'Login with OTP' : 'Register Patient'}
+                {mode === 'login' ? 'Sign In to Account' : 'Register Patient'}
               </h3>
               <p className="text-slate-400 text-xs mt-1">Access appointments, book OPD tokens and view live statuses.</p>
             </div>
@@ -257,7 +245,7 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
             {/* Mobile form title */}
             <div className="md:hidden text-center mb-5">
               <h3 className="text-base font-black text-slate-800 tracking-tight font-heading">
-                {mode === 'login' ? 'Log in or Sign up' : mode === 'otp' ? 'Login with OTP' : 'Register Patient'}
+                {mode === 'login' ? 'Log in or Sign up' : 'Register Patient'}
               </h3>
               <p className="text-slate-400 text-[10px] mt-0.5">
                 {mode === 'login' ? 'Enter credentials to continue' : 'Access your appointments pass'}
@@ -288,13 +276,13 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
                 </div>
               )}
 
-              {(mode === 'login' || mode === 'otp') && (
+              {mode === 'login' && (
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                    {mode === 'otp' ? 'Mobile Number' : 'Email Address or Mobile'}
+                    Email Address or Mobile
                   </label>
                   <div className="relative">
-                    {mode === 'otp' || !emailOrPhone.includes('@') && emailOrPhone !== '' ? (
+                    {!emailOrPhone.includes('@') && emailOrPhone !== '' ? (
                       <Phone size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                     ) : (
                       <Mail size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -303,7 +291,7 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
                       type="text" 
                       value={emailOrPhone}
                       onChange={(e) => setEmailOrPhone(e.target.value)}
-                      placeholder={mode === 'otp' ? "+91 98765 43210" : "name@email.com or mobile"}
+                      placeholder="name@email.com or mobile"
                       className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
                     />
                   </div>
@@ -342,32 +330,30 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
                 </>
               )}
 
-              {mode !== 'otp' && (
-                <div className="space-y-1">
-                  <div className="flex justify-between items-center">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Password</label>
-                    {mode === 'login' && (
-                      <button 
-                        type="button"
-                        className="text-[11px] text-blue-600 font-extrabold hover:underline cursor-pointer border-none bg-transparent"
-                        onClick={() => setShowForgotModal(true)}
-                      >
-                        Forgot Password?
-                      </button>
-                    )}
-                  </div>
-                  <div className="relative">
-                    <Lock size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input 
-                      type="password" 
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="••••••••"
-                      className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
-                    />
-                  </div>
+              <div className="space-y-1">
+                <div className="flex justify-between items-center">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Password</label>
+                  {mode === 'login' && (
+                    <button 
+                      type="button"
+                      className="text-[11px] text-blue-600 font-extrabold hover:underline cursor-pointer border-none bg-transparent"
+                      onClick={() => setShowForgotModal(true)}
+                    >
+                      Forgot Password?
+                    </button>
+                  )}
                 </div>
-              )}
+                <div className="relative">
+                  <Lock size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input 
+                    type="password" 
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
+                  />
+                </div>
+              </div>
 
               {mode === 'signup' && (
                 <div className="space-y-1">
@@ -385,29 +371,6 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
                 </div>
               )}
 
-              {mode === 'otp' && (
-                <div className="space-y-1">
-                  <div className="flex justify-between items-center">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Verification Code</label>
-                    <button 
-                      type="button"
-                      className="text-[10px] text-blue-600 font-bold hover:underline cursor-pointer"
-                      onClick={() => alert("Verification code resent.")}
-                    >
-                      Resend
-                    </button>
-                  </div>
-                  <input 
-                    type="text" 
-                    maxLength={4}
-                    value={otp}
-                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                    placeholder="4-digit OTP"
-                    className="w-full text-center tracking-[1em] font-mono py-2 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
-                  />
-                </div>
-              )}
-
               <Button 
                 type="submit" 
                 variant="primary" 
@@ -415,7 +378,7 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
                 fullWidth 
                 className="py-2 mt-2 rounded-xl text-xs font-bold"
               >
-                {mode === 'login' ? 'Sign In' : mode === 'otp' ? 'Verify & Login' : 'Create Account'}
+                {mode === 'login' ? 'Sign In' : 'Create Account'}
               </Button>
             </form>
 
@@ -446,34 +409,14 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
             {/* Toggle Controls */}
             <div className="space-y-2 text-center">
               {mode === 'login' ? (
-                <>
-                  <button 
-                    type="button" 
-                    onClick={() => setMode('otp')}
-                    className="text-xs text-blue-600 font-bold hover:underline block w-full cursor-pointer"
-                  >
-                    Login with Mobile OTP
-                  </button>
-                  <p className="text-xs text-slate-500">
-                    New to InstaToken?{' '}
-                    <button 
-                      type="button" 
-                      onClick={() => setMode('signup')}
-                      className="text-blue-600 font-bold hover:underline cursor-pointer"
-                    >
-                      Register Now
-                    </button>
-                  </p>
-                </>
-              ) : mode === 'otp' ? (
                 <p className="text-xs text-slate-500">
-                  Want to use password?{' '}
+                  New to InstaToken?{' '}
                   <button 
                     type="button" 
-                    onClick={() => setMode('login')}
-                    className="text-blue-600 font-bold hover:underline cursor-pointer"
+                    onClick={() => setMode('signup')}
+                    className="text-blue-600 font-bold hover:underline cursor-pointer border-none bg-transparent"
                   >
-                    Login with Email
+                    Register Now
                   </button>
                 </p>
               ) : (
@@ -482,7 +425,7 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
                   <button 
                     type="button" 
                     onClick={() => setMode('login')}
-                    className="text-blue-600 font-bold hover:underline cursor-pointer"
+                    className="text-blue-600 font-bold hover:underline cursor-pointer border-none bg-transparent"
                   >
                     Sign In
                   </button>
