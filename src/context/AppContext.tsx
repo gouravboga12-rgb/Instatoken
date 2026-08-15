@@ -144,6 +144,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [hospitals, setHospitals] = useState<Hospital[]>(() => {
     const saved = localStorage.getItem('insta_hospitals');
+    const savedHDocs = localStorage.getItem('insta_hospital_doctors');
+
+    let hospitalPanelDoctors: Doctor[] | null = null;
+    if (savedHDocs) {
+      try {
+        const parsedHDocs = JSON.parse(savedHDocs);
+        if (Array.isArray(parsedHDocs) && parsedHDocs.length > 0) {
+          hospitalPanelDoctors = parsedHDocs.map((d: any) => ({
+            id: d.id,
+            name: d.name,
+            specialty: d.specialization || d.departmentName || "Specialist",
+            departmentId: d.departmentId || "dept-general",
+            qualification: d.qualification || "MBBS",
+            experience: d.experience || 5,
+            consultationFee: d.consultationFee || 500,
+            rating: d.rating || 4.8,
+            reviewsCount: 120,
+            image: d.photo || "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&auto=format&fit=crop&q=80",
+            availability: {
+              days: d.opdDays && d.opdDays.length > 0 ? d.opdDays : ["Mon", "Tue", "Wed", "Thu", "Fri"],
+              slots: [
+                `${d.opdStartTime || '09:00'} AM`,
+                "10:00 AM", "11:00 AM", "02:00 PM", "03:00 PM",
+                `${d.opdEndTime || '17:00'} PM`
+              ]
+            },
+            currentQueue: 3,
+            nextAvailableToken: 7,
+            estimatedWaitPerPatient: d.consultationDuration || 12
+          }));
+        }
+      } catch (e) {}
+    }
+
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -154,18 +188,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (validSaved.length > 0) {
             return HOSPITALS.map(defaultHosp => {
               const found = validSaved.find((p: Hospital) => p.id === defaultHosp.id);
-              if (!found) return defaultHosp;
-              
+              if (!found) {
+                if (defaultHosp.id === 'hosp-apollo' && hospitalPanelDoctors) {
+                  return { ...defaultHosp, doctors: hospitalPanelDoctors };
+                }
+                return defaultHosp;
+              }
+
+              let finalDoctors = [...(found.doctors || [])];
+              if (defaultHosp.id === 'hosp-apollo' && hospitalPanelDoctors && hospitalPanelDoctors.length > 0) {
+                finalDoctors = hospitalPanelDoctors;
+              } else {
+                defaultHosp.doctors.forEach(defDoc => {
+                  if (!finalDoctors.some((fd: Doctor) => fd.id === defDoc.id)) {
+                    finalDoctors.push(defDoc);
+                  }
+                });
+              }
+
               return {
                 ...defaultHosp,
                 ...found,
-                doctors: (found.doctors && found.doctors.length > 0) ? found.doctors : defaultHosp.doctors
+                departments: defaultHosp.departments,
+                doctors: finalDoctors
               };
             }).concat(validSaved.filter((p: Hospital) => !defaultIds.has(p.id)));
           }
         }
       } catch (e) {}
     }
+
+    if (hospitalPanelDoctors && hospitalPanelDoctors.length > 0) {
+      return HOSPITALS.map(h => h.id === 'hosp-apollo' ? { ...h, doctors: hospitalPanelDoctors! } : h);
+    }
+
     return HOSPITALS;
   });
 

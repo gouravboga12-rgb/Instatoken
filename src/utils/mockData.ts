@@ -179,7 +179,9 @@ export const HOSPITALS: Hospital[] = [
       DEPARTMENTS[0], // General
       DEPARTMENTS[1], // Cardio
       DEPARTMENTS[2], // Ortho
-      DEPARTMENTS[6]  // Neuro
+      DEPARTMENTS[3], // Pediatrics
+      DEPARTMENTS[6], // Neuro
+      DEPARTMENTS[7]  // Gynecology
     ],
     timings: "Open 24 Hours (OPD: 09:00 AM - 05:00 PM)",
     contact: "+91 80 4668 8888",
@@ -456,9 +458,12 @@ export const HOSPITALS: Hospital[] = [
     about: "Continental Hospitals is a JCI and NABH accredited multi-specialty hospital in Hyderabad, offering state-of-the-art diagnostic and clinical care across various medical departments.",
     facilities: ["24/7 Emergency Care", "ICU", "Ambulance Services", "Pharmacy Hub", "Surgical Desks"],
     departments: [
-      DEPARTMENTS[0],
-      DEPARTMENTS[6],
-      DEPARTMENTS[7]
+      DEPARTMENTS[0], // General Medicine
+      DEPARTMENTS[1], // Cardiology
+      DEPARTMENTS[2], // Orthopedic
+      DEPARTMENTS[3], // Pediatrics
+      DEPARTMENTS[6], // Neurology
+      DEPARTMENTS[7]  // Gynecology
     ],
     timings: "Open 24 Hours (OPD: 10:00 AM - 05:00 PM)",
     contact: "+91 40 6700 0000",
