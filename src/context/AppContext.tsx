@@ -89,6 +89,8 @@ interface AppContextType {
   cancelAppointment: (id: string) => void;
   advanceQueue: (hospitalId: string, doctorId: string) => void;
   addHospital: (hospital: Omit<Hospital, 'id' | 'rating' | 'reviewsCount' | 'distance' | 'doctors'>) => void;
+  updateHospital: (hospitalId: string, updates: Partial<Hospital>) => void;
+  updateHospitalDoctors: (hospitalId: string, doctors: Doctor[]) => void;
   addDoctor: (hospitalId: string, doctor: Omit<Doctor, 'id' | 'rating' | 'reviewsCount' | 'currentQueue' | 'nextAvailableToken'>) => void;
   addNotification: (title: string, message: string, type: 'success' | 'info' | 'warning') => void;
   clearNotifications: () => void;
@@ -146,23 +148,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return HOSPITALS.map(defaultHosp => {
-            const found = parsed.find((p: Hospital) => p.id === defaultHosp.id);
-            if (!found) return defaultHosp;
-            
-            // Sync doctor photos from defaultHosp
-            const updatedDoctors = defaultHosp.doctors.map(defDoc => {
-              const cachedDoc = found.doctors?.find((cd: Doctor) => cd.id === defDoc.id);
-              return cachedDoc ? { ...cachedDoc, image: defDoc.image } : defDoc;
-            });
-
-            return {
-              ...found,
-              image: defaultHosp.image,
-              gallery: defaultHosp.gallery,
-              doctors: updatedDoctors
-            };
-          });
+          const defaultIds = new Set(HOSPITALS.map(h => h.id));
+          const validSaved = parsed.filter((p: Hospital) => defaultIds.has(p.id) || (p.id && (p.id.startsWith('hosp-new-') || p.id.startsWith('hosp-add-'))));
+          
+          if (validSaved.length > 0) {
+            return HOSPITALS.map(defaultHosp => {
+              const found = validSaved.find((p: Hospital) => p.id === defaultHosp.id);
+              if (!found) return defaultHosp;
+              
+              return {
+                ...defaultHosp,
+                ...found,
+                doctors: (found.doctors && found.doctors.length > 0) ? found.doctors : defaultHosp.doctors
+              };
+            }).concat(validSaved.filter((p: Hospital) => !defaultIds.has(p.id)));
+          }
         }
       } catch (e) {}
     }
@@ -613,6 +613,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addNotification("Hospital Registered", `${hosp.name} added to the platform.`, "success");
   };
 
+  const updateHospital = (hospitalId: string, updates: Partial<Hospital>) => {
+    setHospitals(prev => prev.map(h => h.id === hospitalId ? { ...h, ...updates } : h));
+  };
+
+  const updateHospitalDoctors = (hospitalId: string, newDoctors: Doctor[]) => {
+    setHospitals(prev => prev.map(h => h.id === hospitalId ? { ...h, doctors: newDoctors } : h));
+  };
+
   const addDoctor = (hospitalId: string, doc: Omit<Doctor, 'id' | 'rating' | 'reviewsCount' | 'currentQueue' | 'nextAvailableToken'>) => {
     const newDoc: Doctor = {
       ...doc,
@@ -805,6 +813,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       cancelAppointment,
       advanceQueue,
       addHospital,
+      updateHospital,
+      updateHospitalDoctors,
       addDoctor,
       addNotification,
       clearNotifications,

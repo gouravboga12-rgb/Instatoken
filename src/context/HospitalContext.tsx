@@ -1,4 +1,6 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useApp } from './AppContext';
+import type { Doctor } from '../utils/mockData';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -392,16 +394,79 @@ export const useHospital = () => {
 };
 
 export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { updateHospital, updateHospitalDoctors } = useApp();
+
   const [hospitalUser, setHospitalUser] = useState<HospitalUser | null>(MOCK_USERS[0]);
-  const [hospitalProfile, setHospitalProfile] = useState<HospitalProfile>(INITIAL_PROFILE);
-  const [departments, setDepartments] = useState<HospitalDepartment[]>(INITIAL_DEPARTMENTS);
-  const [doctors, setDoctors] = useState<HospitalDoctor[]>(INITIAL_DOCTORS);
+
+  const [hospitalProfile, setHospitalProfile] = useState<HospitalProfile>(() => {
+    const saved = localStorage.getItem('insta_hospital_profile');
+    return saved ? JSON.parse(saved) : INITIAL_PROFILE;
+  });
+
+  const [departments, setDepartments] = useState<HospitalDepartment[]>(() => {
+    const saved = localStorage.getItem('insta_hospital_departments');
+    return saved ? JSON.parse(saved) : INITIAL_DEPARTMENTS;
+  });
+
+  const [doctors, setDoctors] = useState<HospitalDoctor[]>(() => {
+    const saved = localStorage.getItem('insta_hospital_doctors');
+    return saved ? JSON.parse(saved) : INITIAL_DOCTORS;
+  });
+
   const [tokens, setTokens] = useState<TokenRecord[]>(generateTokens());
   const [patients, setPatients] = useState<PatientRecord[]>(INITIAL_PATIENTS);
   const [scheduleConfig, setScheduleConfig] = useState<ScheduleConfig>(INITIAL_SCHEDULE);
   const [notifications, setNotifications] = useState<NotificationMessage[]>([]);
   const [activeSection, setActiveSection] = useState('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // ─── Global Sync to AppContext & localStorage ──────────────────────────────
+  useEffect(() => {
+    localStorage.setItem('insta_hospital_profile', JSON.stringify(hospitalProfile));
+    if (updateHospital) {
+      updateHospital('hosp-apollo', {
+        name: hospitalProfile.name,
+        address: hospitalProfile.address,
+        contact: hospitalProfile.phone,
+        about: hospitalProfile.about,
+        facilities: hospitalProfile.facilities,
+      });
+    }
+  }, [hospitalProfile]);
+
+  useEffect(() => {
+    localStorage.setItem('insta_hospital_doctors', JSON.stringify(doctors));
+    if (updateHospitalDoctors) {
+      const mappedAppDoctors: Doctor[] = doctors.map(d => ({
+        id: d.id,
+        name: d.name,
+        specialty: d.specialization || d.departmentName || "Specialist",
+        departmentId: d.departmentId || "dept-general",
+        qualification: d.qualification || "MBBS",
+        experience: d.experience || 5,
+        consultationFee: d.consultationFee || 500,
+        rating: d.rating || 4.8,
+        reviewsCount: 120,
+        image: d.photo || "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&auto=format&fit=crop&q=80",
+        availability: {
+          days: d.opdDays && d.opdDays.length > 0 ? d.opdDays : ["Mon", "Tue", "Wed", "Thu", "Fri"],
+          slots: [
+            `${d.opdStartTime || '09:00'} AM`,
+            "10:00 AM", "11:00 AM", "02:00 PM", "03:00 PM",
+            `${d.opdEndTime || '17:00'} PM`
+          ]
+        },
+        currentQueue: 3,
+        nextAvailableToken: 7,
+        estimatedWaitPerPatient: d.consultationDuration || 12
+      }));
+      updateHospitalDoctors('hosp-apollo', mappedAppDoctors);
+    }
+  }, [doctors]);
+
+  useEffect(() => {
+    localStorage.setItem('insta_hospital_departments', JSON.stringify(departments));
+  }, [departments]);
 
   // Auth
   const hospitalLogin = (email: string, password: string) => {
