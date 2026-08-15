@@ -7,7 +7,7 @@ import { Button } from '../../components/ui/Button';
 import type { CustomerAccount } from '../../utils/mockData';
 import { 
   ArrowLeft, LayoutDashboard, Stethoscope, 
-  TrendingUp, Volume2, ShieldCheck, Activity, Bell,
+  TrendingUp, ShieldCheck, Activity, Bell,
   DollarSign, Building2, CheckCircle2, Search, Plus,
   Server, Key, Lock, Globe, Users, UserCheck, UserX,
   AlertTriangle, Download, X, Calendar
@@ -16,12 +16,12 @@ import {
 export const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { 
-    hospitals, appointments, customers, advanceQueue, addHospital, addDoctor, 
+    hospitals, appointments, customers, addHospital, addDoctor, 
     toggleDisableHospital, toggleCustomerStatus, notifications, addNotification 
   } = useApp();
 
   const [adminTab, setAdminTab] = useState<
-    'stats' | 'hospitals' | 'customers' | 'doctors' | 'financials' | 'queue' | 'add-hospital' | 'add-doctor' | 'aws-setup'
+    'stats' | 'hospitals' | 'customers' | 'financials' | 'add-hospital' | 'add-doctor' | 'aws-setup'
   >('stats');
 
   // --- Add Hospital Form State ---
@@ -42,10 +42,6 @@ export const AdminDashboard: React.FC = () => {
   const [docExp, setDocExp] = useState('10');
   const [docFee, setDocFee] = useState('500');
   
-  // --- Queue Operator State ---
-  const [operatorHospId, setOperatorHospId] = useState(hospitals[0]?.id || '');
-  const [operatorDocId, setOperatorDocId] = useState(hospitals[0]?.doctors[0]?.id || '');
-
   // --- Hospital Management State ---
   const [hospitalSearch, setHospitalSearch] = useState('');
   const [hospitalStatusFilter, setHospitalStatusFilter] = useState<'all' | 'active' | 'disabled'>('all');
@@ -58,14 +54,6 @@ export const AdminDashboard: React.FC = () => {
   // --- Financials State ---
   const [revenueDateFilter, setRevenueDateFilter] = useState<'all' | 'month' | 'today'>('all');
 
-  const operatorHosp = hospitals.find(h => h.id === operatorHospId);
-  const operatorDoc = operatorHosp?.doctors.find(d => d.id === operatorDocId);
-
-  // Active appointments in the queue for the operator
-  const activeQueueAppts = appointments.filter(
-    appt => appt.hospitalId === operatorHospId && appt.doctorId === operatorDocId && appt.status === 'booked'
-  ).sort((a, b) => a.tokenNumber - b.tokenNumber);
-
   // Calculate gross customer revenue across mock customers & live appointments
   const allCustomerBookings = customers.flatMap(c => c.bookings);
   const customerRevenueSum = allCustomerBookings.reduce((sum, b) => sum + b.fee, 0);
@@ -74,7 +62,6 @@ export const AdminDashboard: React.FC = () => {
   const platformCommissionEarned = Math.round(totalRevenueGenerated * 0.10);
   const activeHospitalsCount = hospitals.filter(h => h.status !== 'disabled').length;
   const disabledHospitalsCount = hospitals.filter(h => h.status === 'disabled').length;
-  const totalDoctorsCount = hospitals.reduce((sum, h) => sum + h.doctors.length, 0);
 
   // Customer aggregates
   const totalCustomerTokens = allCustomerBookings.length + appointments.length;
@@ -151,21 +138,7 @@ export const AdminDashboard: React.FC = () => {
     // Reset Form
     setDocName('');
     setDocSpecialty('');
-    setAdminTab('doctors');
-  };
-
-  const handleCallNext = () => {
-    if (!operatorHospId || !operatorDocId) return;
-    advanceQueue(operatorHospId, operatorDocId);
-  };
-
-  const triggerSMSNotification = (appt: any) => {
-    alert(`SMS Alert sent to ${appt.patientName} (${appt.phone}):\n"Your token #${appt.tokenNumber} is active. Proceed to cabin now."`);
-    addNotification(
-      "SMS Notification Triggered",
-      `Queue advisory text dispatched successfully to patient cell ${appt.phone}.`,
-      "success"
-    );
+    setAdminTab('hospitals');
   };
 
   // CSV Revenue Report Export Handler
@@ -263,30 +236,12 @@ export const AdminDashboard: React.FC = () => {
             </button>
 
             <button
-              onClick={() => setAdminTab('doctors')}
-              className={`w-full text-left px-3.5 py-2 text-xs font-bold rounded-xl flex items-center gap-2.5 transition-all cursor-pointer border-none ${
-                adminTab === 'doctors' ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-              }`}
-            >
-              <Stethoscope size={15} /> Global Doctors ({totalDoctorsCount})
-            </button>
-
-            <button
               onClick={() => setAdminTab('financials')}
               className={`w-full text-left px-3.5 py-2 text-xs font-bold rounded-xl flex items-center gap-2.5 transition-all cursor-pointer border-none ${
                 adminTab === 'financials' ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
               }`}
             >
               <DollarSign size={15} /> Financials & Revenue
-            </button>
-
-            <button
-              onClick={() => setAdminTab('queue')}
-              className={`w-full text-left px-3.5 py-2 text-xs font-bold rounded-xl flex items-center gap-2.5 transition-all cursor-pointer border-none ${
-                adminTab === 'queue' ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-              }`}
-            >
-              <Volume2 size={15} /> Live Queue Control
             </button>
 
             <p className="text-[9px] font-extrabold text-slate-500 uppercase tracking-widest px-3 py-1 pt-2">Infrastructure</p>
@@ -343,7 +298,7 @@ export const AdminDashboard: React.FC = () => {
 
         {/* Mobile Nav Tabs */}
         <div className="flex overflow-x-auto px-2 border-b border-slate-800 text-[10px] font-bold uppercase tracking-wider no-scrollbar">
-          {(['stats', 'hospitals', 'customers', 'doctors', 'financials', 'queue', 'aws-setup'] as const).map(tab => (
+          {(['stats', 'hospitals', 'customers', 'financials', 'aws-setup'] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setAdminTab(tab)}
@@ -351,7 +306,7 @@ export const AdminDashboard: React.FC = () => {
                 adminTab === tab ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400'
               }`}
             >
-              {tab === 'stats' ? 'Overview' : tab === 'hospitals' ? 'Hospitals' : tab === 'customers' ? 'Customers' : tab === 'doctors' ? 'Doctors' : tab === 'financials' ? 'Revenue' : tab === 'queue' ? 'Queue' : 'AWS Setup'}
+              {tab === 'stats' ? 'Overview' : tab === 'hospitals' ? 'Hospitals' : tab === 'customers' ? 'Customers' : tab === 'financials' ? 'Revenue' : 'AWS Setup'}
             </button>
           ))}
         </div>
@@ -829,43 +784,7 @@ export const AdminDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* ── TAB 4: DOCTORS DIRECTORY ─────────────────────────────────── */}
-        {adminTab === 'doctors' && (
-          <div className="space-y-6 animate-in fade-in duration-200">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-xs">
-              <div>
-                <h2 className="text-xl font-black text-slate-800">Global Medical Specialists Directory</h2>
-                <p className="text-xs text-slate-400 font-semibold">Enrolled doctors across all registered partner hospitals</p>
-              </div>
-              <button
-                onClick={() => setAdminTab('add-doctor')}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl flex items-center gap-1.5 cursor-pointer border-none"
-              >
-                <Plus size={14} /> Enroll New Doctor
-              </button>
-            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {hospitals.flatMap(h => h.doctors.map(d => ({ ...d, hospitalName: h.name }))).map((doc) => (
-                <div key={doc.id} className="bg-white rounded-2xl border border-slate-100 p-4 shadow-xs flex gap-3 hover:shadow-md transition-shadow">
-                  <img src={doc.image} alt={doc.name} className="w-14 h-14 rounded-xl object-cover shrink-0 border border-slate-100" />
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-black text-slate-800 text-sm truncate">{doc.name}</h4>
-                    <p className="text-xs font-extrabold text-blue-600 truncate">{doc.specialty}</p>
-                    <p className="text-[10px] text-slate-400 font-semibold mt-0.5">{doc.qualification} · {doc.experience} Yrs Exp</p>
-                    <p className="text-[10px] text-slate-500 font-bold mt-1 truncate">🏥 {doc.hospitalName}</p>
-                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-50 text-[11px]">
-                      <span className="font-black text-slate-800">₹{doc.consultationFee} Fee</span>
-                      <span className="bg-emerald-50 text-emerald-700 font-extrabold text-[9px] px-2 py-0.5 rounded-md">
-                        {doc.availability?.slots?.length || 6} Slots / Day
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* ── TAB 5: FINANCIALS & REVENUE (EXPANDED) ──────────────────── */}
         {adminTab === 'financials' && (
@@ -1023,111 +942,7 @@ export const AdminDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* ── TAB 6: QUEUE OPERATOR PANEL ──────────────────────────────── */}
-        {adminTab === 'queue' && (
-          <div className="space-y-6 animate-in fade-in duration-200">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              <div className="lg:col-span-4 space-y-6">
-                <Card className="p-4 border-none shadow-xs bg-white space-y-4">
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wide">Assign Hospital</label>
-                    <select 
-                      value={operatorHospId}
-                      onChange={(e) => {
-                        const hId = e.target.value;
-                        setOperatorHospId(hId);
-                        const matchingHosp = hospitals.find(h => h.id === hId);
-                        if (matchingHosp && matchingHosp.doctors.length > 0) {
-                          setOperatorDocId(matchingHosp.doctors[0].id);
-                        }
-                      }}
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none"
-                    >
-                      {hospitals.map(h => (
-                        <option key={h.id} value={h.id}>{h.name}</option>
-                      ))}
-                    </select>
-                  </div>
 
-                  {operatorHosp && operatorHosp.doctors.length > 0 && (
-                    <div className="space-y-1">
-                      <label className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wide">Active Doctor Cabin</label>
-                      <select 
-                        value={operatorDocId}
-                        onChange={(e) => setOperatorDocId(e.target.value)}
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none"
-                      >
-                        {operatorHosp.doctors.map(d => (
-                          <option key={d.id} value={d.id}>{d.name} ({d.specialty})</option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                </Card>
-
-                {operatorDoc && (
-                  <Card className="p-5 border-none shadow-xs bg-white text-center flex flex-col items-center">
-                    <Badge variant="blue" className="mb-2 bg-blue-50 text-blue-700 text-[9px] px-2.5 py-0.5 rounded-md font-bold">
-                      CABIN CONTROL #{operatorDoc.id.slice(-2)}
-                    </Badge>
-                    
-                    <div className="grid grid-cols-2 gap-3 w-full my-3">
-                      <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-100">
-                        <span className="text-[8px] font-bold text-slate-400 uppercase block tracking-wider">Serving</span>
-                        <span className="text-2xl font-black text-slate-800 font-heading block mt-0.5">{operatorDoc.currentQueue}</span>
-                      </div>
-                      <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-100">
-                        <span className="text-[8px] font-bold text-slate-400 uppercase block tracking-wider">Booked Max</span>
-                        <span className="text-2xl font-black text-blue-600 font-heading block mt-0.5">{operatorDoc.nextAvailableToken - 1}</span>
-                      </div>
-                    </div>
-
-                    <Button 
-                      variant="primary" 
-                      onClick={handleCallNext}
-                      disabled={operatorDoc.currentQueue >= operatorDoc.nextAvailableToken - 1}
-                      className="w-full py-2.5 text-xs font-bold rounded-xl cursor-pointer"
-                    >
-                      Call Next Patient
-                    </Button>
-                  </Card>
-                )}
-              </div>
-
-              <div className="lg:col-span-8">
-                <Card className="p-5 border-none shadow-xs bg-white h-full">
-                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-4">Patient Queue Waiting Line</h4>
-                  
-                  {activeQueueAppts.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[400px] overflow-y-auto pr-1">
-                      {activeQueueAppts.map((appt) => (
-                        <div key={appt.id} className="p-4 bg-slate-50 border border-slate-100 rounded-2xl flex justify-between items-center h-fit">
-                          <div>
-                            <span className="text-xs font-extrabold text-slate-800 block">Token #{appt.tokenNumber}</span>
-                            <span className="text-[10px] text-slate-500 font-medium block mt-0.5 truncate max-w-[120px]">{appt.patientName}</span>
-                            <span className="text-[8px] text-slate-400 block mt-0.5">Slot: {appt.time}</span>
-                          </div>
-                          
-                          <button 
-                            type="button"
-                            onClick={() => triggerSMSNotification(appt)}
-                            className="px-2.5 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-xl text-[9px] font-bold transition-all cursor-pointer border-none shrink-0"
-                          >
-                            SMS Alert
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-16 flex flex-col items-center justify-center h-full">
-                      <p className="text-xs font-bold text-slate-400">All patient slots served for this doctor. Queue is clear!</p>
-                    </div>
-                  )}
-                </Card>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* ── TAB 7: REGISTER HOSPITAL FORM ───────────────────────────── */}
         {adminTab === 'add-hospital' && (
@@ -1236,7 +1051,7 @@ export const AdminDashboard: React.FC = () => {
                 <p className="text-xs text-slate-400 font-semibold">Assign doctor to a partner hospital roster</p>
               </div>
               <button
-                onClick={() => setAdminTab('doctors')}
+                onClick={() => setAdminTab('hospitals')}
                 className="text-xs font-bold text-slate-500 hover:text-slate-800 cursor-pointer border-none bg-transparent"
               >
                 ✕ Cancel
