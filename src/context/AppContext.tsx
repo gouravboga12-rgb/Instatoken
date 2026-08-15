@@ -219,8 +219,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0 && Array.isArray(parsed[0]?.bookings)) {
-          return parsed;
+        if (Array.isArray(parsed)) {
+          // Filter out old dummy mock customers (cust-1 through cust-5)
+          const realCustomers = parsed.filter((c: CustomerAccount) => 
+            c && c.id && !['cust-1', 'cust-2', 'cust-3', 'cust-4', 'cust-5'].includes(c.id)
+          );
+          return realCustomers;
         }
       } catch (e) {}
     }
@@ -341,6 +345,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       familyMembers: [],
       subscription: null
     });
+
+    setCustomers(prev => {
+      const exists = prev.some(c => c.email === email || c.phone === phone);
+      if (exists) return prev;
+      const newCust: CustomerAccount = {
+        id: `cust-${Date.now()}`,
+        name,
+        email,
+        phone,
+        location: "Koramangala, Bengaluru",
+        joinedDate: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+        status: 'active',
+        avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+        bookings: []
+      };
+      return [newCust, ...prev];
+    });
+
     addNotification("Account Created", `Welcome ${name}! Start booking digital OPD tokens now.`, "success");
     return true;
   };
@@ -472,6 +494,48 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }));
 
     setAppointments(prev => [newAppt, ...prev]);
+
+    // Attach to customer account in admin customers store
+    setCustomers(prev => {
+      const newBookingObj = {
+        id: newAppt.id,
+        tokenNumber: newAppt.tokenNumber,
+        hospitalId: newAppt.hospitalId,
+        hospitalName: newAppt.hospitalName,
+        doctorId: newAppt.doctorId,
+        doctorName: newAppt.doctorName,
+        departmentName: newAppt.departmentName,
+        date: newAppt.date,
+        time: newAppt.time,
+        fee: newAppt.fee,
+        status: 'booked' as const,
+        paymentId: newAppt.paymentId,
+        paymentMethod: newAppt.paymentMethod
+      };
+
+      const existingIndex = prev.findIndex(c => c.email === patientDetails.email || c.phone === patientDetails.phone);
+      if (existingIndex >= 0) {
+        const updated = [...prev];
+        updated[existingIndex] = {
+          ...updated[existingIndex],
+          bookings: [newBookingObj, ...(updated[existingIndex].bookings || [])]
+        };
+        return updated;
+      } else {
+        const newCust: CustomerAccount = {
+          id: `cust-${Date.now()}`,
+          name: patientDetails.name,
+          email: patientDetails.email,
+          phone: patientDetails.phone,
+          location: patientDetails.address || "Koramangala, Bengaluru",
+          joinedDate: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+          status: 'active',
+          avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+          bookings: [newBookingObj]
+        };
+        return [newCust, ...prev];
+      }
+    });
 
     addNotification(
       "OPD Token Booked!",
