@@ -72,26 +72,58 @@ export const DoctorManagement: React.FC<DoctorManagementProps> = ({ tab: initial
     active: true
   });
 
+const to24Hour = (timeStr?: string): string => {
+  if (!timeStr) return '09:00';
+  const clean = timeStr.trim();
+  if (!clean.toUpperCase().includes('AM') && !clean.toUpperCase().includes('PM')) {
+    return clean;
+  }
+  const parts = clean.split(' ');
+  const timePart = parts[0] || '09:00';
+  const modifier = parts[1] || 'AM';
+  let [hours, minutes] = timePart.split(':');
+  let h = parseInt(hours, 10) || 9;
+  if (modifier.toUpperCase() === 'PM' && h < 12) h += 12;
+  if (modifier.toUpperCase() === 'AM' && h === 12) h = 0;
+  return `${h < 10 ? '0' + h : h}:${minutes || '00'}`;
+};
+
+const to12Hour = (timeStr?: string): string => {
+  if (!timeStr) return '09:00 AM';
+  const clean = timeStr.trim();
+  if (clean.toUpperCase().includes('AM') || clean.toUpperCase().includes('PM')) {
+    return clean;
+  }
+  const [hStr, mStr] = clean.split(':');
+  let h = parseInt(hStr, 10);
+  const m = mStr ? mStr.slice(0, 2) : '00';
+  if (isNaN(h)) return '09:00 AM';
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12;
+  if (h === 0) h = 12;
+  return `${h < 10 ? '0' + h : h}:${m} ${ampm}`;
+};
+
   const handleDocSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const dept = departments.find(d => d.id === docForm.departmentId);
     const docData = {
-      name: docForm.name,
-      photo: docForm.photo,
-      qualification: docForm.qualification,
-      specialization: docForm.specialization,
+      name: docForm.name.trim(),
+      photo: docForm.photo.trim(),
+      qualification: docForm.qualification.trim(),
+      specialization: docForm.specialization.trim(),
       departmentId: docForm.departmentId,
       departmentName: dept ? dept.name : '',
-      experience: parseInt(docForm.experience),
-      consultationFee: parseFloat(docForm.consultationFee),
-      languages: docForm.languages.split(',').map(l => l.trim()),
-      gender: docForm.gender,
+      experience: parseInt(docForm.experience) || 5,
+      consultationFee: parseFloat(docForm.consultationFee) || 500,
+      languages: docForm.languages ? docForm.languages.split(',').map(l => l.trim()).filter(Boolean) : ['English'],
+      gender: docForm.gender as 'Male' | 'Female' | 'Other',
       biography: docForm.biography,
-      opdDays: docForm.opdDays,
-      opdStartTime: docForm.opdStartTime,
-      opdEndTime: docForm.opdEndTime,
-      consultationDuration: parseInt(docForm.consultationDuration),
-      maxTokensPerDay: parseInt(docForm.maxTokensPerDay),
+      opdDays: docForm.opdDays && docForm.opdDays.length > 0 ? docForm.opdDays : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+      opdStartTime: to12Hour(docForm.opdStartTime),
+      opdEndTime: to12Hour(docForm.opdEndTime),
+      consultationDuration: parseInt(docForm.consultationDuration) || 15,
+      maxTokensPerDay: parseInt(docForm.maxTokensPerDay) || 50,
       onlineConsult: docForm.onlineConsult,
       offlineConsult: docForm.offlineConsult,
       active: docForm.active
@@ -109,7 +141,7 @@ export const DoctorManagement: React.FC<DoctorManagementProps> = ({ tab: initial
   const handleDeptSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const deptData = {
-      name: deptForm.name,
+      name: deptForm.name.trim(),
       icon: deptForm.icon,
       headDoctor: deptForm.headDoctor,
       totalDoctors: doctors.filter(d => d.departmentId === (editingDept?.id || '')).length,
@@ -129,23 +161,23 @@ export const DoctorManagement: React.FC<DoctorManagementProps> = ({ tab: initial
     setEditingDoc(doc);
     setDocForm({
       name: doc.name,
-      photo: doc.photo,
-      qualification: doc.qualification,
-      specialization: doc.specialization,
-      departmentId: doc.departmentId,
-      experience: String(doc.experience),
-      consultationFee: String(doc.consultationFee),
-      languages: doc.languages.join(', '),
-      gender: doc.gender,
-      biography: doc.biography,
-      opdDays: doc.opdDays,
-      opdStartTime: doc.opdStartTime,
-      opdEndTime: doc.opdEndTime,
-      consultationDuration: String(doc.consultationDuration),
-      maxTokensPerDay: String(doc.maxTokensPerDay),
-      onlineConsult: doc.onlineConsult,
-      offlineConsult: doc.offlineConsult,
-      active: doc.active
+      photo: doc.photo || '',
+      qualification: doc.qualification || '',
+      specialization: doc.specialization || '',
+      departmentId: doc.departmentId || '',
+      experience: String(doc.experience || 5),
+      consultationFee: String(doc.consultationFee || 500),
+      languages: Array.isArray(doc.languages) ? doc.languages.join(', ') : 'English',
+      gender: doc.gender || 'Male',
+      biography: doc.biography || '',
+      opdDays: doc.opdDays || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+      opdStartTime: to24Hour(doc.opdStartTime),
+      opdEndTime: to24Hour(doc.opdEndTime),
+      consultationDuration: String(doc.consultationDuration || 15),
+      maxTokensPerDay: String(doc.maxTokensPerDay || 50),
+      onlineConsult: doc.onlineConsult !== false,
+      offlineConsult: doc.offlineConsult !== false,
+      active: doc.active !== false
     });
     setShowDocModal(true);
   };

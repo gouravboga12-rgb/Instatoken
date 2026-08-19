@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { HOSPITALS, DEPARTMENTS, HEALTH_ARTICLES, MOCK_CUSTOMERS } from '../utils/mockData';
 import type { Hospital, Doctor, HealthArticle, CustomerAccount } from '../utils/mockData';
-import { broadcastGlobalSync, subscribeGlobalSync } from '../utils/syncBus';
+import { broadcastGlobalSync, subscribeGlobalSync, formatTimeSlot } from '../utils/syncBus';
 
 export interface FamilyMember {
   id: string;
@@ -128,9 +128,9 @@ export const getHydratedHospitals = (): Hospital[] => {
           availability: {
             days: d.opdDays && d.opdDays.length > 0 ? d.opdDays : ["Mon", "Tue", "Wed", "Thu", "Fri"],
             slots: [
-              `${d.opdStartTime || '09:00'} AM`,
+              formatTimeSlot(d.opdStartTime, '09:00 AM'),
               "10:00 AM", "11:00 AM", "02:00 PM", "03:00 PM",
-              `${d.opdEndTime || '17:00'} PM`
+              formatTimeSlot(d.opdEndTime, '05:00 PM')
             ]
           },
           currentQueue: 3,

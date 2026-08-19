@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useApp } from './AppContext';
 import type { Doctor } from '../utils/mockData';
-import { broadcastGlobalSync, subscribeGlobalSync } from '../utils/syncBus';
+import { broadcastGlobalSync, subscribeGlobalSync, formatTimeSlot } from '../utils/syncBus';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -469,7 +469,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           localStorage.setItem('insta_hospital_tokens', JSON.stringify(updated));
           return updated;
         });
-      } else if (event.type === 'STORAGE_CHANGED') {
+      } else if (event.type === 'STORAGE_CHANGED' || event.type === 'CLOUD_SYNC_UPDATED' || event.type === 'HOSPITAL_DOCTORS_UPDATED' || event.type === 'HOSPITAL_PROFILE_UPDATED' || event.type === 'HOSPITAL_DEPARTMENTS_UPDATED' || event.type === 'HOSPITAL_TOKENS_UPDATED') {
         const savedDocs = localStorage.getItem('insta_hospital_doctors');
         if (savedDocs) {
           try { setDoctors(JSON.parse(savedDocs)); } catch (e) {}
@@ -524,9 +524,9 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       availability: {
         days: d.opdDays && d.opdDays.length > 0 ? d.opdDays : ["Mon", "Tue", "Wed", "Thu", "Fri"],
         slots: [
-          `${d.opdStartTime || '09:00'} AM`,
+          formatTimeSlot(d.opdStartTime, '09:00 AM'),
           "10:00 AM", "11:00 AM", "02:00 PM", "03:00 PM",
-          `${d.opdEndTime || '17:00'} PM`
+          formatTimeSlot(d.opdEndTime, '05:00 PM')
         ]
       },
       currentQueue: tokens.filter(t => t.doctorId === d.id && ['completed'].includes(t.status)).length,

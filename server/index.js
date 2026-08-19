@@ -18,19 +18,123 @@ if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
+const INITIAL_DOCTORS = [
+  {
+    id: 'doc-arvind', name: 'Dr. Arvind Sharma', photo: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=400&auto=format&fit=crop&q=80',
+    qualification: 'MD, DM (Cardiology), FACC', specialization: 'Interventional Cardiologist',
+    departmentId: 'dept-cardio', departmentName: 'Cardiology', experience: 16,
+    consultationFee: 800, languages: ['Hindi', 'English', 'Kannada'], gender: 'Male',
+    biography: 'Dr. Arvind is a leading interventional cardiologist with 16+ years of experience.',
+    opdDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+    opdStartTime: '09:00', opdEndTime: '13:00',
+    consultationDuration: 15, maxTokensPerDay: 50,
+    onlineConsult: true, offlineConsult: true, active: true, rating: 4.9, totalPatients: 4820,
+  },
+  {
+    id: 'doc-sarah', name: 'Dr. Sarah Jenkins', photo: 'https://images.unsplash.com/photo-1594824813573-246434de83fb?w=400&auto=format&fit=crop&q=80',
+    qualification: 'MBBS, DM (Neurology)', specialization: 'Consultant Neurologist',
+    departmentId: 'dept-neuro', departmentName: 'Neurology', experience: 12,
+    consultationFee: 1000, languages: ['English', 'Hindi'], gender: 'Female',
+    biography: 'Dr. Sarah specializes in epilepsy, stroke management and cognitive disorders.',
+    opdDays: ['Mon', 'Wed', 'Fri'],
+    opdStartTime: '10:00', opdEndTime: '17:00',
+    consultationDuration: 20, maxTokensPerDay: 30,
+    onlineConsult: true, offlineConsult: true, active: true, rating: 4.7, totalPatients: 2140,
+  },
+  {
+    id: 'doc-ramesh', name: 'Dr. Ramesh Patel', photo: 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&auto=format&fit=crop&q=80',
+    qualification: 'MS (Ortho), MCh (Ortho)', specialization: 'Joint Replacement Specialist',
+    departmentId: 'dept-ortho', departmentName: 'Orthopedics', experience: 18,
+    consultationFee: 900, languages: ['Gujarati', 'Hindi', 'English'], gender: 'Male',
+    biography: 'Dr. Ramesh is a pioneer in minimally invasive joint replacement surgery.',
+    opdDays: ['Tue', 'Thu', 'Sat'],
+    opdStartTime: '09:30', opdEndTime: '13:00',
+    consultationDuration: 15, maxTokensPerDay: 40,
+    onlineConsult: false, offlineConsult: true, active: true, rating: 4.8, totalPatients: 3300,
+  },
+  {
+    id: 'doc-anjali', name: 'Dr. Anjali Sharma', photo: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=400&auto=format&fit=crop&q=80',
+    qualification: 'MD (Pediatrics), Fellowship in Neonatology', specialization: 'Pediatrician',
+    departmentId: 'dept-pedia', departmentName: 'Pediatrics', experience: 10,
+    consultationFee: 700, languages: ['Hindi', 'English', 'Telugu'], gender: 'Female',
+    biography: 'Dr. Anjali specializes in neonatal care and childhood developmental disorders.',
+    opdDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+    opdStartTime: '09:00', opdEndTime: '17:00',
+    consultationDuration: 12, maxTokensPerDay: 60,
+    onlineConsult: true, offlineConsult: true, active: true, rating: 4.8, totalPatients: 5600,
+  },
+  {
+    id: 'doc-vivek', name: 'Dr. Vivek Singh', photo: 'https://images.unsplash.com/photo-1537368910025-700350fe46c7?w=400&auto=format&fit=crop&q=80',
+    qualification: 'MBBS, MS - Orthopedics', specialization: 'Orthopedic Surgeon',
+    departmentId: 'dept-ortho', departmentName: 'Orthopedics', experience: 12,
+    consultationFee: 600, languages: ['Hindi', 'English'], gender: 'Male',
+    biography: 'Dr. Vivek focuses on sports injuries and arthroscopic procedures.',
+    opdDays: ['Mon', 'Wed', 'Fri'],
+    opdStartTime: '05:00 PM', opdEndTime: '09:00 PM',
+    consultationDuration: 15, maxTokensPerDay: 30,
+    onlineConsult: true, offlineConsult: true, active: true, rating: 4.6, totalPatients: 1890,
+  },
+];
+
+const INITIAL_PROFILE = {
+  id: 'hosp-apollo', name: 'Apollo Spectra Hospital', logo: '', coverImage: '',
+  registrationNumber: 'KA/HOS/2009/04521', accreditation: 'NABH Accredited',
+  gstNumber: '29AABCA1234K1Z5', licenseNumber: 'KA-MED-2009-1234',
+  type: 'Multi Speciality', ownershipType: 'Private',
+  phone: '+91 80 4668 8888', whatsapp: '+91 98765 43210',
+  email: 'info@apollospectra.com', website: 'www.apollospectra.com', emergencyNumber: '+91 80 4668 9999',
+  country: 'India', state: 'Karnataka', city: 'Bengaluru', area: 'Koramangala',
+  address: 'Koramangala 5th Block, near Sony World Signal, Bengaluru', pinCode: '560095',
+  lat: 12.9348, lng: 77.6189,
+  about: 'Apollo Spectra is a state-of-the-art multi-specialty hospital committed to delivering world-class healthcare.',
+  mission: 'To provide accessible, affordable, and high-quality healthcare to every patient.',
+  vision: 'To be the most trusted and patient-centric hospital network in India.',
+  facilities: ['24/7 Emergency', 'ICU', 'Pharmacy', 'Ambulance', 'Lab Testing', 'Cafeteria', 'Dialysis', 'Blood Bank'],
+  emergencyServices: ['Cardiac Emergency', 'Trauma Care', 'Stroke Unit', 'Burn Unit'],
+  gallery: [],
+  timings: [
+    { day: 'Mon', open: '09:00', close: '18:00' }, { day: 'Tue', open: '09:00', close: '18:00' },
+    { day: 'Wed', open: '09:00', close: '18:00' }, { day: 'Thu', open: '09:00', close: '18:00' },
+    { day: 'Fri', open: '09:00', close: '18:00' }, { day: 'Sat', open: '09:00', close: '14:00' },
+    { day: 'Sun', open: '10:00', close: '13:00' },
+  ],
+  brandColor: '#2563EB',
+};
+
+const INITIAL_DEPARTMENTS = [
+  { id: 'dept-cardio', name: 'Cardiology', icon: '❤️', headDoctor: 'Dr. Arvind Sharma', totalDoctors: 2, active: true },
+  { id: 'dept-neuro', name: 'Neurology', icon: '🧠', headDoctor: 'Dr. Sarah Jenkins', totalDoctors: 1, active: true },
+  { id: 'dept-ortho', name: 'Orthopedics', icon: '🦴', headDoctor: 'Dr. Ramesh Patel', totalDoctors: 2, active: true },
+  { id: 'dept-pedia', name: 'Pediatrics', icon: '👶', headDoctor: 'Dr. Anjali Sharma', totalDoctors: 1, active: true },
+  { id: 'dept-gynaec', name: 'Gynecology', icon: '🌸', headDoctor: 'Dr. Meera Nair', totalDoctors: 1, active: true },
+  { id: 'dept-general', name: 'General Medicine', icon: '🩺', headDoctor: 'Dr. Vivek Singh', totalDoctors: 3, active: true },
+  { id: 'dept-eye', name: 'Ophthalmology', icon: '👁️', headDoctor: '', totalDoctors: 0, active: false },
+  { id: 'dept-dental', name: 'Dental', icon: '🦷', headDoctor: '', totalDoctors: 0, active: false },
+];
+
 function loadStore() {
   try {
     if (fs.existsSync(STORE_FILE)) {
-      return JSON.parse(fs.readFileSync(STORE_FILE, 'utf-8'));
+      const data = JSON.parse(fs.readFileSync(STORE_FILE, 'utf-8'));
+      if (!data.hospitalDoctors || Object.keys(data.hospitalDoctors).length === 0) {
+        data.hospitalDoctors = { 'hosp-apollo': INITIAL_DOCTORS };
+      }
+      if (!data.hospitalProfiles || Object.keys(data.hospitalProfiles).length === 0) {
+        data.hospitalProfiles = { 'hosp-apollo': INITIAL_PROFILE };
+      }
+      if (!data.hospitalDepartments || Object.keys(data.hospitalDepartments).length === 0) {
+        data.hospitalDepartments = { 'hosp-apollo': INITIAL_DEPARTMENTS };
+      }
+      return data;
     }
   } catch (e) {
     console.error('Error reading store.json:', e);
   }
   return {
     hospitals: [],
-    hospitalDoctors: {},
-    hospitalProfiles: {},
-    hospitalDepartments: {},
+    hospitalDoctors: { 'hosp-apollo': INITIAL_DOCTORS },
+    hospitalProfiles: { 'hosp-apollo': INITIAL_PROFILE },
+    hospitalDepartments: { 'hosp-apollo': INITIAL_DEPARTMENTS },
     tokens: [],
     appointments: [],
     lastUpdated: Date.now()

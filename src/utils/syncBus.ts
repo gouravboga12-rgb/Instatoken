@@ -14,6 +14,23 @@ try {
   console.warn('BroadcastChannel not supported or restricted', e);
 }
 
+export const formatTimeSlot = (timeStr?: string, defaultFallback: string = '09:00 AM'): string => {
+  if (!timeStr) return defaultFallback;
+  const clean = timeStr.trim();
+  if (clean.toUpperCase().includes('AM') || clean.toUpperCase().includes('PM')) {
+    return clean;
+  }
+  const [hStr, mStr] = clean.split(':');
+  let h = parseInt(hStr, 10);
+  const m = mStr ? mStr.slice(0, 2) : '00';
+  if (isNaN(h)) return defaultFallback;
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12;
+  if (h === 0) h = 12;
+  const padH = h < 10 ? `0${h}` : `${h}`;
+  return `${padH}:${m} ${ampm}`;
+};
+
 // ─── Remote API Cloud Synchronization ─────────────────────────────────────────
 
 const API_BASE = '/api';
