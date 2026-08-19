@@ -152,9 +152,19 @@ function saveStore(data) {
 
 // ─── Data Sync API Endpoints ──────────────────────────────────────────────────
 
+const isDummyTokenRecord = (t) =>
+  !t ||
+  ['tok-101', 'tok-102', 'tok-103', 'tok-104', 'tok-105', 'tok-106', 'tok-107', 'tok-108', 'tok-98', 'tok-99', 'tok-100', 'tok-1001'].includes(t.id) ||
+  ['Rahul Kumar', 'Priya Sharma', 'Mohan Reddy', 'Ananya Patel', 'Ramesh Kumar', 'Neha Singh', 'Mohan Das', 'Lakshmi Devi', 'Suresh Reddy', 'Kavitha Rao', 'Arun Verma', 'Guest Patient'].includes(t.patientName);
+
+const isDummyApptRecord = (a) =>
+  !a || a.id === 'tok-1001' || a.patientName === 'Guest Patient';
+
 // GET all synced data from AWS
 app.get('/api/sync', (req, res) => {
   const store = loadStore();
+  store.tokens = (store.tokens || []).filter(t => !isDummyTokenRecord(t));
+  store.appointments = (store.appointments || []).filter(a => !isDummyApptRecord(a));
   res.json(store);
 });
 
@@ -167,8 +177,8 @@ app.post('/api/sync', (req, res) => {
   if (hospitalDoctors) store.hospitalDoctors = { ...store.hospitalDoctors, ...hospitalDoctors };
   if (hospitalProfiles) store.hospitalProfiles = { ...store.hospitalProfiles, ...hospitalProfiles };
   if (hospitalDepartments) store.hospitalDepartments = { ...store.hospitalDepartments, ...hospitalDepartments };
-  if (tokens) store.tokens = tokens;
-  if (appointments) store.appointments = appointments;
+  if (tokens) store.tokens = tokens.filter(t => !isDummyTokenRecord(t));
+  if (appointments) store.appointments = appointments.filter(a => !isDummyApptRecord(a));
 
   saveStore(store);
   res.json({ success: true, store });
