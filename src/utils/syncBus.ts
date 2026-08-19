@@ -98,13 +98,21 @@ export const broadcastGlobalSync = (type: string, data?: any) => {
 
     const targetHospId = savedHProfile ? (JSON.parse(savedHProfile).id || 'hosp-apollo') : 'hosp-apollo';
 
+    const isDummyToken = (t: any) =>
+      !t ||
+      ['tok-101', 'tok-102', 'tok-103', 'tok-104', 'tok-105', 'tok-106', 'tok-107', 'tok-108', 'tok-98', 'tok-99', 'tok-100', 'tok-1001'].includes(t.id) ||
+      ['Rahul Kumar', 'Priya Sharma', 'Mohan Reddy', 'Ananya Patel', 'Ramesh Kumar', 'Neha Singh', 'Mohan Das', 'Lakshmi Devi', 'Suresh Reddy', 'Kavitha Rao', 'Arun Verma', 'Guest Patient'].includes(t.patientName);
+
+    const cleanTokens = savedHToks ? (JSON.parse(savedHToks) as any[]).filter(t => !isDummyToken(t)) : [];
+    const cleanAppts = savedAppts ? (JSON.parse(savedAppts) as any[]).filter(t => !isDummyToken(t)) : [];
+
     pushCloudSync({
       hospitals: savedHospitals ? JSON.parse(savedHospitals) : undefined,
       hospitalDoctors: savedHDocs ? { [targetHospId]: JSON.parse(savedHDocs) } : undefined,
       hospitalProfiles: savedHProfile ? { [targetHospId]: JSON.parse(savedHProfile) } : undefined,
       hospitalDepartments: savedHDepts ? { [targetHospId]: JSON.parse(savedHDepts) } : undefined,
-      tokens: savedHToks ? JSON.parse(savedHToks) : undefined,
-      appointments: savedAppts ? JSON.parse(savedAppts) : undefined,
+      tokens: cleanTokens,
+      appointments: cleanAppts,
     }).catch(() => {});
   }
 };
