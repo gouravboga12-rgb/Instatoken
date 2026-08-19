@@ -332,42 +332,6 @@ const INITIAL_DOCTORS: HospitalDoctor[] = [
   },
 ];
 
-const generateTokens = (): TokenRecord[] => {
-  const today = new Date().toISOString().split('T')[0];
-  const base = [
-    { tokenNo: 101, type: 'online' as const, name: 'Rahul Kumar', phone: '9876543210', age: 28, gender: 'M', docId: 'doc-arvind', docName: 'Dr. Arvind Sharma', deptId: 'dept-cardio', deptName: 'Cardiology', session: 'morning' as const, time: '09:15 AM', status: 'booked' as const, fee: 800 },
-    { tokenNo: 102, type: 'online' as const, name: 'Priya Sharma', phone: '9123456780', age: 32, gender: 'F', docId: 'doc-anjali', docName: 'Dr. Anjali Sharma', deptId: 'dept-pedia', deptName: 'Pediatrics', session: 'morning' as const, time: '09:20 AM', status: 'booked' as const, fee: 700 },
-    { tokenNo: 103, type: 'offline' as const, name: 'Mohan Reddy', phone: '9988776655', age: 45, gender: 'M', docId: 'doc-vivek', docName: 'Dr. Vivek Singh', deptId: 'dept-ortho', deptName: 'Orthopedics', session: 'morning' as const, time: '09:25 AM', status: 'checked-in' as const, fee: 600 },
-    { tokenNo: 104, type: 'online' as const, name: 'Ananya Patel', phone: '9072345678', age: 19, gender: 'F', docId: 'doc-arvind', docName: 'Dr. Arvind Sharma', deptId: 'dept-cardio', deptName: 'Cardiology', session: 'afternoon' as const, time: '01:10 PM', status: 'booked' as const, fee: 800 },
-    { tokenNo: 105, type: 'offline' as const, name: 'Ramesh Kumar', phone: '8859001122', age: 50, gender: 'M', docId: 'doc-anjali', docName: 'Dr. Anjali Sharma', deptId: 'dept-pedia', deptName: 'Pediatrics', session: 'afternoon' as const, time: '01:30 PM', status: 'waiting' as const, fee: 700 },
-    { tokenNo: 106, type: 'online' as const, name: 'Neha Singh', phone: '9123998871', age: 27, gender: 'F', docId: 'doc-vivek', docName: 'Dr. Vivek Singh', deptId: 'dept-ortho', deptName: 'Orthopedics', session: 'evening' as const, time: '05:05 PM', status: 'booked' as const, fee: 600 },
-    { tokenNo: 107, type: 'offline' as const, name: 'Mohan Das', phone: '7776889991', age: 60, gender: 'M', docId: 'doc-arvind', docName: 'Dr. Arvind Sharma', deptId: 'dept-cardio', deptName: 'Cardiology', session: 'evening' as const, time: '05:30 PM', status: 'waiting' as const, fee: 800 },
-    { tokenNo: 98, type: 'online' as const, name: 'Lakshmi Devi', phone: '9988001122', age: 42, gender: 'F', docId: 'doc-sarah', docName: 'Dr. Sarah Jenkins', deptId: 'dept-neuro', deptName: 'Neurology', session: 'morning' as const, time: '09:00 AM', status: 'completed' as const, fee: 1000 },
-    { tokenNo: 99, type: 'offline' as const, name: 'Suresh Reddy', phone: '9871234567', age: 38, gender: 'M', docId: 'doc-ramesh', docName: 'Dr. Ramesh Patel', deptId: 'dept-ortho', deptName: 'Orthopedics', session: 'morning' as const, time: '09:30 AM', status: 'completed' as const, fee: 900 },
-    { tokenNo: 100, type: 'online' as const, name: 'Kavitha Rao', phone: '9900112233', age: 29, gender: 'F', docId: 'doc-anjali', docName: 'Dr. Anjali Sharma', deptId: 'dept-pedia', deptName: 'Pediatrics', session: 'morning' as const, time: '09:00 AM', status: 'completed' as const, fee: 700 },
-    { tokenNo: 108, type: 'offline' as const, name: 'Arun Verma', phone: '9812345670', age: 34, gender: 'M', docId: 'doc-vivek', docName: 'Dr. Vivek Singh', deptId: 'dept-ortho', deptName: 'Orthopedics', session: 'morning' as const, time: '10:15 AM', status: 'cancelled' as const, fee: 600 },
-  ];
-  return base.map((t, i) => ({
-    id: `tok-${t.tokenNo}`,
-    tokenNo: t.tokenNo, type: t.type,
-    patientName: t.name, patientPhone: t.phone, patientAge: t.age, patientGender: t.gender,
-    doctorId: t.docId, doctorName: t.docName, departmentId: t.deptId, departmentName: t.deptName,
-    session: t.session, time: t.time, bookingDate: today, status: t.status,
-    queuePosition: i + 1, estimatedWait: (i + 1) * 12,
-    consultationFee: t.fee, paymentStatus: t.status === 'cancelled' ? 'refunded' : t.type === 'online' ? 'paid' : 'pending',
-    paymentMethod: t.type === 'online' ? 'Online' : 'Cash',
-    isRevisit: t.tokenNo === 101, revisitValidUpto: t.tokenNo === 101 ? '2026-07-25' : undefined,
-  }));
-};
-
-const INITIAL_PATIENTS: PatientRecord[] = [
-  { id: 'pat-1', uhid: 'APS001234', name: 'Rahul Kumar', phone: '9876543210', email: 'rahul@email.com', age: 28, gender: 'Male', bloodGroup: 'B+', address: '12, MG Road', city: 'Bengaluru', pinCode: '560001', registeredOn: '2024-01-15', totalVisits: 4, lastVisit: '2026-07-15', familyMembers: [{ name: 'Sunita Kumar', relation: 'Wife', age: 26 }], medicalHistory: ['Hypertension', 'Diabetes Type 2'], allergies: ['Penicillin'], tokenHistory: ['tok-101'] },
-  { id: 'pat-2', uhid: 'APS001235', name: 'Priya Sharma', phone: '9123456780', email: 'priya@email.com', age: 32, gender: 'Female', bloodGroup: 'A+', address: '45, HSR Layout', city: 'Bengaluru', pinCode: '560102', registeredOn: '2024-03-20', totalVisits: 2, lastVisit: '2026-07-10', familyMembers: [], medicalHistory: ['Asthma'], allergies: [], tokenHistory: ['tok-102'] },
-  { id: 'pat-3', uhid: 'APS001236', name: 'Mohan Reddy', phone: '9988776655', email: '', age: 45, gender: 'Male', bloodGroup: 'O+', address: '78, Koramangala', city: 'Bengaluru', pinCode: '560034', registeredOn: '2023-11-10', totalVisits: 7, lastVisit: '2026-07-17', familyMembers: [{ name: 'Lakshmi Reddy', relation: 'Wife', age: 42 }, { name: 'Ravi Reddy', relation: 'Son', age: 18 }], medicalHistory: ['Knee Osteoarthritis', 'Hypertension'], allergies: ['Aspirin'], tokenHistory: ['tok-103'] },
-  { id: 'pat-4', uhid: 'APS001237', name: 'Ananya Patel', phone: '9072345678', email: 'ananya@email.com', age: 19, gender: 'Female', bloodGroup: 'AB+', address: '23, Indiranagar', city: 'Bengaluru', pinCode: '560038', registeredOn: '2026-05-01', totalVisits: 1, lastVisit: '2026-07-17', familyMembers: [], medicalHistory: [], allergies: [], tokenHistory: ['tok-104'] },
-  { id: 'pat-5', uhid: 'APS001238', name: 'Ramesh Kumar', phone: '8859001122', email: '', age: 50, gender: 'Male', bloodGroup: 'B-', address: '99, JP Nagar', city: 'Bengaluru', pinCode: '560078', registeredOn: '2023-06-15', totalVisits: 12, lastVisit: '2026-07-17', familyMembers: [], medicalHistory: ['Type 1 Diabetes', 'Retinopathy'], allergies: [], tokenHistory: ['tok-105'] },
-];
-
 const INITIAL_SCHEDULE: ScheduleConfig = {
   sessions: [
     { id: 'sess-morning', name: 'Morning', startTime: '09:00 AM', endTime: '01:00 PM', maxTokens: 50, consultationDuration: 12, breakTime: 5, active: true },
@@ -416,12 +380,12 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const [tokens, setTokens] = useState<TokenRecord[]>(() => {
     const saved = localStorage.getItem('insta_hospital_tokens');
-    return saved ? JSON.parse(saved) : generateTokens();
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [patients, setPatients] = useState<PatientRecord[]>(() => {
     const saved = localStorage.getItem('insta_hospital_patients');
-    return saved ? JSON.parse(saved) : INITIAL_PATIENTS;
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [scheduleConfig, setScheduleConfig] = useState<ScheduleConfig>(() => {
@@ -603,36 +567,104 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     patientGender: string; address: string; departmentId: string;
     doctorId: string; session: 'morning' | 'afternoon' | 'evening';
   }): TokenRecord => {
-    const maxToken = Math.max(...tokens.map(t => t.tokenNo), 100);
+    const maxToken = tokens.length > 0 ? Math.max(...tokens.map(t => t.tokenNo || 0)) : 0;
     const doctor = doctors.find(d => d.id === form.doctorId);
     const dept = departments.find(d => d.id === form.departmentId);
     const waitingInSession = tokens.filter(t => t.session === form.session && ['booked','waiting','checked-in'].includes(t.status)).length;
     const newToken: TokenRecord = {
-      id: `tok-${Date.now()}`, tokenNo: maxToken + 1, type: 'offline',
-      patientName: form.patientName, patientPhone: form.patientPhone,
-      patientAge: form.patientAge, patientGender: form.patientGender,
-      doctorId: form.doctorId, doctorName: doctor?.name || '',
-      departmentId: form.departmentId, departmentName: dept?.name || '',
-      session: form.session, time: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }),
+      id: `tok-${Date.now()}`,
+      tokenNo: maxToken + 1,
+      type: 'offline',
+      patientName: form.patientName,
+      patientPhone: form.patientPhone,
+      patientAge: form.patientAge,
+      patientGender: form.patientGender,
+      doctorId: form.doctorId,
+      doctorName: doctor?.name || '',
+      departmentId: form.departmentId,
+      departmentName: dept?.name || '',
+      session: form.session,
+      time: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }),
       bookingDate: new Date().toISOString().split('T')[0],
-      status: 'booked', queuePosition: waitingInSession + 1,
+      status: 'booked',
+      queuePosition: waitingInSession + 1,
       estimatedWait: (waitingInSession + 1) * (doctor?.consultationDuration || 12),
-      consultationFee: doctor?.consultationFee || 0, paymentStatus: 'pending', paymentMethod: 'Cash',
+      consultationFee: doctor?.consultationFee || 0,
+      paymentStatus: 'pending',
+      paymentMethod: 'Cash',
       isRevisit: false,
     };
-    setTokens(prev => [...prev, newToken]);
+    const updated = [newToken, ...tokens];
+    setTokens(updated);
+    localStorage.setItem('insta_hospital_tokens', JSON.stringify(updated));
+
+    // Register / update patient record
+    setPatients(prev => {
+      const exists = prev.some(p => p.phone === form.patientPhone);
+      if (exists) {
+        const updatedPatients = prev.map(p => p.phone === form.patientPhone ? {
+          ...p,
+          totalVisits: (p.totalVisits || 0) + 1,
+          lastVisit: new Date().toISOString().split('T')[0],
+          tokenHistory: [newToken.id, ...(p.tokenHistory || [])]
+        } : p);
+        localStorage.setItem('insta_hospital_patients', JSON.stringify(updatedPatients));
+        return updatedPatients;
+      }
+      const uhid = `APS${String(prev.length + 1001).padStart(6, '0')}`;
+      const newPat: PatientRecord = {
+        id: `pat-${Date.now()}`,
+        uhid,
+        name: form.patientName,
+        phone: form.patientPhone,
+        email: '',
+        age: form.patientAge,
+        gender: form.patientGender,
+        bloodGroup: 'O+',
+        address: form.address || '',
+        city: hospitalProfile?.city || 'Bengaluru',
+        pinCode: hospitalProfile?.pinCode || '',
+        registeredOn: new Date().toISOString().split('T')[0],
+        totalVisits: 1,
+        lastVisit: new Date().toISOString().split('T')[0],
+        familyMembers: [],
+        medicalHistory: [],
+        allergies: [],
+        tokenHistory: [newToken.id]
+      };
+      const updatedPatients = [newPat, ...prev];
+      localStorage.setItem('insta_hospital_patients', JSON.stringify(updatedPatients));
+      return updatedPatients;
+    });
+
+    broadcastGlobalSync('HOSPITAL_TOKENS_UPDATED', updated);
     return newToken;
   };
 
-  const updateTokenStatus = (id: string, status: TokenRecord['status']) =>
-    setTokens(prev => prev.map(t => t.id === id ? { ...t, status } : t));
-  const cancelToken = (id: string) =>
-    setTokens(prev => prev.map(t => t.id === id ? { ...t, status: 'cancelled', paymentStatus: 'refunded' } : t));
+  const updateTokenStatus = (id: string, status: TokenRecord['status']) => {
+    setTokens(prev => {
+      const updated = prev.map(t => t.id === id ? {
+        ...t,
+        status,
+        paymentStatus: status === 'cancelled' ? ('refunded' as const) : status === 'completed' ? ('paid' as const) : t.paymentStatus
+      } : t);
+      localStorage.setItem('insta_hospital_tokens', JSON.stringify(updated));
+      broadcastGlobalSync('HOSPITAL_TOKENS_UPDATED', updated);
+      return updated;
+    });
+  };
+
+  const cancelToken = (id: string) => {
+    updateTokenStatus(id, 'cancelled');
+  };
 
   // Patients
   const addPatient = (p: Omit<PatientRecord, 'id' | 'uhid' | 'registeredOn' | 'totalVisits' | 'lastVisit' | 'tokenHistory'>) => {
-    const uhid = `APS${String(patients.length + 1239).padStart(6, '0')}`;
-    setPatients(prev => [...prev, { ...p, id: `pat-${Date.now()}`, uhid, registeredOn: new Date().toISOString().split('T')[0], totalVisits: 0, lastVisit: '', tokenHistory: [] }]);
+    const uhid = `APS${String(patients.length + 1001).padStart(6, '0')}`;
+    const newPat: PatientRecord = { ...p, id: `pat-${Date.now()}`, uhid, registeredOn: new Date().toISOString().split('T')[0], totalVisits: 0, lastVisit: '', tokenHistory: [] };
+    const updated = [newPat, ...patients];
+    setPatients(updated);
+    localStorage.setItem('insta_hospital_patients', JSON.stringify(updated));
   };
   const updatePatient = (id: string, updates: Partial<PatientRecord>) =>
     setPatients(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));

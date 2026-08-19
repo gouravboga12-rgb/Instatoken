@@ -256,25 +256,25 @@ export const HospitalDashboard: React.FC = () => {
         <StatCardSparkline
           type="online"
           title="Online Tokens"
-          value={onlineCount || 34}
+          value={onlineCount}
           sub="Today's Online Bookings"
-          trend="12% from yesterday"
+          trend={`${onlineCount} active`}
           color="bg-emerald-50 text-emerald-600"
         />
         <StatCardSparkline
           type="offline"
           title="Offline Tokens"
-          value={offlineCount || 27}
+          value={offlineCount}
           sub="Today's Walk-in Tokens"
-          trend="8% from yesterday"
+          trend={`${offlineCount} active`}
           color="bg-blue-50 text-blue-600"
         />
         <StatCardSparkline
           type="total"
           title="Total Tokens Today"
-          value={totalToday || 61}
+          value={totalToday}
           sub="Online + Offline"
-          trend="15% from yesterday"
+          trend={`${totalToday} registered`}
           color="bg-purple-50 text-purple-600"
         />
       </div>
@@ -296,7 +296,7 @@ export const HospitalDashboard: React.FC = () => {
                       tokenFilter === 'all' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-500 hover:text-slate-800'
                     }`}
                   >
-                    All Tokens
+                    All Tokens ({totalToday})
                   </button>
                   <button
                     onClick={() => setTokenFilter('online')}
@@ -304,7 +304,7 @@ export const HospitalDashboard: React.FC = () => {
                       tokenFilter === 'online' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-500 hover:text-slate-800'
                     }`}
                   >
-                    Online ({onlineCount || 34})
+                    Online ({onlineCount})
                   </button>
                   <button
                     onClick={() => setTokenFilter('offline')}
@@ -312,7 +312,7 @@ export const HospitalDashboard: React.FC = () => {
                       tokenFilter === 'offline' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-500 hover:text-slate-800'
                     }`}
                   >
-                    Offline ({offlineCount || 27})
+                    Offline ({offlineCount})
                   </button>
                 </div>
 

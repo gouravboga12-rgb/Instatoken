@@ -246,31 +246,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [appointments, setAppointments] = useState<Appointment[]>(() => {
     const saved = localStorage.getItem('insta_appointments');
-    return saved ? JSON.parse(saved) : [
-      {
-        id: "tok-1001",
-        tokenNumber: 4,
-        patientName: "Guest Patient",
-        age: 28,
-        gender: "Male",
-        phone: "+91 9876543210",
-        email: "patient@example.com",
-        address: "Koramangala, Bengaluru",
-        hospitalId: "hosp-apollo",
-        hospitalName: "Apollo Spectra Hospital",
-        doctorId: "doc-arvind",
-        doctorName: "Dr. Arvind Sharma",
-        departmentName: "Cardiology",
-        date: new Date().toISOString().split('T')[0],
-        time: "10:30 AM",
-        fee: 800,
-        status: "completed",
-        paymentId: "PAYID-7849204",
-        paymentMethod: "UPI",
-        estimatedWaitTime: 0,
-        createdAt: new Date(Date.now() - 86400000).toISOString()
-      }
-    ];
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [notifications, setNotifications] = useState<AppNotification[]>(() => {
@@ -546,7 +522,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     const tokenAssigned = targetDoc.nextAvailableToken;
-    const patientsAhead = tokenAssigned - targetDoc.currentQueue - 1;
+    const patientsAhead = Math.max(0, tokenAssigned - targetDoc.currentQueue - 1);
     const computedWaitTime = Math.max(0, patientsAhead * targetDoc.estimatedWaitPerPatient);
 
     const newAppt: Appointment = {
@@ -573,6 +549,79 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       createdAt: new Date().toISOString()
     };
 
+    // Construct corresponding Hospital TokenRecord
+    const todayStr = new Date().toISOString().split('T')[0];
+    const newHospitalToken = {
+      id: newAppt.id,
+      tokenNo: newAppt.tokenNumber,
+      type: 'online' as const,
+      patientName: newAppt.patientName,
+      patientPhone: newAppt.phone,
+      patientAge: newAppt.age,
+      patientGender: newAppt.gender,
+      doctorId: newAppt.doctorId,
+      doctorName: newAppt.doctorName,
+      departmentId: targetDoc.departmentId || 'dept-general',
+      departmentName: newAppt.departmentName,
+      session: parseInt(newAppt.time.split(':')[0], 10) < 12 ? ('morning' as const) : parseInt(newAppt.time.split(':')[0], 10) < 17 ? ('afternoon' as const) : ('evening' as const),
+      time: newAppt.time,
+      bookingDate: newAppt.date || todayStr,
+      status: 'booked' as const,
+      queuePosition: patientsAhead + 1,
+      estimatedWait: computedWaitTime,
+      consultationFee: newAppt.fee,
+      paymentStatus: 'paid' as const,
+      paymentMethod: newAppt.paymentMethod || 'Online',
+      isRevisit: false
+    };
+
+    // Save to local hospital tokens store
+    let currentHospitalTokens = [];
+    try {
+      const savedToks = localStorage.getItem('insta_hospital_tokens');
+      currentHospitalTokens = savedToks ? JSON.parse(savedToks) : [];
+    } catch (e) {}
+    const updatedHospitalTokens = [newHospitalToken, ...currentHospitalTokens.filter((t: any) => t.id !== newHospitalToken.id)];
+    localStorage.setItem('insta_hospital_tokens', JSON.stringify(updatedHospitalTokens));
+
+    // Register patient in hospital patients store
+    try {
+      const savedPats = localStorage.getItem('insta_hospital_patients');
+      let currentPats = savedPats ? JSON.parse(savedPats) : [];
+      const exists = currentPats.some((p: any) => p.phone === patientDetails.phone || p.email === patientDetails.email);
+      if (exists) {
+        currentPats = currentPats.map((p: any) => (p.phone === patientDetails.phone || p.email === patientDetails.email) ? {
+          ...p,
+          totalVisits: (p.totalVisits || 0) + 1,
+          lastVisit: newAppt.date || todayStr,
+          tokenHistory: [newHospitalToken.id, ...(p.tokenHistory || [])]
+        } : p);
+      } else {
+        const newPat = {
+          id: `pat-${Date.now()}`,
+          uhid: `APS${String(currentPats.length + 1001).padStart(6, '0')}`,
+          name: patientDetails.name,
+          phone: patientDetails.phone,
+          email: patientDetails.email,
+          age: patientDetails.age,
+          gender: patientDetails.gender,
+          bloodGroup: 'B+',
+          address: patientDetails.address || '',
+          city: (targetHosp as any).city || 'Bengaluru',
+          pinCode: '',
+          registeredOn: todayStr,
+          totalVisits: 1,
+          lastVisit: todayStr,
+          familyMembers: [],
+          medicalHistory: [],
+          allergies: [],
+          tokenHistory: [newHospitalToken.id]
+        };
+        currentPats = [newPat, ...currentPats];
+      }
+      localStorage.setItem('insta_hospital_patients', JSON.stringify(currentPats));
+    } catch (e) {}
+
     // Update doctor's token state in the local hospital store
     setHospitals(prev => prev.map(h => {
       if (h.id === hospitalId) {
@@ -589,7 +638,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return h;
     }));
 
-    setAppointments(prev => [newAppt, ...prev]);
+    const updatedAppts = [newAppt, ...appointments];
+    setAppointments(updatedAppts);
+
+    broadcastGlobalSync('HOSPITAL_TOKEN_CREATED', { token: newHospitalToken, appointment: newAppt, tokens: updatedHospitalTokens });
+    broadcastGlobalSync('HOSPITAL_TOKENS_UPDATED', updatedHospitalTokens);
 
     // Attach to customer account in admin customers store
     setCustomers(prev => {

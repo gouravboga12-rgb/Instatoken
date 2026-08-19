@@ -4,221 +4,497 @@ import { useHospital } from '../../context/HospitalContext';
 import type { TokenRecord } from '../../context/HospitalContext';
 import {
   Plus, Search, XCircle, CheckCircle, Wifi, WifiOff,
-  Printer, X
+  Printer, X, Calendar, AlertCircle
 } from 'lucide-react';
 
 const statusColors: Record<string, string> = {
-  booked: 'bg-blue-100 text-blue-700',
-  'checked-in': 'bg-amber-100 text-amber-700',
-  completed: 'bg-emerald-100 text-emerald-700',
-  cancelled: 'bg-red-100 text-red-700',
-  waiting: 'bg-purple-100 text-purple-700',
-  skipped: 'bg-slate-100 text-slate-600',
+  booked: 'bg-blue-50 text-blue-700 border border-blue-200',
+  'checked-in': 'bg-amber-50 text-amber-700 border border-amber-200',
+  waiting: 'bg-purple-50 text-purple-700 border border-purple-200',
+  completed: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+  cancelled: 'bg-red-50 text-red-700 border border-red-200',
+  skipped: 'bg-slate-100 text-slate-600 border border-slate-200',
 };
 
-// ─── Walk-in Token Generator Modal ───────────────────────────────────────────
-const WalkInModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+// ─── Direct Walk-in Token Generator Component ─────────────────────────────
+const WalkInGenerator: React.FC<{ onCreated?: (token: TokenRecord) => void }> = ({ onCreated }) => {
   const { generateWalkInToken, doctors, departments } = useHospital();
   const [form, setForm] = useState({
-    patientName: '', patientPhone: '', patientAge: '', patientGender: 'Male',
-    address: '', departmentId: '', doctorId: '', session: 'morning' as 'morning'|'afternoon'|'evening',
+    patientName: '',
+    patientPhone: '',
+    patientAge: '',
+    patientGender: 'Male',
+    address: '',
+    departmentId: '',
+    doctorId: '',
+    session: 'morning' as 'morning' | 'afternoon' | 'evening',
+    isRevisit: false
   });
   const [generated, setGenerated] = useState<TokenRecord | null>(null);
   const [error, setError] = useState('');
 
   const activeDepts = departments.filter(d => d.active);
-  const availDoctors = form.departmentId ? doctors.filter(d => d.departmentId === form.departmentId && d.active) : doctors.filter(d => d.active);
+  const availDoctors = form.departmentId
+    ? doctors.filter(d => d.departmentId === form.departmentId && d.active)
+    : doctors.filter(d => d.active);
+
+  const selectedDoctor = doctors.find(d => d.id === form.doctorId);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.patientName || !form.patientPhone || !form.patientAge || !form.departmentId || !form.doctorId) {
-      setError('Please fill all required fields.');
+    if (!form.patientName.trim() || !form.patientPhone.trim() || !form.patientAge || !form.departmentId || !form.doctorId) {
+      setError('Please fill in all mandatory fields.');
       return;
     }
     const token = generateWalkInToken({
-      ...form, patientAge: parseInt(form.patientAge),
+      patientName: form.patientName.trim(),
+      patientPhone: form.patientPhone.trim(),
+      patientAge: parseInt(form.patientAge, 10) || 25,
+      patientGender: form.patientGender,
+      address: form.address.trim(),
+      departmentId: form.departmentId,
+      doctorId: form.doctorId,
+      session: form.session
     });
     setGenerated(token);
     setError('');
+    if (onCreated) onCreated(token);
+  };
+
+  const handleReset = () => {
+    setGenerated(null);
+    setForm({
+      patientName: '',
+      patientPhone: '',
+      patientAge: '',
+      patientGender: 'Male',
+      address: '',
+      departmentId: '',
+      doctorId: '',
+      session: 'morning',
+      isRevisit: false
+    });
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-3xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-6 border-b border-slate-100">
-          <div>
-            <h3 className="text-lg font-black text-slate-800">Generate Walk-in Token</h3>
-            <p className="text-xs text-slate-400 mt-0.5">Register patient and assign token number</p>
+    <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 max-w-3xl">
+      {!generated ? (
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <div>
+              <h3 className="text-base font-black text-slate-800">Walk-in Patient Token Form</h3>
+              <p className="text-xs text-slate-400 mt-0.5">Register walk-in patient and generate instant digital queue slip</p>
+            </div>
+            <span className="text-[11px] font-extrabold px-3 py-1 bg-blue-50 text-blue-600 rounded-full">
+              Counter Offline Token
+            </span>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-xl cursor-pointer border-none"><X size={18} /></button>
-        </div>
 
-        {!generated ? (
-          <form onSubmit={handleSubmit} className="p-6 space-y-4">
-            {error && <div className="bg-red-50 border border-red-100 text-red-600 text-xs font-semibold px-4 py-2.5 rounded-xl">{error}</div>}
-            <div className="grid grid-cols-2 gap-4">
+          {error && (
+            <div className="bg-red-50 border border-red-100 text-red-600 text-xs font-semibold px-4 py-2.5 rounded-xl flex items-center gap-2">
+              <AlertCircle size={14} />
+              {error}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-bold text-slate-700 block mb-1.5">Patient Full Name *</label>
+              <input
+                type="text"
+                required
+                value={form.patientName}
+                onChange={e => setForm(p => ({ ...p, patientName: e.target.value }))}
+                placeholder="e.g. Ramesh Kumar"
+                className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-medium"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-700 block mb-1.5">10-Digit Mobile Number *</label>
+              <input
+                type="tel"
+                required
+                maxLength={10}
+                value={form.patientPhone}
+                onChange={e => setForm(p => ({ ...p, patientPhone: e.target.value.replace(/\D/g, '') }))}
+                placeholder="e.g. 9876543210"
+                className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-medium"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1.5">Patient Name *</label>
-                <input type="text" value={form.patientName} onChange={e => setForm(p => ({...p, patientName: e.target.value}))}
-                  placeholder="Full name" className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-500" required />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1.5">Mobile Number *</label>
-                <input type="tel" value={form.patientPhone} onChange={e => setForm(p => ({...p, patientPhone: e.target.value}))}
-                  placeholder="10-digit mobile" maxLength={10} className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-500" required />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1.5">Age *</label>
-                <input type="number" value={form.patientAge} onChange={e => setForm(p => ({...p, patientAge: e.target.value}))}
-                  placeholder="Age" min={1} max={120} className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-500" required />
+                <label className="text-xs font-bold text-slate-700 block mb-1.5">Age (Years) *</label>
+                <input
+                  type="number"
+                  required
+                  min={1}
+                  max={120}
+                  value={form.patientAge}
+                  onChange={e => setForm(p => ({ ...p, patientAge: e.target.value }))}
+                  placeholder="35"
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-medium"
+                />
               </div>
               <div>
                 <label className="text-xs font-bold text-slate-700 block mb-1.5">Gender *</label>
-                <select value={form.patientGender} onChange={e => setForm(p => ({...p, patientGender: e.target.value}))}
-                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-500 bg-white">
-                  {['Male','Female','Other'].map(g => <option key={g}>{g}</option>)}
+                <select
+                  value={form.patientGender}
+                  onChange={e => setForm(p => ({ ...p, patientGender: e.target.value }))}
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 bg-white font-medium"
+                >
+                  <option>Male</option>
+                  <option>Female</option>
+                  <option>Other</option>
                 </select>
               </div>
-              <div className="col-span-2">
-                <label className="text-xs font-bold text-slate-700 block mb-1.5">Address</label>
-                <input type="text" value={form.address} onChange={e => setForm(p => ({...p, address: e.target.value}))}
-                  placeholder="Patient address" className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-500" />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1.5">Department *</label>
-                <select value={form.departmentId} onChange={e => setForm(p => ({...p, departmentId: e.target.value, doctorId: ''}))}
-                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-500 bg-white" required>
-                  <option value="">Select Department</option>
-                  {activeDepts.map(d => <option key={d.id} value={d.id}>{d.icon} {d.name}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1.5">Doctor *</label>
-                <select value={form.doctorId} onChange={e => setForm(p => ({...p, doctorId: e.target.value}))}
-                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-500 bg-white" required>
-                  <option value="">Select Doctor</option>
-                  {availDoctors.map(d => <option key={d.id} value={d.id}>{d.name} (₹{d.consultationFee})</option>)}
-                </select>
-              </div>
-              <div className="col-span-2">
-                <label className="text-xs font-bold text-slate-700 block mb-1.5">Session *</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {(['morning','afternoon','evening'] as const).map(s => (
-                    <button type="button" key={s} onClick={() => setForm(p => ({...p, session: s}))}
-                      className={`py-2.5 rounded-xl text-xs font-bold capitalize cursor-pointer border-2 transition-all ${form.session === s ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
-                      {s === 'morning' ? '🌅 Morning' : s === 'afternoon' ? '☀️ Afternoon' : '🌙 Evening'}
-                    </button>
-                  ))}
-                </div>
-              </div>
             </div>
-            <div className="flex gap-3 pt-2">
-              <button type="button" onClick={onClose} className="flex-1 py-3 border border-slate-200 rounded-2xl text-sm font-bold text-slate-600 hover:bg-slate-50 cursor-pointer">Cancel</button>
-              <button type="submit" className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl text-sm cursor-pointer border-none">Generate Token</button>
+
+            <div>
+              <label className="text-xs font-bold text-slate-700 block mb-1.5">Area / Residential Address</label>
+              <input
+                type="text"
+                value={form.address}
+                onChange={e => setForm(p => ({ ...p, address: e.target.value }))}
+                placeholder="e.g. Koramangala 4th Block"
+                className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-medium"
+              />
             </div>
-          </form>
-        ) : (
-          <div className="p-8 text-center">
-            <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <CheckCircle size={40} className="text-emerald-600" />
+
+            <div>
+              <label className="text-xs font-bold text-slate-700 block mb-1.5">Department *</label>
+              <select
+                required
+                value={form.departmentId}
+                onChange={e => setForm(p => ({ ...p, departmentId: e.target.value, doctorId: '' }))}
+                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 bg-white font-medium"
+              >
+                <option value="">Select Department</option>
+                {activeDepts.map(d => (
+                  <option key={d.id} value={d.id}>{d.icon} {d.name}</option>
+                ))}
+              </select>
             </div>
-            <h3 className="text-xl font-black text-slate-800 mb-1">Token Generated!</h3>
-            <p className="text-slate-400 text-sm mb-6">Walk-in token has been successfully created</p>
-            <div className="bg-gradient-to-br from-blue-600 to-indigo-600 rounded-3xl p-6 text-white mb-6">
-              <p className="text-sm opacity-75 mb-1">Token Number</p>
-              <p className="text-6xl font-black mb-4">#{generated.tokenNo}</p>
-              <div className="grid grid-cols-2 gap-3 text-left text-sm">
-                <div><p className="opacity-60 text-xs">Patient</p><p className="font-bold">{generated.patientName}</p></div>
-                <div><p className="opacity-60 text-xs">Doctor</p><p className="font-bold">{generated.doctorName}</p></div>
-                <div><p className="opacity-60 text-xs">Queue Position</p><p className="font-bold">#{generated.queuePosition}</p></div>
-                <div><p className="opacity-60 text-xs">Est. Wait</p><p className="font-bold">~{generated.estimatedWait} mins</p></div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-700 block mb-1.5">Consulting Doctor *</label>
+              <select
+                required
+                value={form.doctorId}
+                onChange={e => setForm(p => ({ ...p, doctorId: e.target.value }))}
+                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 bg-white font-medium"
+              >
+                <option value="">Select Doctor</option>
+                {availDoctors.map(d => (
+                  <option key={d.id} value={d.id}>{d.name} · ₹{d.consultationFee}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className="text-xs font-bold text-slate-700 block mb-1.5">OPD Session Time *</label>
+              <div className="grid grid-cols-3 gap-3">
+                {(['morning', 'afternoon', 'evening'] as const).map(s => (
+                  <button
+                    type="button"
+                    key={s}
+                    onClick={() => setForm(p => ({ ...p, session: s }))}
+                    className={`py-2.5 rounded-xl text-xs font-bold capitalize cursor-pointer border transition-all ${
+                      form.session === s
+                        ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-xs'
+                        : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                    }`}
+                  >
+                    {s === 'morning' ? '🌅 Morning' : s === 'afternoon' ? '☀️ Afternoon' : '🌙 Evening'}
+                  </button>
+                ))}
               </div>
-            </div>
-            <div className="flex gap-3">
-              <button onClick={onClose} className="flex-1 py-3 border border-slate-200 rounded-2xl text-sm font-bold cursor-pointer">Close</button>
-              <button className="flex-1 py-3 bg-blue-600 text-white font-bold rounded-2xl text-sm cursor-pointer border-none flex items-center justify-center gap-2">
-                <Printer size={15} /> Print Token
-              </button>
             </div>
           </div>
-        )}
+
+          {selectedDoctor && (
+            <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-bold text-slate-800">{selectedDoctor.name}</p>
+                <p className="text-[10px] text-slate-400 font-semibold">{selectedDoctor.specialization} · Est. Duration: {selectedDoctor.consultationDuration || 15} mins</p>
+              </div>
+              <div className="text-right">
+                <span className="text-[10px] text-slate-400 block font-semibold">Consultation Fee</span>
+                <span className="text-sm font-black text-blue-600">₹{selectedDoctor.consultationFee}</span>
+              </div>
+            </div>
+          )}
+
+          <div className="pt-2">
+            <button
+              type="submit"
+              className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs rounded-2xl cursor-pointer border-none shadow-md shadow-blue-500/20 flex items-center justify-center gap-2"
+            >
+              <Plus size={16} /> Generate & Assign Token
+            </button>
+          </div>
+        </form>
+      ) : (
+        <div className="py-4 text-center space-y-6 animate-in fade-in">
+          <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto text-emerald-600">
+            <CheckCircle size={36} />
+          </div>
+          <div>
+            <h3 className="text-lg font-black text-slate-800">Token Generated Successfully!</h3>
+            <p className="text-xs text-slate-400 mt-1">Walk-in token is registered in the hospital live queue</p>
+          </div>
+
+          {/* Digital Token Slip Preview */}
+          <div className="bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-3xl p-6 max-w-md mx-auto shadow-lg text-left relative overflow-hidden">
+            <div className="flex justify-between items-start border-b border-white/20 pb-3 mb-4">
+              <div>
+                <p className="text-[10px] uppercase font-bold tracking-widest text-blue-200">Apollo Spectra Hospital</p>
+                <p className="text-xs font-semibold opacity-90">OPD Consultation Slip</p>
+              </div>
+              <span className="text-[10px] font-bold px-2 py-0.5 bg-white/20 rounded-full">Walk-in</span>
+            </div>
+
+            <div className="text-center py-2">
+              <span className="text-xs text-blue-200 block font-semibold">Token Number</span>
+              <h1 className="text-5xl font-black tracking-tight my-1">#{generated.tokenNo}</h1>
+              <span className="text-[11px] bg-white/20 px-3 py-1 rounded-full font-bold inline-block capitalize">
+                Session: {generated.session}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 pt-4 border-t border-white/20 text-xs">
+              <div>
+                <span className="text-[10px] text-blue-200 block">Patient Name</span>
+                <p className="font-bold truncate">{generated.patientName}</p>
+                <p className="text-[10px] text-blue-100">{generated.patientPhone}</p>
+              </div>
+              <div>
+                <span className="text-[10px] text-blue-200 block">Doctor</span>
+                <p className="font-bold truncate">{generated.doctorName}</p>
+                <p className="text-[10px] text-blue-100">{generated.departmentName}</p>
+              </div>
+              <div>
+                <span className="text-[10px] text-blue-200 block">Queue Position</span>
+                <p className="font-bold">#{generated.queuePosition}</p>
+              </div>
+              <div>
+                <span className="text-[10px] text-blue-200 block">Consultation Fee</span>
+                <p className="font-bold">₹{generated.consultationFee} (Pay at Cabin)</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-3 justify-center max-w-md mx-auto">
+            <button
+              onClick={() => window.print()}
+              className="flex-1 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl cursor-pointer border-none flex items-center justify-center gap-1.5"
+            >
+              <Printer size={14} /> Print Token Slip
+            </button>
+            <button
+              onClick={handleReset}
+              className="flex-1 py-2.5 bg-blue-50 text-blue-600 hover:bg-blue-100 font-bold text-xs rounded-xl cursor-pointer border-none"
+            >
+              + Issue Another Token
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── Modal Wrapper ────────────────────────────────────────────────────────────
+const WalkInModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto relative">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 p-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full cursor-pointer border-none z-10"
+        >
+          <X size={16} />
+        </button>
+        <WalkInGenerator onCreated={() => {}} />
       </div>
     </div>
   );
 };
 
 // ─── Token Table ──────────────────────────────────────────────────────────────
-const TokenTable: React.FC<{ tokens: TokenRecord[]; title: string }> = ({ tokens: toks, title }) => {
+const TokenTable: React.FC<{ tokens: TokenRecord[]; title: string; subtitle: string; onAddClick: () => void }> = ({
+  tokens: toks,
+  title,
+  subtitle,
+  onAddClick
+}) => {
   const { updateTokenStatus, cancelToken } = useHospital();
   const [search, setSearch] = useState('');
-  const filtered = toks.filter(t =>
-    t.patientName.toLowerCase().includes(search.toLowerCase()) ||
-    t.patientPhone.includes(search) ||
-    String(t.tokenNo).includes(search)
-  );
+  const [statusFilter, setStatusFilter] = useState('all');
+
+  const filtered = toks.filter(t => {
+    const matchesSearch =
+      (t.patientName || '').toLowerCase().includes(search.toLowerCase()) ||
+      (t.patientPhone || '').includes(search) ||
+      (t.doctorName || '').toLowerCase().includes(search.toLowerCase()) ||
+      String(t.tokenNo).includes(search);
+    const matchesStatus = statusFilter === 'all' || t.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-      <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-        <h3 className="font-black text-slate-800 text-sm">{title} <span className="text-slate-400 font-normal text-xs">({toks.length})</span></h3>
-        <div className="relative">
-          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search token, patient, phone..."
-            className="pl-8 pr-3 py-1.5 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-blue-500 w-52" />
+    <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden space-y-0">
+      {/* Table Header & Controls */}
+      <div className="p-5 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <h3 className="font-black text-slate-800 text-sm">{title}</h3>
+            <span className="text-[11px] font-bold px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full">
+              {toks.length} Tokens
+            </span>
+          </div>
+          <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2.5">
+          <select
+            value={statusFilter}
+            onChange={e => setStatusFilter(e.target.value)}
+            className="text-xs font-bold text-slate-600 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none cursor-pointer"
+          >
+            <option value="all">All Statuses</option>
+            <option value="booked">Booked</option>
+            <option value="checked-in">Checked In</option>
+            <option value="waiting">Waiting</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+
+          <div className="relative">
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search token #, patient, phone, doctor..."
+              className="pl-8 pr-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-blue-500 w-60 bg-slate-50"
+            />
+          </div>
         </div>
       </div>
+
+      {/* Table Content */}
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[700px]">
+        <table className="w-full min-w-[780px]">
           <thead className="bg-slate-50 border-b border-slate-100">
-            <tr>{['#', 'Type', 'Patient', 'Doctor', 'Session', 'Time', 'Fee', 'Status', 'Actions'].map(h => (
-              <th key={h} className="px-4 py-2.5 text-left text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">{h}</th>
-            ))}</tr>
+            <tr>
+              {['Token #', 'Type', 'Patient Details', 'Doctor & Dept', 'Session / Date', 'Time', 'Fee', 'Status', 'Actions'].map(h => (
+                <th key={h} className="px-4 py-3 text-left text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                  {h}
+                </th>
+              ))}
+            </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <tr><td colSpan={9} className="text-center py-10 text-sm text-slate-400">No tokens found</td></tr>
-            ) : filtered.map(t => (
-              <tr key={t.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
-                <td className="px-4 py-3 font-extrabold text-slate-800">{t.tokenNo}</td>
-                <td className="px-4 py-3">
-                  <span className={`text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1 w-fit ${t.type === 'online' ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-600'}`}>
-                    {t.type === 'online' ? <Wifi size={9}/> : <WifiOff size={9}/>} {t.type}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  <p className="text-xs font-semibold text-slate-800">{t.patientName}</p>
-                  <p className="text-[10px] text-slate-400">{t.patientPhone} · {t.patientGender},{t.patientAge}Y</p>
-                </td>
-                <td className="px-4 py-3 text-xs text-slate-700">{t.doctorName}</td>
-                <td className="px-4 py-3 text-xs text-slate-600 capitalize">{t.session}</td>
-                <td className="px-4 py-3 text-xs font-semibold text-slate-700">{t.time}</td>
-                <td className="px-4 py-3 text-xs font-bold text-slate-800">₹{t.consultationFee}</td>
-                <td className="px-4 py-3">
-                  <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full capitalize ${statusColors[t.status] || 'bg-slate-100 text-slate-700'}`}>
-                    {t.status.replace('-',' ')}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex gap-1">
-                    {t.status === 'booked' && (
-                      <button onClick={() => updateTokenStatus(t.id, 'checked-in')} title="Check In"
-                        className="p-1.5 hover:bg-amber-50 rounded-lg text-slate-400 hover:text-amber-600 cursor-pointer transition-colors">
-                        <CheckCircle size={13} />
-                      </button>
-                    )}
-                    {(t.status === 'booked' || t.status === 'checked-in') && (
-                      <button onClick={() => cancelToken(t.id)} title="Cancel"
-                        className="p-1.5 hover:bg-red-50 rounded-lg text-slate-400 hover:text-red-500 cursor-pointer transition-colors">
-                        <XCircle size={13} />
-                      </button>
-                    )}
-                    <button title="Print" className="p-1.5 hover:bg-blue-50 rounded-lg text-slate-400 hover:text-blue-600 cursor-pointer transition-colors">
-                      <Printer size={13} />
-                    </button>
+              <tr>
+                <td colSpan={9} className="text-center py-16">
+                  <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto text-slate-400 mb-3">
+                    <Calendar size={22} />
                   </div>
+                  <p className="text-xs font-bold text-slate-700">No tokens found in this category</p>
+                  <p className="text-[11px] text-slate-400 mt-1 max-w-sm mx-auto">
+                    Tokens booked by customers online or generated at the reception desk will automatically populate here in real-time.
+                  </p>
+                  <button
+                    onClick={onAddClick}
+                    className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl cursor-pointer border-none inline-flex items-center gap-1.5"
+                  >
+                    <Plus size={13} /> Add Walk-in Token
+                  </button>
                 </td>
               </tr>
-            ))}
+            ) : (
+              filtered.map(t => (
+                <tr key={t.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+                  <td className="px-4 py-3 font-black text-slate-800 text-sm">
+                    #{t.tokenNo}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`text-[10px] font-bold px-2 py-1 rounded-full inline-flex items-center gap-1 ${
+                      t.type === 'online' ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-600'
+                    }`}>
+                      {t.type === 'online' ? <Wifi size={10} /> : <WifiOff size={10} />}
+                      {t.type === 'online' ? 'Online' : 'Walk-in'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <p className="text-xs font-bold text-slate-800">{t.patientName}</p>
+                    <p className="text-[10px] text-slate-400 font-semibold">{t.patientPhone} · {t.patientGender}, {t.patientAge}Y</p>
+                  </td>
+                  <td className="px-4 py-3">
+                    <p className="text-xs font-bold text-slate-700">{t.doctorName}</p>
+                    <p className="text-[10px] text-blue-600 font-semibold">{t.departmentName}</p>
+                  </td>
+                  <td className="px-4 py-3">
+                    <p className="text-xs font-bold text-slate-700 capitalize">{t.session}</p>
+                    <p className="text-[10px] text-slate-400">{t.bookingDate || 'Today'}</p>
+                  </td>
+                  <td className="px-4 py-3 text-xs font-semibold text-slate-700">
+                    {t.time}
+                  </td>
+                  <td className="px-4 py-3">
+                    <p className="text-xs font-black text-slate-800">₹{t.consultationFee}</p>
+                    <span className={`text-[9px] font-bold capitalize ${t.paymentStatus === 'paid' ? 'text-emerald-600' : 'text-amber-600'}`}>
+                      {t.paymentStatus}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`text-[10px] font-black px-2.5 py-1 rounded-full capitalize ${statusColors[t.status] || 'bg-slate-100 text-slate-700'}`}>
+                      {t.status.replace('-', ' ')}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-1">
+                      {t.status === 'booked' && (
+                        <button
+                          onClick={() => updateTokenStatus(t.id, 'checked-in')}
+                          title="Check In Patient"
+                          className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 font-bold rounded-lg text-[10px] cursor-pointer border-none transition-colors"
+                        >
+                          Check In
+                        </button>
+                      )}
+                      {(t.status === 'checked-in' || t.status === 'waiting') && (
+                        <button
+                          onClick={() => updateTokenStatus(t.id, 'completed')}
+                          title="Mark Consultation Completed"
+                          className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold rounded-lg text-[10px] cursor-pointer border-none transition-colors"
+                        >
+                          Complete
+                        </button>
+                      )}
+                      {t.status !== 'completed' && t.status !== 'cancelled' && (
+                        <button
+                          onClick={() => cancelToken(t.id)}
+                          title="Cancel Token"
+                          className="p-1.5 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-lg cursor-pointer border-none transition-colors"
+                        >
+                          <XCircle size={13} />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => window.print()}
+                        title="Print Token Slip"
+                        className="p-1.5 hover:bg-blue-50 text-slate-400 hover:text-blue-600 rounded-lg cursor-pointer border-none transition-colors"
+                      >
+                        <Printer size={13} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
@@ -226,75 +502,115 @@ const TokenTable: React.FC<{ tokens: TokenRecord[]; title: string }> = ({ tokens
   );
 };
 
-// ─── Main TokenManagement ─────────────────────────────────────────────────────
+// ─── Main TokenManagement View ────────────────────────────────────────────────
 export const TokenManagement: React.FC = () => {
   const { tokens } = useHospital();
-  const [showWalkIn, setShowWalkIn] = useState(false);
+  const [showWalkInModal, setShowWalkInModal] = useState(false);
   const location = useLocation();
 
   const getTokenSet = () => {
     const path = location.pathname;
-    if (path.includes('online')) return { title: 'Online Tokens', toks: tokens.filter(t => t.type === 'online') };
-    if (path.includes('offline')) return { title: 'Offline / Walk-in Tokens', toks: tokens.filter(t => t.type === 'offline') };
-    if (path.includes('today')) return { title: "Today's Tokens", toks: tokens };
-    if (path.includes('upcoming')) return { title: 'Upcoming Tokens', toks: tokens.filter(t => t.status === 'booked') };
-    if (path.includes('completed')) return { title: 'Completed Tokens', toks: tokens.filter(t => t.status === 'completed') };
-    if (path.includes('cancelled')) return { title: 'Cancelled Tokens', toks: tokens.filter(t => t.status === 'cancelled') };
-    if (path.includes('revisit')) return { title: 'Revisit Tokens', toks: tokens.filter(t => t.isRevisit) };
-    if (path.includes('add')) return null;
-    return { title: 'All Tokens', toks: tokens };
+    const today = new Date().toISOString().split('T')[0];
+
+    if (path.includes('online')) {
+      return {
+        title: 'Online Tokens',
+        subtitle: 'Real-time patient bookings from the customer app and web portal',
+        toks: tokens.filter(t => t.type === 'online')
+      };
+    }
+    if (path.includes('offline')) {
+      return {
+        title: 'Offline / Walk-in Tokens',
+        subtitle: 'Tokens generated directly at the hospital reception counter',
+        toks: tokens.filter(t => t.type === 'offline')
+      };
+    }
+    if (path.includes('today')) {
+      return {
+        title: "Today's Tokens",
+        subtitle: `All scheduled OPD consultations for today (${today})`,
+        toks: tokens.filter(t => !t.bookingDate || t.bookingDate === today)
+      };
+    }
+    if (path.includes('upcoming')) {
+      return {
+        title: 'Upcoming Tokens',
+        subtitle: 'Advance appointments scheduled for future dates',
+        toks: tokens.filter(t => (t.bookingDate && t.bookingDate > today) || (t.status === 'booked' && t.bookingDate >= today))
+      };
+    }
+    if (path.includes('completed')) {
+      return {
+        title: 'Completed Tokens',
+        subtitle: 'Consultations finished and discharged by hospital doctors',
+        toks: tokens.filter(t => t.status === 'completed')
+      };
+    }
+    if (path.includes('cancelled')) {
+      return {
+        title: 'Cancelled Tokens',
+        subtitle: 'Appointments cancelled or refunded',
+        toks: tokens.filter(t => t.status === 'cancelled')
+      };
+    }
+    if (path.includes('revisit')) {
+      return {
+        title: 'Revisit Tokens',
+        subtitle: 'Follow-up consultations and valid revisit tokens',
+        toks: tokens.filter(t => Boolean(t.isRevisit))
+      };
+    }
+    if (path.includes('add')) {
+      return null;
+    }
+    return {
+      title: 'All Tokens',
+      subtitle: 'Unified repository of all online and walk-in patient tokens',
+      toks: tokens
+    };
   };
 
   const tokenSet = getTokenSet();
 
-  // Add Token page (walk-in generator)
+  // "Add Token" page view
   if (!tokenSet) {
     return (
-      <div className="p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-xl font-black text-slate-800">Add Walk-in Token</h2>
-            <p className="text-xs text-slate-400 mt-1">Generate a token for walk-in / offline patient</p>
-          </div>
+      <div className="p-6 space-y-6 max-w-4xl mx-auto">
+        <div>
+          <h2 className="text-xl font-black text-slate-800">Add Walk-in Token</h2>
+          <p className="text-xs text-slate-400 mt-1">
+            Register an offline / walk-in patient and immediately assign a queue token number
+          </p>
         </div>
-        <div className="max-w-2xl">
-          {showWalkIn
-            ? <WalkInModal onClose={() => setShowWalkIn(false)} />
-            : (
-              <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-8 text-center">
-                <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Plus size={36} className="text-blue-600" />
-                </div>
-                <h3 className="text-lg font-black text-slate-800 mb-2">Generate Walk-in Token</h3>
-                <p className="text-sm text-slate-400 mb-6 max-w-md mx-auto">
-                  Register a new patient at the reception desk and automatically assign them a token number with queue position.
-                </p>
-                <button onClick={() => setShowWalkIn(true)}
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-8 py-3 rounded-2xl cursor-pointer border-none flex items-center gap-2 mx-auto text-sm">
-                  <Plus size={16} /> Generate Walk-in Token
-                </button>
-              </div>
-            )
-          }
-        </div>
+        <WalkInGenerator />
       </div>
     );
   }
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-6 space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 className="text-xl font-black text-slate-800">{tokenSet.title}</h2>
-          <p className="text-xs text-slate-400 mt-1">{tokenSet.toks.length} tokens found</p>
+          <p className="text-xs text-slate-400 mt-1">{tokenSet.subtitle}</p>
         </div>
-        <button onClick={() => setShowWalkIn(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2.5 rounded-xl cursor-pointer border-none flex items-center gap-2 text-xs">
+        <button
+          onClick={() => setShowWalkInModal(true)}
+          className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2.5 rounded-xl cursor-pointer border-none flex items-center gap-2 text-xs shadow-md shadow-blue-500/20 self-start sm:self-auto"
+        >
           <Plus size={14} /> Add Walk-in Token
         </button>
       </div>
-      <TokenTable tokens={tokenSet.toks} title={tokenSet.title} />
-      {showWalkIn && <WalkInModal onClose={() => setShowWalkIn(false)} />}
+
+      <TokenTable
+        tokens={tokenSet.toks}
+        title={tokenSet.title}
+        subtitle={tokenSet.subtitle}
+        onAddClick={() => setShowWalkInModal(true)}
+      />
+
+      {showWalkInModal && <WalkInModal onClose={() => setShowWalkInModal(false)} />}
     </div>
   );
 };
