@@ -2,12 +2,127 @@ const express = require('express');
 const nodemailer = require('nodemailer');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+
+// ─── File-Based Persistent Data Store ─────────────────────────────────────────
+const DATA_DIR = path.join(__dirname, 'data');
+const STORE_FILE = path.join(DATA_DIR, 'store.json');
+
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+
+function loadStore() {
+  try {
+    if (fs.existsSync(STORE_FILE)) {
+      return JSON.parse(fs.readFileSync(STORE_FILE, 'utf-8'));
+    }
+  } catch (e) {
+    console.error('Error reading store.json:', e);
+  }
+  return {
+    hospitals: [],
+    hospitalDoctors: {},
+    hospitalProfiles: {},
+    hospitalDepartments: {},
+    tokens: [],
+    appointments: [],
+    lastUpdated: Date.now()
+  };
+}
+
+function saveStore(data) {
+  try {
+    data.lastUpdated = Date.now();
+    fs.writeFileSync(STORE_FILE, JSON.stringify(data, null, 2), 'utf-8');
+  } catch (e) {
+    console.error('Error writing store.json:', e);
+  }
+}
+
+// ─── Data Sync API Endpoints ──────────────────────────────────────────────────
+
+// GET all synced data from AWS
+app.get('/api/sync', (req, res) => {
+  const store = loadStore();
+  res.json(store);
+});
+
+// POST to update global sync data
+app.post('/api/sync', (req, res) => {
+  const store = loadStore();
+  const { hospitals, hospitalDoctors, hospitalProfiles, hospitalDepartments, tokens, appointments } = req.body;
+
+  if (hospitals) store.hospitals = hospitals;
+  if (hospitalDoctors) store.hospitalDoctors = { ...store.hospitalDoctors, ...hospitalDoctors };
+  if (hospitalProfiles) store.hospitalProfiles = { ...store.hospitalProfiles, ...hospitalProfiles };
+  if (hospitalDepartments) store.hospitalDepartments = { ...store.hospitalDepartments, ...hospitalDepartments };
+  if (tokens) store.tokens = tokens;
+  if (appointments) store.appointments = appointments;
+
+  saveStore(store);
+  res.json({ success: true, store });
+});
+
+// GET hospitals
+app.get('/api/hospitals', (req, res) => {
+  const store = loadStore();
+  res.json({ success: true, hospitals: store.hospitals, store });
+});
+
+// POST hospital doctors
+app.post('/api/hospitals/:id/doctors', (req, res) => {
+  const { id } = req.params;
+  const { doctors } = req.body;
+  const store = loadStore();
+
+  store.hospitalDoctors = store.hospitalDoctors || {};
+  store.hospitalDoctors[id] = doctors;
+
+  saveStore(store);
+  res.json({ success: true, hospitalId: id, doctors });
+});
+
+// POST hospital profile
+app.post('/api/hospitals/:id/profile', (req, res) => {
+  const { id } = req.params;
+  const { profile } = req.body;
+  const store = loadStore();
+
+  store.hospitalProfiles = store.hospitalProfiles || {};
+  store.hospitalProfiles[id] = profile;
+
+  saveStore(store);
+  res.json({ success: true, hospitalId: id, profile });
+});
+
+// POST hospital departments
+app.post('/api/hospitals/:id/departments', (req, res) => {
+  const { id } = req.params;
+  const { departments } = req.body;
+  const store = loadStore();
+
+  store.hospitalDepartments = store.hospitalDepartments || {};
+  store.hospitalDepartments[id] = departments;
+
+  saveStore(store);
+  res.json({ success: true, hospitalId: id, departments });
+});
+
+// POST tokens
+app.post('/api/tokens', (req, res) => {
+  const { tokens } = req.body;
+  const store = loadStore();
+  store.tokens = tokens;
+  saveStore(store);
+  res.json({ success: true, tokens });
+});
 
 // Nodemailer SMTP Transporter setup for token.in1999@gmail.com
 const transporter = nodemailer.createTransport({
