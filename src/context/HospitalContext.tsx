@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useApp } from './AppContext';
 import type { Doctor } from '../utils/mockData';
+import { broadcastGlobalSync, subscribeGlobalSync } from '../utils/syncBus';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -394,7 +395,7 @@ export const useHospital = () => {
 };
 
 export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { updateHospital, updateHospitalDoctors } = useApp();
+  const { updateHospital, updateHospitalDoctors, updateHospitalDepartments } = useApp();
 
   const [hospitalUser, setHospitalUser] = useState<HospitalUser | null>(MOCK_USERS[0]);
 
@@ -413,60 +414,157 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return saved ? JSON.parse(saved) : INITIAL_DOCTORS;
   });
 
-  const [tokens, setTokens] = useState<TokenRecord[]>(generateTokens());
-  const [patients, setPatients] = useState<PatientRecord[]>(INITIAL_PATIENTS);
-  const [scheduleConfig, setScheduleConfig] = useState<ScheduleConfig>(INITIAL_SCHEDULE);
+  const [tokens, setTokens] = useState<TokenRecord[]>(() => {
+    const saved = localStorage.getItem('insta_hospital_tokens');
+    return saved ? JSON.parse(saved) : generateTokens();
+  });
+
+  const [patients, setPatients] = useState<PatientRecord[]>(() => {
+    const saved = localStorage.getItem('insta_hospital_patients');
+    return saved ? JSON.parse(saved) : INITIAL_PATIENTS;
+  });
+
+  const [scheduleConfig, setScheduleConfig] = useState<ScheduleConfig>(() => {
+    const saved = localStorage.getItem('insta_hospital_schedule');
+    return saved ? JSON.parse(saved) : INITIAL_SCHEDULE;
+  });
+
   const [notifications, setNotifications] = useState<NotificationMessage[]>([]);
   const [activeSection, setActiveSection] = useState('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  const targetHospId = hospitalProfile?.id || hospitalUser?.hospitalId || 'hosp-apollo';
+
+  // ─── Cross-tab & Real-time Global Sync ─────────────────────────────────────
+  useEffect(() => {
+    const unsubscribe = subscribeGlobalSync((event) => {
+      if (event.type === 'TOKEN_BOOKED' && event.data?.appointment) {
+        const appt = event.data.appointment;
+        setTokens(prev => {
+          if (prev.some(t => t.id === appt.id)) return prev;
+          const newTok: TokenRecord = {
+            id: appt.id,
+            tokenNo: appt.tokenNumber,
+            type: 'online',
+            patientName: appt.patientName,
+            patientPhone: appt.phone,
+            patientAge: appt.age,
+            patientGender: appt.gender,
+            doctorId: appt.doctorId,
+            doctorName: appt.doctorName,
+            departmentId: 'dept-general',
+            departmentName: appt.departmentName,
+            session: 'morning',
+            time: appt.time,
+            bookingDate: appt.date,
+            status: 'booked',
+            queuePosition: Math.max(1, prev.filter(t => t.doctorId === appt.doctorId && ['booked','waiting','checked-in'].includes(t.status)).length + 1),
+            estimatedWait: appt.estimatedWaitTime || 15,
+            consultationFee: appt.fee,
+            paymentStatus: 'paid',
+            paymentMethod: appt.paymentMethod || 'Online',
+            isRevisit: false
+          };
+          const updated = [newTok, ...prev];
+          localStorage.setItem('insta_hospital_tokens', JSON.stringify(updated));
+          return updated;
+        });
+      } else if (event.type === 'STORAGE_CHANGED') {
+        const savedDocs = localStorage.getItem('insta_hospital_doctors');
+        if (savedDocs) {
+          try { setDoctors(JSON.parse(savedDocs)); } catch (e) {}
+        }
+        const savedProfile = localStorage.getItem('insta_hospital_profile');
+        if (savedProfile) {
+          try { setHospitalProfile(JSON.parse(savedProfile)); } catch (e) {}
+        }
+        const savedDepts = localStorage.getItem('insta_hospital_departments');
+        if (savedDepts) {
+          try { setDepartments(JSON.parse(savedDepts)); } catch (e) {}
+        }
+        const savedToks = localStorage.getItem('insta_hospital_tokens');
+        if (savedToks) {
+          try { setTokens(JSON.parse(savedToks)); } catch (e) {}
+        }
+      }
+    });
+
+    return unsubscribe;
+  }, []);
 
   // ─── Global Sync to AppContext & localStorage ──────────────────────────────
   useEffect(() => {
     localStorage.setItem('insta_hospital_profile', JSON.stringify(hospitalProfile));
     if (updateHospital) {
-      updateHospital('hosp-apollo', {
+      updateHospital(targetHospId, {
         name: hospitalProfile.name,
         address: hospitalProfile.address,
         contact: hospitalProfile.phone,
         about: hospitalProfile.about,
         facilities: hospitalProfile.facilities,
+        image: hospitalProfile.coverImage || hospitalProfile.logo,
       });
     }
-  }, [hospitalProfile]);
+    broadcastGlobalSync('HOSPITAL_PROFILE_UPDATED', { hospitalId: targetHospId, profile: hospitalProfile });
+  }, [hospitalProfile, targetHospId]);
 
   useEffect(() => {
     localStorage.setItem('insta_hospital_doctors', JSON.stringify(doctors));
+    const mappedAppDoctors: Doctor[] = doctors.map(d => ({
+      id: d.id,
+      name: d.name,
+      specialty: d.specialization || d.departmentName || "Specialist",
+      departmentId: d.departmentId || "dept-general",
+      qualification: d.qualification || "MBBS",
+      experience: Number(d.experience) || 5,
+      consultationFee: Number(d.consultationFee) || 500,
+      rating: Number(d.rating) || 4.8,
+      reviewsCount: Number(d.totalPatients) || 120,
+      image: d.photo || "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&auto=format&fit=crop&q=80",
+      availability: {
+        days: d.opdDays && d.opdDays.length > 0 ? d.opdDays : ["Mon", "Tue", "Wed", "Thu", "Fri"],
+        slots: [
+          `${d.opdStartTime || '09:00'} AM`,
+          "10:00 AM", "11:00 AM", "02:00 PM", "03:00 PM",
+          `${d.opdEndTime || '17:00'} PM`
+        ]
+      },
+      currentQueue: tokens.filter(t => t.doctorId === d.id && ['completed'].includes(t.status)).length,
+      nextAvailableToken: Math.max(1, tokens.filter(t => t.doctorId === d.id).length + 1),
+      estimatedWaitPerPatient: Number(d.consultationDuration) || 12,
+      active: d.active !== false
+    }));
+
     if (updateHospitalDoctors) {
-      const mappedAppDoctors: Doctor[] = doctors.map(d => ({
-        id: d.id,
-        name: d.name,
-        specialty: d.specialization || d.departmentName || "Specialist",
-        departmentId: d.departmentId || "dept-general",
-        qualification: d.qualification || "MBBS",
-        experience: d.experience || 5,
-        consultationFee: d.consultationFee || 500,
-        rating: d.rating || 4.8,
-        reviewsCount: 120,
-        image: d.photo || "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&auto=format&fit=crop&q=80",
-        availability: {
-          days: d.opdDays && d.opdDays.length > 0 ? d.opdDays : ["Mon", "Tue", "Wed", "Thu", "Fri"],
-          slots: [
-            `${d.opdStartTime || '09:00'} AM`,
-            "10:00 AM", "11:00 AM", "02:00 PM", "03:00 PM",
-            `${d.opdEndTime || '17:00'} PM`
-          ]
-        },
-        currentQueue: 3,
-        nextAvailableToken: 7,
-        estimatedWaitPerPatient: d.consultationDuration || 12
-      }));
-      updateHospitalDoctors('hosp-apollo', mappedAppDoctors);
+      updateHospitalDoctors(targetHospId, mappedAppDoctors);
     }
-  }, [doctors]);
+    broadcastGlobalSync('HOSPITAL_DOCTORS_UPDATED', { hospitalId: targetHospId, doctors: mappedAppDoctors });
+  }, [doctors, targetHospId, tokens]);
 
   useEffect(() => {
     localStorage.setItem('insta_hospital_departments', JSON.stringify(departments));
-  }, [departments]);
+    const mappedDepts = departments.map(d => ({
+      id: d.id,
+      name: d.name,
+      icon: d.icon || '🩺'
+    }));
+    if (updateHospitalDepartments) {
+      updateHospitalDepartments(targetHospId, mappedDepts);
+    }
+    broadcastGlobalSync('HOSPITAL_DEPARTMENTS_UPDATED', { hospitalId: targetHospId, departments: mappedDepts });
+  }, [departments, targetHospId]);
+
+  useEffect(() => {
+    localStorage.setItem('insta_hospital_tokens', JSON.stringify(tokens));
+  }, [tokens]);
+
+  useEffect(() => {
+    localStorage.setItem('insta_hospital_patients', JSON.stringify(patients));
+  }, [patients]);
+
+  useEffect(() => {
+    localStorage.setItem('insta_hospital_schedule', JSON.stringify(scheduleConfig));
+  }, [scheduleConfig]);
 
   // Auth
   const hospitalLogin = (email: string, password: string) => {
