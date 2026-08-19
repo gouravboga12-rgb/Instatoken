@@ -348,6 +348,17 @@ const INITIAL_SCHEDULE: ScheduleConfig = {
   autoContinuity: true,
 };
 
+const isDummyToken = (t: any) =>
+  !t ||
+  ['tok-101', 'tok-102', 'tok-103', 'tok-104', 'tok-105', 'tok-106', 'tok-107', 'tok-108', 'tok-98', 'tok-99', 'tok-100', 'tok-1001'].includes(t.id) ||
+  ['Rahul Kumar', 'Priya Sharma', 'Mohan Reddy', 'Ananya Patel', 'Ramesh Kumar', 'Neha Singh', 'Mohan Das', 'Lakshmi Devi', 'Suresh Reddy', 'Kavitha Rao', 'Arun Verma', 'Guest Patient'].includes(t.patientName);
+
+const isDummyPatient = (p: any) =>
+  !p ||
+  ['pat-1', 'pat-2', 'pat-3', 'pat-4', 'pat-5'].includes(p.id) ||
+  ['APS001234', 'APS001235', 'APS001236', 'APS001237', 'APS001238'].includes(p.uhid) ||
+  ['Rahul Kumar', 'Priya Sharma', 'Mohan Reddy', 'Ananya Patel', 'Ramesh Kumar'].includes(p.name);
+
 // ─── Context ──────────────────────────────────────────────────────────────────
 
 const HospitalContext = createContext<HospitalContextType | undefined>(undefined);
@@ -380,12 +391,32 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const [tokens, setTokens] = useState<TokenRecord[]>(() => {
     const saved = localStorage.getItem('insta_hospital_tokens');
-    return saved ? JSON.parse(saved) : [];
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          const clean = parsed.filter(t => !isDummyToken(t));
+          localStorage.setItem('insta_hospital_tokens', JSON.stringify(clean));
+          return clean;
+        }
+      } catch (e) {}
+    }
+    return [];
   });
 
   const [patients, setPatients] = useState<PatientRecord[]>(() => {
     const saved = localStorage.getItem('insta_hospital_patients');
-    return saved ? JSON.parse(saved) : [];
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          const clean = parsed.filter(p => !isDummyPatient(p));
+          localStorage.setItem('insta_hospital_patients', JSON.stringify(clean));
+          return clean;
+        }
+      } catch (e) {}
+    }
+    return [];
   });
 
   const [scheduleConfig, setScheduleConfig] = useState<ScheduleConfig>(() => {
@@ -405,7 +436,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       if (event.type === 'TOKEN_BOOKED' && event.data?.appointment) {
         const appt = event.data.appointment;
         setTokens(prev => {
-          if (prev.some(t => t.id === appt.id)) return prev;
+          if (prev.some(t => t.id === appt.id) || isDummyToken(appt)) return prev;
           const newTok: TokenRecord = {
             id: appt.id,
             tokenNo: appt.tokenNumber,
@@ -448,7 +479,12 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         }
         const savedToks = localStorage.getItem('insta_hospital_tokens');
         if (savedToks) {
-          try { setTokens(JSON.parse(savedToks)); } catch (e) {}
+          try {
+            const parsed = JSON.parse(savedToks);
+            if (Array.isArray(parsed)) {
+              setTokens(parsed.filter(t => !isDummyToken(t)));
+            }
+          } catch (e) {}
         }
       }
     });

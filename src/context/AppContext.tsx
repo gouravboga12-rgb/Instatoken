@@ -246,7 +246,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [appointments, setAppointments] = useState<Appointment[]>(() => {
     const saved = localStorage.getItem('insta_appointments');
-    return saved ? JSON.parse(saved) : [];
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          const clean = parsed.filter(a => a.id !== 'tok-1001' && a.patientName !== 'Guest Patient');
+          localStorage.setItem('insta_appointments', JSON.stringify(clean));
+          return clean;
+        }
+      } catch (e) {}
+    }
+    return [];
   });
 
   const [notifications, setNotifications] = useState<AppNotification[]>(() => {
