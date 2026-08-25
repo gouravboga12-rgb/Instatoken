@@ -195,9 +195,9 @@ const AppContent: React.FC = () => {
   const isHospitalRoute = location.pathname.startsWith('/hospital') && !location.pathname.startsWith('/hospital-login') && !location.pathname.startsWith('/hospital-signup') && location.pathname !== '/hospital/login' && location.pathname !== '/hospital/signup';
   const isHospitalLoginRoute = location.pathname === '/hospital-login' || location.pathname === '/hospital-signup' || location.pathname === '/hospital/login' || location.pathname === '/hospital/signup';
 
-  // Always show Splash Screen first when opening website or logging in
+  // Always show Splash Screen first when opening website
   if (showSplash && !isHospitalRoute && !isHospitalLoginRoute) {
-    return <SplashScreen onFinish={() => setShowSplash(false)} />;
+    return <SplashScreen duration={1200} onFinish={() => setShowSplash(false)} />;
   }
 
   if (!onboarded && !isHospitalRoute && !isHospitalLoginRoute) {
@@ -208,7 +208,7 @@ const AppContent: React.FC = () => {
     return (
       <Login 
         onSuccess={() => {
-          setShowSplash(true);
+          setShowSplash(false);
           navigate('/');
         }} 
       />
