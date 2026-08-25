@@ -5,7 +5,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { 
   ArrowLeft, Calendar as CalendarIcon, Clock, User, Phone, 
   MapPin, ShieldCheck, Sun, Moon, Ticket, ArrowRight, Zap, Users,
-  ChevronDown, Heart
+  ChevronDown, Heart, Stethoscope
 } from 'lucide-react';
 
 const monthsList = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -65,7 +65,7 @@ const generateDynamicDateOptions = () => {
 
 export const BookToken: React.FC = () => {
   const { hospitalId, doctorId } = useParams<{ hospitalId: string; doctorId: string }>();
-  const { hospitals, user, toggleSaveDoctor } = useApp();
+  const { hospitals, user, toggleSaveDoctor, platformFeePercent } = useApp();
   const navigate = useNavigate();
 
   const hospital = hospitals.find(h => h.id === hospitalId) || hospitals[0];
@@ -541,14 +541,37 @@ export const BookToken: React.FC = () => {
             </div>
           </div>
 
-          {/* Platform Charge Info Note (User Audio Request: ₹10 platform fee paid directly) */}
-          <div className="p-3.5 bg-blue-50 border border-blue-100 rounded-2xl flex items-center justify-between text-xs font-bold text-blue-900">
-            <div className="flex items-center gap-2">
-              <Zap size={16} className="text-blue-600 shrink-0" />
-              <span>Platform Service Fee: ₹10</span>
-            </div>
-            <span className="bg-blue-600 text-white text-[9px] font-black px-2 py-0.5 rounded-md">INSTANT TOKEN</span>
-          </div>
+          {/* Platform Charge Info Note (Dynamic Platform Fee Breakdown) */}
+          {(() => {
+            const docFee = doctor.consultationFee || 500;
+            const platFee = Math.max(10, Math.round(docFee * ((platformFeePercent || 5) / 100)));
+            const totalPayable = docFee + platFee;
+
+            return (
+              <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl space-y-2 text-xs font-bold text-slate-800">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-slate-600">
+                    <Stethoscope size={14} className="text-blue-600" />
+                    <span>Doctor Consultation Fee</span>
+                  </div>
+                  <span className="font-extrabold text-slate-900">₹{docFee}</span>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-blue-700">
+                    <Zap size={14} className="text-blue-600" />
+                    <span>Platform Booking Fee ({platformFeePercent || 5}%)</span>
+                  </div>
+                  <span className="font-extrabold text-blue-700">₹{platFee}</span>
+                </div>
+
+                <div className="pt-2 border-t border-blue-200/60 flex items-center justify-between text-sm">
+                  <span className="font-black text-slate-900">Total Payable</span>
+                  <span className="font-black text-blue-700 text-base">₹{totalPayable}</span>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Giant Full-Width Pill CTA Button matching Image 3 */}
           <button 

@@ -45,7 +45,9 @@ export interface Appointment {
   date: string;
   time: string;
   fee: number;
-  status: 'booked' | 'completed' | 'cancelled';
+  platformFee?: number;
+  totalFee?: number;
+  status: 'booked' | 'checked-in' | 'in-cabin' | 'completed' | 'cancelled';
   paymentId: string;
   paymentMethod: string;
   estimatedWaitTime: number; // in minutes
@@ -69,7 +71,14 @@ interface AppContextType {
   customers: CustomerAccount[];
   notifications: AppNotification[];
   currentLocation: string;
+  userCoords: { lat: number; lng: number } | null;
+  searchRadiusKm: number;
+  platformFeePercent: number;
+  setPlatformFeePercent: (percent: number) => void;
+  setUserCoords: (coords: { lat: number; lng: number } | null) => void;
+  setSearchRadiusKm: (km: number) => void;
   setCurrentLocation: (loc: string) => void;
+  getOrCreateCustomerAccount: (name: string, phone: string, email?: string) => CustomerAccount;
   login: (emailOrPhone: string, passwordOrOtp: string) => boolean;
   signup: (name: string, email: string, phone: string) => boolean;
   logout: () => void;
@@ -293,6 +302,55 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [currentLocation, setCurrentLocation] = useState<string>(() => {
     return localStorage.getItem('insta_location') || "Koramangala, Bengaluru";
   });
+
+  const [platformFeePercent, setPlatformFeePercentState] = useState<number>(() => {
+    const saved = localStorage.getItem('insta_platform_fee_percent');
+    return saved ? Number(saved) : 5; // Default 5% platform fee
+  });
+
+  const setPlatformFeePercent = (percent: number) => {
+    const val = Math.max(1, Math.min(50, percent));
+    setPlatformFeePercentState(val);
+    localStorage.setItem('insta_platform_fee_percent', val.toString());
+  };
+
+  const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(() => {
+    const saved = localStorage.getItem('insta_user_coords');
+    return saved ? JSON.parse(saved) : { lat: 12.9348, lng: 77.6189 }; // Default Bengaluru Koramangala
+  });
+
+  const [searchRadiusKm, setSearchRadiusKmState] = useState<number>(() => {
+    const saved = localStorage.getItem('insta_search_radius_km');
+    return saved ? Number(saved) : 50; // Default 50 km radius
+  });
+
+  const setSearchRadiusKm = (km: number) => {
+    setSearchRadiusKmState(km);
+    localStorage.setItem('insta_search_radius_km', km.toString());
+  };
+
+  const getOrCreateCustomerAccount = (name: string, phone: string, email?: string): CustomerAccount => {
+    const cleanPhone = phone.trim();
+    const existing = customers.find(c => c.phone.replace(/\s+/g, '') === cleanPhone.replace(/\s+/g, ''));
+    if (existing) {
+      return existing;
+    }
+
+    const newCust: CustomerAccount = {
+      id: `cust-${Date.now()}`,
+      name: name.trim() || 'Valued Patient',
+      phone: cleanPhone,
+      email: email?.trim() || `${cleanPhone.replace(/[^0-9]/g, '')}@patient.instatoken.in`,
+      location: 'Bengaluru, Karnataka',
+      joinedDate: new Date().toISOString().split('T')[0],
+      status: 'active',
+      bookings: []
+    };
+
+    setCustomers(prev => [newCust, ...prev]);
+    localStorage.setItem('insta_customers', JSON.stringify([newCust, ...customers]));
+    return newCust;
+  };
 
   // --- Cross-tab & Real-time Global Sync ---
   useEffect(() => {
@@ -535,6 +593,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const patientsAhead = Math.max(0, tokenAssigned - targetDoc.currentQueue - 1);
     const computedWaitTime = Math.max(0, patientsAhead * targetDoc.estimatedWaitPerPatient);
 
+    // Calculate dynamic platform fee (default 5% of doctor fee, min ₹10)
+    const platformFee = Math.max(10, Math.round(targetDoc.consultationFee * (platformFeePercent / 100)));
+    const totalFee = targetDoc.consultationFee + platformFee;
+
+    // Ensure customer account exists & is updated
+    getOrCreateCustomerAccount(patientDetails.name, patientDetails.phone, patientDetails.email);
+
     const newAppt: Appointment = {
       id: `tok-${Date.now().toString().slice(-4)}`,
       tokenNumber: tokenAssigned,
@@ -552,6 +617,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       date,
       time,
       fee: targetDoc.consultationFee,
+      platformFee,
+      totalFee,
       status: 'booked',
       paymentId: `PAYID-${Math.floor(1000000 + Math.random() * 9000000)}`,
       paymentMethod,
@@ -977,7 +1044,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       customers,
       notifications,
       currentLocation,
+      userCoords,
+      searchRadiusKm,
+      platformFeePercent,
+      setPlatformFeePercent,
+      setUserCoords,
+      setSearchRadiusKm,
       setCurrentLocation,
+      getOrCreateCustomerAccount,
       login,
       signup,
       logout,

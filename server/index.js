@@ -1,22 +1,47 @@
+require('dotenv').config();
 const express = require('express');
 const nodemailer = require('nodemailer');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const multer = require('multer');
+
+// AWS & DB Integrations
+const { query, testConnection } = require('./config/db');
+const { generateUploadUrl, uploadFile, deleteFile } = require('./config/s3');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 app.use(cors());
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '25mb' }));
+app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 
-// ─── File-Based Persistent Data Store ─────────────────────────────────────────
+// Multer in-memory storage for direct S3 file uploads
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024 }, // 15MB max file size
+});
+
+// ─── File-Based Fallback Data Store ───────────────────────────────────────────
 const DATA_DIR = path.join(__dirname, 'data');
 const STORE_FILE = path.join(DATA_DIR, 'store.json');
 
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
+
+let isDbConnected = false;
+
+// Attempt initial DB connection test
+testConnection().then((connected) => {
+  isDbConnected = connected;
+  if (connected) {
+    console.log('⚡ Active Data Layer: AWS RDS PostgreSQL');
+  } else {
+    console.log('📁 Active Data Layer: Local File Store (Fallback)');
+  }
+});
 
 const INITIAL_DOCTORS = [
   {
@@ -150,6 +175,66 @@ function saveStore(data) {
   }
 }
 
+// ─── Health Check Endpoint for ECS ALB ─────────────────────────────────────────
+app.get('/health', async (req, res) => {
+  res.json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    service: 'instatoken-backend',
+    database: isDbConnected ? 'connected' : 'local-fallback',
+  });
+});
+
+// ─── AWS S3 Media Upload Endpoints ───────────────────────────────────────────
+
+// 1. Get Pre-signed URL for direct browser uploads (Recommended)
+app.post('/api/media/upload-url', async (req, res) => {
+  try {
+    const { filename, fileType, folder = 'uploads' } = req.body;
+    if (!filename || !fileType) {
+      return res.status(400).json({ success: false, message: 'filename and fileType are required' });
+    }
+
+    const ext = path.extname(filename) || '.jpg';
+    const key = `${folder}/${Date.now()}-${Math.random().toString(36).substring(2, 8)}${ext}`;
+    const result = await generateUploadUrl(key, fileType);
+
+    res.json({
+      success: true,
+      uploadUrl: result.uploadUrl,
+      publicUrl: result.publicUrl,
+      key: result.key,
+    });
+  } catch (err) {
+    console.error('❌ Error creating presigned URL:', err);
+    res.status(500).json({ success: false, message: 'Failed to generate upload URL', error: err.message });
+  }
+});
+
+// 2. Direct Multipart File Upload to S3
+app.post('/api/media/upload', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file uploaded' });
+    }
+
+    const folder = req.body.folder || 'general';
+    const ext = path.extname(req.file.originalname) || '.jpg';
+    const key = `${folder}/${Date.now()}-${Math.random().toString(36).substring(2, 8)}${ext}`;
+
+    const publicUrl = await uploadFile(key, req.file.buffer, req.file.mimetype);
+
+    res.json({
+      success: true,
+      url: publicUrl,
+      key,
+    });
+  } catch (err) {
+    console.error('❌ Error uploading file to S3:', err);
+    res.status(500).json({ success: false, message: 'File upload failed', error: err.message });
+  }
+});
+
 // ─── Data Sync API Endpoints ──────────────────────────────────────────────────
 
 const isDummyTokenRecord = (t) =>
@@ -160,8 +245,22 @@ const isDummyTokenRecord = (t) =>
 const isDummyApptRecord = (a) =>
   !a || a.id === 'tok-1001' || a.patientName === 'Guest Patient';
 
-// GET all synced data from AWS
-app.get('/api/sync', (req, res) => {
+// GET all synced data
+app.get('/api/sync', async (req, res) => {
+  if (isDbConnected) {
+    try {
+      const dbRes = await query(`SELECT data FROM sync_store WHERE key = 'global_store'`);
+      if (dbRes.rows.length > 0) {
+        const store = dbRes.rows[0].data;
+        store.tokens = (store.tokens || []).filter(t => !isDummyTokenRecord(t));
+        store.appointments = (store.appointments || []).filter(a => !isDummyApptRecord(a));
+        return res.json(store);
+      }
+    } catch (e) {
+      console.error('Error fetching sync from RDS, using fallback:', e.message);
+    }
+  }
+
   const store = loadStore();
   store.tokens = (store.tokens || []).filter(t => !isDummyTokenRecord(t));
   store.appointments = (store.appointments || []).filter(a => !isDummyApptRecord(a));
@@ -169,7 +268,7 @@ app.get('/api/sync', (req, res) => {
 });
 
 // POST to update global sync data
-app.post('/api/sync', (req, res) => {
+app.post('/api/sync', async (req, res) => {
   const store = loadStore();
   const { hospitals, hospitalDoctors, hospitalProfiles, hospitalDepartments, tokens, appointments } = req.body;
 
@@ -181,6 +280,20 @@ app.post('/api/sync', (req, res) => {
   if (appointments) store.appointments = appointments.filter(a => !isDummyApptRecord(a));
 
   saveStore(store);
+
+  if (isDbConnected) {
+    try {
+      await query(
+        `INSERT INTO sync_store (key, data, last_updated) 
+         VALUES ('global_store', $1, NOW()) 
+         ON CONFLICT (key) DO UPDATE SET data = $1, last_updated = NOW()`,
+        [JSON.stringify(store)]
+      );
+    } catch (e) {
+      console.error('Error syncing to RDS:', e.message);
+    }
+  }
+
   res.json({ success: true, store });
 });
 
@@ -358,4 +471,5 @@ app.get('*', (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`🚀 Insta Token Unified Express Server running on port ${PORT}`);
+  console.log(`🌐 Health check endpoint: http://localhost:${PORT}/health`);
 });

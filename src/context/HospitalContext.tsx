@@ -131,6 +131,32 @@ export interface NotificationMessage {
   status: 'sent' | 'failed' | 'pending';
 }
 
+export interface StaffAttendanceRecord {
+  date: string;
+  status: 'present' | 'absent' | 'half-day' | 'leave';
+  checkIn?: string;
+  checkOut?: string;
+  notes?: string;
+}
+
+export interface HospitalStaffMember {
+  id: string;
+  employeeId: string;
+  name: string;
+  photo: string;
+  phone: string;
+  email: string;
+  departmentId: string;
+  departmentName: string;
+  designation: string;
+  shift: 'Morning' | 'Evening' | 'Night' | 'General';
+  joiningDate: string;
+  salary: number;
+  employmentType: 'Full-time' | 'Part-time' | 'Contract';
+  status: 'active' | 'on-leave' | 'inactive';
+  attendance: StaffAttendanceRecord[];
+}
+
 export interface HospitalProfile {
   id: string;
   name: string;
@@ -220,6 +246,13 @@ interface HospitalContextType {
 
   // Notifications
   sendNotification: (msg: Omit<NotificationMessage, 'id' | 'sentAt' | 'status'>) => void;
+
+  // Staff & Employees
+  staff: HospitalStaffMember[];
+  addStaffMember: (member: Omit<HospitalStaffMember, 'id' | 'attendance'>) => void;
+  updateStaffMember: (id: string, updates: Partial<HospitalStaffMember>) => void;
+  deleteStaffMember: (id: string) => void;
+  markStaffAttendance: (staffId: string, date: string, status: StaffAttendanceRecord['status'], checkIn?: string, checkOut?: string, notes?: string) => void;
 
   // Profile
   updateHospitalProfile: (updates: Partial<HospitalProfile>) => void;
@@ -348,6 +381,66 @@ const INITIAL_SCHEDULE: ScheduleConfig = {
   autoContinuity: true,
 };
 
+const INITIAL_STAFF: HospitalStaffMember[] = [
+  {
+    id: 'staff-1',
+    employeeId: 'EMP-1001',
+    name: 'Pooja Verma',
+    photo: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&auto=format&fit=crop&q=80',
+    phone: '+91 98450 12345',
+    email: 'pooja.verma@apollospectra.com',
+    departmentId: 'dept-general',
+    departmentName: 'General OPD',
+    designation: 'Senior OPD Receptionist',
+    shift: 'Morning',
+    joiningDate: '2022-03-15',
+    salary: 28000,
+    employmentType: 'Full-time',
+    status: 'active',
+    attendance: [
+      { date: new Date().toISOString().split('T')[0], status: 'present', checkIn: '08:45 AM' }
+    ]
+  },
+  {
+    id: 'staff-2',
+    employeeId: 'EMP-1002',
+    name: 'Sunita Deshmukh',
+    photo: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=400&auto=format&fit=crop&q=80',
+    phone: '+91 98450 67890',
+    email: 'sunita.d@apollospectra.com',
+    departmentId: 'dept-cardio',
+    departmentName: 'Cardiology',
+    designation: 'Lead OPD Nurse',
+    shift: 'Morning',
+    joiningDate: '2021-08-10',
+    salary: 35000,
+    employmentType: 'Full-time',
+    status: 'active',
+    attendance: [
+      { date: new Date().toISOString().split('T')[0], status: 'present', checkIn: '08:50 AM' }
+    ]
+  },
+  {
+    id: 'staff-3',
+    employeeId: 'EMP-1003',
+    name: 'Kiran Rao',
+    photo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80',
+    phone: '+91 98450 99887',
+    email: 'kiran.rao@apollospectra.com',
+    departmentId: 'dept-ortho',
+    departmentName: 'Orthopedics',
+    designation: 'Patient Queue Coordinator',
+    shift: 'Evening',
+    joiningDate: '2023-01-20',
+    salary: 24000,
+    employmentType: 'Full-time',
+    status: 'active',
+    attendance: [
+      { date: new Date().toISOString().split('T')[0], status: 'present', checkIn: '01:55 PM' }
+    ]
+  }
+];
+
 const isDummyToken = (t: any) =>
   !t ||
   ['tok-101', 'tok-102', 'tok-103', 'tok-104', 'tok-105', 'tok-106', 'tok-107', 'tok-108', 'tok-98', 'tok-99', 'tok-100', 'tok-1001'].includes(t.id) ||
@@ -370,7 +463,7 @@ export const useHospital = () => {
 };
 
 export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { updateHospital, updateHospitalDoctors, updateHospitalDepartments } = useApp();
+  const { updateHospital, updateHospitalDoctors, updateHospitalDepartments, getOrCreateCustomerAccount } = useApp();
 
   const [hospitalUser, setHospitalUser] = useState<HospitalUser | null>(MOCK_USERS[0]);
 
@@ -387,6 +480,11 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [doctors, setDoctors] = useState<HospitalDoctor[]>(() => {
     const saved = localStorage.getItem('insta_hospital_doctors');
     return saved ? JSON.parse(saved) : INITIAL_DOCTORS;
+  });
+
+  const [staff, setStaff] = useState<HospitalStaffMember[]>(() => {
+    const saved = localStorage.getItem('insta_hospital_staff');
+    return saved ? JSON.parse(saved) : INITIAL_STAFF;
   });
 
   const [tokens, setTokens] = useState<TokenRecord[]>(() => {
@@ -566,6 +664,10 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     localStorage.setItem('insta_hospital_schedule', JSON.stringify(scheduleConfig));
   }, [scheduleConfig]);
 
+  useEffect(() => {
+    localStorage.setItem('insta_hospital_staff', JSON.stringify(staff));
+  }, [staff]);
+
   // Auth
   const hospitalLogin = (email: string, password: string) => {
     const cred = MOCK_CREDENTIALS.find(c => c.email === email && c.password === password);
@@ -597,6 +699,53 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const toggleDepartmentActive = (id: string) =>
     setDepartments(prev => prev.map(d => d.id === id ? { ...d, active: !d.active } : d));
 
+  // Staff & Employees
+  const addStaffMember = (member: Omit<HospitalStaffMember, 'id' | 'attendance'>) => {
+    const newStaff: HospitalStaffMember = {
+      ...member,
+      id: `staff-${Date.now()}`,
+      attendance: [
+        { date: new Date().toISOString().split('T')[0], status: 'present', checkIn: '09:00 AM' }
+      ]
+    };
+    setStaff(prev => [newStaff, ...prev]);
+  };
+
+  const updateStaffMember = (id: string, updates: Partial<HospitalStaffMember>) => {
+    setStaff(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
+  };
+
+  const deleteStaffMember = (id: string) => {
+    setStaff(prev => prev.filter(s => s.id !== id));
+  };
+
+  const markStaffAttendance = (
+    staffId: string,
+    date: string,
+    status: StaffAttendanceRecord['status'],
+    checkIn?: string,
+    checkOut?: string,
+    notes?: string
+  ) => {
+    setStaff(prev => prev.map(s => {
+      if (s.id !== staffId) return s;
+      const existingIdx = s.attendance.findIndex(a => a.date === date);
+      let updatedAttendance = [...s.attendance];
+      if (existingIdx >= 0) {
+        updatedAttendance[existingIdx] = {
+          ...updatedAttendance[existingIdx],
+          status,
+          checkIn: checkIn || updatedAttendance[existingIdx].checkIn,
+          checkOut: checkOut || updatedAttendance[existingIdx].checkOut,
+          notes: notes || updatedAttendance[existingIdx].notes
+        };
+      } else {
+        updatedAttendance.push({ date, status, checkIn, checkOut, notes });
+      }
+      return { ...s, attendance: updatedAttendance };
+    }));
+  };
+
   // Tokens
   const generateWalkInToken = (form: {
     patientName: string; patientPhone: string; patientAge: number;
@@ -607,6 +756,9 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const doctor = doctors.find(d => d.id === form.doctorId);
     const dept = departments.find(d => d.id === form.departmentId);
     const waitingInSession = tokens.filter(t => t.session === form.session && ['booked','waiting','checked-in'].includes(t.status)).length;
+    const todayStr = new Date().toISOString().split('T')[0];
+    const timeStr = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+
     const newToken: TokenRecord = {
       id: `tok-${Date.now()}`,
       tokenNo: maxToken + 1,
@@ -620,8 +772,8 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       departmentId: form.departmentId,
       departmentName: dept?.name || '',
       session: form.session,
-      time: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }),
-      bookingDate: new Date().toISOString().split('T')[0],
+      time: timeStr,
+      bookingDate: todayStr,
       status: 'booked',
       queuePosition: waitingInSession + 1,
       estimatedWait: (waitingInSession + 1) * (doctor?.consultationDuration || 12),
@@ -630,18 +782,54 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       paymentMethod: 'Cash',
       isRevisit: false,
     };
+
     const updated = [newToken, ...tokens];
     setTokens(updated);
     localStorage.setItem('insta_hospital_tokens', JSON.stringify(updated));
 
-    // Register / update patient record
+    // Automatically create / link patient customer account
+    if (getOrCreateCustomerAccount) {
+      getOrCreateCustomerAccount(form.patientName, form.patientPhone);
+    }
+
+    // Also sync as appointment into patient appointment store
+    try {
+      const savedAppts = localStorage.getItem('insta_appointments');
+      const curAppts = savedAppts ? JSON.parse(savedAppts) : [];
+      const newAppt = {
+        id: newToken.id,
+        tokenNumber: newToken.tokenNo,
+        patientName: newToken.patientName,
+        age: newToken.patientAge,
+        gender: newToken.patientGender,
+        phone: newToken.patientPhone,
+        email: '',
+        address: form.address || '',
+        hospitalId: targetHospId,
+        hospitalName: hospitalProfile?.name || 'Apollo Spectra Hospital',
+        doctorId: newToken.doctorId,
+        doctorName: newToken.doctorName,
+        departmentName: newToken.departmentName,
+        date: todayStr,
+        time: timeStr,
+        fee: newToken.consultationFee,
+        status: 'booked' as const,
+        paymentId: `OFFLINE-${newToken.tokenNo}`,
+        paymentMethod: 'Counter / Walk-in Cash',
+        estimatedWaitTime: newToken.estimatedWait,
+        createdAt: new Date().toISOString()
+      };
+      localStorage.setItem('insta_appointments', JSON.stringify([newAppt, ...curAppts]));
+    } catch (e) {}
+
+    // Register / update hospital patient record
     setPatients(prev => {
       const exists = prev.some(p => p.phone === form.patientPhone);
       if (exists) {
         const updatedPatients = prev.map(p => p.phone === form.patientPhone ? {
           ...p,
           totalVisits: (p.totalVisits || 0) + 1,
-          lastVisit: new Date().toISOString().split('T')[0],
+          lastVisit: todayStr,
           tokenHistory: [newToken.id, ...(p.tokenHistory || [])]
         } : p);
         localStorage.setItem('insta_hospital_patients', JSON.stringify(updatedPatients));
@@ -660,9 +848,9 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         address: form.address || '',
         city: hospitalProfile?.city || 'Bengaluru',
         pinCode: hospitalProfile?.pinCode || '',
-        registeredOn: new Date().toISOString().split('T')[0],
+        registeredOn: todayStr,
         totalVisits: 1,
-        lastVisit: new Date().toISOString().split('T')[0],
+        lastVisit: todayStr,
         familyMembers: [],
         medicalHistory: [],
         allergies: [],
@@ -734,12 +922,13 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   return (
     <HospitalContext.Provider value={{
-      hospitalUser, hospitalProfile, departments, doctors, tokens, patients,
+      hospitalUser, hospitalProfile, departments, doctors, staff, tokens, patients,
       scheduleConfig, notifications, activeSection, sidebarCollapsed,
       hospitalLogin, hospitalLogout,
       setActiveSection, setSidebarCollapsed,
       addDoctor, updateDoctor, deleteDoctor, toggleDoctorActive,
       addDepartment, updateDepartment, deleteDepartment, toggleDepartmentActive,
+      addStaffMember, updateStaffMember, deleteStaffMember, markStaffAttendance,
       generateWalkInToken, updateTokenStatus, cancelToken,
       addPatient, updatePatient, searchPatients, validateToken,
       updateScheduleConfig, updateSession,

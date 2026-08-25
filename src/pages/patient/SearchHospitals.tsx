@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { getHospitalSVGImage } from '../../utils/mockData';
+import { calculateDistanceKm } from '../../utils/googleMaps';
 import { Card } from '../../components/ui/Card';
-import { Search, MapPin, Clock, Star, ArrowLeft } from 'lucide-react';
+import { Search, MapPin, Clock, Star, ArrowLeft, Compass } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 interface SearchHospitalsProps {
@@ -14,7 +15,7 @@ export const SearchHospitals: React.FC<SearchHospitalsProps> = ({
   onHospitalSelect, 
   defaultFilter = '' 
 }) => {
-  const { hospitals } = useApp();
+  const { hospitals, searchRadiusKm, setSearchRadiusKm, userCoords } = useApp();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -22,6 +23,7 @@ export const SearchHospitals: React.FC<SearchHospitalsProps> = ({
   const [query, setQuery] = useState(searchParams.get('q') || '');
   const [selectedSpecialty, setSelectedSpecialty] = useState(searchParams.get('specialty') || 'All');
   const [activeFilter, setActiveFilter] = useState<string>(defaultFilter || searchParams.get('filter') || 'all');
+  const [radiusFilter, setRadiusFilter] = useState<number>(searchRadiusKm || 50);
   
   useEffect(() => {
     const q = searchParams.get('q');
@@ -37,7 +39,18 @@ export const SearchHospitals: React.FC<SearchHospitalsProps> = ({
 
   // Filter & sort logic
   const getFilteredHospitals = () => {
-    let list = [...hospitals];
+    let list = hospitals.map(h => {
+      let dynamicDistance = h.distance;
+      if (userCoords && h.lat && h.lng) {
+        dynamicDistance = calculateDistanceKm(userCoords.lat, userCoords.lng, h.lat, h.lng);
+      }
+      return { ...h, distance: dynamicDistance };
+    });
+
+    // Filter by radius if radiusFilter is active (not 0/all)
+    if (radiusFilter > 0) {
+      list = list.filter(h => h.distance <= radiusFilter);
+    }
 
     // Filter by text search (name, address, category, doctors)
     if (query.trim()) {
@@ -105,21 +118,49 @@ export const SearchHospitals: React.FC<SearchHospitalsProps> = ({
           </div>
         </div>
 
-        {/* Mobile Sorting Pills */}
-        <div className="flex gap-2 overflow-x-auto no-scrollbar py-1">
-          {['all', 'nearby', 'top-rated', 'short-wait', 'lowest-fee'].map((f) => (
-            <button
-              key={f}
-              onClick={() => setActiveFilter(f)}
-              className={`px-3 py-1.5 rounded-full text-xs font-semibold shrink-0 cursor-pointer border uppercase tracking-wider text-[9px] ${
-                activeFilter === f 
-                  ? 'bg-blue-600 text-white border-blue-600' 
-                  : 'bg-white text-slate-500 border-slate-100'
-              }`}
-            >
-              {f.replace('-', ' ')}
-            </button>
-          ))}
+        {/* Mobile Sorting & Radius Pills */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wide shrink-0">Radius:</span>
+            {[
+              { val: 10, label: '10 km' },
+              { val: 25, label: '25 km' },
+              { val: 50, label: '50 km (Nearby)' },
+              { val: 100, label: '100 km' },
+              { val: 0, label: 'All' }
+            ].map(r => (
+              <button
+                key={r.val}
+                onClick={() => {
+                  setRadiusFilter(r.val);
+                  setSearchRadiusKm(r.val);
+                }}
+                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold shrink-0 cursor-pointer border ${
+                  radiusFilter === r.val
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'bg-slate-50 text-slate-600 border-slate-200'
+                }`}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex gap-2 overflow-x-auto no-scrollbar py-1">
+            {['all', 'nearby', 'top-rated', 'short-wait', 'lowest-fee'].map((f) => (
+              <button
+                key={f}
+                onClick={() => setActiveFilter(f)}
+                className={`px-3 py-1.5 rounded-full text-xs font-semibold shrink-0 cursor-pointer border uppercase tracking-wider text-[9px] ${
+                  activeFilter === f 
+                    ? 'bg-blue-600 text-white border-blue-600' 
+                    : 'bg-white text-slate-500 border-slate-100'
+                }`}
+              >
+                {f.replace('-', ' ')}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -128,6 +169,38 @@ export const SearchHospitals: React.FC<SearchHospitalsProps> = ({
         
         {/* Left Filter Sidebar (Desktop Only) */}
         <div className="hidden md:block w-64 shrink-0 bg-white border border-slate-100 rounded-3xl p-5 shadow-xs h-fit sticky top-20">
+          {/* Radius Filter */}
+          <div className="mb-6">
+            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-2.5 flex items-center justify-between">
+              <span>Location Radius</span>
+              <Compass size={14} className="text-blue-600" />
+            </h3>
+            <div className="grid grid-cols-2 gap-1.5">
+              {[
+                { val: 10, label: '10 km' },
+                { val: 25, label: '25 km' },
+                { val: 50, label: '50 km' },
+                { val: 100, label: '100 km' },
+                { val: 0, label: 'All Cities' }
+              ].map(r => (
+                <button
+                  key={r.val}
+                  onClick={() => {
+                    setRadiusFilter(r.val);
+                    setSearchRadiusKm(r.val);
+                  }}
+                  className={`px-2.5 py-1.5 rounded-xl text-xs font-bold text-center transition-all cursor-pointer border ${
+                    radiusFilter === r.val
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                      : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-4">Sorting Filter</h3>
           
           <div className="space-y-2 mb-6">

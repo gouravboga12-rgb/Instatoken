@@ -22,3 +22,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Planning & Docs
+implementation_plan_plan
+implementation_plan_backend
+.env
+.env.*
+!server/.env.example

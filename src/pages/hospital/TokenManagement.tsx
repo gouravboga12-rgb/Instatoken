@@ -329,9 +329,17 @@ const TokenTable: React.FC<{ tokens: TokenRecord[]; title: string; subtitle: str
   subtitle,
   onAddClick
 }) => {
-  const { updateTokenStatus, cancelToken } = useHospital();
+  const { updateTokenStatus, cancelToken, departments, doctors } = useHospital();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [deptFilter, setDeptFilter] = useState('all');
+  const [docFilter, setDocFilter] = useState('all');
+  const [dateFilter, setDateFilter] = useState(() => new Date().toISOString().split('T')[0]);
+
+  // Doctor list filtered by department if dept is chosen
+  const filteredDocList = deptFilter === 'all'
+    ? doctors
+    : doctors.filter(d => d.departmentId === deptFilter);
 
   const filtered = toks.filter(t => {
     const matchesSearch =
@@ -339,45 +347,131 @@ const TokenTable: React.FC<{ tokens: TokenRecord[]; title: string; subtitle: str
       (t.patientPhone || '').includes(search) ||
       (t.doctorName || '').toLowerCase().includes(search.toLowerCase()) ||
       String(t.tokenNo).includes(search);
+
     const matchesStatus = statusFilter === 'all' || t.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    const matchesDept = deptFilter === 'all' || t.departmentId === deptFilter;
+    const matchesDoc = docFilter === 'all' || t.doctorId === docFilter;
+    const matchesDate = !dateFilter || t.bookingDate === dateFilter || (!t.bookingDate && dateFilter === new Date().toISOString().split('T')[0]);
+
+    return matchesSearch && matchesStatus && matchesDept && matchesDoc && matchesDate;
   });
+
+  // Calculate filtered stats
+  const totalCount = filtered.length;
+  const completedCount = filtered.filter(t => t.status === 'completed').length;
+  const inCabinCount = filtered.filter(t => t.status === 'checked-in' || (t.status as string) === 'in-cabin').length;
+  const cancelledCount = filtered.filter(t => t.status === 'cancelled' || t.status === 'skipped').length;
+  const totalRevenue = filtered.reduce((acc, t) => acc + (t.status !== 'cancelled' ? (t.consultationFee || 0) : 0), 0);
 
   return (
     <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden space-y-0">
-      {/* Table Header & Controls */}
-      <div className="p-5 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <h3 className="font-black text-slate-800 text-sm">{title}</h3>
-            <span className="text-[11px] font-bold px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full">
-              {toks.length} Tokens
-            </span>
+      {/* Table Header & Summary KPI Strip */}
+      <div className="p-5 border-b border-slate-100 space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="font-black text-slate-800 text-sm">{title}</h3>
+              <span className="text-[11px] font-bold px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full">
+                {filtered.length} Displayed
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>
           </div>
-          <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onAddClick}
+              className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl cursor-pointer border-none inline-flex items-center gap-1.5 shadow-sm shadow-blue-500/20"
+            >
+              <Plus size={14} /> Add Walk-in Token
+            </button>
+          </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
+        {/* Analytics Mini Strip */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 pt-2 border-t border-slate-100/80">
+          <div className="bg-slate-50 p-2.5 rounded-xl text-center">
+            <p className="text-[10px] font-bold text-slate-400">Total Booked</p>
+            <p className="text-sm font-black text-slate-800">{totalCount}</p>
+          </div>
+          <div className="bg-emerald-50 p-2.5 rounded-xl text-center">
+            <p className="text-[10px] font-bold text-emerald-600">Completed</p>
+            <p className="text-sm font-black text-emerald-700">{completedCount}</p>
+          </div>
+          <div className="bg-amber-50 p-2.5 rounded-xl text-center">
+            <p className="text-[10px] font-bold text-amber-600">In-Cabin / Waiting</p>
+            <p className="text-sm font-black text-amber-700">{inCabinCount}</p>
+          </div>
+          <div className="bg-red-50 p-2.5 rounded-xl text-center">
+            <p className="text-[10px] font-bold text-red-500">Cancelled / Skipped</p>
+            <p className="text-sm font-black text-red-600">{cancelledCount}</p>
+          </div>
+          <div className="bg-purple-50 p-2.5 rounded-xl text-center col-span-2 sm:col-span-1">
+            <p className="text-[10px] font-bold text-purple-600">Token Fees</p>
+            <p className="text-sm font-black text-purple-700">₹{totalRevenue.toLocaleString('en-IN')}</p>
+          </div>
+        </div>
+
+        {/* Filter Controls: Department, Doctor, Date, Status, Search */}
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          {/* Department Filter */}
+          <select
+            value={deptFilter}
+            onChange={e => {
+              setDeptFilter(e.target.value);
+              setDocFilter('all');
+            }}
+            className="text-xs font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none cursor-pointer"
+          >
+            <option value="all">All Departments</option>
+            {departments.map(d => (
+              <option key={d.id} value={d.id}>{d.name}</option>
+            ))}
+          </select>
+
+          {/* Doctor Filter */}
+          <select
+            value={docFilter}
+            onChange={e => setDocFilter(e.target.value)}
+            className="text-xs font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none cursor-pointer"
+          >
+            <option value="all">All Doctors</option>
+            {filteredDocList.map(d => (
+              <option key={d.id} value={d.id}>{d.name}</option>
+            ))}
+          </select>
+
+          {/* Date Picker */}
+          <input
+            type="date"
+            value={dateFilter}
+            onChange={e => setDateFilter(e.target.value)}
+            className="text-xs font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 outline-none cursor-pointer"
+          />
+
+          {/* Status Filter */}
           <select
             value={statusFilter}
             onChange={e => setStatusFilter(e.target.value)}
-            className="text-xs font-bold text-slate-600 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none cursor-pointer"
+            className="text-xs font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none cursor-pointer"
           >
             <option value="all">All Statuses</option>
             <option value="booked">Booked</option>
-            <option value="checked-in">Checked In</option>
+            <option value="checked-in">Checked In / In-Cabin</option>
             <option value="waiting">Waiting</option>
             <option value="completed">Completed</option>
             <option value="cancelled">Cancelled</option>
+            <option value="skipped">Skipped</option>
           </select>
 
-          <div className="relative">
+          {/* Search bar */}
+          <div className="relative flex-1 min-w-[200px]">
             <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Search token #, patient, phone, doctor..."
-              className="pl-8 pr-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-blue-500 w-60 bg-slate-50"
+              placeholder="Search token #, patient, phone..."
+              className="w-full pl-8 pr-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-blue-500 bg-slate-50"
             />
           </div>
         </div>

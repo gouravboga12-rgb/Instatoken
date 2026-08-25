@@ -17,7 +17,8 @@ export const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { 
     hospitals, appointments, customers, addHospital, addDoctor, 
-    toggleDisableHospital, toggleCustomerStatus, notifications, addNotification 
+    toggleDisableHospital, toggleCustomerStatus, notifications, addNotification,
+    platformFeePercent, setPlatformFeePercent 
   } = useApp();
 
   const [adminTab, setAdminTab] = useState<
@@ -828,76 +829,173 @@ export const AdminDashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* Financial Headline Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-2xl p-5 shadow-lg shadow-blue-500/20 space-y-2">
-                <p className="text-xs font-bold text-blue-200 uppercase tracking-wider">Gross Customer Revenue</p>
-                <div className="text-3xl font-black font-heading">₹{totalRevenueGenerated.toLocaleString()}</div>
-                <p className="text-[10px] text-blue-200">Generated from online patient token bookings</p>
+            {/* Platform Fee Configuration & Headline Cards */}
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+              {/* Platform Fee Percentage Controller */}
+              <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-xs space-y-3 lg:col-span-1 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Platform Booking Fee</span>
+                    <span className="text-xs font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">{platformFeePercent}%</span>
+                  </div>
+                  <p className="text-xs text-slate-600 font-semibold mt-1">
+                    Charged on every online OPD token booking.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <input
+                    type="range"
+                    min="1"
+                    max="20"
+                    step="1"
+                    value={platformFeePercent}
+                    onChange={(e) => setPlatformFeePercent(Number(e.target.value))}
+                    className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                  />
+                  <div className="flex justify-between text-[10px] font-bold text-slate-400">
+                    <span>1%</span>
+                    <span>Default: 5%</span>
+                    <span>20%</span>
+                  </div>
+                  <div className="p-2.5 bg-blue-50/70 rounded-xl text-[11px] text-blue-800 font-bold leading-tight">
+                    💡 On ₹1,000 doctor fee, platform collects ₹{Math.round(1000 * (platformFeePercent / 100))}.
+                  </div>
+                </div>
               </div>
 
-              <div className="bg-gradient-to-br from-emerald-600 to-teal-700 text-white rounded-2xl p-5 shadow-lg shadow-emerald-500/20 space-y-2">
-                <p className="text-xs font-bold text-emerald-200 uppercase tracking-wider">Total Customer Tokens</p>
-                <div className="text-3xl font-black font-heading">{totalCustomerTokens}</div>
-                <p className="text-[10px] text-emerald-200">Total patient consultation tokens issued</p>
+              {/* Total Platform Fee Revenue */}
+              <div className="bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-2xl p-5 shadow-lg shadow-blue-500/20 space-y-2 lg:col-span-1">
+                <p className="text-xs font-bold text-blue-200 uppercase tracking-wider">Platform Fee Revenue ({platformFeePercent}%)</p>
+                <div className="text-3xl font-black font-heading">
+                  ₹{Math.round(totalRevenueGenerated * (platformFeePercent / 100)).toLocaleString('en-IN')}
+                </div>
+                <p className="text-[10px] text-blue-200">Net platform revenue collected across all hospitals</p>
               </div>
 
-              <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-xs space-y-2">
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Avg Revenue / Customer</p>
-                <div className="text-3xl font-black text-purple-600 font-heading">₹{avgRevenuePerCustomer.toLocaleString()}</div>
-                <p className="text-[10px] text-slate-500 font-semibold">Across {customers.length} registered customer accounts</p>
+              {/* Gross Patient Booking Spend */}
+              <div className="bg-gradient-to-br from-emerald-600 to-teal-700 text-white rounded-2xl p-5 shadow-lg shadow-emerald-500/20 space-y-2 lg:col-span-1">
+                <p className="text-xs font-bold text-emerald-200 uppercase tracking-wider">Gross Consultation Volume</p>
+                <div className="text-3xl font-black font-heading">₹{totalRevenueGenerated.toLocaleString('en-IN')}</div>
+                <p className="text-[10px] text-emerald-200">Total doctor fees booked through Insta Token</p>
+              </div>
+
+              {/* Total Tokens Count */}
+              <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-xs space-y-2 lg:col-span-1">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Tokens Issued</p>
+                <div className="text-3xl font-black text-purple-600 font-heading">{totalCustomerTokens}</div>
+                <p className="text-[10px] text-slate-500 font-semibold">Across {hospitals.length} partner hospitals</p>
               </div>
             </div>
 
-            {/* Customer Revenue Breakdown Table (Full Width) */}
+            {/* Detailed Transaction & Payment Audit Log Table (IST Timezone) */}
             <div className="w-full bg-white rounded-2xl border border-slate-100 shadow-xs p-5 space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-xs font-black text-slate-800 uppercase tracking-wide">Revenue Generated Per Customer</h3>
-                  <p className="text-[10px] text-slate-400 font-semibold">Tracking customer token booking payments across all registered patients</p>
+                  <h3 className="text-xs font-black text-slate-800 uppercase tracking-wide">
+                    Live Payment & Revenue Audit Trail (IST Timezone)
+                  </h3>
+                  <p className="text-[10px] text-slate-400 font-semibold">
+                    Real-time transaction logs showing hospital details, patient info, doctor fees, and platform booking revenue in Indian Standard Time
+                  </p>
                 </div>
-                <Users size={16} className="text-blue-600" />
+                <span className="text-[10px] font-extrabold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-full">
+                  Asia/Kolkata (IST)
+                </span>
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full text-xs text-left border-collapse">
-                  <thead className="bg-slate-50 border-b border-slate-100 text-[10px] font-black text-slate-500 uppercase">
+                <table className="w-full text-xs text-left border-collapse min-w-[900px]">
+                  <thead className="bg-slate-50 border-b border-slate-100 text-[10px] font-black text-slate-500 uppercase tracking-wider">
                     <tr>
-                      <th className="py-2.5 px-3">Customer Account</th>
-                      <th className="py-2.5 px-3">Contact & Location</th>
-                      <th className="py-2.5 px-3">Tokens Booked</th>
-                      <th className="py-2.5 px-3">Hospitals Visited</th>
-                      <th className="py-2.5 px-3">Gross Customer Spend</th>
+                      <th className="py-2.5 px-3">Txn & Token ID</th>
+                      <th className="py-2.5 px-3">Hospital & Location</th>
+                      <th className="py-2.5 px-3">Doctor & Dept</th>
+                      <th className="py-2.5 px-3">Patient Customer</th>
+                      <th className="py-2.5 px-3">Doctor Fee / Platform Fee</th>
+                      <th className="py-2.5 px-3">Method & Status</th>
+                      <th className="py-2.5 px-3 text-right">Date & Time (IST)</th>
                     </tr>
                   </thead>
-                  <tbody>
-                    {customers.map((cust) => {
-                      const totalSpent = (cust.bookings || []).reduce((sum, b) => sum + (b?.fee || 0), 0);
-                      const uniqueHospitals = new Set((cust.bookings || []).map(b => b.hospitalId)).size;
-                      return (
-                        <tr key={cust.id} className="border-b border-slate-50 hover:bg-slate-50/50">
-                          <td className="py-2.5 px-3 font-bold text-slate-800">
-                            {cust.name}
-                            <span className="block text-[9px] text-slate-400 font-medium">{cust.email}</span>
-                          </td>
-                          <td className="py-2.5 px-3 text-slate-700">
-                            <span className="font-bold">{cust.phone}</span>
-                            <span className="block text-[9px] text-slate-400 font-medium">{cust.location}</span>
-                          </td>
-                          <td className="py-2.5 px-3 font-extrabold text-blue-600">
-                            <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded-lg">
-                              {cust.bookings?.length || 0} Tokens
-                            </span>
-                          </td>
-                          <td className="py-2.5 px-3 font-extrabold text-purple-600">
-                            <span className="bg-purple-50 text-purple-700 px-2 py-0.5 rounded-lg">
-                              🏥 {uniqueHospitals} Hospitals
-                            </span>
-                          </td>
-                          <td className="py-2.5 px-3 font-black text-emerald-600">₹{totalSpent.toLocaleString()}</td>
-                        </tr>
-                      );
-                    })}
+                  <tbody className="divide-y divide-slate-100">
+                    {safeAppointments.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="py-8 text-center text-slate-400 font-semibold">
+                          No transaction records logged yet. New token bookings will appear here instantly.
+                        </td>
+                      </tr>
+                    ) : (
+                      safeAppointments.map((appt) => {
+                        const fee = appt.fee || 500;
+                        const platFee = appt.platformFee || Math.max(10, Math.round(fee * (platformFeePercent / 100)));
+                        const total = fee + platFee;
+
+                        const istDate = new Intl.DateTimeFormat('en-IN', {
+                          timeZone: 'Asia/Kolkata',
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          hour12: true
+                        }).format(new Date(appt.createdAt || Date.now()));
+
+                        return (
+                          <tr key={appt.id} className="hover:bg-slate-50/60 transition-colors font-medium">
+                            {/* Txn ID */}
+                            <td className="py-3 px-3">
+                              <p className="font-mono font-bold text-slate-900">{appt.paymentId || `TXN-${appt.id}`}</p>
+                              <span className="text-[10px] font-extrabold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
+                                #{appt.tokenNumber}
+                              </span>
+                            </td>
+
+                            {/* Hospital & Location */}
+                            <td className="py-3 px-3">
+                              <p className="font-bold text-slate-800">{appt.hospitalName}</p>
+                              <p className="text-[10px] text-slate-400 font-semibold truncate max-w-[180px]">
+                                {hospitals.find(h => h.id === appt.hospitalId)?.address || 'Koramangala, Bengaluru'}
+                              </p>
+                            </td>
+
+                            {/* Doctor & Dept */}
+                            <td className="py-3 px-3">
+                              <p className="font-bold text-slate-800">{appt.doctorName}</p>
+                              <span className="text-[10px] text-blue-600 font-semibold">{appt.departmentName}</span>
+                            </td>
+
+                            {/* Patient Customer */}
+                            <td className="py-3 px-3">
+                              <p className="font-bold text-slate-900">{appt.patientName}</p>
+                              <p className="text-[10px] text-slate-500 font-semibold">{appt.phone}</p>
+                            </td>
+
+                            {/* Fee Breakdown */}
+                            <td className="py-3 px-3">
+                              <div className="space-y-0.5">
+                                <p className="font-black text-slate-900">Total: ₹{total}</p>
+                                <p className="text-[10px] text-slate-500 font-semibold">
+                                  Doctor: ₹{fee} + <span className="text-blue-600 font-bold">Platform: ₹{platFee}</span>
+                                </p>
+                              </div>
+                            </td>
+
+                            {/* Payment Status */}
+                            <td className="py-3 px-3">
+                              <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full text-[10px] font-extrabold">
+                                <CheckCircle2 size={11} /> Paid · {appt.paymentMethod || 'UPI'}
+                              </span>
+                            </td>
+
+                            {/* IST Time */}
+                            <td className="py-3 px-3 text-right">
+                              <p className="font-bold text-slate-800 text-[11px]">{istDate}</p>
+                              <span className="text-[9px] text-slate-400 font-bold uppercase">IST (UTC+5:30)</span>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
                   </tbody>
                 </table>
               </div>
