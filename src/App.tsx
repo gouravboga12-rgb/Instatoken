@@ -243,12 +243,12 @@ const AppContent: React.FC = () => {
   const isProfileActive = location.pathname === '/profile';
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col justify-between relative" style={{ overflowX: 'clip' }}>
+    <div className={`min-h-screen bg-slate-50 flex flex-col justify-between relative ${isManagementRoute ? 'h-screen overflow-hidden' : ''}`} style={{ overflowX: 'clip' }}>
       {/* Desktop Navigation Header */}
-      {!isAdminRoute && <TopNavbar />}
+      {!isManagementRoute && <TopNavbar />}
 
       {/* Main Page Area Container */}
-      <div className={`flex-grow w-full ${isAdminRoute ? '' : 'w-full max-w-7xl mx-auto px-0 md:px-8 md:mt-6 pb-24 lg:pb-6'}`}>
+      <div className={`flex-grow w-full ${isManagementRoute ? 'p-0 m-0 w-full h-full' : 'w-full max-w-7xl mx-auto px-0 md:px-8 md:mt-6 pb-24 lg:pb-6'}`}>
         <Routes>
           <Route path="/" element={
             <Home 
@@ -311,7 +311,7 @@ const AppContent: React.FC = () => {
       </div>
 
       {/* Desktop Footer */}
-      {!isAdminRoute && <Footer />}
+      {!isManagementRoute && <Footer />}
 
       {/* Bottom Navigation Menu (visible on mobile & tablet for all patient pages) */}
       {showBottomNav && (

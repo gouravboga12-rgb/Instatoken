@@ -72,14 +72,52 @@ export const BookToken: React.FC = () => {
   const hospital = hospitals.find(h => h.id === hospitalId) || hospitals[0];
   const doctor = hospital?.doctors.find(d => d.id === doctorId) || hospital?.doctors[0];
 
+  // Dynamic Sessions from Central Token Configuration
+  const rawSchedule = typeof window !== 'undefined' ? localStorage.getItem('insta_hospital_schedule') : null;
+  const activeSessionsList = useMemo(() => {
+    if (rawSchedule) {
+      try {
+        const parsed = JSON.parse(rawSchedule);
+        if (parsed?.sessions?.length > 0) {
+          const acts = parsed.sessions.filter((s: any) => s.active);
+          if (acts.length > 0) return acts;
+        }
+      } catch (e) {}
+    }
+    return [
+      { id: 'sess-1', name: 'Morning', startTime: '09:00 AM', endTime: '01:00 PM', active: true },
+      { id: 'sess-2', name: 'Afternoon', startTime: '01:00 PM', endTime: '05:00 PM', active: true },
+      { id: 'sess-3', name: 'Evening', startTime: '05:00 PM', endTime: '09:00 PM', active: true },
+    ];
+  }, [rawSchedule]);
+
+  interface SessionOptionItem {
+    id: string;
+    title: string;
+    timing: string;
+    icon: React.ReactNode;
+    activeClass: string;
+    iconBg: string;
+  }
+
+  const sessionOptions: SessionOptionItem[] = useMemo(() => {
+    return activeSessionsList.map((s: any) => {
+      const isMorning = s.name.toLowerCase().includes('morn');
+      const isAfternoon = s.name.toLowerCase().includes('after');
+      return {
+        id: s.name,
+        title: `${s.name} OPD`,
+        timing: `${s.startTime} - ${s.endTime}`,
+        icon: isMorning ? <Sun size={20} /> : isAfternoon ? <Sun size={20} className="text-amber-500" /> : <Moon size={20} />,
+        activeClass: isMorning ? 'bg-amber-50/70 border-amber-400' : isAfternoon ? 'bg-orange-50/70 border-orange-400' : 'bg-blue-50/70 border-blue-500',
+        iconBg: isMorning ? 'bg-amber-100 text-amber-600' : isAfternoon ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'
+      };
+    });
+  }, [activeSessionsList]);
+
   // States
   const [selectedDate, setSelectedDate] = useState<string>(getTodayDateStr());
-  const [selectedSession, setSelectedSession] = useState<'Morning' | 'Evening'>('Morning');
-
-  const sessionOptions = [
-    { id: 'Morning', title: 'Morning', timing: '10:00 AM - 04:00 PM', icon: <Sun size={20} />, activeClass: 'bg-amber-50/70 border-amber-400', iconBg: 'bg-amber-100 text-amber-600' },
-    { id: 'Evening', title: 'Evening', timing: '05:00 PM - 10:00 PM', icon: <Moon size={20} />, activeClass: 'bg-blue-50/70 border-blue-500', iconBg: 'bg-blue-100 text-blue-600' }
-  ];
+  const [selectedSession, setSelectedSession] = useState<string>(activeSessionsList[0]?.name || 'Morning');
   
   // Patient details form
   const [name, setName] = useState(user?.name || '');

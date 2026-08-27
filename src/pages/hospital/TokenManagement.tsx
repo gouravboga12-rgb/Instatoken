@@ -18,7 +18,13 @@ const statusColors: Record<string, string> = {
 
 // ─── Direct Walk-in Token Generator Component ─────────────────────────────
 const WalkInGenerator: React.FC<{ onCreated?: (token: TokenRecord) => void }> = ({ onCreated }) => {
-  const { generateWalkInToken, doctors, departments } = useHospital();
+  const { generateWalkInToken, doctors, departments, scheduleConfig } = useHospital();
+  const activeSessions = scheduleConfig?.sessions?.filter(s => s.active) || [
+    { id: 'sess-1', name: 'Morning', startTime: '09:00 AM', endTime: '01:00 PM', active: true },
+    { id: 'sess-2', name: 'Afternoon', startTime: '01:00 PM', endTime: '05:00 PM', active: true },
+    { id: 'sess-3', name: 'Evening', startTime: '05:00 PM', endTime: '09:00 PM', active: true },
+  ];
+
   const [form, setForm] = useState({
     patientName: '',
     patientPhone: '',
@@ -27,7 +33,7 @@ const WalkInGenerator: React.FC<{ onCreated?: (token: TokenRecord) => void }> = 
     address: '',
     departmentId: '',
     doctorId: '',
-    session: 'morning' as 'morning' | 'afternoon' | 'evening',
+    session: (activeSessions[0]?.name?.toLowerCase() || 'morning') as 'morning' | 'afternoon' | 'evening',
     isRevisit: false
   });
   const [generated, setGenerated] = useState<TokenRecord | null>(null);
@@ -71,7 +77,7 @@ const WalkInGenerator: React.FC<{ onCreated?: (token: TokenRecord) => void }> = 
       address: '',
       departmentId: '',
       doctorId: '',
-      session: 'morning',
+      session: (activeSessions[0]?.name?.toLowerCase() || 'morning') as any,
       isRevisit: false
     });
   };
@@ -194,21 +200,29 @@ const WalkInGenerator: React.FC<{ onCreated?: (token: TokenRecord) => void }> = 
 
             <div className="sm:col-span-2">
               <label className="text-xs font-bold text-slate-700 block mb-1.5">OPD Session Time *</label>
-              <div className="grid grid-cols-3 gap-3">
-                {(['morning', 'afternoon', 'evening'] as const).map(s => (
-                  <button
-                    type="button"
-                    key={s}
-                    onClick={() => setForm(p => ({ ...p, session: s }))}
-                    className={`py-2.5 rounded-xl text-xs font-bold capitalize cursor-pointer border transition-all ${
-                      form.session === s
-                        ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-xs'
-                        : 'border-slate-200 text-slate-600 hover:border-slate-300'
-                    }`}
-                  >
-                    {s === 'morning' ? '🌅 Morning' : s === 'afternoon' ? '☀️ Afternoon' : '🌙 Evening'}
-                  </button>
-                ))}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {activeSessions.map(s => {
+                  const sKey = s.name.toLowerCase();
+                  const isSelected = form.session === sKey || form.session === s.name;
+                  return (
+                    <button
+                      type="button"
+                      key={s.id}
+                      onClick={() => setForm(p => ({ ...p, session: sKey as any }))}
+                      className={`p-3 rounded-2xl text-xs font-bold cursor-pointer border transition-all text-left flex flex-col justify-between ${
+                        isSelected
+                          ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-xs'
+                          : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-extrabold text-sm">{s.name}</span>
+                        <span>{s.name.toLowerCase().includes('morn') ? '🌅' : s.name.toLowerCase().includes('after') ? '☀️' : '🌙'}</span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-semibold mt-1">{s.startTime} – {s.endTime}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>

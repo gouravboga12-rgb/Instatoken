@@ -4,7 +4,7 @@ import { useHospital } from '../../context/HospitalContext';
 import {
   Wifi, WifiOff, Users, Plus, Eye, Edit3, Trash2, TrendingUp,
   Bell, Send, ChevronRight, CheckCircle,
-  Zap, ShieldCheck, Printer, Search, ChevronLeft
+  ShieldCheck, Printer, Search, ChevronLeft, Stethoscope, DollarSign
 } from 'lucide-react';
 
 const StatCardSparkline: React.FC<{
@@ -469,77 +469,82 @@ export const HospitalDashboard: React.FC = () => {
               </button>
             </div>
 
-            {/* 2. Automatic Scheduling Card */}
+            {/* 2. Doctor Token Screens & Live Cabins */}
             <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-xs flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <div>
-                    <h4 className="text-xs font-black text-slate-800">Automatic Scheduling</h4>
-                    <p className="text-[10px] text-slate-400 font-semibold">Like BookMyShow - Patients book in advance</p>
+                    <h4 className="text-xs font-black text-slate-800">Doctor Token Screens</h4>
+                    <p className="text-[10px] text-slate-400 font-semibold">{doctors.filter(d => d.active).length} Active Doctor Screens</p>
                   </div>
+                  <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">Dynamic</span>
                 </div>
 
                 <div className="space-y-2 text-xs py-1">
-                  <div className="flex items-center justify-between py-1 border-b border-slate-50">
-                    <span className="text-slate-500 font-semibold">Booking Open Days</span>
-                    <span className="font-extrabold text-slate-800">{scheduleConfig.bookingOpensDaysBefore || 3} Days from Today</span>
-                  </div>
-                  <div className="flex items-center justify-between py-1 border-b border-slate-50">
-                    <span className="text-slate-500 font-semibold">Max Advance Booking</span>
-                    <span className="font-extrabold text-slate-800">{scheduleConfig.advanceBookingLimit || 7} Days</span>
-                  </div>
-                  <div className="flex items-center justify-between py-1 border-b border-slate-50">
-                    <span className="text-slate-500 font-semibold">Session Type</span>
-                    <span className="font-extrabold text-slate-800">Morning / Afternoon / Evening</span>
-                  </div>
-                  <div className="flex items-center justify-between py-1 border-b border-slate-50">
-                    <span className="text-slate-500 font-semibold">Auto Token Generation</span>
-                    <span className="font-extrabold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full text-[10px]">Enabled</span>
-                  </div>
-                  <div className="flex items-center justify-between py-1 border-b border-slate-50">
-                    <span className="text-slate-500 font-semibold">Token Continuity</span>
-                    <span className="font-extrabold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full text-[10px]">Enabled</span>
-                  </div>
-                  <div className="flex items-center justify-between py-1">
-                    <span className="text-slate-500 font-semibold">Buffer Time Between Sessions</span>
-                    <span className="font-extrabold text-slate-800">{scheduleConfig.bufferTime || 15} Minutes</span>
-                  </div>
+                  {doctors.filter(d => d.active).slice(0, 3).map(d => {
+                    const queueCount = tokens.filter(t => t.doctorId === d.id && ['booked', 'waiting', 'checked-in'].includes(t.status)).length;
+                    return (
+                      <div
+                        key={d.id}
+                        onClick={() => handleNavSection(`doc-screen-${d.id}`, `/hospital/tokens/doctor/${d.id}`)}
+                        className="flex items-center justify-between p-2 rounded-xl bg-slate-50 hover:bg-blue-50 transition-colors cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Stethoscope size={13} className="text-blue-600" />
+                          <span className="font-bold text-slate-800 text-xs truncate max-w-[120px]">{d.name}</span>
+                        </div>
+                        <span className="text-[10px] font-black bg-blue-600 text-white px-2 py-0.5 rounded-full">
+                          {queueCount} in Queue
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
               <button
-                onClick={() => handleNavSection('auto-schedule', '/hospital/auto-schedule')}
-                className="mt-4 w-full bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs py-2 rounded-xl flex items-center justify-center gap-1.5 cursor-pointer border-none transition-colors"
+                onClick={() => handleNavSection('revenue', '/hospital/revenue')}
+                className="mt-4 w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs py-2 rounded-xl flex items-center justify-center gap-1.5 cursor-pointer border-none transition-colors shadow-sm shadow-emerald-500/20"
               >
-                <Zap size={13} className="text-amber-400" /> Configure Schedule
+                <DollarSign size={13} /> View Revenue Overview
               </button>
             </div>
 
             {/* 3. Session & Schedule Overview Card */}
             <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-xs flex flex-col justify-between">
               <div>
-                <h4 className="text-xs font-black text-slate-800 mb-2">Session & Schedule Overview</h4>
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-xs font-black text-slate-800">Session & Schedule Overview</h4>
+                  <button
+                    onClick={() => handleNavSection('token-manage', '/hospital/tokens/manage')}
+                    className="text-[10px] font-bold text-blue-600 hover:underline cursor-pointer border-none bg-transparent"
+                  >
+                    Configure
+                  </button>
+                </div>
 
                 <div className="space-y-2 mb-3">
-                  {[
-                    { name: 'Morning', time: '09:00 AM - 01:00 PM', tokens: 50, booked: 28, pct: 56 },
-                    { name: 'Afternoon', time: '01:00 PM - 05:00 PM', tokens: 50, booked: 18, pct: 36 },
-                    { name: 'Evening', time: '05:00 PM - 09:00 PM', tokens: 50, booked: 15, pct: 30 },
-                  ].map((sess) => (
-                    <div key={sess.name} className="bg-slate-50 p-2 rounded-xl text-xs space-y-1">
-                      <div className="flex items-center justify-between font-extrabold text-slate-800">
-                        <span>{sess.name}</span>
-                        <span className="text-[10px] text-slate-400 font-semibold">{sess.time}</span>
+                  {scheduleConfig.sessions.map((sess) => {
+                    const sessTokens = tokens.filter(t => t.session?.toLowerCase() === sess.name.toLowerCase());
+                    const booked = sessTokens.length;
+                    const max = sess.maxTokens || 50;
+                    const pct = Math.min(100, Math.round((booked / max) * 100));
+                    return (
+                      <div key={sess.id} className="bg-slate-50 p-2 rounded-xl text-xs space-y-1">
+                        <div className="flex items-center justify-between font-extrabold text-slate-800">
+                          <span>{sess.name}</span>
+                          <span className="text-[10px] text-slate-400 font-semibold">{sess.startTime} - {sess.endTime}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-[10px] font-bold text-slate-600">
+                          <span>Capacity: {max}</span>
+                          <span>Booked: {booked} ({pct}%)</span>
+                        </div>
+                        <div className="w-full bg-slate-200 rounded-full h-1.5">
+                          <div className="bg-blue-600 h-1.5 rounded-full" style={{ width: `${pct}%` }} />
+                        </div>
                       </div>
-                      <div className="flex items-center justify-between text-[10px] font-bold text-slate-600">
-                        <span>Tokens: {sess.tokens}</span>
-                        <span>Booked: {sess.booked} ({sess.pct}%)</span>
-                      </div>
-                      <div className="w-full bg-slate-200 rounded-full h-1.5">
-                        <div className="bg-blue-600 h-1.5 rounded-full" style={{ width: `${sess.pct}%` }} />
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 {/* Booking Calendar Header */}

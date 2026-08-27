@@ -143,7 +143,10 @@ export const HospitalDetails: React.FC<HospitalDetailsProps> = ({ onDoctorSelect
                 </p>
               </div>
               <a 
-                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(hospital.name + ' ' + hospital.address)}`} 
+                href={hospital.lat && hospital.lng 
+                  ? `https://www.google.com/maps/dir/?api=1&destination=${hospital.lat},${hospital.lng}`
+                  : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(hospital.name + ' ' + hospital.address)}`
+                } 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-black px-3 py-2 rounded-xl flex items-center gap-1 shrink-0 shadow-lg border border-blue-400/20 transition-all cursor-pointer hover:scale-105"
@@ -301,7 +304,10 @@ export const HospitalDetails: React.FC<HospitalDetailsProps> = ({ onDoctorSelect
               <div className="flex items-center gap-2 pt-1 border-t border-slate-50">
                 <Navigation size={14} className="text-blue-600 shrink-0" />
                 <a 
-                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(hospital.name + ' ' + hospital.address)}`} 
+                  href={hospital.lat && hospital.lng 
+                    ? `https://www.google.com/maps/dir/?api=1&destination=${hospital.lat},${hospital.lng}`
+                    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(hospital.name + ' ' + hospital.address)}`
+                  } 
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="text-blue-650 hover:underline flex items-center gap-0.5 font-bold"

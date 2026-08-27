@@ -30,6 +30,7 @@ export const DoctorManagement: React.FC<DoctorManagementProps> = ({ tab: initial
   const [editingDoc, setEditingDoc] = useState<HospitalDoctor | null>(null);
   const [showDeptModal, setShowDeptModal] = useState(false);
   const [editingDept, setEditingDept] = useState<HospitalDepartment | null>(null);
+  const [selectedDeptDetail, setSelectedDeptDetail] = useState<HospitalDepartment | null>(null);
 
   // Form Fields for Doctor
   const [docForm, setDocForm] = useState({
@@ -352,43 +353,115 @@ const to12Hour = (timeStr?: string): string => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {filteredDepts.map(dept => (
-              <div key={dept.id} className="bg-white rounded-3xl border border-slate-100 shadow-sm p-4 hover:shadow-md transition-shadow flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-2xl">{dept.icon}</span>
+            {filteredDepts.map(dept => {
+              const deptDoctors = doctors.filter(d => d.departmentId === dept.id);
+              return (
+                <div
+                  key={dept.id}
+                  onClick={() => setSelectedDeptDetail(dept)}
+                  className="bg-white rounded-3xl border border-slate-100 shadow-sm p-4 hover:shadow-md transition-all flex flex-col justify-between cursor-pointer hover:border-blue-200 group"
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-2xl group-hover:scale-110 transition-transform">{dept.icon}</span>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); toggleDepartmentActive(dept.id); }}
+                        className={`text-[9px] font-black px-2 py-0.5 rounded-full capitalize cursor-pointer border-none ${
+                          dept.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
+                        }`}
+                      >
+                        {dept.active ? 'Active' : 'Inactive'}
+                      </button>
+                    </div>
+                    <h4 className="font-extrabold text-slate-800 text-sm group-hover:text-blue-600 transition-colors">{dept.name}</h4>
+                    <div className="space-y-1 mt-3 text-[10px] text-slate-500 font-semibold">
+                      <div className="flex justify-between"><span>Head Doctor:</span><span className="text-slate-800 font-extrabold">{dept.headDoctor || '—'}</span></div>
+                      <div className="flex justify-between"><span>Total Doctors:</span><span className="text-blue-600 font-extrabold">{deptDoctors.length}</span></div>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 mt-4 pt-3 border-t border-slate-50" onClick={e => e.stopPropagation()}>
                     <button
-                      onClick={() => toggleDepartmentActive(dept.id)}
-                      className={`text-[9px] font-black px-2 py-0.5 rounded-full capitalize cursor-pointer border-none ${
-                        dept.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
-                      }`}
+                      onClick={() => openEditDept(dept)}
+                      className="flex-1 border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-bold py-1.5 rounded-xl cursor-pointer transition-colors flex items-center justify-center gap-1"
                     >
-                      {dept.active ? 'Active' : 'Inactive'}
+                      <Edit3 size={11} /> Edit
+                    </button>
+                    <button
+                      onClick={() => deleteDepartment(dept.id)}
+                      className="p-1.5 border border-slate-200 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-xl cursor-pointer transition-colors"
+                    >
+                      <Trash2 size={11} />
                     </button>
                   </div>
-                  <h4 className="font-extrabold text-slate-800 text-sm">{dept.name}</h4>
-                  <div className="space-y-1 mt-3 text-[10px] text-slate-500 font-semibold">
-                    <div className="flex justify-between"><span>Head Doctor:</span><span className="text-slate-800 font-extrabold">{dept.headDoctor || '—'}</span></div>
-                    <div className="flex justify-between"><span>Total Doctors:</span><span className="text-slate-800 font-extrabold">{doctors.filter(d => d.departmentId === dept.id).length}</span></div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Department Detail Modal */}
+          {selectedDeptDetail && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-3xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 space-y-4 animate-scaleUp">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-2xl">{selectedDeptDetail.icon}</span>
+                    <div>
+                      <h3 className="text-base font-black text-slate-800">{selectedDeptDetail.name} Department</h3>
+                      <p className="text-xs text-slate-400 font-semibold">Head Doctor: {selectedDeptDetail.headDoctor || 'Not Assigned'}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setSelectedDeptDetail(null)}
+                    className="p-1 rounded-lg hover:bg-slate-100 cursor-pointer border-none text-slate-400 font-bold"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  <h4 className="text-xs font-black text-slate-700 uppercase tracking-wider">
+                    Doctors in this Department ({doctors.filter(d => d.departmentId === selectedDeptDetail.id).length})
+                  </h4>
+
+                  <div className="space-y-2.5 max-h-72 overflow-y-auto">
+                    {doctors.filter(d => d.departmentId === selectedDeptDetail.id).map(doc => (
+                      <div key={doc.id} className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={doc.photo || 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&auto=format&fit=crop&q=80'}
+                            alt={doc.name}
+                            className="w-10 h-10 rounded-2xl object-cover border border-slate-200"
+                          />
+                          <div>
+                            <p className="font-extrabold text-xs text-slate-800">{doc.name}</p>
+                            <p className="text-[10px] text-blue-600 font-bold">{doc.specialization} · Fee: ₹{doc.consultationFee}</p>
+                          </div>
+                        </div>
+                        <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${doc.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>
+                          {doc.active ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+                    ))}
+
+                    {doctors.filter(d => d.departmentId === selectedDeptDetail.id).length === 0 && (
+                      <div className="p-6 text-center text-slate-400 text-xs font-semibold bg-slate-50 rounded-2xl">
+                        No doctors currently assigned to {selectedDeptDetail.name}.
+                      </div>
+                    )}
                   </div>
                 </div>
-                <div className="flex gap-2 mt-4 pt-3 border-t border-slate-50">
+
+                <div className="flex justify-end pt-3 border-t border-slate-100">
                   <button
-                    onClick={() => openEditDept(dept)}
-                    className="flex-1 border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-bold py-1.5 rounded-xl cursor-pointer transition-colors flex items-center justify-center gap-1"
+                    onClick={() => setSelectedDeptDetail(null)}
+                    className="px-5 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 cursor-pointer"
                   >
-                    <Edit3 size={11} /> Edit
-                  </button>
-                  <button
-                    onClick={() => deleteDepartment(dept.id)}
-                    className="p-1.5 border border-slate-200 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-xl cursor-pointer transition-colors"
-                  >
-                    <Trash2 size={11} />
+                    Close
                   </button>
                 </div>
               </div>
-            ))}
-          </div>
+            </div>
+          )}
         </div>
       )}
 

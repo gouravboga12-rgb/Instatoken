@@ -1,8 +1,12 @@
 import React, { useState } from 'react';
 import { Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import { useHospital } from '../../context/HospitalContext';
+import type { HospitalDoctor, TokenRecord } from '../../context/HospitalContext';
 import { HospitalDashboard } from './HospitalDashboard';
 import { TokenManagement } from './TokenManagement';
+import { TokenManage } from './TokenManage';
+import { DoctorTokenScreen } from './DoctorTokenScreen';
+import { RevenueOverview } from './RevenueOverview';
 import { DoctorManagement } from './DoctorManagement';
 import { PatientManagement } from './PatientManagement';
 
@@ -13,78 +17,96 @@ import { ReportsAnalytics } from './ReportsAnalytics';
 import { HospitalSettings } from './HospitalSettings';
 import { HospitalStaff } from './HospitalStaff';
 import {
-  LayoutDashboard, Plus, List, Wifi, WifiOff, Calendar, Clock, RefreshCw, XCircle, 
-  CheckSquare, Users, Stethoscope, Building2, CalendarRange, Zap, 
+  LayoutDashboard, Plus, List, Wifi, WifiOff, Calendar, RefreshCw,
+  Users, Stethoscope, Building2, CalendarRange,
   Printer, ShieldCheck, MessageSquare, BarChart2, Download, Settings,
   UserCog, ChevronLeft, ChevronRight, Bell, Search, LogOut, Menu, X, Activity,
-  Layers, CreditCard
+  Layers, CreditCard, DollarSign, Sliders
 } from 'lucide-react';
 
 // ─── RBAC permission map ──────────────────────────────────────────────────────
 const ROLE_SECTIONS: Record<string, string[]> = {
-  owner:        ['dashboard','tokens','add-token','all-tokens','online-tokens','offline-tokens','today-tokens','upcoming-tokens','completed-tokens','cancelled-tokens','revisit-tokens','doctors','departments','sessions','auto-schedule','staff','patients','token-validation','prescription','communication','billing','reports','settings','users','general'],
-  admin:        ['dashboard','tokens','add-token','all-tokens','online-tokens','offline-tokens','today-tokens','upcoming-tokens','completed-tokens','cancelled-tokens','revisit-tokens','doctors','departments','sessions','auto-schedule','staff','patients','token-validation','reports'],
-  receptionist: ['dashboard','add-token','all-tokens','today-tokens','staff','patients','token-validation','prescription'],
-  doctor:       ['dashboard','today-tokens','patients'],
-  accountant:   ['dashboard','billing','reports'],
-  nurse:        ['dashboard','today-tokens','staff'],
+  owner:        ['dashboard','doctor-screens','token-manage','tokens','add-token','all-tokens','online-tokens','offline-tokens','today-tokens','upcoming-tokens','completed-tokens','cancelled-tokens','revisit-tokens','revenue','doctors','departments','sessions','staff','patients','token-validation','prescription','communication','billing','reports','settings','users','general'],
+  admin:        ['dashboard','doctor-screens','token-manage','tokens','add-token','all-tokens','online-tokens','offline-tokens','today-tokens','upcoming-tokens','completed-tokens','cancelled-tokens','revisit-tokens','revenue','doctors','departments','sessions','staff','patients','token-validation','reports'],
+  receptionist: ['dashboard','doctor-screens','token-manage','add-token','all-tokens','today-tokens','staff','patients','token-validation','prescription'],
+  doctor:       ['dashboard','doctor-screens','today-tokens','patients'],
+  accountant:   ['dashboard','revenue','billing','reports'],
+  nurse:        ['dashboard','doctor-screens','today-tokens','staff'],
 };
 
 interface NavItem {
   id: string; label: string; icon: React.ReactNode; path: string;
-  badge?: string; children?: NavItem[];
+  badge?: string; isDoctorScreen?: boolean;
 }
 
-const buildNav = (): { section: string; items: NavItem[] }[] => [
-  { section: '', items: [
-    { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={15} />, path: '/hospital/dashboard' },
-  ]},
-  { section: 'Token Management', items: [
-    { id: 'add-token', label: 'Add Token', icon: <Plus size={15} />, path: '/hospital/tokens/add' },
-    { id: 'all-tokens', label: 'All Tokens', icon: <List size={15} />, path: '/hospital/tokens/all' },
-    { id: 'online-tokens', label: 'Online Tokens', icon: <Wifi size={15} />, path: '/hospital/tokens/online' },
-    { id: 'offline-tokens', label: 'Offline Tokens', icon: <WifiOff size={15} />, path: '/hospital/tokens/offline' },
-    { id: 'today-tokens', label: "Today's Tokens", icon: <Calendar size={15} />, path: '/hospital/tokens/today' },
-    { id: 'upcoming-tokens', label: 'Upcoming Tokens', icon: <Clock size={15} />, path: '/hospital/tokens/upcoming' },
-    { id: 'completed-tokens', label: 'Completed Tokens', icon: <CheckSquare size={15} />, path: '/hospital/tokens/completed' },
-    { id: 'cancelled-tokens', label: 'Cancelled Tokens', icon: <XCircle size={15} />, path: '/hospital/tokens/cancelled' },
-    { id: 'revisit-tokens', label: 'Revisit Tokens', icon: <RefreshCw size={15} />, path: '/hospital/tokens/revisit' },
-  ]},
-  { section: 'Doctor Management', items: [
-    { id: 'doctors', label: 'Doctors Management', icon: <Stethoscope size={15} />, path: '/hospital/doctors' },
-    { id: 'departments', label: 'Departments', icon: <Building2 size={15} />, path: '/hospital/departments' },
-    { id: 'sessions', label: 'Sessions & Schedule', icon: <CalendarRange size={15} />, path: '/hospital/schedule' },
-    { id: 'auto-schedule', label: 'Auto Scheduling', icon: <Zap size={15} />, path: '/hospital/auto-schedule', badge: 'New' },
-  ]},
-  { section: 'Staff & Team', items: [
-    { id: 'staff', label: 'Staff & Employees', icon: <Users size={15} />, path: '/hospital/staff' },
-  ]},
-  { section: 'Patient Management', items: [
-    { id: 'patients', label: 'Patients', icon: <Users size={15} />, path: '/hospital/patients' },
-    { id: 'token-validation', label: 'Token Validation', icon: <ShieldCheck size={15} />, path: '/hospital/validate' },
-    { id: 'prescription', label: 'Prescription Print', icon: <Printer size={15} />, path: '/hospital/validate?tab=prescription' },
-  ]},
-  { section: 'Communication', items: [
-    { id: 'communication', label: 'Push Notification', icon: <Bell size={15} />, path: '/hospital/communication' },
-    { id: 'sms', label: 'SMS / WhatsApp', icon: <MessageSquare size={15} />, path: '/hospital/communication?tab=sms' },
-  ]},
-  { section: 'Reports & Analytics', items: [
-    { id: 'reports', label: 'Reports & Analytics', icon: <BarChart2 size={15} />, path: '/hospital/reports' },
-    { id: 'download', label: 'Download Reports', icon: <Download size={15} />, path: '/hospital/reports?tab=download' },
-  ]},
-  { section: 'Settings', items: [
-    { id: 'settings', label: 'Hospital Settings', icon: <Settings size={15} />, path: '/hospital/settings' },
-    { id: 'users', label: 'Users & Roles', icon: <UserCog size={15} />, path: '/hospital/settings?tab=users' },
-    { id: 'general', label: 'General Settings', icon: <Layers size={15} />, path: '/hospital/settings?tab=general' },
-    { id: 'billing', label: 'Billing & Payments', icon: <CreditCard size={15} />, path: '/hospital/billing' },
-  ]},
-];
+const buildNav = (doctors: HospitalDoctor[], tokens: TokenRecord[]): { section: string; items: NavItem[] }[] => {
+  const activeDoctors = doctors.filter(d => d.active);
+
+  // Generate Doctor Screens dynamically based on active doctors
+  const doctorScreenItems: NavItem[] = activeDoctors.map(doc => {
+    const docActiveQueue = tokens.filter(t => t.doctorId === doc.id && ['booked', 'waiting', 'checked-in'].includes(t.status)).length;
+    return {
+      id: `doc-screen-${doc.id}`,
+      label: doc.name,
+      icon: <Stethoscope size={14} className="text-blue-400" />,
+      path: `/hospital/tokens/doctor/${doc.id}`,
+      badge: docActiveQueue > 0 ? `${docActiveQueue}` : undefined,
+      isDoctorScreen: true
+    };
+  });
+
+  return [
+    { section: '', items: [
+      { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={15} />, path: '/hospital/dashboard' },
+    ]},
+    { section: `Doctor Token Screens (${activeDoctors.length})`, items: doctorScreenItems },
+    { section: 'Token Management', items: [
+      { id: 'token-manage', label: 'Token Manage & Sessions', icon: <Sliders size={15} />, path: '/hospital/tokens/manage' },
+      { id: 'add-token', label: 'Add Token', icon: <Plus size={15} />, path: '/hospital/tokens/add' },
+      { id: 'all-tokens', label: 'All Tokens', icon: <List size={15} />, path: '/hospital/tokens/all' },
+      { id: 'online-tokens', label: 'Online Tokens', icon: <Wifi size={15} />, path: '/hospital/tokens/online' },
+      { id: 'offline-tokens', label: 'Offline Tokens', icon: <WifiOff size={15} />, path: '/hospital/tokens/offline' },
+      { id: 'today-tokens', label: "Today's Tokens", icon: <Calendar size={15} />, path: '/hospital/tokens/today' },
+      { id: 'revisit-tokens', label: 'Revisit Tokens', icon: <RefreshCw size={15} />, path: '/hospital/tokens/revisit' },
+    ]},
+    { section: 'Revenue & Finance', items: [
+      { id: 'revenue', label: 'Revenue Overview', icon: <DollarSign size={15} />, path: '/hospital/revenue' },
+      { id: 'billing', label: 'Billing & Transactions', icon: <CreditCard size={15} />, path: '/hospital/billing' },
+    ]},
+    { section: 'Doctor Management', items: [
+      { id: 'doctors', label: 'Doctors Management', icon: <Stethoscope size={15} />, path: '/hospital/doctors' },
+      { id: 'departments', label: 'Departments', icon: <Building2 size={15} />, path: '/hospital/departments' },
+      { id: 'sessions', label: 'Sessions & Schedule', icon: <CalendarRange size={15} />, path: '/hospital/schedule' },
+    ]},
+    { section: 'Staff & Team', items: [
+      { id: 'staff', label: 'Staff & Employees', icon: <Users size={15} />, path: '/hospital/staff' },
+    ]},
+    { section: 'Patient Management', items: [
+      { id: 'patients', label: 'Patients', icon: <Users size={15} />, path: '/hospital/patients' },
+      { id: 'token-validation', label: 'Token Validation', icon: <ShieldCheck size={15} />, path: '/hospital/validate' },
+      { id: 'prescription', label: 'Prescription Print', icon: <Printer size={15} />, path: '/hospital/validate?tab=prescription' },
+    ]},
+    { section: 'Communication', items: [
+      { id: 'communication', label: 'Push Notification', icon: <Bell size={15} />, path: '/hospital/communication' },
+      { id: 'sms', label: 'SMS / WhatsApp', icon: <MessageSquare size={15} />, path: '/hospital/communication?tab=sms' },
+    ]},
+    { section: 'Reports & Analytics', items: [
+      { id: 'reports', label: 'Reports & Analytics', icon: <BarChart2 size={15} />, path: '/hospital/reports' },
+      { id: 'download', label: 'Download Reports', icon: <Download size={15} />, path: '/hospital/reports?tab=download' },
+    ]},
+    { section: 'Settings', items: [
+      { id: 'settings', label: 'Hospital Settings', icon: <Settings size={15} />, path: '/hospital/settings' },
+      { id: 'users', label: 'Users & Roles', icon: <UserCog size={15} />, path: '/hospital/settings?tab=users' },
+      { id: 'general', label: 'General Settings', icon: <Layers size={15} />, path: '/hospital/settings?tab=general' },
+    ]},
+  ];
+};
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 const Sidebar: React.FC<{ collapsed: boolean; onToggle: () => void }> = ({ collapsed, onToggle }) => {
-  const { hospitalUser, activeSection, setActiveSection, hospitalProfile } = useHospital();
+  const { hospitalUser, activeSection, setActiveSection, hospitalProfile, doctors, tokens } = useHospital();
   const navigate = useNavigate();
-  const nav = buildNav();
+  const nav = buildNav(doctors, tokens);
   const allowed = ROLE_SECTIONS[hospitalUser?.role || 'receptionist'] || [];
 
   const handleNav = (item: NavItem) => {
@@ -298,11 +320,14 @@ export const HospitalLayout: React.FC = () => {
         <main className="flex-1 overflow-y-auto bg-slate-50">
           <Routes>
             <Route path="dashboard" element={<HospitalDashboard />} />
+            <Route path="tokens/add" element={<TokenManagement />} />
+            <Route path="tokens/manage" element={<TokenManage />} />
+            <Route path="tokens/doctor/:doctorId" element={<DoctorTokenScreen />} />
             <Route path="tokens/*" element={<TokenManagement />} />
+            <Route path="revenue" element={<RevenueOverview />} />
             <Route path="doctors" element={<DoctorManagement tab="doctors" />} />
             <Route path="departments" element={<DoctorManagement tab="departments" />} />
             <Route path="schedule" element={<ScheduleManagement tab="sessions" />} />
-            <Route path="auto-schedule" element={<ScheduleManagement tab="auto" />} />
             <Route path="staff" element={<HospitalStaff />} />
             <Route path="patients" element={<PatientManagement />} />
             <Route path="validate" element={<TokenValidationPage />} />
@@ -314,10 +339,6 @@ export const HospitalLayout: React.FC = () => {
             <Route path="*" element={<Navigate to="dashboard" replace />} />
           </Routes>
         </main>
-        {/* Copyright footer */}
-        <footer className="bg-white border-t border-slate-100 px-6 py-2 text-center shrink-0">
-          <p className="text-[9px] text-slate-400">© 2026 InstaToken Admin · Designed for Smart Healthcare ❤️</p>
-        </footer>
       </div>
     </div>
   );
