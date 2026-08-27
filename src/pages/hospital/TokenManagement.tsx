@@ -667,7 +667,12 @@ const WalkInGenerator: React.FC<{
               <select
                 required
                 value={form.departmentId}
-                onChange={e => setForm(p => ({ ...p, departmentId: e.target.value, doctorId: '' }))}
+                onChange={e => {
+                  const deptId = e.target.value;
+                  const currentDoc = doctors.find(d => d.id === form.doctorId);
+                  const keepDoc = currentDoc && currentDoc.departmentId === deptId;
+                  setForm(p => ({ ...p, departmentId: deptId, doctorId: keepDoc ? form.doctorId : '' }));
+                }}
                 className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 bg-white font-medium"
               >
                 <option value="">Select Department</option>
@@ -682,7 +687,15 @@ const WalkInGenerator: React.FC<{
               <select
                 required
                 value={form.doctorId}
-                onChange={e => setForm(p => ({ ...p, doctorId: e.target.value }))}
+                onChange={e => {
+                  const docId = e.target.value;
+                  const doc = doctors.find(d => d.id === docId);
+                  setForm(p => ({
+                    ...p,
+                    doctorId: docId,
+                    departmentId: doc?.departmentId || p.departmentId
+                  }));
+                }}
                 className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 bg-white font-medium"
               >
                 <option value="">Select Doctor</option>
