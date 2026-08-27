@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { HOSPITALS, DEPARTMENTS, HEALTH_ARTICLES, MOCK_CUSTOMERS } from '../utils/mockData';
 import type { Hospital, Doctor, HealthArticle, CustomerAccount } from '../utils/mockData';
 import { broadcastGlobalSync, subscribeGlobalSync, formatTimeSlot } from '../utils/syncBus';
+import { geocodeLocation, reverseGeocode } from '../utils/googleMaps';
 
 export interface FamilyMember {
   id: string;
@@ -26,6 +27,10 @@ export interface UserProfile {
   savedDoctors: string[];
   familyMembers: FamilyMember[];
   subscription: Subscription | null;
+  location?: string;
+  lat?: number;
+  lng?: number;
+  address?: string;
 }
 
 export interface Appointment {
@@ -78,6 +83,8 @@ interface AppContextType {
   setUserCoords: (coords: { lat: number; lng: number } | null) => void;
   setSearchRadiusKm: (km: number) => void;
   setCurrentLocation: (loc: string) => void;
+  updateUserProfile: (updates: Partial<UserProfile>) => void;
+  updateUserLocation: (locationName: string, coords?: { lat: number; lng: number }) => Promise<void>;
   getOrCreateCustomerAccount: (name: string, phone: string, email?: string) => CustomerAccount;
   login: (emailOrPhone: string, passwordOrOtp: string) => boolean;
   signup: (name: string, email: string, phone: string) => boolean;
@@ -235,6 +242,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       email: "patient@example.com",
       phone: "+91 9876543210",
       role: "patient",
+      location: "Koramangala, Bengaluru",
+      lat: 12.9348,
+      lng: 77.6189,
       savedHospitals: ["hosp-apollo"],
       savedDoctors: ["doc-arvind"],
       familyMembers: [
@@ -299,7 +309,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return MOCK_CUSTOMERS;
   });
 
-  const [currentLocation, setCurrentLocation] = useState<string>(() => {
+  const [currentLocation, setCurrentLocationState] = useState<string>(() => {
     return localStorage.getItem('insta_location') || "Koramangala, Bengaluru";
   });
 
@@ -327,6 +337,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const setSearchRadiusKm = (km: number) => {
     setSearchRadiusKmState(km);
     localStorage.setItem('insta_search_radius_km', km.toString());
+  };
+
+  const setCurrentLocation = (loc: string) => {
+    setCurrentLocationState(loc);
+    localStorage.setItem('insta_location', loc);
+
+    // Asynchronously geocode location for real-time customer distance calculations
+    geocodeLocation(loc).then(geo => {
+      if (geo) {
+        const coords = { lat: geo.lat, lng: geo.lng };
+        setUserCoords(coords);
+        localStorage.setItem('insta_user_coords', JSON.stringify(coords));
+
+        setUser(prev => {
+          if (!prev) return null;
+          const updated = { ...prev, location: loc, lat: geo.lat, lng: geo.lng };
+          localStorage.setItem('insta_user', JSON.stringify(updated));
+          return updated;
+        });
+
+        setCustomers(prev => {
+          const updated = prev.map(c => {
+            if (user && (c.email === user.email || c.phone === user.phone)) {
+              return { ...c, location: loc, lat: geo.lat, lng: geo.lng };
+            }
+            return c;
+          });
+          localStorage.setItem('insta_customers', JSON.stringify(updated));
+          return updated;
+        });
+      }
+    }).catch(err => {
+      console.warn('Geocoding location update failed:', err);
+    });
   };
 
   const getOrCreateCustomerAccount = (name: string, phone: string, email?: string): CustomerAccount => {
@@ -978,28 +1022,91 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
   };
 
-  // Haversine formula — geodesic distance in km between two coordinates
-  const haversineDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
-    const R = 6371; // Earth radius in km
-    const dLat = (lat2 - lat1) * (Math.PI / 180);
-    const dLng = (lng2 - lng1) * (Math.PI / 180);
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
-      Math.sin(dLng / 2) * Math.sin(dLng / 2);
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const updateUserProfile = (updates: Partial<UserProfile>) => {
+    setUser(prev => {
+      if (!prev) return null;
+      const updated = { ...prev, ...updates };
+      localStorage.setItem('insta_user', JSON.stringify(updated));
+      return updated;
+    });
+
+    if (updates.location || updates.lat || updates.lng || updates.name || updates.phone || updates.email) {
+      if (updates.lat && updates.lng) {
+        setUserCoords({ lat: updates.lat, lng: updates.lng });
+        localStorage.setItem('insta_user_coords', JSON.stringify({ lat: updates.lat, lng: updates.lng }));
+      }
+      if (updates.location) {
+        setCurrentLocationState(updates.location);
+        localStorage.setItem('insta_location', updates.location);
+      }
+      setCustomers(prev => {
+        const updated = prev.map(c => {
+          if (user && (c.email === user.email || c.phone === user.phone)) {
+            return {
+              ...c,
+              name: updates.name || c.name,
+              phone: updates.phone || c.phone,
+              email: updates.email || c.email,
+              location: updates.location || c.location,
+              lat: updates.lat ?? c.lat,
+              lng: updates.lng ?? c.lng
+            };
+          }
+          return c;
+        });
+        localStorage.setItem('insta_customers', JSON.stringify(updated));
+        return updated;
+      });
+    }
+
+    addNotification("Profile Updated", "Your customer account details and location were saved.", "success");
   };
 
-  // City centroids mapped to our location picker labels
-  const CITY_CENTROIDS = [
-    { label: "Koramangala, Bengaluru", lat: 12.9352, lng: 77.6244 },
-    { label: "HSR Layout, Bengaluru", lat: 12.9081, lng: 77.6476 },
-    { label: "Gachibowli, Hyderabad", lat: 17.4401, lng: 78.3489 },
-    { label: "ITI Road, Vijayawada", lat: 16.5062, lng: 80.6480 },
-    { label: "Ram Nagar, Visakhapatnam", lat: 17.7230, lng: 83.3012 },
-    { label: "Indiranagar, Bengaluru", lat: 12.9784, lng: 77.6408 },
-    { label: "Jayanagar, Bengaluru", lat: 12.9258, lng: 77.5933 },
-  ];
+  const updateUserLocation = async (locationName: string, coords?: { lat: number; lng: number }) => {
+    let resolvedCoords = coords;
+    if (!resolvedCoords) {
+      const geo = await geocodeLocation(locationName);
+      if (geo) {
+        resolvedCoords = { lat: geo.lat, lng: geo.lng };
+      }
+    }
+
+    if (resolvedCoords) {
+      setUserCoords(resolvedCoords);
+      localStorage.setItem('insta_user_coords', JSON.stringify(resolvedCoords));
+    }
+
+    setCurrentLocationState(locationName);
+    localStorage.setItem('insta_location', locationName);
+
+    setUser(prev => {
+      if (!prev) return null;
+      const updated = {
+        ...prev,
+        location: locationName,
+        ...(resolvedCoords ? { lat: resolvedCoords.lat, lng: resolvedCoords.lng } : {})
+      };
+      localStorage.setItem('insta_user', JSON.stringify(updated));
+      return updated;
+    });
+
+    setCustomers(prev => {
+      const updated = prev.map(c => {
+        if (user && (c.email === user.email || c.phone === user.phone)) {
+          return {
+            ...c,
+            location: locationName,
+            ...(resolvedCoords ? { lat: resolvedCoords.lat, lng: resolvedCoords.lng } : {})
+          };
+        }
+        return c;
+      });
+      localStorage.setItem('insta_customers', JSON.stringify(updated));
+      return updated;
+    });
+
+    addNotification("Location Updated", `Recorded location: ${locationName}. Real-time hospital distance updated.`, "success");
+  };
 
   const detectAndSetLocation = () => {
     if (!navigator.geolocation) {
@@ -1007,21 +1114,44 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
     navigator.geolocation.getCurrentPosition(
-      (position) => {
+      async (position) => {
         const { latitude, longitude } = position.coords;
-        let nearest = CITY_CENTROIDS[0];
-        let minDist = haversineDistance(latitude, longitude, nearest.lat, nearest.lng);
-        for (const city of CITY_CENTROIDS) {
-          const dist = haversineDistance(latitude, longitude, city.lat, city.lng);
-          if (dist < minDist) {
-            minDist = dist;
-            nearest = city;
-          }
-        }
-        setCurrentLocation(nearest.label);
+        const coords = { lat: latitude, lng: longitude };
+        setUserCoords(coords);
+        localStorage.setItem('insta_user_coords', JSON.stringify(coords));
+
+        // Reverse geocode with Nominatim / Google Geocoding API / known cities
+        const areaName = await reverseGeocode(latitude, longitude);
+        setCurrentLocationState(areaName);
+        localStorage.setItem('insta_location', areaName);
+
+        // Record in Customer Profile and Account list
+        setUser(prev => {
+          if (!prev) return null;
+          const updated = {
+            ...prev,
+            location: areaName,
+            lat: latitude,
+            lng: longitude
+          };
+          localStorage.setItem('insta_user', JSON.stringify(updated));
+          return updated;
+        });
+
+        setCustomers(prev => {
+          const updated = prev.map(c => {
+            if (user && (c.email === user.email || c.phone === user.phone)) {
+              return { ...c, location: areaName, lat: latitude, lng: longitude };
+            }
+            return c;
+          });
+          localStorage.setItem('insta_customers', JSON.stringify(updated));
+          return updated;
+        });
+
         addNotification(
-          "Location Detected",
-          `Your area has been set to ${nearest.label} (${Math.round(minDist)} km from GPS position).`,
+          "Customer Location Recorded",
+          `Live GPS recorded: ${areaName}. Hospital distances updated in real-time.`,
           "success"
         );
       },
@@ -1031,7 +1161,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           : "Unable to retrieve your location. Please try again.";
         addNotification("Location Error", msg, "warning");
       },
-      { timeout: 10000, maximumAge: 60000 }
+      { timeout: 10000, maximumAge: 60000, enableHighAccuracy: true }
     );
   };
 
@@ -1051,6 +1181,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setUserCoords,
       setSearchRadiusKm,
       setCurrentLocation,
+      updateUserProfile,
+      updateUserLocation,
       getOrCreateCustomerAccount,
       login,
       signup,

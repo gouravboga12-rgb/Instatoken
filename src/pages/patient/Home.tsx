@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { getHospitalSVGImage } from '../../utils/mockData';
+import { calculateDistanceKm } from '../../utils/googleMaps';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { 
-  MapPin, Bell, User, Search, Star, Clock, 
+  MapPin, Bell, User, Search, Star, 
   ChevronRight, ChevronLeft, Heart, Activity, Baby, 
   Smile, ShieldAlert, Award, Loader2, FileText,
   Menu, BellRing, ShieldCheck, 
@@ -26,7 +27,7 @@ export const Home: React.FC<HomeProps> = ({
   onHospitalSelect, 
   onOpenNotifications 
 }) => {
-  const { user, hospitals, notifications, currentLocation, setCurrentLocation, detectAndSetLocation, addNotification } = useApp();
+  const { user, hospitals, notifications, currentLocation, setCurrentLocation, detectAndSetLocation, addNotification, userCoords } = useApp();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -703,13 +704,15 @@ export const Home: React.FC<HomeProps> = ({
           </div>
 
           <div className="space-y-4">
-            {hospitals.slice(0, 3).map((hosp) => {
-              const totalWaitTime = hosp.doctors.reduce((acc, doc) => {
-                const ahead = Math.max(0, doc.nextAvailableToken - doc.currentQueue - 1);
-                return acc + (ahead * (doc.estimatedWaitPerPatient || 10));
-              }, 0);
-              const calculatedAvgWait = Math.round(totalWaitTime / (hosp.doctors.length || 1)) + (hosp.baseWaitingTime || 15);
-              const avgWait = isNaN(calculatedAvgWait) || calculatedAvgWait <= 0 ? 20 : calculatedAvgWait;
+            {hospitals.map(h => {
+              let dynamicDistance = h.distance;
+              if (userCoords && h.lat && h.lng) {
+                dynamicDistance = calculateDistanceKm(userCoords.lat, userCoords.lng, h.lat, h.lng);
+              }
+              return { ...h, distance: dynamicDistance };
+            })
+            .sort((a, b) => a.distance - b.distance)
+            .slice(0, 3).map((hosp) => {
               const minFee = hosp.doctors.length > 0 ? Math.min(...hosp.doctors.map(d => d.consultationFee)) : 0;
 
               return (
@@ -770,15 +773,11 @@ export const Home: React.FC<HomeProps> = ({
                         )}
                       </div>
 
-                      {/* Distance & Wait Badges */}
+                      {/* Distance Badges */}
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50/90 text-blue-700 border border-blue-200/80 text-[11px] font-extrabold shadow-2xs">
                           <MapPin size={13} className="text-blue-600 shrink-0" />
                           <span>{hosp.distance} km away</span>
-                        </span>
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50/90 text-emerald-700 border border-emerald-200/80 text-[11px] font-extrabold shadow-2xs">
-                          <Clock size={13} className="text-emerald-600 shrink-0" />
-                          <span>{avgWait}m wait</span>
                         </span>
                       </div>
                     </div>

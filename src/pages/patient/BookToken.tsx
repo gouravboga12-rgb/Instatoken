@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
+import { calculateDistanceKm } from '../../utils/googleMaps';
 import { Button } from '../../components/ui/Button';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
@@ -65,7 +66,7 @@ const generateDynamicDateOptions = () => {
 
 export const BookToken: React.FC = () => {
   const { hospitalId, doctorId } = useParams<{ hospitalId: string; doctorId: string }>();
-  const { hospitals, user, toggleSaveDoctor, platformFeePercent } = useApp();
+  const { hospitals, user, toggleSaveDoctor, platformFeePercent, userCoords } = useApp();
   const navigate = useNavigate();
 
   const hospital = hospitals.find(h => h.id === hospitalId) || hospitals[0];
@@ -245,7 +246,7 @@ export const BookToken: React.FC = () => {
                     ★ {doctor.rating} ({doctor.reviewsCount})
                   </span>
                   <span className="bg-blue-50 text-blue-700 font-bold text-[9px] px-2 py-0.5 rounded-full flex items-center gap-0.5 border border-blue-100">
-                    <MapPin size={10} /> {hospital.distance} km away
+                    <MapPin size={10} /> {(userCoords && hospital?.lat && hospital?.lng) ? calculateDistanceKm(userCoords.lat, userCoords.lng, hospital.lat, hospital.lng) : (hospital?.distance || 2.5)} km away
                   </span>
                 </div>
               </div>

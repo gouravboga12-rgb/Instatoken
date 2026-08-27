@@ -3,7 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { getHospitalSVGImage } from '../../utils/mockData';
 import { calculateDistanceKm } from '../../utils/googleMaps';
 import { Card } from '../../components/ui/Card';
-import { Search, MapPin, Clock, Star, ArrowLeft, Compass } from 'lucide-react';
+import { Search, MapPin, Star, ArrowLeft, Compass } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 interface SearchHospitalsProps {
@@ -285,11 +285,6 @@ export const SearchHospitals: React.FC<SearchHospitalsProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {filteredHospitals.length > 0 ? (
               filteredHospitals.map((hosp) => {
-                const totalWaitTime = hosp.doctors.reduce((acc, doc) => {
-                  const ahead = Math.max(0, doc.nextAvailableToken - doc.currentQueue - 1);
-                  return acc + (ahead * doc.estimatedWaitPerPatient);
-                }, 0);
-                const avgWait = Math.round(totalWaitTime / (hosp.doctors.length || 1)) + hosp.baseWaitingTime;
                 const minFee = hosp.doctors.length > 0 ? Math.min(...hosp.doctors.map(d => d.consultationFee)) : 0;
 
                 return (
@@ -350,15 +345,11 @@ export const SearchHospitals: React.FC<SearchHospitalsProps> = ({
                         )}
                       </div>
 
-                      {/* Map Pins and wait timing metrics */}
+                      {/* Map Pins and location metrics */}
                       <div className="flex items-center gap-2 border-t border-slate-50 pt-2.5 flex-wrap">
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50/90 text-blue-700 border border-blue-200/80 text-[11px] font-extrabold shadow-2xs">
                           <MapPin size={13} className="text-blue-600 shrink-0" />
                           <span>{hosp.distance} km away</span>
-                        </span>
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50/90 text-emerald-700 border border-emerald-200/80 text-[11px] font-extrabold shadow-2xs">
-                          <Clock size={13} className="text-emerald-600 shrink-0" />
-                          <span>{avgWait}m wait</span>
                         </span>
                       </div>
                     </div>

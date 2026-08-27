@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { getHospitalSVGImage } from '../../utils/mockData';
+import { calculateDistanceKm } from '../../utils/googleMaps';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { 
@@ -15,7 +16,7 @@ interface HospitalDetailsProps {
 
 export const HospitalDetails: React.FC<HospitalDetailsProps> = ({ onDoctorSelect }) => {
   const { id } = useParams<{ id: string }>();
-  const { hospitals, user, toggleSaveHospital, toggleSaveDoctor } = useApp();
+  const { hospitals, user, toggleSaveHospital, toggleSaveDoctor, userCoords } = useApp();
   const navigate = useNavigate();
   
   const hospital = hospitals.find(h => h.id === id);
@@ -130,7 +131,9 @@ export const HospitalDetails: React.FC<HospitalDetailsProps> = ({ onDoctorSelect
                   <MapPin size={13} className="text-blue-400 shrink-0" />
                   <span>{hospital.address}</span>
                   <span className="bg-blue-600/90 text-white font-extrabold px-2.5 py-0.5 rounded-lg text-[10.5px] shadow-sm border border-blue-400/40 backdrop-blur-xs">
-                    {hospital.distance} km away
+                    {(userCoords && hospital.lat && hospital.lng)
+                      ? calculateDistanceKm(userCoords.lat, userCoords.lng, hospital.lat, hospital.lng)
+                      : hospital.distance} km away
                   </span>
                   <span className="text-slate-400">•</span>
                   <span className="text-amber-400 flex items-center gap-0.5 font-bold">

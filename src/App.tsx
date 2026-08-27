@@ -197,7 +197,7 @@ const AppContent: React.FC = () => {
 
   // Always show Splash Screen first when opening website
   if (showSplash && !isHospitalRoute && !isHospitalLoginRoute) {
-    return <SplashScreen duration={1200} onFinish={() => setShowSplash(false)} />;
+    return <SplashScreen duration={1000} onFinish={() => setShowSplash(false)} />;
   }
 
   if (!onboarded && !isHospitalRoute && !isHospitalLoginRoute) {

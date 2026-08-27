@@ -5,7 +5,7 @@ interface SplashScreenProps {
   duration?: number;
 }
 
-export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish, duration = 2500 }) => {
+export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish, duration = 1000 }) => {
   const [fading, setFading] = useState(false);
 
   useEffect(() => {
@@ -13,7 +13,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish, duration =
       setFading(true);
       setTimeout(() => {
         onFinish();
-      }, 400); // 400ms fade transition
+      }, 300); // 300ms smooth fade transition
     }, duration);
 
     return () => clearTimeout(timer);

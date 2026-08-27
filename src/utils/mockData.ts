@@ -68,6 +68,8 @@ export interface CustomerAccount {
   email: string;
   phone: string;
   location: string;
+  lat?: number;
+  lng?: number;
   joinedDate: string;
   status: 'active' | 'suspended';
   avatar?: string;

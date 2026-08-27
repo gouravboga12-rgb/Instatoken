@@ -7,11 +7,23 @@ import {
   Bell, Settings, Camera, Edit2, Calendar,
   FileText, Heart, User,
   Shield, Trash2, LogOut, ChevronRight,
-  ArrowLeft
+  ArrowLeft, MapPin, Navigation, Loader2, CheckCircle2
 } from 'lucide-react';
 
 export const Profile: React.FC = () => {
-  const { user, hospitals, logout, addFamilyMember, removeFamilyMember, toggleSaveDoctor } = useApp();
+  const { 
+    user, 
+    hospitals, 
+    logout, 
+    addFamilyMember, 
+    removeFamilyMember, 
+    toggleSaveDoctor,
+    currentLocation,
+    userCoords,
+    detectAndSetLocation,
+    updateUserProfile,
+    updateUserLocation
+  } = useApp();
   const navigate = useNavigate();
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
@@ -48,11 +60,22 @@ export const Profile: React.FC = () => {
   const [famAge, setFamAge] = useState('');
   const [famGender, setFamGender] = useState('Male');
   const [famRel, setFamRel] = useState('Spouse');
+  const [detectingGps, setDetectingGps] = useState(false);
 
   // Edit profile form state
   const [editName, setEditName] = useState(user?.name || 'Anil Kumar');
   const [editPhone, setEditPhone] = useState(user?.phone || '+91 98856 14326');
   const [editEmail, setEditEmail] = useState(user?.email || 'anil.kumar@example.com');
+  const [editLocation, setEditLocation] = useState(user?.location || currentLocation || 'Koramangala, Bengaluru');
+
+  useEffect(() => {
+    if (user) {
+      setEditName(user.name);
+      setEditPhone(user.phone);
+      setEditEmail(user.email);
+      setEditLocation(user.location || currentLocation || 'Koramangala, Bengaluru');
+    }
+  }, [user, currentLocation]);
 
   if (!user) {
     return (
@@ -174,7 +197,43 @@ export const Profile: React.FC = () => {
 
       <div className="space-y-4">
 
-        {/* 2. QUICK ACCESS CARDS GRID */}
+        {/* 2. CUSTOMER LOCATION & REAL-TIME DISTANCE CARD */}
+        <div className="bg-white border border-slate-150 rounded-3xl p-4 shadow-2xs">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center shrink-0 border border-blue-100">
+                <MapPin size={20} className="text-blue-600" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h4 className="text-xs sm:text-sm font-extrabold text-slate-900">Recorded Customer Location</h4>
+                  <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <CheckCircle2 size={10} className="text-emerald-600" /> Live Geocoded
+                  </span>
+                </div>
+                <p className="text-xs font-bold text-blue-600 mt-0.5">{user.location || currentLocation || 'Koramangala, Bengaluru'}</p>
+                <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
+                  GPS: {userCoords ? `${userCoords.lat.toFixed(4)}° N, ${userCoords.lng.toFixed(4)}° E` : '12.9348° N, 77.6189° E'} • Used for real-time hospital distance
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                setDetectingGps(true);
+                detectAndSetLocation();
+                setTimeout(() => setDetectingGps(false), 3000);
+              }}
+              disabled={detectingGps}
+              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[11px] font-black flex items-center gap-1.5 shadow-sm shadow-blue-500/20 transition-all cursor-pointer disabled:opacity-60 shrink-0"
+            >
+              {detectingGps ? <Loader2 size={12} className="animate-spin" /> : <Navigation size={12} />}
+              <span>{detectingGps ? 'Detecting...' : 'Update GPS'}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* 3. QUICK ACCESS CARDS GRID */}
         <div className="grid grid-cols-2 gap-3">
           
           {/* Card 1: My Bookings */}
@@ -366,11 +425,19 @@ export const Profile: React.FC = () => {
       </Modal>
 
       {/* Modal Edit Profile */}
-      <Modal isOpen={isEditProfileOpen} onClose={() => setIsEditProfileOpen(false)} title="Edit Profile Details">
+      <Modal isOpen={isEditProfileOpen} onClose={() => setIsEditProfileOpen(false)} title="Edit Customer Account Details">
         <form 
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault();
-            alert("Profile updated successfully!");
+            updateUserProfile({
+              name: editName,
+              phone: editPhone,
+              email: editEmail,
+              location: editLocation
+            });
+            if (editLocation !== user.location) {
+              await updateUserLocation(editLocation);
+            }
             setIsEditProfileOpen(false);
           }} 
           className="space-y-4 text-left"
@@ -405,8 +472,42 @@ export const Profile: React.FC = () => {
             />
           </div>
 
-          <Button type="submit" variant="primary" fullWidth className="py-2.5 mt-2 rounded-xl text-xs font-bold">
-            Save Changes
+          <div className="space-y-1">
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] font-bold text-slate-700 uppercase">Customer Area / City (For Real-Time Distance)</label>
+              <button
+                type="button"
+                onClick={() => {
+                  setDetectingGps(true);
+                  detectAndSetLocation();
+                  setTimeout(() => {
+                    setDetectingGps(false);
+                    setEditLocation(localStorage.getItem('insta_location') || 'Koramangala, Bengaluru');
+                  }, 2000);
+                }}
+                className="text-[10px] text-blue-600 font-extrabold flex items-center gap-1 hover:underline cursor-pointer"
+              >
+                {detectingGps ? <Loader2 size={10} className="animate-spin" /> : <Navigation size={10} />}
+                <span>Auto-Detect GPS</span>
+              </button>
+            </div>
+            <div className="relative">
+              <input 
+                type="text"
+                value={editLocation}
+                onChange={(e) => setEditLocation(e.target.value)}
+                placeholder="e.g. Indiranagar, Bengaluru or Gachibowli, Hyderabad"
+                className="w-full pl-8 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
+              />
+              <MapPin size={13} className="text-slate-400 absolute left-2.5 top-2.5" />
+            </div>
+            <p className="text-[9.5px] text-slate-400 font-medium">
+              Geocodes coordinates to calculate live driving distance to nearby hospital OPDs.
+            </p>
+          </div>
+
+          <Button type="submit" variant="primary" fullWidth className="py-2.5 mt-2 rounded-xl text-xs font-bold shadow-md shadow-blue-500/20">
+            Save Account &amp; Update Hospital Distance
           </Button>
         </form>
       </Modal>

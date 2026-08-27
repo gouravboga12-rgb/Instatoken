@@ -14,7 +14,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
     if (step === 'splash') {
       const timer = setTimeout(() => {
         setStep('slides');
-      }, 2500);
+      }, 1000);
       return () => clearTimeout(timer);
     }
   }, [step]);
