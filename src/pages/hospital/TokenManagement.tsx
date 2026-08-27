@@ -266,6 +266,7 @@ const WalkInGenerator: React.FC<{
   onRequestCreateAccount?: () => void;
 }> = ({ onCreated, onRequestCreateAccount }) => {
   const { generateWalkInToken, doctors, departments, scheduleConfig, patients } = useHospital();
+  const { user, customers, appointments } = useApp();
 
   const [form, setForm] = useState({
     patientName: '',
@@ -288,31 +289,135 @@ const WalkInGenerator: React.FC<{
   const [patientSearchQuery, setPatientSearchQuery] = useState('');
   const [showSearchResults, setShowSearchResults] = useState(false);
 
-  const matchedPatients = useMemo(() => {
-    if (!patientSearchQuery.trim() || patientSearchQuery.trim().length < 2) return [];
-    const q = patientSearchQuery.toLowerCase().trim();
-    return patients.filter(p =>
-      (p.name && p.name.toLowerCase().includes(q)) ||
-      (p.phone && p.phone.includes(q)) ||
-      (p.email && p.email.toLowerCase().includes(q)) ||
-      (p.uhid && p.uhid.toLowerCase().includes(q))
-    ).slice(0, 5);
-  }, [patients, patientSearchQuery]);
+  // Combined Pool of All Registered Patients, App Accounts, and Past Bookings
+  const allSearchablePatients = useMemo(() => {
+    const list: Array<{
+      id: string;
+      name: string;
+      phone: string;
+      email?: string;
+      age?: number;
+      gender?: string;
+      address?: string;
+      uhid?: string;
+      source: string;
+    }> = [];
 
-  const handleSelectPatient = (p: PatientRecord) => {
+    const seenPhones = new Set<string>();
+
+    const addEntry = (item: { id: string; name: string; phone: string; email?: string; age?: number; gender?: string; address?: string; uhid?: string; source: string }) => {
+      if (!item.name && !item.phone) return;
+      const cleanPhone = (item.phone || '').replace(/\D/g, '').slice(-10);
+      const key = cleanPhone || item.id;
+      if (key && seenPhones.has(key)) return;
+      if (key) seenPhones.add(key);
+      list.push({
+        ...item,
+        phone: item.phone || '',
+        name: item.name || 'Patient'
+      });
+    };
+
+    // 1. Hospital Patients Database
+    (patients || []).forEach(p => {
+      addEntry({
+        id: p.id,
+        name: p.name,
+        phone: p.phone,
+        email: p.email,
+        age: p.age,
+        gender: p.gender,
+        address: p.address || p.city,
+        uhid: p.uhid,
+        source: 'Hospital Patient'
+      });
+    });
+
+    // 2. Active Customer Profile (App User)
+    if (user && user.phone) {
+      addEntry({
+        id: 'user-active-profile',
+        name: user.name || 'Customer',
+        phone: user.phone,
+        email: user.email,
+        age: 28,
+        gender: 'Male',
+        address: user.address || user.location || '',
+        uhid: 'CUST-' + user.phone.replace(/\D/g, '').slice(-4),
+        source: 'Customer App'
+      });
+    }
+
+    // 3. Registered Customer Accounts
+    (customers || []).forEach(c => {
+      addEntry({
+        id: c.id,
+        name: c.name,
+        phone: c.phone,
+        email: c.email,
+        age: 30,
+        gender: 'Male',
+        address: c.location || '',
+        uhid: 'CUST-' + (c.phone ? c.phone.replace(/\D/g, '').slice(-4) : 'USER'),
+        source: 'Customer Account'
+      });
+    });
+
+    // 4. Past Appointments
+    (appointments || []).forEach(a => {
+      if (a.patientName && a.phone) {
+        addEntry({
+          id: `appt-${a.id}`,
+          name: a.patientName,
+          phone: a.phone,
+          email: a.email,
+          age: a.age,
+          gender: a.gender,
+          address: a.address,
+          uhid: 'APT-' + a.phone.replace(/\D/g, '').slice(-4),
+          source: 'Booking Record'
+        });
+      }
+    });
+
+    return list;
+  }, [patients, user, customers, appointments]);
+
+  const matchedPatients = useMemo(() => {
+    if (!patientSearchQuery.trim()) return [];
+    const rawQ = patientSearchQuery.toLowerCase().trim();
+    const digitQ = rawQ.replace(/\D/g, '');
+
+    return allSearchablePatients.filter(p => {
+      const pName = (p.name || '').toLowerCase();
+      const pEmail = (p.email || '').toLowerCase();
+      const pUhid = (p.uhid || '').toLowerCase();
+      const pPhone = (p.phone || '').replace(/\D/g, '');
+
+      const matchName = pName.includes(rawQ);
+      const matchEmail = pEmail.includes(rawQ);
+      const matchUhid = pUhid.includes(rawQ);
+      const matchPhone = (digitQ.length >= 2 && pPhone.includes(digitQ)) || (p.phone && p.phone.includes(rawQ));
+
+      return matchName || matchEmail || matchUhid || matchPhone;
+    }).slice(0, 8);
+  }, [allSearchablePatients, patientSearchQuery]);
+
+  const handleSelectPatient = (p: { name: string; phone: string; age?: number; gender?: string; address?: string; uhid?: string }) => {
+    const rawPhone = (p.phone || '').replace(/\D/g, '').slice(-10);
     setForm(prev => ({
       ...prev,
       patientName: p.name,
-      patientPhone: p.phone,
+      patientPhone: rawPhone,
       patientAge: String(p.age || 30),
       patientGender: p.gender || 'Male',
-      address: p.address || p.city || '',
-      selectedPatientUhid: p.uhid
+      address: p.address || '',
+      selectedPatientUhid: p.uhid || `APS${Math.floor(100000 + Math.random() * 900000)}`
     }));
     setPatientSearchQuery('');
     setShowSearchResults(false);
-    setSuccessToast(`Auto-filled details for ${p.name} (UHID: ${p.uhid})`);
-    setTimeout(() => setSuccessToast(''), 3000);
+    setSuccessToast(`Auto-filled details for ${p.name} (${rawPhone})`);
+    setTimeout(() => setSuccessToast(''), 3500);
   };
 
   const handleClearSelectedPatient = () => {
