@@ -3,22 +3,22 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useHospital } from '../../context/HospitalContext';
 import type { TokenRecord } from '../../context/HospitalContext';
 import {
-  CheckCircle, Clock, Play, SkipForward,
+  CheckCircle, Clock, Play,
   XCircle, Calendar, Search, Tv,
   Printer, Eye, Phone, Wifi, WifiOff,
-  Volume2, Stethoscope, Sparkles, X
+  Volume2, Stethoscope, Sparkles, X, UserX, Trash2
 } from 'lucide-react';
 
 export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorIdProp }) => {
   const params = useParams<{ doctorId: string }>();
   const doctorId = doctorIdProp || params.doctorId;
-  const { doctors, tokens, updateTokenStatus, hospitalProfile } = useHospital();
+  const { doctors, tokens, updateTokenStatus, deleteToken, hospitalProfile } = useHospital();
   const navigate = useNavigate();
 
   const doctor = doctors.find(d => d.id === doctorId) || doctors[0];
 
   // Filters State
-  const [statusTab, setStatusTab] = useState<'all' | 'active' | 'completed' | 'skipped' | 'cancelled'>('all');
+  const [statusTab, setStatusTab] = useState<'all' | 'active' | 'completed' | 'not-visited' | 'cancelled'>('all');
   const [dateFilter, setDateFilter] = useState<'today' | 'tomorrow' | 'yesterday' | 'all' | 'custom'>('today');
   const [customDate, setCustomDate] = useState('');
   const [sourceFilter, setSourceFilter] = useState<'all' | 'online' | 'offline'>('all');
@@ -64,7 +64,7 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
       // 1. Status Tab
       if (statusTab === 'active' && !['booked', 'waiting', 'checked-in'].includes(t.status)) return false;
       if (statusTab === 'completed' && t.status !== 'completed') return false;
-      if (statusTab === 'skipped' && t.status !== 'skipped') return false;
+      if (statusTab === 'not-visited' && !['not-visited', 'skipped'].includes(t.status)) return false;
       if (statusTab === 'cancelled' && t.status !== 'cancelled') return false;
 
       // 2. Date Filter
@@ -96,12 +96,12 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
     });
   }, [doctorTokens, statusTab, dateFilter, customDate, sourceFilter, selectedSessionFilter, searchQuery, todayStr, tomorrowStr, yesterdayStr]);
 
-  // Metrics specifically for this Doctor
+  // Metrics specifically for this Doctor (Revenue strictly from completed/visited tokens)
   const activeQueue = doctorTokens.filter(t => ['booked', 'waiting', 'checked-in'].includes(t.status) && (t.bookingDate === todayStr || !t.bookingDate));
   const inConsultation = activeQueue.find(t => t.status === 'checked-in');
   const nextInLine = activeQueue.filter(t => t.id !== inConsultation?.id);
   const completedToday = doctorTokens.filter(t => t.status === 'completed' && (t.bookingDate === todayStr || !t.bookingDate));
-  const skippedToday = doctorTokens.filter(t => t.status === 'skipped' && (t.bookingDate === todayStr || !t.bookingDate));
+  const notVisitedToday = doctorTokens.filter(t => ['not-visited', 'skipped'].includes(t.status) && (t.bookingDate === todayStr || !t.bookingDate));
   const todayDoctorRevenue = completedToday.reduce((acc, t) => acc + (t.consultationFee || doctor?.consultationFee || 0), 0);
 
   if (!doctor) {
@@ -137,8 +137,19 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
     updateTokenStatus(id, 'completed');
   };
 
-  const handleSkipToken = (id: string) => {
-    updateTokenStatus(id, 'skipped');
+  const handleMarkNotVisited = (id: string) => {
+    updateTokenStatus(id, 'not-visited');
+  };
+
+  const handleRecallToken = (id: string) => {
+    updateTokenStatus(id, 'checked-in');
+    playCallChime();
+  };
+
+  const handleReleaseSlot = (id: string) => {
+    if (window.confirm('Release / delete this unvisited token slot so it becomes available to book again?')) {
+      deleteToken(id);
+    }
   };
 
   const handleCancelToken = (id: string) => {
@@ -242,7 +253,7 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
       {/* ── Key Metrics Cards ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-xs flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center font-black">
+          <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-black">
             <Clock size={22} />
           </div>
           <div>
@@ -256,28 +267,28 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
             <CheckCircle size={22} />
           </div>
           <div>
-            <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider block">Completed Today</span>
+            <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider block">Visited Today</span>
             <span className="text-2xl font-black text-emerald-600">{completedToday.length}</span>
           </div>
         </div>
 
         <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-xs flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center font-black">
-            <SkipForward size={22} />
+          <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center font-black">
+            <UserX size={22} />
           </div>
           <div>
-            <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider block">Skipped / Hold</span>
-            <span className="text-2xl font-black text-purple-600">{skippedToday.length}</span>
+            <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider block">Not Visited / Absent</span>
+            <span className="text-2xl font-black text-amber-600">{notVisitedToday.length}</span>
           </div>
         </div>
 
         <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-xs flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-black">
+          <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center font-black">
             <Sparkles size={22} />
           </div>
           <div>
-            <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider block">Today's Doctor Earnings</span>
-            <span className="text-2xl font-black text-slate-800">₹{todayDoctorRevenue}</span>
+            <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider block">Today's Earned Revenue</span>
+            <span className="text-2xl font-black text-slate-800">₹{todayDoctorRevenue.toLocaleString('en-IN')}</span>
           </div>
         </div>
       </div>
@@ -337,15 +348,17 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
               <button
                 onClick={() => handleCompleteToken(inConsultation.id)}
                 className="px-5 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black text-xs cursor-pointer border-none shadow-sm flex items-center justify-center gap-2 transition-colors"
+                title="Mark Visited / Done (Adds to Doctor Revenue)"
               >
                 <CheckCircle size={16} /> Mark Visited / Done
               </button>
 
               <button
-                onClick={() => handleSkipToken(inConsultation.id)}
-                className="px-4 py-3 bg-white/15 hover:bg-white/25 text-white rounded-2xl font-bold text-xs cursor-pointer border-none flex items-center justify-center gap-1.5 transition-colors"
+                onClick={() => handleMarkNotVisited(inConsultation.id)}
+                className="px-4 py-3 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-2xl font-bold text-xs cursor-pointer flex items-center justify-center gap-1.5 transition-colors"
+                title="Patient absent or skipped - moves to Not Visited list (No revenue counted)"
               >
-                <SkipForward size={15} /> Skip / Hold
+                <UserX size={15} /> Mark Not Visited
               </button>
 
               <button
@@ -367,9 +380,9 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
             {[
               { key: 'all', label: `All (${doctorTokens.length})` },
-              { key: 'active', label: `Waiting / Active (${activeQueue.length})` },
-              { key: 'completed', label: `Completed (${completedToday.length})` },
-              { key: 'skipped', label: `Skipped (${skippedToday.length})` },
+              { key: 'active', label: `Waiting / In Cabin (${activeQueue.length})` },
+              { key: 'completed', label: `Visited (${completedToday.length})` },
+              { key: 'not-visited', label: `Not Visited / Absent (${notVisitedToday.length})` },
               { key: 'cancelled', label: `Cancelled (${doctorTokens.filter(t => t.status === 'cancelled').length})` }
             ].map(tab => (
               <button
@@ -482,17 +495,24 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
               ) : (
                 filteredTokens.map(tok => {
                   const isCurrent = inConsultation?.id === tok.id;
+                  const isNotVisited = ['not-visited', 'skipped'].includes(tok.status);
+                  const isCompleted = tok.status === 'completed';
+
                   return (
                     <tr
                       key={tok.id}
                       className={`hover:bg-slate-50/80 transition-colors ${
-                        isCurrent ? 'bg-blue-50/50' : ''
+                        isCurrent ? 'bg-blue-50/50' : isNotVisited ? 'bg-amber-50/20' : ''
                       }`}
                     >
                       <td className="py-3.5 px-4">
                         <span className={`inline-flex items-center justify-center w-8 h-8 rounded-xl font-black text-sm ${
                           isCurrent
                             ? 'bg-blue-600 text-white shadow-xs'
+                            : isCompleted
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : isNotVisited
+                            ? 'bg-amber-100 text-amber-800'
                             : 'bg-slate-100 text-slate-800'
                         }`}>
                           #{tok.tokenNo}
@@ -528,9 +548,15 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
                       <td className="py-3.5 px-4">
                         <div className="font-extrabold text-slate-800">₹{tok.consultationFee}</div>
                         <span className={`text-[9px] font-black uppercase ${
-                          tok.paymentStatus === 'paid' ? 'text-emerald-600' : 'text-amber-600'
+                          tok.status === 'completed'
+                            ? 'text-emerald-600'
+                            : isNotVisited
+                            ? 'text-amber-600'
+                            : tok.paymentStatus === 'paid'
+                            ? 'text-emerald-600'
+                            : 'text-slate-400'
                         }`}>
-                          {tok.paymentStatus}
+                          {tok.status === 'completed' ? 'Earned' : isNotVisited ? 'Uncollected' : tok.paymentStatus}
                         </span>
                       </td>
 
@@ -540,18 +566,18 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
                             ? 'bg-emerald-100 text-emerald-700'
                             : tok.status === 'checked-in'
                             ? 'bg-blue-600 text-white'
-                            : tok.status === 'skipped'
-                            ? 'bg-purple-100 text-purple-700'
+                            : isNotVisited
+                            ? 'bg-amber-100 text-amber-700'
                             : tok.status === 'cancelled'
                             ? 'bg-red-100 text-red-700'
-                            : 'bg-amber-100 text-amber-700'
+                            : 'bg-blue-50 text-blue-700'
                         }`}>
-                          {tok.status === 'checked-in' ? 'In Cabin' : tok.status}
+                          {tok.status === 'checked-in' ? 'In Cabin' : tok.status === 'completed' ? 'Visited' : isNotVisited ? 'Not Visited' : tok.status}
                         </span>
                       </td>
 
                       <td className="py-3.5 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
+                        <div className="flex items-center justify-end gap-1.5 flex-wrap">
                           {['booked', 'waiting'].includes(tok.status) && (
                             <button
                               onClick={() => handleCallNext(tok.id)}
@@ -566,20 +592,46 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
                             <button
                               onClick={() => handleCompleteToken(tok.id)}
                               className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold cursor-pointer border-none shadow-xs flex items-center gap-1"
-                              title="Complete consultation"
+                              title="Complete consultation (adds to revenue)"
                             >
-                              <CheckCircle size={11} /> Done
+                              <CheckCircle size={11} /> Visited
                             </button>
                           )}
 
                           {['booked', 'waiting', 'checked-in'].includes(tok.status) && (
                             <button
-                              onClick={() => handleSkipToken(tok.id)}
-                              className="p-1 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg cursor-pointer transition-colors"
-                              title="Skip patient"
+                              onClick={() => handleMarkNotVisited(tok.id)}
+                              className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-lg text-xs font-bold cursor-pointer flex items-center gap-1"
+                              title="Mark as Not Visited / Absent"
                             >
-                              <SkipForward size={13} />
+                              <UserX size={11} /> Not Visited
                             </button>
+                          )}
+
+                          {isNotVisited && (
+                            <>
+                              <button
+                                onClick={() => handleCompleteToken(tok.id)}
+                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold cursor-pointer border-none shadow-xs flex items-center gap-1"
+                                title="Patient arrived late - mark as visited and add revenue"
+                              >
+                                <CheckCircle size={11} /> Mark Visited
+                              </button>
+                              <button
+                                onClick={() => handleRecallToken(tok.id)}
+                                className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-xs font-bold cursor-pointer flex items-center gap-1"
+                                title="Re-call into cabin"
+                              >
+                                <Play size={11} /> Call Cabin
+                              </button>
+                              <button
+                                onClick={() => handleReleaseSlot(tok.id)}
+                                className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg text-xs font-bold cursor-pointer flex items-center gap-1"
+                                title="Cancel / delete and release slot"
+                              >
+                                <Trash2 size={11} /> Release Slot
+                              </button>
+                            </>
                           )}
 
                           <button

@@ -3,12 +3,12 @@ import { useHospital } from '../../context/HospitalContext';
 import type { HospitalDoctor } from '../../context/HospitalContext';
 import {
   DollarSign, TrendingUp, ChevronRight,
-  Search, Clock, CheckCircle2,
-  Stethoscope, X
+  Search, CheckCircle2,
+  Stethoscope, X, UserX, CheckCircle, Trash2
 } from 'lucide-react';
 
 export const RevenueOverview: React.FC = () => {
-  const { doctors, tokens } = useHospital();
+  const { doctors, tokens, updateTokenStatus, deleteToken } = useHospital();
 
   // Filters State
   const [dateFilter, setDateFilter] = useState<'today' | 'week' | 'month' | 'all' | 'custom'>('today');
@@ -19,7 +19,7 @@ export const RevenueOverview: React.FC = () => {
   // Selected Doctor for Detailed History Modal / Drawer
   const [selectedDoctor, setSelectedDoctor] = useState<HospitalDoctor | null>(null);
   const [detailSearch, setDetailSearch] = useState('');
-  const [detailStatusFilter, setDetailStatusFilter] = useState('all');
+  const [detailStatusFilter, setDetailStatusFilter] = useState<'all' | 'visited' | 'not-visited' | 'waiting'>('all');
 
   const todayStr = new Date().toISOString().split('T')[0];
 
@@ -53,28 +53,28 @@ export const RevenueOverview: React.FC = () => {
     return tokens.filter(t => isDateInFilter(t.bookingDate));
   }, [tokens, dateFilter, customStartDate, customEndDate]);
 
-  // Aggregate stats per doctor
+  // Aggregate stats per doctor strictly based on completed/visited tokens
   const doctorRevenueStats = useMemo(() => {
     return doctors.map(doc => {
       const docTokens = dateFilteredTokens.filter(t => t.doctorId === doc.id);
       const completedTokens = docTokens.filter(t => t.status === 'completed');
-      const paidTokens = docTokens.filter(t => t.paymentStatus === 'paid');
-      const pendingTokens = docTokens.filter(t => t.paymentStatus === 'pending');
+      const notVisitedTokens = docTokens.filter(t => ['not-visited', 'skipped'].includes(t.status));
+      const waitingTokens = docTokens.filter(t => ['booked', 'waiting', 'checked-in'].includes(t.status));
 
       const fee = doc.consultationFee || 500;
-      const completedRevenue = completedTokens.reduce((acc, t) => acc + (t.consultationFee || fee), 0);
-      const paidRevenue = paidTokens.reduce((acc, t) => acc + (t.consultationFee || fee), 0);
-      const pendingRevenue = pendingTokens.reduce((acc, t) => acc + (t.consultationFee || fee), 0);
+      // Revenue is strictly from visited consultations
+      const earnedRevenue = completedTokens.reduce((acc, t) => acc + (t.consultationFee || fee), 0);
+      const uncollectedAmount = notVisitedTokens.reduce((acc, t) => acc + (t.consultationFee || fee), 0);
 
       return {
         doctor: doc,
         totalBookings: docTokens.length,
         completedVisits: completedTokens.length,
-        paidVisits: paidTokens.length,
-        pendingVisits: pendingTokens.length,
+        notVisitedCount: notVisitedTokens.length,
+        waitingCount: waitingTokens.length,
         consultationFee: fee,
-        earnedRevenue: paidRevenue || completedRevenue,
-        pendingAmount: pendingRevenue
+        earnedRevenue,
+        uncollectedAmount
       };
     });
   }, [doctors, dateFilteredTokens]);
@@ -92,7 +92,7 @@ export const RevenueOverview: React.FC = () => {
   // Global Totals
   const totalEarnedRevenue = doctorRevenueStats.reduce((acc, d) => acc + d.earnedRevenue, 0);
   const totalCompletedVisits = doctorRevenueStats.reduce((acc, d) => acc + d.completedVisits, 0);
-  const totalPendingAmount = doctorRevenueStats.reduce((acc, d) => acc + d.pendingAmount, 0);
+  const totalNotVisitedCount = doctorRevenueStats.reduce((acc, d) => acc + d.notVisitedCount, 0);
   const avgRevenuePerDoctor = doctors.length > 0 ? Math.round(totalEarnedRevenue / doctors.length) : 0;
 
   // Detailed tokens for selected doctor
@@ -100,7 +100,10 @@ export const RevenueOverview: React.FC = () => {
     if (!selectedDoctor) return [];
     return dateFilteredTokens.filter(t => {
       if (t.doctorId !== selectedDoctor.id) return false;
-      if (detailStatusFilter !== 'all' && t.status !== detailStatusFilter) return false;
+      if (detailStatusFilter === 'visited' && t.status !== 'completed') return false;
+      if (detailStatusFilter === 'not-visited' && !['not-visited', 'skipped'].includes(t.status)) return false;
+      if (detailStatusFilter === 'waiting' && !['booked', 'waiting', 'checked-in'].includes(t.status)) return false;
+
       if (detailSearch.trim()) {
         const q = detailSearch.toLowerCase();
         return (
@@ -112,6 +115,26 @@ export const RevenueOverview: React.FC = () => {
       return true;
     });
   }, [selectedDoctor, dateFilteredTokens, detailStatusFilter, detailSearch]);
+
+  const selectedDoctorCompletedTokens = useMemo(() => {
+    if (!selectedDoctor) return [];
+    return dateFilteredTokens.filter(t => t.doctorId === selectedDoctor.id && t.status === 'completed');
+  }, [selectedDoctor, dateFilteredTokens]);
+
+  const selectedDoctorEarnedRevenue = useMemo(() => {
+    if (!selectedDoctor) return 0;
+    return selectedDoctorCompletedTokens.reduce((acc, t) => acc + (t.consultationFee || selectedDoctor.consultationFee || 0), 0);
+  }, [selectedDoctor, selectedDoctorCompletedTokens]);
+
+  const handleMarkVisitedFromModal = (tokenId: string) => {
+    updateTokenStatus(tokenId, 'completed');
+  };
+
+  const handleReleaseSlotFromModal = (tokenId: string) => {
+    if (window.confirm('Are you sure you want to release this token slot?')) {
+      deleteToken(tokenId);
+    }
+  };
 
   return (
     <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
@@ -125,7 +148,7 @@ export const RevenueOverview: React.FC = () => {
             <div>
               <h1 className="text-xl font-black text-slate-800 leading-tight">Revenue Overview & Doctor Financial Ledger</h1>
               <p className="text-xs text-slate-400 font-semibold mt-0.5">
-                Dynamic backend-calculated consultation collections, visit counts, and doctor revenue drilldown.
+                Calculated strictly on completed / visited consultations according to hospital business rules.
               </p>
             </div>
           </div>
@@ -172,10 +195,10 @@ export const RevenueOverview: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white rounded-3xl border border-slate-100 p-5 shadow-xs flex items-center justify-between">
           <div>
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Total Realized Revenue</span>
-            <h3 className="text-3xl font-black text-emerald-600 mt-1">₹{totalEarnedRevenue.toLocaleString()}</h3>
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Realized Earned Revenue</span>
+            <h3 className="text-3xl font-black text-emerald-600 mt-1">₹{totalEarnedRevenue.toLocaleString('en-IN')}</h3>
             <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full mt-1 inline-block">
-              {totalCompletedVisits} Completed Visits
+              {totalCompletedVisits} Visited Consultations
             </span>
           </div>
           <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl">
@@ -185,9 +208,9 @@ export const RevenueOverview: React.FC = () => {
 
         <div className="bg-white rounded-3xl border border-slate-100 p-5 shadow-xs flex items-center justify-between">
           <div>
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Completed Consultations</span>
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Total Visited Patients</span>
             <h3 className="text-3xl font-black text-slate-800 mt-1">{totalCompletedVisits}</h3>
-            <span className="text-[10px] text-slate-400 font-semibold mt-1 block">Across all doctor cabins</span>
+            <span className="text-[10px] text-slate-400 font-semibold mt-1 block">Successfully consulted</span>
           </div>
           <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl">
             <CheckCircle2 size={24} />
@@ -196,19 +219,21 @@ export const RevenueOverview: React.FC = () => {
 
         <div className="bg-white rounded-3xl border border-slate-100 p-5 shadow-xs flex items-center justify-between">
           <div>
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Pending Desk Collections</span>
-            <h3 className="text-3xl font-black text-amber-600 mt-1">₹{totalPendingAmount.toLocaleString()}</h3>
-            <span className="text-[10px] text-slate-400 font-semibold mt-1 block">Pay-at-counter tokens</span>
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Not Visited / Absent</span>
+            <h3 className="text-3xl font-black text-amber-600 mt-1">{totalNotVisitedCount}</h3>
+            <span className="text-[10px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full font-bold mt-1 inline-block">
+              ₹0 Revenue Counted
+            </span>
           </div>
           <div className="p-3 bg-amber-50 text-amber-600 rounded-2xl">
-            <Clock size={24} />
+            <UserX size={24} />
           </div>
         </div>
 
         <div className="bg-white rounded-3xl border border-slate-100 p-5 shadow-xs flex items-center justify-between">
           <div>
             <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Avg Revenue Per Doctor</span>
-            <h3 className="text-3xl font-black text-purple-600 mt-1">₹{avgRevenuePerDoctor.toLocaleString()}</h3>
+            <h3 className="text-3xl font-black text-purple-600 mt-1">₹{avgRevenuePerDoctor.toLocaleString('en-IN')}</h3>
             <span className="text-[10px] text-slate-400 font-semibold mt-1 block">{doctors.length} active doctors</span>
           </div>
           <div className="p-3 bg-purple-50 text-purple-600 rounded-2xl">
@@ -223,9 +248,9 @@ export const RevenueOverview: React.FC = () => {
           <div>
             <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
               <Stethoscope size={16} className="text-blue-600" />
-              <span>Doctor-Wise Revenue Breakdown</span>
+              <span>Doctor-Wise Revenue Breakdown (Phase 10)</span>
             </h2>
-            <p className="text-xs text-slate-400 font-medium mt-0.5">Click any doctor row to view their granular patient-by-patient revenue ledger</p>
+            <p className="text-xs text-slate-400 font-medium mt-0.5">Click any doctor row to view patient-by-patient revenue ledger</p>
           </div>
 
           <div className="relative">
@@ -246,15 +271,15 @@ export const RevenueOverview: React.FC = () => {
               <tr>
                 <th className="px-5 py-3.5">Doctor Name & Specialty</th>
                 <th className="px-4 py-3.5">Department</th>
-                <th className="px-4 py-3.5 text-center">Completed Visits</th>
+                <th className="px-4 py-3.5 text-center">Visited / Completed</th>
+                <th className="px-4 py-3.5 text-center">Not Visited / Absent</th>
                 <th className="px-4 py-3.5 text-center">Consultation Fee</th>
                 <th className="px-4 py-3.5 text-right">Earned Revenue</th>
-                <th className="px-4 py-3.5 text-right">Pending Amount</th>
                 <th className="px-5 py-3.5 text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50 font-medium text-slate-700">
-              {filteredDoctorStats.map(({ doctor, completedVisits, totalBookings, consultationFee, earnedRevenue, pendingAmount }) => (
+              {filteredDoctorStats.map(({ doctor, completedVisits, notVisitedCount, totalBookings, consultationFee, earnedRevenue }) => (
                 <tr
                   key={doctor.id}
                   onClick={() => setSelectedDoctor(doctor)}
@@ -281,8 +306,16 @@ export const RevenueOverview: React.FC = () => {
                   </td>
 
                   <td className="px-4 py-4 text-center">
-                    <span className="font-extrabold text-slate-900 bg-slate-100 px-3 py-1 rounded-full text-xs">
+                    <span className="font-extrabold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full text-xs">
                       {completedVisits} <span className="text-[10px] text-slate-400 font-semibold">/ {totalBookings}</span>
+                    </span>
+                  </td>
+
+                  <td className="px-4 py-4 text-center">
+                    <span className={`font-extrabold px-3 py-1 rounded-full text-xs ${
+                      notVisitedCount > 0 ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-400'
+                    }`}>
+                      {notVisitedCount} Absent
                     </span>
                   </td>
 
@@ -292,13 +325,7 @@ export const RevenueOverview: React.FC = () => {
 
                   <td className="px-4 py-4 text-right">
                     <span className="font-black text-emerald-600 text-sm">
-                      ₹{earnedRevenue.toLocaleString()}
-                    </span>
-                  </td>
-
-                  <td className="px-4 py-4 text-right">
-                    <span className={`font-bold text-xs ${pendingAmount > 0 ? 'text-amber-600' : 'text-slate-400'}`}>
-                      ₹{pendingAmount.toLocaleString()}
+                      ₹{earnedRevenue.toLocaleString('en-IN')}
                     </span>
                   </td>
 
@@ -307,7 +334,7 @@ export const RevenueOverview: React.FC = () => {
                       onClick={(e) => { e.stopPropagation(); setSelectedDoctor(doctor); }}
                       className="px-3 py-1.5 bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white rounded-xl font-bold text-xs transition-all flex items-center gap-1 ml-auto border-none cursor-pointer"
                     >
-                      <span>Details</span>
+                      <span>History</span>
                       <ChevronRight size={13} />
                     </button>
                   </td>
@@ -327,10 +354,10 @@ export const RevenueOverview: React.FC = () => {
                 <td className="px-5 py-4 text-sm" colSpan={2}>
                   Hospital Overall Totals
                 </td>
-                <td className="px-4 py-4 text-center text-sm">{totalCompletedVisits} Visits</td>
+                <td className="px-4 py-4 text-center text-sm text-emerald-700">{totalCompletedVisits} Visited</td>
+                <td className="px-4 py-4 text-center text-sm text-amber-700">{totalNotVisitedCount} Absent</td>
                 <td className="px-4 py-4 text-center">—</td>
-                <td className="px-4 py-4 text-right text-emerald-700 text-base">₹{totalEarnedRevenue.toLocaleString()}</td>
-                <td className="px-4 py-4 text-right text-amber-700 text-sm">₹{totalPendingAmount.toLocaleString()}</td>
+                <td className="px-4 py-4 text-right text-emerald-700 text-base">₹{totalEarnedRevenue.toLocaleString('en-IN')}</td>
                 <td className="px-5 py-4"></td>
               </tr>
             </tfoot>
@@ -338,7 +365,7 @@ export const RevenueOverview: React.FC = () => {
         </div>
       </div>
 
-      {/* ── Doctor Revenue Detail Modal / Drawer ───────────────────────────── */}
+      {/* ── Doctor Revenue Detail Modal / Drawer (Phase 11) ─────────────────── */}
       {selectedDoctor && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-scaleUp">
@@ -353,7 +380,7 @@ export const RevenueOverview: React.FC = () => {
                 <div>
                   <h3 className="text-base font-black text-slate-800">{selectedDoctor.name} — Revenue History</h3>
                   <p className="text-xs text-blue-600 font-bold">
-                    {selectedDoctor.specialization} · Fee: ₹{selectedDoctor.consultationFee}
+                    {selectedDoctor.specialization} · Fee: ₹{selectedDoctor.consultationFee} · Realized Revenue: <strong className="text-emerald-700 font-black">₹{selectedDoctorEarnedRevenue.toLocaleString('en-IN')}</strong>
                   </p>
                 </div>
               </div>
@@ -369,16 +396,38 @@ export const RevenueOverview: React.FC = () => {
             {/* Filter Sub-bar */}
             <div className="p-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 shrink-0 bg-white">
               <div className="flex items-center gap-2">
-                <select
-                  value={detailStatusFilter}
-                  onChange={e => setDetailStatusFilter(e.target.value)}
-                  className="text-xs font-bold text-slate-600 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 outline-none"
+                <button
+                  onClick={() => setDetailStatusFilter('all')}
+                  className={`px-3 py-1 rounded-xl text-xs font-extrabold cursor-pointer border transition-all ${
+                    detailStatusFilter === 'all' ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-50 text-slate-600 border-slate-200'
+                  }`}
                 >
-                  <option value="all">All Visits ({selectedDoctorTokens.length})</option>
-                  <option value="completed">Completed / Visited</option>
-                  <option value="booked">Booked / Waiting</option>
-                  <option value="skipped">Skipped</option>
-                </select>
+                  All ({dateFilteredTokens.filter(t => t.doctorId === selectedDoctor.id).length})
+                </button>
+                <button
+                  onClick={() => setDetailStatusFilter('visited')}
+                  className={`px-3 py-1 rounded-xl text-xs font-extrabold cursor-pointer border transition-all ${
+                    detailStatusFilter === 'visited' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  }`}
+                >
+                  Visited ({dateFilteredTokens.filter(t => t.doctorId === selectedDoctor.id && t.status === 'completed').length})
+                </button>
+                <button
+                  onClick={() => setDetailStatusFilter('not-visited')}
+                  className={`px-3 py-1 rounded-xl text-xs font-extrabold cursor-pointer border transition-all ${
+                    detailStatusFilter === 'not-visited' ? 'bg-amber-600 text-white border-amber-600' : 'bg-amber-50 text-amber-700 border-amber-200'
+                  }`}
+                >
+                  Not Visited ({dateFilteredTokens.filter(t => t.doctorId === selectedDoctor.id && ['not-visited', 'skipped'].includes(t.status)).length})
+                </button>
+                <button
+                  onClick={() => setDetailStatusFilter('waiting')}
+                  className={`px-3 py-1 rounded-xl text-xs font-extrabold cursor-pointer border transition-all ${
+                    detailStatusFilter === 'waiting' ? 'bg-slate-800 text-white border-slate-800' : 'bg-slate-50 text-slate-600 border-slate-200'
+                  }`}
+                >
+                  In Queue / Waiting
+                </button>
               </div>
 
               <div className="relative">
@@ -399,56 +448,92 @@ export const RevenueOverview: React.FC = () => {
                 <thead className="bg-slate-50 border-b border-slate-100 text-[10px] font-black text-slate-500 uppercase tracking-wider">
                   <tr>
                     <th className="px-3.5 py-3">Token No.</th>
-                    <th className="px-3.5 py-3">Patient</th>
+                    <th className="px-3.5 py-3">Patient Details</th>
                     <th className="px-3.5 py-3">Date & Session</th>
-                    <th className="px-3.5 py-3">Source</th>
-                    <th className="px-3.5 py-3">Status</th>
-                    <th className="px-3.5 py-3 text-right">Fee / Paid</th>
+                    <th className="px-3.5 py-3">Visit Status</th>
+                    <th className="px-3.5 py-3 text-right">Consultation Fee</th>
+                    <th className="px-3.5 py-3 text-right">Revenue Counted</th>
+                    <th className="px-3.5 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50 font-medium text-slate-700">
-                  {selectedDoctorTokens.map(t => (
-                    <tr key={t.id} className="hover:bg-slate-50/70">
-                      <td className="px-3.5 py-3 font-mono font-extrabold text-slate-800">
-                        #{t.tokenNo}
-                      </td>
-                      <td className="px-3.5 py-3">
-                        <p className="font-extrabold text-slate-800">{t.patientName}</p>
-                        <p className="text-[10px] text-slate-400">{t.patientPhone} · {t.patientAge}Y</p>
-                      </td>
-                      <td className="px-3.5 py-3">
-                        <p className="font-bold text-slate-700 capitalize">{t.session || 'Morning'}</p>
-                        <p className="text-[10px] text-slate-400">{t.bookingDate || todayStr} {t.time}</p>
-                      </td>
-                      <td className="px-3.5 py-3">
-                        <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md ${
-                          t.type === 'online' ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700'
-                        }`}>
-                          {t.type === 'online' ? 'Customer App' : 'Desk'}
-                        </span>
-                      </td>
-                      <td className="px-3.5 py-3">
-                        <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full capitalize ${
-                          t.status === 'completed' ? 'bg-emerald-100 text-emerald-700' :
-                          t.status === 'checked-in' ? 'bg-amber-100 text-amber-700' :
-                          'bg-slate-100 text-slate-600'
-                        }`}>
-                          {t.status}
-                        </span>
-                      </td>
-                      <td className="px-3.5 py-3 text-right">
-                        <span className="font-black text-slate-900 text-xs block">₹{t.consultationFee || selectedDoctor.consultationFee}</span>
-                        <span className={`text-[9px] font-bold capitalize ${t.paymentStatus === 'paid' ? 'text-emerald-600' : 'text-amber-600'}`}>
-                          {t.paymentStatus}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                  {selectedDoctorTokens.map(t => {
+                    const isVisited = t.status === 'completed';
+                    const isNotVisited = ['not-visited', 'skipped'].includes(t.status);
+                    const fee = t.consultationFee || selectedDoctor.consultationFee || 500;
+
+                    return (
+                      <tr key={t.id} className={`hover:bg-slate-50/70 ${isVisited ? 'bg-emerald-50/20' : isNotVisited ? 'bg-amber-50/20' : ''}`}>
+                        <td className="px-3.5 py-3 font-mono font-extrabold text-slate-800">
+                          #{t.tokenNo}
+                        </td>
+                        <td className="px-3.5 py-3">
+                          <p className="font-extrabold text-slate-800">{t.patientName}</p>
+                          <p className="text-[10px] text-slate-400">{t.patientPhone} · {t.patientAge}Y, {t.patientGender}</p>
+                        </td>
+                        <td className="px-3.5 py-3">
+                          <p className="font-bold text-slate-700 capitalize">{t.session || 'Morning'} OPD</p>
+                          <p className="text-[10px] text-slate-400">{t.bookingDate || todayStr} at {t.time}</p>
+                        </td>
+                        <td className="px-3.5 py-3">
+                          <span className={`text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider ${
+                            isVisited
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : isNotVisited
+                              ? 'bg-amber-100 text-amber-800'
+                              : t.status === 'checked-in'
+                              ? 'bg-blue-600 text-white'
+                              : t.status === 'cancelled'
+                              ? 'bg-red-100 text-red-700'
+                              : 'bg-slate-100 text-slate-700'
+                          }`}>
+                            {isVisited ? 'Visited' : isNotVisited ? 'Not Visited' : t.status === 'checked-in' ? 'In Cabin' : t.status}
+                          </span>
+                        </td>
+                        <td className="px-3.5 py-3 text-right font-extrabold text-slate-800">
+                          ₹{fee}
+                        </td>
+                        <td className="px-3.5 py-3 text-right">
+                          {isVisited ? (
+                            <span className="font-black text-emerald-600 text-xs">
+                              +₹{fee}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-slate-400 font-bold">
+                              ₹0 (Excluded)
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3.5 py-3 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            {!isVisited && (
+                              <button
+                                onClick={() => handleMarkVisitedFromModal(t.id)}
+                                className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded-lg cursor-pointer border-none shadow-2xs flex items-center gap-1"
+                                title="Mark as Visited to include in revenue"
+                              >
+                                <CheckCircle size={10} /> Mark Visited
+                              </button>
+                            )}
+                            {isNotVisited && (
+                              <button
+                                onClick={() => handleReleaseSlotFromModal(t.id)}
+                                className="px-1.5 py-1 bg-red-50 hover:bg-red-100 text-red-600 text-[10px] font-bold rounded-lg cursor-pointer border border-red-200"
+                                title="Release / delete token slot"
+                              >
+                                <Trash2 size={11} />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
 
                   {selectedDoctorTokens.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="text-center py-8 text-slate-400 font-semibold">
-                        No transactions found for {selectedDoctor.name} in this time window.
+                      <td colSpan={7} className="text-center py-8 text-slate-400 font-semibold">
+                        No transactions found for {selectedDoctor.name} matching filter.
                       </td>
                     </tr>
                   )}
@@ -458,15 +543,15 @@ export const RevenueOverview: React.FC = () => {
 
             {/* Modal Footer */}
             <div className="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between shrink-0">
-              <span className="text-xs font-bold text-slate-500">
-                Total Visits: {selectedDoctorTokens.length} · Total Revenue: <strong className="text-emerald-700">₹{selectedDoctorTokens.reduce((acc, t) => acc + (t.consultationFee || selectedDoctor.consultationFee || 0), 0)}</strong>
+              <span className="text-xs font-bold text-slate-600">
+                Visited: <strong className="text-emerald-700">{selectedDoctorCompletedTokens.length}</strong> · Realized Revenue: <strong className="text-emerald-700">₹{selectedDoctorEarnedRevenue.toLocaleString('en-IN')}</strong>
               </span>
 
               <button
                 onClick={() => setSelectedDoctor(null)}
                 className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-extrabold cursor-pointer border-none"
               >
-                Done
+                Close
               </button>
             </div>
           </div>

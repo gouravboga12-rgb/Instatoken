@@ -68,7 +68,7 @@ export interface TokenRecord {
   session: 'morning' | 'afternoon' | 'evening';
   time: string;
   bookingDate: string;
-  status: 'booked' | 'checked-in' | 'completed' | 'cancelled' | 'waiting' | 'skipped';
+  status: 'booked' | 'checked-in' | 'completed' | 'cancelled' | 'waiting' | 'skipped' | 'not-visited';
   queuePosition: number;
   estimatedWait: number; // minutes
   consultationFee: number;
@@ -241,6 +241,7 @@ interface HospitalContextType {
   }) => TokenRecord;
   updateTokenStatus: (id: string, status: TokenRecord['status']) => void;
   cancelToken: (id: string) => void;
+  deleteToken: (id: string) => void;
 
   // Patients
   addPatient: (p: Omit<PatientRecord, 'id' | 'uhid' | 'registeredOn' | 'totalVisits' | 'lastVisit' | 'tokenHistory'>) => void;
@@ -935,6 +936,15 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     updateTokenStatus(id, 'cancelled');
   };
 
+  const deleteToken = (id: string) => {
+    setTokens(prev => {
+      const updated = prev.filter(t => t.id !== id);
+      localStorage.setItem('insta_hospital_tokens', JSON.stringify(updated));
+      broadcastGlobalSync('HOSPITAL_TOKENS_UPDATED', updated);
+      return updated;
+    });
+  };
+
   // Patients
   const addPatient = (p: Omit<PatientRecord, 'id' | 'uhid' | 'registeredOn' | 'totalVisits' | 'lastVisit' | 'tokenHistory'>) => {
     const uhid = `APS${String(patients.length + 1001).padStart(6, '0')}`;
@@ -982,7 +992,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       addDoctor, updateDoctor, deleteDoctor, toggleDoctorActive,
       addDepartment, updateDepartment, deleteDepartment, toggleDepartmentActive,
       addStaffMember, updateStaffMember, deleteStaffMember, markStaffAttendance,
-      generateWalkInToken, updateTokenStatus, cancelToken,
+      generateWalkInToken, updateTokenStatus, cancelToken, deleteToken,
       addPatient, updatePatient, searchPatients, validateToken,
       updateScheduleConfig, updateSession,
       sendNotification,
