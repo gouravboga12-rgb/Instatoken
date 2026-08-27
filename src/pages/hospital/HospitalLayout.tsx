@@ -10,7 +10,6 @@ import { RevenueOverview } from './RevenueOverview';
 import { DoctorManagement } from './DoctorManagement';
 import { PatientManagement } from './PatientManagement';
 
-import { ScheduleManagement } from './ScheduleManagement';
 import { CommunicationCenter } from './CommunicationCenter';
 import { BillingPayments } from './BillingPayments';
 import { ReportsAnalytics } from './ReportsAnalytics';
@@ -18,7 +17,7 @@ import { HospitalSettings } from './HospitalSettings';
 import { HospitalStaff } from './HospitalStaff';
 import {
   LayoutDashboard, Plus, List, Wifi, WifiOff, Calendar, RefreshCw,
-  Users, Stethoscope, Building2, CalendarRange,
+  Users, Stethoscope, Building2,
   Printer, ShieldCheck, MessageSquare, BarChart2, Download, Settings,
   UserCog, ChevronLeft, ChevronRight, Bell, Search, LogOut, Menu, X, Activity,
   Layers, CreditCard, DollarSign, Sliders
@@ -61,7 +60,7 @@ const buildNav = (doctors: HospitalDoctor[], tokens: TokenRecord[]): { section: 
     ]},
     { section: `Doctor Token Screens (${activeDoctors.length})`, items: doctorScreenItems },
     { section: 'Token Management', items: [
-      { id: 'token-manage', label: 'Token Manage & Sessions', icon: <Sliders size={15} />, path: '/hospital/tokens/manage' },
+      { id: 'sessions', label: 'Sessions & Schedule', icon: <Sliders size={15} />, path: '/hospital/tokens/manage' },
       { id: 'add-token', label: 'Add Token', icon: <Plus size={15} />, path: '/hospital/tokens/add' },
       { id: 'all-tokens', label: 'All Tokens', icon: <List size={15} />, path: '/hospital/tokens/all' },
       { id: 'online-tokens', label: 'Online Tokens', icon: <Wifi size={15} />, path: '/hospital/tokens/online' },
@@ -76,7 +75,6 @@ const buildNav = (doctors: HospitalDoctor[], tokens: TokenRecord[]): { section: 
     { section: 'Doctor Management', items: [
       { id: 'doctors', label: 'Doctors Management', icon: <Stethoscope size={15} />, path: '/hospital/doctors' },
       { id: 'departments', label: 'Departments', icon: <Building2 size={15} />, path: '/hospital/departments' },
-      { id: 'sessions', label: 'Sessions & Schedule', icon: <CalendarRange size={15} />, path: '/hospital/schedule' },
     ]},
     { section: 'Staff & Team', items: [
       { id: 'staff', label: 'Staff & Employees', icon: <Users size={15} />, path: '/hospital/staff' },
@@ -327,7 +325,7 @@ export const HospitalLayout: React.FC = () => {
             <Route path="revenue" element={<RevenueOverview />} />
             <Route path="doctors" element={<DoctorManagement tab="doctors" />} />
             <Route path="departments" element={<DoctorManagement tab="departments" />} />
-            <Route path="schedule" element={<ScheduleManagement tab="sessions" />} />
+            <Route path="schedule" element={<TokenManage />} />
             <Route path="staff" element={<HospitalStaff />} />
             <Route path="patients" element={<PatientManagement />} />
             <Route path="validate" element={<TokenValidationPage />} />

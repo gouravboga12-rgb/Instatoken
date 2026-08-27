@@ -2,26 +2,67 @@ import React, { useState } from 'react';
 import { useHospital } from '../../context/HospitalContext';
 import type { SessionConfig, HospitalDoctor } from '../../context/HospitalContext';
 import {
-  Clock, Plus, Trash2, Edit3, Save, Check,
-  Sliders, Zap, Stethoscope
+  Clock, Plus, Trash2, Edit3, Save,
+  Sliders, Zap, Stethoscope, Calendar, CheckCircle,
+  ToggleLeft, ToggleRight
 } from 'lucide-react';
+
+const DAYS_OF_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 export const TokenManage: React.FC = () => {
   const { scheduleConfig, updateScheduleConfig, updateSession, doctors, updateDoctor } = useHospital();
 
-  // Mode: 'doctor' (per-doctor session management) or 'global' (master default sessions)
-  const [selectedDoctorId, setSelectedDoctorId] = useState<string>(doctors[0]?.id || 'global');
+  // Selected Doctor
+  const [selectedDoctorId, setSelectedDoctorId] = useState<string>(doctors[0]?.id || '');
+  const selectedDoctor: HospitalDoctor | undefined = doctors.find(d => d.id === selectedDoctorId) || doctors[0];
 
-  const selectedDoctor: HospitalDoctor | undefined = doctors.find(d => d.id === selectedDoctorId);
-
-  // Active sessions for the currently selected view (doctor's own sessions or global hospital sessions)
+  // Active sessions for the currently selected doctor
   const currentSessions: SessionConfig[] = selectedDoctor
     ? (selectedDoctor.sessions && selectedDoctor.sessions.length > 0
         ? selectedDoctor.sessions
         : scheduleConfig.sessions)
     : scheduleConfig.sessions;
 
-  // Session Form State
+  // Weekly Schedule State for Selected Doctor
+  const [opdDays, setOpdDays] = useState<string[]>(selectedDoctor?.opdDays || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']);
+  const [onlineConsult, setOnlineConsult] = useState<boolean>(selectedDoctor?.onlineConsult ?? true);
+  const [offlineConsult, setOfflineConsult] = useState<boolean>(selectedDoctor?.offlineConsult ?? true);
+
+  // Sync state when switching doctor
+  const handleSelectDoctor = (doc: HospitalDoctor) => {
+    setSelectedDoctorId(doc.id);
+    setOpdDays(doc.opdDays || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']);
+    setOnlineConsult(doc.onlineConsult ?? true);
+    setOfflineConsult(doc.offlineConsult ?? true);
+    setEditingSessionId(null);
+  };
+
+  const handleDayToggle = (day: string) => {
+    const updated = opdDays.includes(day)
+      ? opdDays.filter(d => d !== day)
+      : [...opdDays, day];
+    const finalDays = updated.length > 0 ? updated : [day];
+    setOpdDays(finalDays);
+    if (selectedDoctor) {
+      updateDoctor(selectedDoctor.id, { opdDays: finalDays });
+      showSuccessNotice('Working days updated successfully!');
+    }
+  };
+
+  const handleConsultTypeToggle = (type: 'online' | 'offline') => {
+    if (type === 'online') {
+      const next = !onlineConsult;
+      setOnlineConsult(next);
+      if (selectedDoctor) updateDoctor(selectedDoctor.id, { onlineConsult: next });
+    } else {
+      const next = !offlineConsult;
+      setOfflineConsult(next);
+      if (selectedDoctor) updateDoctor(selectedDoctor.id, { offlineConsult: next });
+    }
+    showSuccessNotice('Consultation modes updated!');
+  };
+
+  // Session Editing State
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [sessForm, setSessForm] = useState({
     name: '',
@@ -38,7 +79,7 @@ export const TokenManage: React.FC = () => {
     name: 'Evening OPD',
     startTime: '05:00 PM',
     endTime: '09:00 PM',
-    maxTokens: '30',
+    maxTokens: '35',
     consultationDuration: '15',
     breakTime: '5',
     active: true
@@ -56,8 +97,12 @@ export const TokenManage: React.FC = () => {
     autoContinuity: scheduleConfig.autoContinuity ?? true
   });
 
-  const [saveSuccess, setSaveSuccess] = useState(false);
-  const [sessionSaveSuccess, setSessionSaveSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  const showSuccessNotice = (msg: string) => {
+    setSuccessMessage(msg);
+    setTimeout(() => setSuccessMessage(null), 2500);
+  };
 
   const startEditSession = (sess: SessionConfig) => {
     setEditingSessionId(sess.id);
@@ -92,8 +137,7 @@ export const TokenManage: React.FC = () => {
     }
 
     setEditingSessionId(null);
-    setSessionSaveSuccess(true);
-    setTimeout(() => setSessionSaveSuccess(false), 2500);
+    showSuccessNotice('OPD session updated and synchronized with Customer App!');
   };
 
   const handleToggleSessionActive = (sess: SessionConfig) => {
@@ -103,8 +147,7 @@ export const TokenManage: React.FC = () => {
     } else {
       updateSession(sess.id, { active: !sess.active });
     }
-    setSessionSaveSuccess(true);
-    setTimeout(() => setSessionSaveSuccess(false), 2000);
+    showSuccessNotice(`Session ${sess.active ? 'disabled' : 'enabled'} successfully.`);
   };
 
   const handleAddSession = (e: React.FormEvent) => {
@@ -130,13 +173,12 @@ export const TokenManage: React.FC = () => {
     }
 
     setShowAddSessionModal(false);
-    setSessionSaveSuccess(true);
-    setTimeout(() => setSessionSaveSuccess(false), 2500);
+    showSuccessNotice('New OPD session added for ' + (selectedDoctor?.name || 'Doctor') + '!');
   };
 
   const handleDeleteSession = (id: string) => {
     if (currentSessions.length <= 1) {
-      alert('Must maintain at least one active OPD session.');
+      alert('Every doctor must have at least one active OPD session.');
       return;
     }
     if (window.confirm('Are you sure you want to remove this session?')) {
@@ -147,8 +189,7 @@ export const TokenManage: React.FC = () => {
         const updated = scheduleConfig.sessions.filter(s => s.id !== id);
         updateScheduleConfig({ sessions: updated });
       }
-      setSessionSaveSuccess(true);
-      setTimeout(() => setSessionSaveSuccess(false), 2000);
+      showSuccessNotice('Session removed.');
     }
   };
 
@@ -164,13 +205,12 @@ export const TokenManage: React.FC = () => {
       emergencySlots: parseInt(rulesForm.emergencySlots) || 5,
       autoContinuity: rulesForm.autoContinuity
     });
-    setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 2500);
+    showSuccessNotice('Global hospital token rules saved!');
   };
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
-      {/* Top Banner */}
+      {/* ── Top Header ──────────────────────────────────────────────────────── */}
       <div className="bg-white rounded-3xl border border-slate-100 p-6 shadow-xs flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="flex items-center gap-3.5">
           <div className="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-sm shadow-blue-500/20">
@@ -178,10 +218,10 @@ export const TokenManage: React.FC = () => {
           </div>
           <div>
             <h1 className="text-xl font-black text-slate-800 leading-tight">
-              Doctor-Wise Token Management & Session Timings
+              Doctor Sessions & Schedule Management
             </h1>
             <p className="text-xs text-slate-400 font-semibold mt-0.5">
-              Customize independent session shifts, start/end hours, and token limits per doctor. Synchronized in real-time with customer booking.
+              Unified Single Source of Truth — configure weekly availability, shift hours, and booking quotas per doctor.
             </p>
           </div>
         </div>
@@ -190,42 +230,40 @@ export const TokenManage: React.FC = () => {
           onClick={() => setShowAddSessionModal(true)}
           className="bg-blue-600 hover:bg-blue-700 text-white font-black text-xs px-4 py-2.5 rounded-xl cursor-pointer border-none shadow-sm shadow-blue-500/20 flex items-center gap-2 self-start md:self-auto transition-colors"
         >
-          <Plus size={15} /> Add Session for {selectedDoctor ? selectedDoctor.name : 'Master'}
+          <Plus size={15} /> Add Session for {selectedDoctor ? selectedDoctor.name : 'Doctor'}
         </button>
       </div>
 
-      {sessionSaveSuccess && (
+      {/* Success Notification Alert */}
+      {successMessage && (
         <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-xs animate-fadeIn">
-          <Check size={16} className="text-emerald-600 shrink-0" />
-          <span>Doctor sessions updated successfully! Customer side and hospital Add Token now reflect these exact timings.</span>
+          <CheckCircle size={16} className="text-emerald-600 shrink-0" />
+          <span>{successMessage}</span>
         </div>
       )}
 
-      {/* Doctor Selector Chips */}
+      {/* ── Doctor Selector Horizontal Bar ──────────────────────────────────── */}
       <div className="bg-white rounded-3xl border border-slate-100 p-4 shadow-xs">
         <div className="flex items-center justify-between mb-3 px-1">
           <span className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
             <Stethoscope size={14} className="text-blue-600" />
-            <span>Select Doctor to Configure Sessions ({doctors.length} Doctors)</span>
+            <span>Select Doctor ({doctors.length} Doctors Registered)</span>
           </span>
           {selectedDoctor && (
             <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-full">
-              {currentSessions.filter(s => s.active).length} Active Sessions Configured
+              {currentSessions.filter(s => s.active).length} Active Sessions · {selectedDoctor.departmentName}
             </span>
           )}
         </div>
 
         <div className="flex items-center gap-2.5 overflow-x-auto pb-1">
           {doctors.map(doc => {
-            const isSelected = selectedDoctorId === doc.id;
+            const isSelected = selectedDoctor?.id === doc.id;
             return (
               <button
                 key={doc.id}
                 type="button"
-                onClick={() => {
-                  setSelectedDoctorId(doc.id);
-                  setEditingSessionId(null);
-                }}
+                onClick={() => handleSelectDoctor(doc)}
                 className={`px-3.5 py-2 rounded-2xl text-xs font-black flex items-center gap-2.5 shrink-0 cursor-pointer border transition-all ${
                   isSelected
                     ? 'bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-500/20'
@@ -249,7 +287,69 @@ export const TokenManage: React.FC = () => {
         </div>
       </div>
 
-      {/* Main Grid: Sessions List (Left) + Global Rules (Right) */}
+      {/* ── Section 1: Weekly Working Days & Consultation Modes ─────────────── */}
+      {selectedDoctor && (
+        <div className="bg-white rounded-3xl border border-slate-100 p-6 shadow-xs space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-2">
+              <Calendar size={16} className="text-blue-600" />
+              <div>
+                <h2 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                  Weekly Working Days for {selectedDoctor.name}
+                </h2>
+                <p className="text-[10px] text-slate-400 font-semibold">Select the days this doctor is available at the clinic</p>
+              </div>
+            </div>
+
+            {/* Online / Walk-in Consultation Switches */}
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => handleConsultTypeToggle('online')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer border transition-colors ${
+                  onlineConsult ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-slate-50 border-slate-200 text-slate-400'
+                }`}
+              >
+                {onlineConsult ? <ToggleRight size={16} className="text-blue-600" /> : <ToggleLeft size={16} />}
+                <span>App Bookings</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleConsultTypeToggle('offline')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer border transition-colors ${
+                  offlineConsult ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-slate-50 border-slate-200 text-slate-400'
+                }`}
+              >
+                {offlineConsult ? <ToggleRight size={16} className="text-emerald-600" /> : <ToggleLeft size={16} />}
+                <span>Walk-in Counter</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            {DAYS_OF_WEEK.map(day => {
+              const active = opdDays.includes(day);
+              return (
+                <button
+                  key={day}
+                  type="button"
+                  onClick={() => handleDayToggle(day)}
+                  className={`w-12 h-11 rounded-2xl text-xs font-extrabold cursor-pointer border transition-all flex items-center justify-center ${
+                    active
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                      : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  {day}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Section 2 & 3: Sessions List (Left) + Global Booking Rules (Right) ─ */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
         {/* Left Column: Doctor Sessions List (8 cols) */}
@@ -258,7 +358,7 @@ export const TokenManage: React.FC = () => {
             <h2 className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
               <Clock size={14} className="text-blue-600" />
               <span>
-                {selectedDoctor ? `${selectedDoctor.name}'s OPD Sessions (${currentSessions.length})` : 'Configured OPD Sessions'}
+                {selectedDoctor ? `${selectedDoctor.name}'s OPD Shifts (${currentSessions.length})` : 'Configured OPD Shifts'}
               </span>
             </h2>
             <span className="text-[10px] text-slate-400 font-semibold">
@@ -383,7 +483,7 @@ export const TokenManage: React.FC = () => {
                         />
                       </div>
                       <div>
-                        <label className="text-[10px] font-bold text-slate-600 block mb-1">Break Time (m)</label>
+                        <label className="text-[10px] font-bold text-slate-600 block mb-1">Buffer Gap (m)</label>
                         <input
                           type="number"
                           value={sessForm.breakTime}
@@ -424,16 +524,10 @@ export const TokenManage: React.FC = () => {
             <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
               <Zap size={16} className="text-amber-500" />
               <div>
-                <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">Global Token Rules</h3>
-                <p className="text-[10px] text-slate-400 font-semibold">Hospital-wide booking policies</p>
+                <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">Hospital Booking Rules</h3>
+                <p className="text-[10px] text-slate-400 font-semibold">Advance booking limits & quotas</p>
               </div>
             </div>
-
-            {saveSuccess && (
-              <div className="bg-emerald-50 text-emerald-700 p-3 rounded-xl text-xs font-bold flex items-center gap-2">
-                <Check size={14} /> Saved Global Rules
-              </div>
-            )}
 
             <div>
               <label className="text-xs font-bold text-slate-700 block mb-1">Advance Booking Open Days</label>
@@ -502,19 +596,19 @@ export const TokenManage: React.FC = () => {
               type="submit"
               className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs rounded-xl cursor-pointer border-none shadow-sm transition-colors flex items-center justify-center gap-1.5"
             >
-              <Save size={13} /> Save Global Token Rules
+              <Save size={13} /> Save Global Booking Rules
             </button>
           </form>
         </div>
       </div>
 
-      {/* Add Session Modal */}
+      {/* ── Add Session Modal ────────────────────────────────────────────────── */}
       {showAddSessionModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-3xl shadow-xl w-full max-w-md p-6 space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="text-base font-black text-slate-800">
-                Add OPD Session for {selectedDoctor ? selectedDoctor.name : 'Master'}
+                Add OPD Session for {selectedDoctor ? selectedDoctor.name : 'Doctor'}
               </h3>
               <button
                 onClick={() => setShowAddSessionModal(false)}
