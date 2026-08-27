@@ -181,7 +181,12 @@ const AppContent: React.FC = () => {
   const location = useLocation();
 
   // Management routes: Admin and Hospital panels (never show splash or onboarding)
-  const isHospitalRoute = location.pathname.startsWith('/hospital') || location.pathname.startsWith('/hospital-login') || location.pathname.startsWith('/hospital-signup');
+  const isHospitalRoute = (
+    location.pathname.startsWith('/hospital/') ||
+    location.pathname === '/hospital' ||
+    location.pathname.startsWith('/hospital-login') ||
+    location.pathname.startsWith('/hospital-signup')
+  ) && !location.pathname.startsWith('/hospital-details') && !location.pathname.startsWith('/hospitals');
   const isAdminRoute = location.pathname.startsWith('/admin') || location.pathname.startsWith('/admin-login');
   const isManagementRoute = isHospitalRoute || isAdminRoute;
 
@@ -189,7 +194,14 @@ const AppContent: React.FC = () => {
   const [showSplash, setShowSplash] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     const path = window.location.pathname;
-    if (path.startsWith('/hospital') || path.startsWith('/hospital-login') || path.startsWith('/hospital-signup') || path.startsWith('/admin')) {
+    const isMgmt = (
+      path.startsWith('/hospital/') ||
+      path === '/hospital' ||
+      path.startsWith('/hospital-login') ||
+      path.startsWith('/hospital-signup') ||
+      path.startsWith('/admin')
+    ) && !path.startsWith('/hospital-details') && !path.startsWith('/hospitals');
+    if (isMgmt) {
       return false;
     }
     return !sessionStorage.getItem('insta_splash_viewed');
