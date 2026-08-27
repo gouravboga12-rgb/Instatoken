@@ -217,7 +217,11 @@ export const HOSPITALS: Hospital[] = [
         },
         currentQueue: 5,
         nextAvailableToken: 9,
-        estimatedWaitPerPatient: 12
+        estimatedWaitPerPatient: 12,
+        sessions: [
+          { id: "sess-arvind-1", name: "Morning", startTime: "09:00 AM", endTime: "04:00 PM", active: true },
+          { id: "sess-arvind-2", name: "Evening", startTime: "05:00 PM", endTime: "10:00 PM", active: true }
+        ]
       },
       {
         id: "doc-sarah",
@@ -236,7 +240,11 @@ export const HOSPITALS: Hospital[] = [
         },
         currentQueue: 2,
         nextAvailableToken: 6,
-        estimatedWaitPerPatient: 15
+        estimatedWaitPerPatient: 15,
+        sessions: [
+          { id: "sess-sarah-1", name: "Afternoon", startTime: "01:30 PM", endTime: "05:30 PM", active: true },
+          { id: "sess-sarah-2", name: "Evening", startTime: "06:00 PM", endTime: "08:30 PM", active: true }
+        ]
       },
       {
         id: "doc-ramesh",
@@ -255,7 +263,11 @@ export const HOSPITALS: Hospital[] = [
         },
         currentQueue: 8,
         nextAvailableToken: 12,
-        estimatedWaitPerPatient: 10
+        estimatedWaitPerPatient: 10,
+        sessions: [
+          { id: "sess-ramesh-1", name: "Morning", startTime: "09:30 AM", endTime: "01:00 PM", active: true },
+          { id: "sess-ramesh-2", name: "Evening", startTime: "05:00 PM", endTime: "08:30 PM", active: true }
+        ]
       },
       {
         id: "doc-anjali",
@@ -274,7 +286,11 @@ export const HOSPITALS: Hospital[] = [
         },
         currentQueue: 3,
         nextAvailableToken: 7,
-        estimatedWaitPerPatient: 12
+        estimatedWaitPerPatient: 12,
+        sessions: [
+          { id: "sess-anjali-1", name: "Morning", startTime: "09:00 AM", endTime: "01:00 PM", active: true },
+          { id: "sess-anjali-2", name: "Evening", startTime: "04:00 PM", endTime: "08:00 PM", active: true }
+        ]
       },
       {
         id: "doc-vivek",
@@ -288,12 +304,15 @@ export const HOSPITALS: Hospital[] = [
         reviewsCount: 140,
         image: "https://images.unsplash.com/photo-1537368910025-700350fe46c7?w=400&auto=format&fit=crop&q=80",
         availability: {
-          days: ["Mon", "Wed", "Fri"],
+          days: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
           slots: ["05:00 PM", "05:30 PM", "06:00 PM", "06:30 PM", "07:00 PM"]
         },
         currentQueue: 1,
         nextAvailableToken: 4,
-        estimatedWaitPerPatient: 15
+        estimatedWaitPerPatient: 15,
+        sessions: [
+          { id: "sess-vivek-1", name: "Evening", startTime: "05:00 PM", endTime: "09:00 PM", active: true }
+        ]
       }
     ]
   },

@@ -394,9 +394,9 @@ const INITIAL_DOCTORS: HospitalDoctor[] = [
 
 const INITIAL_SCHEDULE: ScheduleConfig = {
   sessions: [
-    { id: 'sess-morning', name: 'Morning', startTime: '09:00 AM', endTime: '01:00 PM', maxTokens: 50, consultationDuration: 12, breakTime: 5, active: true },
+    { id: 'sess-morning', name: 'Morning', startTime: '09:00 AM', endTime: '04:00 PM', maxTokens: 50, consultationDuration: 12, breakTime: 5, active: true },
     { id: 'sess-afternoon', name: 'Afternoon', startTime: '01:00 PM', endTime: '05:00 PM', maxTokens: 50, consultationDuration: 12, breakTime: 5, active: true },
-    { id: 'sess-evening', name: 'Evening', startTime: '05:00 PM', endTime: '09:00 PM', maxTokens: 50, consultationDuration: 12, breakTime: 5, active: true },
+    { id: 'sess-evening', name: 'Evening', startTime: '05:00 PM', endTime: '10:00 PM', maxTokens: 50, consultationDuration: 12, breakTime: 5, active: true },
   ],
   bookingOpensDaysBefore: 3,
   advanceBookingLimit: 7,
