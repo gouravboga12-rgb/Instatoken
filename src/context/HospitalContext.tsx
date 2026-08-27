@@ -324,11 +324,11 @@ const INITIAL_DOCTORS: HospitalDoctor[] = [
     consultationFee: 800, languages: ['Hindi', 'English', 'Kannada'], gender: 'Male',
     biography: 'Dr. Arvind is a leading interventional cardiologist with 16+ years of experience.',
     opdDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
-    opdStartTime: '09:00 AM', opdEndTime: '01:00 PM',
+    opdStartTime: '09:00 AM', opdEndTime: '04:00 PM',
     consultationDuration: 15, maxTokensPerDay: 50,
     onlineConsult: true, offlineConsult: true, active: true, rating: 4.9, totalPatients: 4820,
     sessions: [
-      { id: 'sess-arvind-1', name: 'Morning', startTime: '09:00 AM', endTime: '01:00 PM', maxTokens: 40, consultationDuration: 15, breakTime: 5, active: true },
+      { id: 'sess-arvind-1', name: 'Morning', startTime: '09:00 AM', endTime: '04:00 PM', maxTokens: 40, consultationDuration: 15, breakTime: 5, active: true },
       { id: 'sess-arvind-2', name: 'Evening', startTime: '05:00 PM', endTime: '09:00 PM', maxTokens: 35, consultationDuration: 15, breakTime: 5, active: true },
     ]
   },
