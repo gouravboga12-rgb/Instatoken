@@ -50,6 +50,7 @@ export interface HospitalDoctor {
   active: boolean;
   rating: number;
   totalPatients: number;
+  sessions?: SessionConfig[];
 }
 
 export interface TokenRecord {
@@ -227,9 +228,16 @@ interface HospitalContextType {
 
   // Tokens
   generateWalkInToken: (form: {
-    patientName: string; patientPhone: string; patientAge: number;
-    patientGender: string; address: string; departmentId: string;
-    doctorId: string; session: 'morning' | 'afternoon' | 'evening';
+    patientName: string;
+    patientPhone: string;
+    patientAge: number;
+    patientGender: string;
+    address?: string;
+    departmentId: string;
+    doctorId: string;
+    session: 'morning' | 'afternoon' | 'evening';
+    isRevisit?: boolean;
+    notes?: string;
   }) => TokenRecord;
   updateTokenStatus: (id: string, status: TokenRecord['status']) => void;
   cancelToken: (id: string) => void;
@@ -315,9 +323,13 @@ const INITIAL_DOCTORS: HospitalDoctor[] = [
     consultationFee: 800, languages: ['Hindi', 'English', 'Kannada'], gender: 'Male',
     biography: 'Dr. Arvind is a leading interventional cardiologist with 16+ years of experience.',
     opdDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
-    opdStartTime: '09:00', opdEndTime: '13:00',
+    opdStartTime: '09:00 AM', opdEndTime: '01:00 PM',
     consultationDuration: 15, maxTokensPerDay: 50,
     onlineConsult: true, offlineConsult: true, active: true, rating: 4.9, totalPatients: 4820,
+    sessions: [
+      { id: 'sess-arvind-1', name: 'Morning', startTime: '09:00 AM', endTime: '01:00 PM', maxTokens: 40, consultationDuration: 15, breakTime: 5, active: true },
+      { id: 'sess-arvind-2', name: 'Evening', startTime: '05:00 PM', endTime: '09:00 PM', maxTokens: 35, consultationDuration: 15, breakTime: 5, active: true },
+    ]
   },
   {
     id: 'doc-sarah', name: 'Dr. Sarah Jenkins', photo: 'https://images.unsplash.com/photo-1594824813573-246434de83fb?w=400&auto=format&fit=crop&q=80',
@@ -326,9 +338,13 @@ const INITIAL_DOCTORS: HospitalDoctor[] = [
     consultationFee: 1000, languages: ['English', 'Hindi'], gender: 'Female',
     biography: 'Dr. Sarah specializes in epilepsy, stroke management and cognitive disorders.',
     opdDays: ['Mon', 'Wed', 'Fri'],
-    opdStartTime: '10:00', opdEndTime: '17:00',
+    opdStartTime: '01:30 PM', opdEndTime: '08:30 PM',
     consultationDuration: 20, maxTokensPerDay: 30,
     onlineConsult: true, offlineConsult: true, active: true, rating: 4.7, totalPatients: 2140,
+    sessions: [
+      { id: 'sess-sarah-1', name: 'Afternoon', startTime: '01:30 PM', endTime: '05:30 PM', maxTokens: 25, consultationDuration: 20, breakTime: 5, active: true },
+      { id: 'sess-sarah-2', name: 'Evening', startTime: '06:00 PM', endTime: '08:30 PM', maxTokens: 15, consultationDuration: 20, breakTime: 5, active: true },
+    ]
   },
   {
     id: 'doc-ramesh', name: 'Dr. Ramesh Patel', photo: 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&auto=format&fit=crop&q=80',
@@ -337,9 +353,12 @@ const INITIAL_DOCTORS: HospitalDoctor[] = [
     consultationFee: 900, languages: ['Gujarati', 'Hindi', 'English'], gender: 'Male',
     biography: 'Dr. Ramesh is a pioneer in minimally invasive joint replacement surgery.',
     opdDays: ['Tue', 'Thu', 'Sat'],
-    opdStartTime: '09:30', opdEndTime: '13:00',
+    opdStartTime: '09:30 AM', opdEndTime: '01:30 PM',
     consultationDuration: 15, maxTokensPerDay: 40,
-    onlineConsult: false, offlineConsult: true, active: true, rating: 4.8, totalPatients: 3300,
+    onlineConsult: true, offlineConsult: true, active: true, rating: 4.8, totalPatients: 3300,
+    sessions: [
+      { id: 'sess-ramesh-1', name: 'Morning', startTime: '09:30 AM', endTime: '01:30 PM', maxTokens: 40, consultationDuration: 15, breakTime: 5, active: true },
+    ]
   },
   {
     id: 'doc-anjali', name: 'Dr. Anjali Sharma', photo: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=400&auto=format&fit=crop&q=80',
@@ -348,9 +367,13 @@ const INITIAL_DOCTORS: HospitalDoctor[] = [
     consultationFee: 700, languages: ['Hindi', 'English', 'Telugu'], gender: 'Female',
     biography: 'Dr. Anjali specializes in neonatal care and childhood developmental disorders.',
     opdDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
-    opdStartTime: '09:00', opdEndTime: '17:00',
+    opdStartTime: '09:00 AM', opdEndTime: '05:00 PM',
     consultationDuration: 12, maxTokensPerDay: 60,
     onlineConsult: true, offlineConsult: true, active: true, rating: 4.8, totalPatients: 5600,
+    sessions: [
+      { id: 'sess-anjali-1', name: 'Morning', startTime: '09:00 AM', endTime: '01:00 PM', maxTokens: 35, consultationDuration: 12, breakTime: 5, active: true },
+      { id: 'sess-anjali-2', name: 'Afternoon', startTime: '02:00 PM', endTime: '05:00 PM', maxTokens: 25, consultationDuration: 12, breakTime: 5, active: true },
+    ]
   },
   {
     id: 'doc-vivek', name: 'Dr. Vivek Singh', photo: 'https://images.unsplash.com/photo-1537368910025-700350fe46c7?w=400&auto=format&fit=crop&q=80',
@@ -362,6 +385,9 @@ const INITIAL_DOCTORS: HospitalDoctor[] = [
     opdStartTime: '05:00 PM', opdEndTime: '09:00 PM',
     consultationDuration: 15, maxTokensPerDay: 30,
     onlineConsult: true, offlineConsult: true, active: true, rating: 4.6, totalPatients: 1890,
+    sessions: [
+      { id: 'sess-vivek-1', name: 'Evening', startTime: '05:00 PM', endTime: '09:00 PM', maxTokens: 30, consultationDuration: 15, breakTime: 5, active: true },
+    ]
   },
 ];
 
@@ -479,7 +505,27 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const [doctors, setDoctors] = useState<HospitalDoctor[]>(() => {
     const saved = localStorage.getItem('insta_hospital_doctors');
-    return saved ? JSON.parse(saved) : INITIAL_DOCTORS;
+    if (saved) {
+      try {
+        const parsed: HospitalDoctor[] = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map(d => {
+            if (!d.sessions || d.sessions.length === 0) {
+              const initDoc = INITIAL_DOCTORS.find(init => init.id === d.id);
+              return {
+                ...d,
+                sessions: initDoc?.sessions || [
+                  { id: `sess-${d.id}-1`, name: 'Morning', startTime: d.opdStartTime || '09:00 AM', endTime: d.opdEndTime || '01:00 PM', maxTokens: Math.round(d.maxTokensPerDay * 0.6) || 30, consultationDuration: d.consultationDuration || 15, breakTime: 5, active: true },
+                  { id: `sess-${d.id}-2`, name: 'Evening', startTime: '05:00 PM', endTime: '09:00 PM', maxTokens: Math.round(d.maxTokensPerDay * 0.4) || 20, consultationDuration: d.consultationDuration || 15, breakTime: 5, active: true }
+                ]
+              };
+            }
+            return d;
+          });
+        }
+      } catch (e) {}
+    }
+    return INITIAL_DOCTORS;
   });
 
   const [staff, setStaff] = useState<HospitalStaffMember[]>(() => {
@@ -748,9 +794,16 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   // Tokens
   const generateWalkInToken = (form: {
-    patientName: string; patientPhone: string; patientAge: number;
-    patientGender: string; address: string; departmentId: string;
-    doctorId: string; session: 'morning' | 'afternoon' | 'evening';
+    patientName: string;
+    patientPhone: string;
+    patientAge: number;
+    patientGender: string;
+    address?: string;
+    departmentId: string;
+    doctorId: string;
+    session: 'morning' | 'afternoon' | 'evening';
+    isRevisit?: boolean;
+    notes?: string;
   }): TokenRecord => {
     const maxToken = tokens.length > 0 ? Math.max(...tokens.map(t => t.tokenNo || 0)) : 0;
     const doctor = doctors.find(d => d.id === form.doctorId);

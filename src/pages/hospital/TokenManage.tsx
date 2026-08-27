@@ -1,13 +1,25 @@
 import React, { useState } from 'react';
 import { useHospital } from '../../context/HospitalContext';
-import type { SessionConfig } from '../../context/HospitalContext';
+import type { SessionConfig, HospitalDoctor } from '../../context/HospitalContext';
 import {
   Clock, Plus, Trash2, Edit3, Save, Check,
-  Sliders, Zap, Users
+  Sliders, Zap, Stethoscope
 } from 'lucide-react';
 
 export const TokenManage: React.FC = () => {
-  const { scheduleConfig, updateScheduleConfig, updateSession, doctors } = useHospital();
+  const { scheduleConfig, updateScheduleConfig, updateSession, doctors, updateDoctor } = useHospital();
+
+  // Mode: 'doctor' (per-doctor session management) or 'global' (master default sessions)
+  const [selectedDoctorId, setSelectedDoctorId] = useState<string>(doctors[0]?.id || 'global');
+
+  const selectedDoctor: HospitalDoctor | undefined = doctors.find(d => d.id === selectedDoctorId);
+
+  // Active sessions for the currently selected view (doctor's own sessions or global hospital sessions)
+  const currentSessions: SessionConfig[] = selectedDoctor
+    ? (selectedDoctor.sessions && selectedDoctor.sessions.length > 0
+        ? selectedDoctor.sessions
+        : scheduleConfig.sessions)
+    : scheduleConfig.sessions;
 
   // Session Form State
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
@@ -23,9 +35,9 @@ export const TokenManage: React.FC = () => {
 
   const [showAddSessionModal, setShowAddSessionModal] = useState(false);
   const [newSess, setNewSess] = useState({
-    name: 'Night Emergency',
-    startTime: '09:00 PM',
-    endTime: '11:30 PM',
+    name: 'Evening OPD',
+    startTime: '05:00 PM',
+    endTime: '09:00 PM',
     maxTokens: '30',
     consultationDuration: '15',
     breakTime: '5',
@@ -61,7 +73,8 @@ export const TokenManage: React.FC = () => {
   };
 
   const handleSessionSave = (id: string) => {
-    updateSession(id, {
+    const updatedSess: SessionConfig = {
+      id,
       name: sessForm.name,
       startTime: sessForm.startTime,
       endTime: sessForm.endTime,
@@ -69,14 +82,27 @@ export const TokenManage: React.FC = () => {
       consultationDuration: parseInt(sessForm.consultationDuration) || 15,
       breakTime: parseInt(sessForm.breakTime) || 5,
       active: sessForm.active
-    });
+    };
+
+    if (selectedDoctor) {
+      const docSessions = currentSessions.map(s => s.id === id ? updatedSess : s);
+      updateDoctor(selectedDoctor.id, { sessions: docSessions });
+    } else {
+      updateSession(id, updatedSess);
+    }
+
     setEditingSessionId(null);
     setSessionSaveSuccess(true);
     setTimeout(() => setSessionSaveSuccess(false), 2500);
   };
 
   const handleToggleSessionActive = (sess: SessionConfig) => {
-    updateSession(sess.id, { active: !sess.active });
+    if (selectedDoctor) {
+      const docSessions = currentSessions.map(s => s.id === sess.id ? { ...s, active: !s.active } : s);
+      updateDoctor(selectedDoctor.id, { sessions: docSessions });
+    } else {
+      updateSession(sess.id, { active: !sess.active });
+    }
     setSessionSaveSuccess(true);
     setTimeout(() => setSessionSaveSuccess(false), 2000);
   };
@@ -95,21 +121,32 @@ export const TokenManage: React.FC = () => {
       active: newSess.active
     };
 
-    const updatedSessions = [...scheduleConfig.sessions, newSessionObj];
-    updateScheduleConfig({ sessions: updatedSessions });
+    if (selectedDoctor) {
+      const updated = [...currentSessions, newSessionObj];
+      updateDoctor(selectedDoctor.id, { sessions: updated });
+    } else {
+      const updatedSessions = [...scheduleConfig.sessions, newSessionObj];
+      updateScheduleConfig({ sessions: updatedSessions });
+    }
+
     setShowAddSessionModal(false);
     setSessionSaveSuccess(true);
     setTimeout(() => setSessionSaveSuccess(false), 2500);
   };
 
   const handleDeleteSession = (id: string) => {
-    if (scheduleConfig.sessions.length <= 1) {
-      alert('Hospital must maintain at least one active OPD session.');
+    if (currentSessions.length <= 1) {
+      alert('Must maintain at least one active OPD session.');
       return;
     }
     if (window.confirm('Are you sure you want to remove this session?')) {
-      const updated = scheduleConfig.sessions.filter(s => s.id !== id);
-      updateScheduleConfig({ sessions: updated });
+      if (selectedDoctor) {
+        const updated = currentSessions.filter(s => s.id !== id);
+        updateDoctor(selectedDoctor.id, { sessions: updated });
+      } else {
+        const updated = scheduleConfig.sessions.filter(s => s.id !== id);
+        updateScheduleConfig({ sessions: updated });
+      }
       setSessionSaveSuccess(true);
       setTimeout(() => setSessionSaveSuccess(false), 2000);
     }
@@ -133,79 +170,126 @@ export const TokenManage: React.FC = () => {
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
-      {/* Top Header Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-xs">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div className="p-2.5 bg-blue-600 text-white rounded-2xl shadow-sm shadow-blue-500/20">
-              <Sliders size={20} />
-            </div>
-            <div>
-              <h1 className="text-xl font-black text-slate-800 leading-tight">Token Management & Session Configuration</h1>
-              <p className="text-xs text-slate-400 font-semibold mt-0.5">
-                Central Single Source of Truth — changes instantly synchronize to Hospital Add Token and Customer Booking.
-              </p>
-            </div>
+      {/* Top Banner */}
+      <div className="bg-white rounded-3xl border border-slate-100 p-6 shadow-xs flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          <div className="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-sm shadow-blue-500/20">
+            <Sliders size={22} />
+          </div>
+          <div>
+            <h1 className="text-xl font-black text-slate-800 leading-tight">
+              Doctor-Wise Token Management & Session Timings
+            </h1>
+            <p className="text-xs text-slate-400 font-semibold mt-0.5">
+              Customize independent session shifts, start/end hours, and token limits per doctor. Synchronized in real-time with customer booking.
+            </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3 self-start sm:self-auto">
-          <button
-            onClick={() => setShowAddSessionModal(true)}
-            className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-bold text-xs shadow-sm shadow-blue-500/20 transition-all cursor-pointer border-none"
-          >
-            <Plus size={14} /> Add OPD Session
-          </button>
-        </div>
+        <button
+          onClick={() => setShowAddSessionModal(true)}
+          className="bg-blue-600 hover:bg-blue-700 text-white font-black text-xs px-4 py-2.5 rounded-xl cursor-pointer border-none shadow-sm shadow-blue-500/20 flex items-center gap-2 self-start md:self-auto transition-colors"
+        >
+          <Plus size={15} /> Add Session for {selectedDoctor ? selectedDoctor.name : 'Master'}
+        </button>
       </div>
 
       {sessionSaveSuccess && (
         <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-xs animate-fadeIn">
           <Check size={16} className="text-emerald-600 shrink-0" />
-          <span>Session settings updated! All changes are live across Customer Booking & Hospital Add Token screens.</span>
+          <span>Doctor sessions updated successfully! Customer side and hospital Add Token now reflect these exact timings.</span>
         </div>
       )}
 
-      {/* Grid: 2 Columns */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-        {/* Left Column (8 cols): Configured OPD Sessions */}
-        <div className="xl:col-span-8 space-y-4">
+      {/* Doctor Selector Chips */}
+      <div className="bg-white rounded-3xl border border-slate-100 p-4 shadow-xs">
+        <div className="flex items-center justify-between mb-3 px-1">
+          <span className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+            <Stethoscope size={14} className="text-blue-600" />
+            <span>Select Doctor to Configure Sessions ({doctors.length} Doctors)</span>
+          </span>
+          {selectedDoctor && (
+            <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-full">
+              {currentSessions.filter(s => s.active).length} Active Sessions Configured
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2.5 overflow-x-auto pb-1">
+          {doctors.map(doc => {
+            const isSelected = selectedDoctorId === doc.id;
+            return (
+              <button
+                key={doc.id}
+                type="button"
+                onClick={() => {
+                  setSelectedDoctorId(doc.id);
+                  setEditingSessionId(null);
+                }}
+                className={`px-3.5 py-2 rounded-2xl text-xs font-black flex items-center gap-2.5 shrink-0 cursor-pointer border transition-all ${
+                  isSelected
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-500/20'
+                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                }`}
+              >
+                <img
+                  src={doc.photo || 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&auto=format&fit=crop&q=80'}
+                  alt={doc.name}
+                  className="w-5 h-5 rounded-full object-cover border border-white/40"
+                />
+                <span>{doc.name}</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                  isSelected ? 'bg-blue-800 text-white' : 'bg-slate-200 text-slate-600'
+                }`}>
+                  {doc.specialization}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Main Grid: Sessions List (Left) + Global Rules (Right) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        {/* Left Column: Doctor Sessions List (8 cols) */}
+        <div className="lg:col-span-8 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
-              <Clock size={16} className="text-blue-600" />
-              <span>Configured OPD Sessions ({scheduleConfig.sessions.length})</span>
+            <h2 className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+              <Clock size={14} className="text-blue-600" />
+              <span>
+                {selectedDoctor ? `${selectedDoctor.name}'s OPD Sessions (${currentSessions.length})` : 'Configured OPD Sessions'}
+              </span>
             </h2>
-            <span className="text-[11px] font-semibold text-slate-400">Synchronized with customer booking cards</span>
+            <span className="text-[10px] text-slate-400 font-semibold">
+              Changes reflect immediately on Customer Doctor Booking
+            </span>
           </div>
 
           <div className="space-y-4">
-            {scheduleConfig.sessions.map((sess) => {
+            {currentSessions.map(sess => {
               const isEditing = editingSessionId === sess.id;
               return (
                 <div
                   key={sess.id}
-                  className={`bg-white rounded-3xl border transition-all p-5 shadow-xs ${
-                    sess.active ? 'border-slate-100 hover:shadow-md' : 'border-slate-200 bg-slate-50/70 opacity-75'
-                  }`}
+                  className="bg-white rounded-3xl border border-slate-100 shadow-xs p-6 hover:border-blue-200 transition-all space-y-4"
                 >
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-sm ${
-                        sess.active ? 'bg-blue-50 text-blue-600' : 'bg-slate-200 text-slate-500'
-                      }`}>
+                      <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-black text-sm">
                         {sess.name.charAt(0)}
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <h3 className="font-extrabold text-slate-800 text-sm">{sess.name} OPD Session</h3>
+                          <h3 className="font-extrabold text-sm text-slate-800">{sess.name} Session</h3>
                           <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${
-                            sess.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'
+                            sess.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
                           }`}>
                             {sess.active ? 'Active' : 'Disabled'}
                           </span>
                         </div>
-                        <p className="text-xs text-slate-400 font-semibold mt-0.5">
-                          Timing: <strong className="text-slate-700">{sess.startTime} - {sess.endTime}</strong> · Max Capacity: <strong className="text-slate-700">{sess.maxTokens} Tokens</strong>
+                        <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
+                          Timing: {sess.startTime} - {sess.endTime} · Max Capacity: {sess.maxTokens} Tokens
                         </p>
                       </div>
                     </div>
@@ -213,10 +297,10 @@ export const TokenManage: React.FC = () => {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => handleToggleSessionActive(sess)}
-                        className={`text-[11px] font-bold px-3 py-1.5 rounded-xl cursor-pointer border transition-all ${
+                        className={`text-[10px] font-bold px-3 py-1.5 rounded-xl cursor-pointer border transition-colors ${
                           sess.active
-                            ? 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
-                            : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                            ? 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                            : 'border-emerald-200 bg-emerald-50 text-emerald-700'
                         }`}
                       >
                         {sess.active ? 'Disable' : 'Enable'}
@@ -225,9 +309,9 @@ export const TokenManage: React.FC = () => {
                       {isEditing ? (
                         <button
                           onClick={() => handleSessionSave(sess.id)}
-                          className="bg-blue-600 text-white font-bold text-xs px-3.5 py-1.5 rounded-xl cursor-pointer border-none flex items-center gap-1 hover:bg-blue-700 shadow-xs"
+                          className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3.5 py-1.5 rounded-xl cursor-pointer border-none flex items-center gap-1 shadow-sm"
                         >
-                          <Save size={13} /> Save
+                          <Save size={12} /> Save
                         </button>
                       ) : (
                         <button
@@ -241,7 +325,7 @@ export const TokenManage: React.FC = () => {
 
                       <button
                         onClick={() => handleDeleteSession(sess.id)}
-                        className="p-2 border border-red-100 hover:bg-red-50 text-red-500 rounded-xl cursor-pointer transition-colors"
+                        className="p-2 border border-slate-200 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-xl cursor-pointer transition-colors"
                         title="Delete Session"
                       >
                         <Trash2 size={13} />
@@ -250,79 +334,81 @@ export const TokenManage: React.FC = () => {
                   </div>
 
                   {isEditing ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 text-xs">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-4 border-t border-slate-100 text-xs">
                       <div>
-                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Session Name</label>
+                        <label className="text-[10px] font-bold text-slate-600 block mb-1">Session Name</label>
                         <input
                           type="text"
                           value={sessForm.name}
                           onChange={e => setSessForm({ ...sessForm, name: e.target.value })}
-                          className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-semibold"
+                          className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500"
                         />
                       </div>
                       <div>
-                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Start Time (e.g. 09:00 AM)</label>
+                        <label className="text-[10px] font-bold text-slate-600 block mb-1">Start Time</label>
                         <input
                           type="text"
                           value={sessForm.startTime}
                           onChange={e => setSessForm({ ...sessForm, startTime: e.target.value })}
-                          className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-semibold"
+                          placeholder="09:00 AM"
+                          className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500"
                         />
                       </div>
                       <div>
-                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">End Time (e.g. 01:00 PM)</label>
+                        <label className="text-[10px] font-bold text-slate-600 block mb-1">End Time</label>
                         <input
                           type="text"
                           value={sessForm.endTime}
                           onChange={e => setSessForm({ ...sessForm, endTime: e.target.value })}
-                          className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-semibold"
+                          placeholder="01:00 PM"
+                          className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500"
                         />
                       </div>
                       <div>
-                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Max Tokens Per Doctor</label>
+                        <label className="text-[10px] font-bold text-slate-600 block mb-1">Max Token Limit</label>
                         <input
                           type="number"
                           value={sessForm.maxTokens}
                           onChange={e => setSessForm({ ...sessForm, maxTokens: e.target.value })}
-                          className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-semibold"
+                          className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500"
                         />
                       </div>
                       <div>
-                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Consultation Time (Mins)</label>
+                        <label className="text-[10px] font-bold text-slate-600 block mb-1">Avg Consult Time (m)</label>
                         <input
                           type="number"
                           value={sessForm.consultationDuration}
                           onChange={e => setSessForm({ ...sessForm, consultationDuration: e.target.value })}
-                          className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-semibold"
+                          className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500"
                         />
                       </div>
                       <div>
-                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Buffer / Break (Mins)</label>
+                        <label className="text-[10px] font-bold text-slate-600 block mb-1">Break Time (m)</label>
                         <input
                           type="number"
                           value={sessForm.breakTime}
                           onChange={e => setSessForm({ ...sessForm, breakTime: e.target.value })}
-                          className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-semibold"
+                          className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500"
                         />
                       </div>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 text-xs">
-                      <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">OPD Window</span>
-                        <span className="font-extrabold text-slate-800 text-xs mt-0.5 block">{sess.startTime} – {sess.endTime}</span>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-slate-100 text-xs">
+                      <div className="p-2.5 rounded-2xl bg-slate-50 border border-slate-100">
+                        <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block">OPD Window</span>
+                        <span className="text-xs font-extrabold text-slate-800">{sess.startTime} – {sess.endTime}</span>
                       </div>
-                      <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Max Token Limit</span>
-                        <span className="font-extrabold text-blue-600 text-xs mt-0.5 block">{sess.maxTokens} Tokens</span>
+                      <div className="p-2.5 rounded-2xl bg-slate-50 border border-slate-100">
+                        <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block">Max Token Limit</span>
+                        <span className="text-xs font-extrabold text-blue-600">{sess.maxTokens} Tokens</span>
                       </div>
-                      <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Est. Duration</span>
-                        <span className="font-extrabold text-slate-800 text-xs mt-0.5 block">{sess.consultationDuration} mins/patient</span>
+                      <div className="p-2.5 rounded-2xl bg-slate-50 border border-slate-100">
+                        <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block">Est. Duration</span>
+                        <span className="text-xs font-extrabold text-slate-800">{sess.consultationDuration} mins/patient</span>
                       </div>
-                      <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Buffer Gap</span>
-                        <span className="font-extrabold text-slate-800 text-xs mt-0.5 block">{sess.breakTime} mins</span>
+                      <div className="p-2.5 rounded-2xl bg-slate-50 border border-slate-100">
+                        <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block">Buffer Gap</span>
+                        <span className="text-xs font-extrabold text-slate-800">{sess.breakTime} mins</span>
                       </div>
                     </div>
                   )}
@@ -332,14 +418,23 @@ export const TokenManage: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Column (4 cols): Global Booking & Token Rules */}
-        <div className="xl:col-span-4 space-y-4">
-          <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
-            <Zap size={16} className="text-amber-500" />
-            <span>Global Token Rules</span>
-          </h2>
+        {/* Right Column: Global Token Rules (4 cols) */}
+        <div className="lg:col-span-4">
+          <form onSubmit={handleSaveGlobalRules} className="bg-white rounded-3xl border border-slate-100 shadow-xs p-6 space-y-5">
+            <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+              <Zap size={16} className="text-amber-500" />
+              <div>
+                <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">Global Token Rules</h3>
+                <p className="text-[10px] text-slate-400 font-semibold">Hospital-wide booking policies</p>
+              </div>
+            </div>
 
-          <form onSubmit={handleSaveGlobalRules} className="bg-white rounded-3xl border border-slate-100 shadow-xs p-5 space-y-4">
+            {saveSuccess && (
+              <div className="bg-emerald-50 text-emerald-700 p-3 rounded-xl text-xs font-bold flex items-center gap-2">
+                <Check size={14} /> Saved Global Rules
+              </div>
+            )}
+
             <div>
               <label className="text-xs font-bold text-slate-700 block mb-1">Advance Booking Open Days</label>
               <input
@@ -348,7 +443,7 @@ export const TokenManage: React.FC = () => {
                 max={30}
                 value={rulesForm.bookingOpensDaysBefore}
                 onChange={e => setRulesForm({ ...rulesForm, bookingOpensDaysBefore: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-semibold"
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500"
               />
               <span className="text-[10px] text-slate-400 font-medium">How many days in advance customer can view slots</span>
             </div>
@@ -361,7 +456,7 @@ export const TokenManage: React.FC = () => {
                 max={60}
                 value={rulesForm.advanceBookingLimit}
                 onChange={e => setRulesForm({ ...rulesForm, advanceBookingLimit: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-semibold"
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500"
               />
             </div>
 
@@ -374,7 +469,7 @@ export const TokenManage: React.FC = () => {
                   max={100}
                   value={rulesForm.walkInPercentage}
                   onChange={e => setRulesForm({ ...rulesForm, walkInPercentage: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-semibold"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500"
                 />
               </div>
               <div>
@@ -385,7 +480,7 @@ export const TokenManage: React.FC = () => {
                   max={100}
                   value={rulesForm.onlinePercentage}
                   onChange={e => setRulesForm({ ...rulesForm, onlinePercentage: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-semibold"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500"
                 />
               </div>
             </div>
@@ -395,66 +490,41 @@ export const TokenManage: React.FC = () => {
               <input
                 type="number"
                 min={0}
-                max={20}
+                max={50}
                 value={rulesForm.emergencySlots}
                 onChange={e => setRulesForm({ ...rulesForm, emergencySlots: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-semibold"
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500"
               />
               <span className="text-[10px] text-slate-400 font-medium">Slots held for priority emergency walk-ins</span>
             </div>
 
-            <div className="pt-2">
-              <button
-                type="submit"
-                className="w-full bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs py-2.5 rounded-xl flex items-center justify-center gap-1.5 cursor-pointer border-none transition-colors shadow-sm"
-              >
-                <Save size={13} /> Save Global Token Rules
-              </button>
-            </div>
-
-            {saveSuccess && (
-              <div className="p-2.5 bg-emerald-50 border border-emerald-100 rounded-xl text-emerald-700 text-xs font-bold flex items-center gap-1.5 animate-fadeIn">
-                <Check size={14} /> Saved & Synced Successfully
-              </div>
-            )}
+            <button
+              type="submit"
+              className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs rounded-xl cursor-pointer border-none shadow-sm transition-colors flex items-center justify-center gap-1.5"
+            >
+              <Save size={13} /> Save Global Token Rules
+            </button>
           </form>
-
-          {/* Quick Doctor Summary Card */}
-          <div className="bg-white rounded-3xl border border-slate-100 shadow-xs p-5 space-y-3">
-            <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
-              <Users size={14} className="text-blue-600" />
-              <span>Active Doctors ({doctors.filter(d => d.active).length})</span>
-            </h3>
-            <p className="text-xs text-slate-400 font-medium leading-relaxed">
-              Sessions configured above apply dynamically to all active hospital doctors.
-            </p>
-            <div className="space-y-1.5 max-h-48 overflow-y-auto">
-              {doctors.filter(d => d.active).map(d => (
-                <div key={d.id} className="flex items-center justify-between p-2 rounded-xl bg-slate-50 text-xs">
-                  <span className="font-extrabold text-slate-800 truncate">{d.name}</span>
-                  <span className="text-[10px] text-blue-600 font-bold">₹{d.consultationFee}</span>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
       </div>
 
       {/* Add Session Modal */}
       {showAddSessionModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5 animate-scaleUp">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl shadow-xl w-full max-w-md p-6 space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-base font-black text-slate-800">Add New OPD Session</h3>
+              <h3 className="text-base font-black text-slate-800">
+                Add OPD Session for {selectedDoctor ? selectedDoctor.name : 'Master'}
+              </h3>
               <button
                 onClick={() => setShowAddSessionModal(false)}
-                className="text-slate-400 hover:text-slate-700 text-lg font-bold cursor-pointer"
+                className="p-1 rounded-lg hover:bg-slate-100 cursor-pointer border-none text-slate-400 font-bold"
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleAddSession} className="space-y-4 text-xs">
+            <form onSubmit={handleAddSession} className="space-y-4">
               <div>
                 <label className="text-xs font-bold text-slate-700 block mb-1">Session Name *</label>
                 <input
@@ -462,8 +532,8 @@ export const TokenManage: React.FC = () => {
                   required
                   value={newSess.name}
                   onChange={e => setNewSess({ ...newSess, name: e.target.value })}
-                  placeholder="e.g. Afternoon OPD or Night Shift"
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-semibold"
+                  placeholder="e.g. Morning OPD / Evening OPD"
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-bold"
                 />
               </div>
 
@@ -475,8 +545,8 @@ export const TokenManage: React.FC = () => {
                     required
                     value={newSess.startTime}
                     onChange={e => setNewSess({ ...newSess, startTime: e.target.value })}
-                    placeholder="02:00 PM"
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-semibold"
+                    placeholder="09:00 AM"
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-bold"
                   />
                 </div>
                 <div>
@@ -486,8 +556,8 @@ export const TokenManage: React.FC = () => {
                     required
                     value={newSess.endTime}
                     onChange={e => setNewSess({ ...newSess, endTime: e.target.value })}
-                    placeholder="06:00 PM"
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-semibold"
+                    placeholder="01:00 PM"
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-bold"
                   />
                 </div>
               </div>
@@ -498,24 +568,27 @@ export const TokenManage: React.FC = () => {
                   <input
                     type="number"
                     required
+                    min={1}
+                    max={200}
                     value={newSess.maxTokens}
                     onChange={e => setNewSess({ ...newSess, maxTokens: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-semibold"
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-bold"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">Consultation Time (Mins)</label>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">Consult Time (m)</label>
                   <input
                     type="number"
-                    required
+                    min={5}
+                    max={60}
                     value={newSess.consultationDuration}
                     onChange={e => setNewSess({ ...newSess, consultationDuration: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-semibold"
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-bold"
                   />
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setShowAddSessionModal(false)}
@@ -525,9 +598,9 @@ export const TokenManage: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-extrabold cursor-pointer border-none shadow-sm shadow-blue-500/20"
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold cursor-pointer border-none shadow-sm shadow-blue-500/20"
                 >
-                  Add Session
+                  Create Session
                 </button>
               </div>
             </form>

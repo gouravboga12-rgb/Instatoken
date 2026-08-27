@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useHospital } from '../../context/HospitalContext';
 import type { TokenRecord } from '../../context/HospitalContext';
@@ -19,11 +19,6 @@ const statusColors: Record<string, string> = {
 // ─── Direct Walk-in Token Generator Component ─────────────────────────────
 const WalkInGenerator: React.FC<{ onCreated?: (token: TokenRecord) => void }> = ({ onCreated }) => {
   const { generateWalkInToken, doctors, departments, scheduleConfig } = useHospital();
-  const activeSessions = scheduleConfig?.sessions?.filter(s => s.active) || [
-    { id: 'sess-1', name: 'Morning', startTime: '09:00 AM', endTime: '01:00 PM', active: true },
-    { id: 'sess-2', name: 'Afternoon', startTime: '01:00 PM', endTime: '05:00 PM', active: true },
-    { id: 'sess-3', name: 'Evening', startTime: '05:00 PM', endTime: '09:00 PM', active: true },
-  ];
 
   const [form, setForm] = useState({
     patientName: '',
@@ -33,7 +28,7 @@ const WalkInGenerator: React.FC<{ onCreated?: (token: TokenRecord) => void }> = 
     address: '',
     departmentId: '',
     doctorId: '',
-    session: (activeSessions[0]?.name?.toLowerCase() || 'morning') as 'morning' | 'afternoon' | 'evening',
+    session: 'morning' as 'morning' | 'afternoon' | 'evening',
     isRevisit: false
   });
   const [generated, setGenerated] = useState<TokenRecord | null>(null);
@@ -45,6 +40,17 @@ const WalkInGenerator: React.FC<{ onCreated?: (token: TokenRecord) => void }> = 
     : doctors.filter(d => d.active);
 
   const selectedDoctor = doctors.find(d => d.id === form.doctorId);
+
+  const activeSessions = useMemo(() => {
+    if (selectedDoctor?.sessions && selectedDoctor.sessions.length > 0) {
+      const acts = selectedDoctor.sessions.filter(s => s.active);
+      if (acts.length > 0) return acts;
+    }
+    return scheduleConfig?.sessions?.filter(s => s.active) || [
+      { id: 'sess-1', name: 'Morning', startTime: '09:00 AM', endTime: '01:00 PM', active: true },
+      { id: 'sess-2', name: 'Evening', startTime: '05:00 PM', endTime: '09:00 PM', active: true },
+    ];
+  }, [selectedDoctor, scheduleConfig]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -201,7 +207,7 @@ const WalkInGenerator: React.FC<{ onCreated?: (token: TokenRecord) => void }> = 
             <div className="sm:col-span-2">
               <label className="text-xs font-bold text-slate-700 block mb-1.5">OPD Session Time *</label>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {activeSessions.map(s => {
+                {activeSessions.map((s: any) => {
                   const sKey = s.name.toLowerCase();
                   const isSelected = form.session === sKey || form.session === s.name;
                   return (

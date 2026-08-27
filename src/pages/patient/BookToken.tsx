@@ -72,9 +72,31 @@ export const BookToken: React.FC = () => {
   const hospital = hospitals.find(h => h.id === hospitalId) || hospitals[0];
   const doctor = hospital?.doctors.find(d => d.id === doctorId) || hospital?.doctors[0];
 
-  // Dynamic Sessions from Central Token Configuration
+  // Dynamic Sessions prioritized per Doctor
   const rawSchedule = typeof window !== 'undefined' ? localStorage.getItem('insta_hospital_schedule') : null;
   const activeSessionsList = useMemo(() => {
+    // 1. Prioritize direct doctor-specific sessions
+    if (doctor?.sessions && doctor.sessions.length > 0) {
+      const acts = doctor.sessions.filter((s: any) => s.active);
+      if (acts.length > 0) return acts;
+    }
+
+    // 2. Check localStorage insta_hospital_doctors for this specific doctor
+    if (typeof window !== 'undefined' && doctor?.id) {
+      try {
+        const savedDocs = localStorage.getItem('insta_hospital_doctors');
+        if (savedDocs) {
+          const parsed = JSON.parse(savedDocs);
+          const found = parsed.find((d: any) => d.id === doctor.id);
+          if (found?.sessions && found.sessions.length > 0) {
+            const acts = found.sessions.filter((s: any) => s.active);
+            if (acts.length > 0) return acts;
+          }
+        }
+      } catch (e) {}
+    }
+
+    // 3. Fallback to general hospital schedule if available
     if (rawSchedule) {
       try {
         const parsed = JSON.parse(rawSchedule);
@@ -84,12 +106,12 @@ export const BookToken: React.FC = () => {
         }
       } catch (e) {}
     }
+
     return [
       { id: 'sess-1', name: 'Morning', startTime: '09:00 AM', endTime: '01:00 PM', active: true },
-      { id: 'sess-2', name: 'Afternoon', startTime: '01:00 PM', endTime: '05:00 PM', active: true },
-      { id: 'sess-3', name: 'Evening', startTime: '05:00 PM', endTime: '09:00 PM', active: true },
+      { id: 'sess-2', name: 'Evening', startTime: '05:00 PM', endTime: '09:00 PM', active: true },
     ];
-  }, [rawSchedule]);
+  }, [doctor, rawSchedule]);
 
   interface SessionOptionItem {
     id: string;

@@ -16,6 +16,16 @@ export interface Doctor {
   currentQueue: number; // e.g., current token number being served
   nextAvailableToken: number; // e.g., next token that will be assigned
   estimatedWaitPerPatient: number; // in minutes
+  sessions?: Array<{
+    id: string;
+    name: string;
+    startTime: string;
+    endTime: string;
+    maxTokens?: number;
+    consultationDuration?: number;
+    breakTime?: number;
+    active: boolean;
+  }>;
 }
 
 export interface Department {

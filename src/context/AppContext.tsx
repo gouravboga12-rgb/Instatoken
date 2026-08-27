@@ -152,7 +152,8 @@ export const getHydratedHospitals = (): Hospital[] => {
           currentQueue: 3,
           nextAvailableToken: 7,
           estimatedWaitPerPatient: Number(d.consultationDuration) || 12,
-          active: d.active !== false
+          active: d.active !== false,
+          sessions: d.sessions || []
         }));
       }
     } catch (e) {}
