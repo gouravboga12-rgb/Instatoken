@@ -729,22 +729,71 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   // Doctors
   const addDoctor = (doc: Omit<HospitalDoctor, 'id' | 'totalPatients' | 'rating'>) => {
-    setDoctors(prev => [...prev, { ...doc, id: `doc-${Date.now()}`, totalPatients: 0, rating: 0 }]);
+    setDoctors(prev => {
+      const updated = [...prev, { ...doc, id: `doc-${Date.now()}`, totalPatients: 0, rating: 0 }];
+      localStorage.setItem('insta_hospital_doctors', JSON.stringify(updated));
+      broadcastGlobalSync('HOSPITAL_DOCTORS_UPDATED', updated);
+      return updated;
+    });
   };
-  const updateDoctor = (id: string, updates: Partial<HospitalDoctor>) =>
-    setDoctors(prev => prev.map(d => d.id === id ? { ...d, ...updates } : d));
-  const deleteDoctor = (id: string) => setDoctors(prev => prev.filter(d => d.id !== id));
-  const toggleDoctorActive = (id: string) =>
-    setDoctors(prev => prev.map(d => d.id === id ? { ...d, active: !d.active } : d));
+  const updateDoctor = (id: string, updates: Partial<HospitalDoctor>) => {
+    setDoctors(prev => {
+      const updated = prev.map(d => d.id === id ? { ...d, ...updates } : d);
+      localStorage.setItem('insta_hospital_doctors', JSON.stringify(updated));
+      broadcastGlobalSync('HOSPITAL_DOCTORS_UPDATED', updated);
+      return updated;
+    });
+  };
+  const deleteDoctor = (id: string) => {
+    setDoctors(prev => {
+      const updated = prev.filter(d => d.id !== id);
+      localStorage.setItem('insta_hospital_doctors', JSON.stringify(updated));
+      broadcastGlobalSync('HOSPITAL_DOCTORS_UPDATED', updated);
+      return updated;
+    });
+  };
+  const toggleDoctorActive = (id: string) => {
+    setDoctors(prev => {
+      const updated = prev.map(d => d.id === id ? { ...d, active: !d.active } : d);
+      localStorage.setItem('insta_hospital_doctors', JSON.stringify(updated));
+      broadcastGlobalSync('HOSPITAL_DOCTORS_UPDATED', updated);
+      return updated;
+    });
+  };
 
   // Departments
-  const addDepartment = (dept: Omit<HospitalDepartment, 'id'>) =>
-    setDepartments(prev => [...prev, { ...dept, id: `dept-${Date.now()}` }]);
-  const updateDepartment = (id: string, updates: Partial<HospitalDepartment>) =>
-    setDepartments(prev => prev.map(d => d.id === id ? { ...d, ...updates } : d));
-  const deleteDepartment = (id: string) => setDepartments(prev => prev.filter(d => d.id !== id));
-  const toggleDepartmentActive = (id: string) =>
-    setDepartments(prev => prev.map(d => d.id === id ? { ...d, active: !d.active } : d));
+  const addDepartment = (dept: Omit<HospitalDepartment, 'id'>) => {
+    setDepartments(prev => {
+      const updated = [...prev, { ...dept, id: `dept-${Date.now()}` }];
+      localStorage.setItem('insta_hospital_departments', JSON.stringify(updated));
+      broadcastGlobalSync('HOSPITAL_DEPARTMENTS_UPDATED', updated);
+      return updated;
+    });
+  };
+  const updateDepartment = (id: string, updates: Partial<HospitalDepartment>) => {
+    setDepartments(prev => {
+      const updated = prev.map(d => d.id === id ? { ...d, ...updates } : d);
+      localStorage.setItem('insta_hospital_departments', JSON.stringify(updated));
+      broadcastGlobalSync('HOSPITAL_DEPARTMENTS_UPDATED', updated);
+      return updated;
+    });
+  };
+  const deleteDepartment = (id: string) => {
+    setDepartments(prev => {
+      const updated = prev.filter(d => d.id !== id);
+      localStorage.setItem('insta_hospital_departments', JSON.stringify(updated));
+      broadcastGlobalSync('HOSPITAL_DEPARTMENTS_UPDATED', updated);
+      return updated;
+    });
+  };
+  const toggleDepartmentActive = (id: string) => {
+    setDepartments(prev => {
+      const updated = prev.map(d => d.id === id ? { ...d, active: !d.active } : d);
+      localStorage.setItem('insta_hospital_departments', JSON.stringify(updated));
+      broadcastGlobalSync('HOSPITAL_DEPARTMENTS_UPDATED', updated);
+      return updated;
+    });
+  };
 
   // Staff & Employees
   const addStaffMember = (member: Omit<HospitalStaffMember, 'id' | 'attendance'>) => {
@@ -966,13 +1015,25 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     tokens.find(t => t.tokenNo === tokenNo) || null;
 
   // Schedule
-  const updateScheduleConfig = (config: Partial<ScheduleConfig>) =>
-    setScheduleConfig(prev => ({ ...prev, ...config }));
-  const updateSession = (id: string, updates: Partial<SessionConfig>) =>
-    setScheduleConfig(prev => ({
-      ...prev,
-      sessions: prev.sessions.map(s => s.id === id ? { ...s, ...updates } : s)
-    }));
+  const updateScheduleConfig = (config: Partial<ScheduleConfig>) => {
+    setScheduleConfig(prev => {
+      const updated = { ...prev, ...config };
+      localStorage.setItem('insta_hospital_schedule', JSON.stringify(updated));
+      broadcastGlobalSync('HOSPITAL_SCHEDULE_UPDATED', updated);
+      return updated;
+    });
+  };
+  const updateSession = (id: string, updates: Partial<SessionConfig>) => {
+    setScheduleConfig(prev => {
+      const updated = {
+        ...prev,
+        sessions: prev.sessions.map(s => s.id === id ? { ...s, ...updates } : s)
+      };
+      localStorage.setItem('insta_hospital_schedule', JSON.stringify(updated));
+      broadcastGlobalSync('HOSPITAL_SCHEDULE_UPDATED', updated);
+      return updated;
+    });
+  };
 
   // Notifications
   const sendNotification = (msg: Omit<NotificationMessage, 'id' | 'sentAt' | 'status'>) => {
@@ -980,8 +1041,14 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   // Profile
-  const updateHospitalProfile = (updates: Partial<HospitalProfile>) =>
-    setHospitalProfile(prev => ({ ...prev, ...updates }));
+  const updateHospitalProfile = (updates: Partial<HospitalProfile>) => {
+    setHospitalProfile(prev => {
+      const updated = { ...prev, ...updates };
+      localStorage.setItem('insta_hospital_profile', JSON.stringify(updated));
+      broadcastGlobalSync('HOSPITAL_PROFILE_UPDATED', updated);
+      return updated;
+    });
+  };
 
   return (
     <HospitalContext.Provider value={{

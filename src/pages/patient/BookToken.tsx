@@ -1,6 +1,7 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { calculateDistanceKm } from '../../utils/googleMaps';
+import { subscribeGlobalSync } from '../../utils/syncBus';
 import { Button } from '../../components/ui/Button';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
@@ -72,16 +73,18 @@ export const BookToken: React.FC = () => {
   const hospital = hospitals.find(h => h.id === hospitalId) || hospitals[0];
   const doctor = hospital?.doctors.find(d => d.id === doctorId) || hospital?.doctors[0];
 
-  // Dynamic Sessions prioritized per Doctor
-  const rawSchedule = typeof window !== 'undefined' ? localStorage.getItem('insta_hospital_schedule') : null;
-  const activeSessionsList = useMemo(() => {
-    // 1. Prioritize direct doctor-specific sessions
-    if (doctor?.sessions && doctor.sessions.length > 0) {
-      const acts = doctor.sessions.filter((s: any) => s.active);
-      if (acts.length > 0) return acts;
-    }
+  const [syncVersion, setSyncVersion] = useState(0);
 
-    // 2. Check localStorage insta_hospital_doctors for this specific doctor
+  useEffect(() => {
+    const unsubscribe = subscribeGlobalSync(() => {
+      setSyncVersion(v => v + 1);
+    });
+    return unsubscribe;
+  }, []);
+
+  // Dynamic Sessions prioritized per Doctor
+  const activeSessionsList = useMemo(() => {
+    // 1. Check localStorage insta_hospital_doctors for this specific doctor first
     if (typeof window !== 'undefined' && doctor?.id) {
       try {
         const savedDocs = localStorage.getItem('insta_hospital_doctors');
@@ -96,7 +99,14 @@ export const BookToken: React.FC = () => {
       } catch (e) {}
     }
 
+    // 2. Prioritize direct doctor-specific sessions
+    if (doctor?.sessions && doctor.sessions.length > 0) {
+      const acts = doctor.sessions.filter((s: any) => s.active);
+      if (acts.length > 0) return acts;
+    }
+
     // 3. Fallback to general hospital schedule if available
+    const rawSchedule = typeof window !== 'undefined' ? localStorage.getItem('insta_hospital_schedule') : null;
     if (rawSchedule) {
       try {
         const parsed = JSON.parse(rawSchedule);
@@ -111,7 +121,7 @@ export const BookToken: React.FC = () => {
       { id: 'sess-1', name: 'Morning', startTime: '09:00 AM', endTime: '01:00 PM', active: true },
       { id: 'sess-2', name: 'Evening', startTime: '05:00 PM', endTime: '09:00 PM', active: true },
     ];
-  }, [doctor, rawSchedule]);
+  }, [doctor, hospitals, syncVersion]);
 
   interface SessionOptionItem {
     id: string;
