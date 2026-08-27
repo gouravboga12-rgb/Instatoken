@@ -231,7 +231,7 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
             <Volume2 size={15} /> Call Next Patient
           </button>
           <button
-            onClick={() => navigate('/hospital/tokens/add')}
+            onClick={() => navigate(`/hospital/tokens/add?doctorId=${doctor.id}&departmentId=${doctor.departmentId || ''}`)}
             className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-extrabold text-xs cursor-pointer border-none shadow-xs flex items-center gap-1.5"
           >
             Add Walk-in Token

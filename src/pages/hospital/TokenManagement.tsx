@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { useLocation } from 'react-router-dom';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import { useHospital } from '../../context/HospitalContext';
 import { useApp } from '../../context/AppContext';
 import type { TokenRecord, PatientRecord } from '../../context/HospitalContext';
@@ -262,11 +262,37 @@ const CreateCustomerModal: React.FC<{
 
 // ─── Direct Walk-in Token Generator Component ─────────────────────────────
 const WalkInGenerator: React.FC<{
+  initialDoctorId?: string;
+  initialDepartmentId?: string;
   onCreated?: (token: TokenRecord) => void;
   onRequestCreateAccount?: () => void;
-}> = ({ onCreated, onRequestCreateAccount }) => {
+}> = ({ initialDoctorId, initialDepartmentId, onCreated, onRequestCreateAccount }) => {
   const { generateWalkInToken, doctors, departments, scheduleConfig, patients } = useHospital();
   const { user, customers, appointments } = useApp();
+
+  const getInitialDoctorAndDept = () => {
+    let docId = initialDoctorId || '';
+    let deptId = initialDepartmentId || '';
+
+    if (docId) {
+      const doc = doctors.find(d => d.id === docId);
+      if (doc) {
+        if (!deptId || deptId !== doc.departmentId) {
+          deptId = doc.departmentId;
+        }
+      } else {
+        docId = '';
+      }
+    } else if (deptId) {
+      const dept = departments.find(d => d.id === deptId);
+      if (!dept) {
+        deptId = '';
+      }
+    }
+    return { docId, deptId };
+  };
+
+  const { docId: resolvedDocId, deptId: resolvedDeptId } = getInitialDoctorAndDept();
 
   const [form, setForm] = useState({
     patientName: '',
@@ -274,12 +300,25 @@ const WalkInGenerator: React.FC<{
     patientAge: '',
     patientGender: 'Male',
     address: '',
-    departmentId: '',
-    doctorId: '',
+    departmentId: resolvedDeptId,
+    doctorId: resolvedDocId,
     session: 'morning' as 'morning' | 'afternoon' | 'evening',
     isRevisit: false,
     selectedPatientUhid: ''
   });
+
+  useEffect(() => {
+    if (initialDoctorId || initialDepartmentId) {
+      const { docId, deptId } = getInitialDoctorAndDept();
+      if (docId || deptId) {
+        setForm(prev => ({
+          ...prev,
+          departmentId: deptId || prev.departmentId,
+          doctorId: docId || prev.doctorId
+        }));
+      }
+    }
+  }, [initialDoctorId, initialDepartmentId, doctors, departments]);
 
   const [generated, setGenerated] = useState<TokenRecord | null>(null);
   const [error, setError] = useState('');
@@ -432,10 +471,10 @@ const WalkInGenerator: React.FC<{
     }));
   };
 
-  const activeDepts = departments.filter(d => d.active);
+  const activeDepts = departments.filter(d => d.active || d.id === form.departmentId);
   const availDoctors = form.departmentId
-    ? doctors.filter(d => d.departmentId === form.departmentId && d.active)
-    : doctors.filter(d => d.active);
+    ? doctors.filter(d => d.departmentId === form.departmentId && (d.active || d.id === form.doctorId))
+    : doctors.filter(d => d.active || d.id === form.doctorId);
 
   const selectedDoctor = doctors.find(d => d.id === form.doctorId);
 
@@ -473,14 +512,15 @@ const WalkInGenerator: React.FC<{
 
   const handleReset = () => {
     setGenerated(null);
+    const { docId, deptId } = getInitialDoctorAndDept();
     setForm({
       patientName: '',
       patientPhone: '',
       patientAge: '',
       patientGender: 'Male',
       address: '',
-      departmentId: '',
-      doctorId: '',
+      departmentId: deptId,
+      doctorId: docId,
       session: (activeSessions[0]?.name?.toLowerCase() || 'morning') as any,
       isRevisit: false,
       selectedPatientUhid: ''
@@ -1126,9 +1166,13 @@ const WalkInModal: React.FC<{ onClose: () => void; onRequestCreateAccount: () =>
 // ─── Main TokenManagement Component ───────────────────────────────────────
 export const TokenManagement: React.FC = () => {
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const { tokens } = useHospital();
   const [showWalkInModal, setShowWalkInModal] = useState(false);
   const [showCreateCustomerModal, setShowCreateCustomerModal] = useState(false);
+
+  const initialDoctorId = searchParams.get('doctorId') || (location.state as any)?.doctorId || '';
+  const initialDepartmentId = searchParams.get('departmentId') || (location.state as any)?.departmentId || '';
 
   const getTokenSet = () => {
     const path = location.pathname;
@@ -1207,7 +1251,12 @@ export const TokenManagement: React.FC = () => {
           </button>
         </div>
 
-        <WalkInGenerator onRequestCreateAccount={() => setShowCreateCustomerModal(true)} />
+        <WalkInGenerator
+          key={`${initialDoctorId}-${initialDepartmentId}`}
+          initialDoctorId={initialDoctorId}
+          initialDepartmentId={initialDepartmentId}
+          onRequestCreateAccount={() => setShowCreateCustomerModal(true)}
+        />
 
         {showCreateCustomerModal && (
           <CreateCustomerModal
