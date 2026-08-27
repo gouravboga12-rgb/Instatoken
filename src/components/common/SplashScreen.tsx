@@ -9,27 +9,31 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish, duration =
   const [fading, setFading] = useState(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
+    const fadeTimer = setTimeout(() => {
       setFading(true);
-      setTimeout(() => {
-        onFinish();
-      }, 300); // 300ms smooth fade transition
+    }, Math.max(100, duration - 200));
+
+    const finishTimer = setTimeout(() => {
+      onFinish();
     }, duration);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(fadeTimer);
+      clearTimeout(finishTimer);
+    };
   }, [duration, onFinish]);
 
   const handleDismiss = () => {
     setFading(true);
     setTimeout(() => {
       onFinish();
-    }, 300);
+    }, 100);
   };
 
   return (
     <div 
       onClick={handleDismiss}
-      className={`fixed inset-0 bg-[#0257f2] flex items-center justify-center text-white z-50 overflow-hidden cursor-pointer select-none transition-opacity duration-400 ${
+      className={`fixed inset-0 bg-[#0257f2] flex items-center justify-center text-white z-50 overflow-hidden cursor-pointer select-none transition-opacity duration-200 ${
         fading ? 'opacity-0 pointer-events-none' : 'opacity-100'
       }`}
     >

@@ -7,14 +7,14 @@ interface OnboardingProps {
 }
 
 export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
-  const [step, setStep] = useState<'splash' | 'slides'>('splash');
+  const [step, setStep] = useState<'splash' | 'slides'>('slides');
   const [currentSlide, setCurrentSlide] = useState(0);
 
   useEffect(() => {
     if (step === 'splash') {
       const timer = setTimeout(() => {
         setStep('slides');
-      }, 1000);
+      }, 500);
       return () => clearTimeout(timer);
     }
   }, [step]);
