@@ -1,10 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useHospital } from '../../context/HospitalContext';
-import type { TokenRecord } from '../../context/HospitalContext';
+import { useApp } from '../../context/AppContext';
+import type { TokenRecord, PatientRecord } from '../../context/HospitalContext';
 import {
   Plus, Search, XCircle, CheckCircle, Wifi, WifiOff,
-  Printer, X, Calendar, AlertCircle
+  Printer, X, Calendar, AlertCircle, UserPlus, User, Phone, Mail,
+  MapPin, Droplets, FileText, Check, ArrowRight
 } from 'lucide-react';
 
 const statusColors: Record<string, string> = {
@@ -16,9 +18,254 @@ const statusColors: Record<string, string> = {
   skipped: 'bg-slate-100 text-slate-600 border border-slate-200',
 };
 
+// ─── Create Customer / Patient Account Modal ─────────────────────────────────
+const CreateCustomerModal: React.FC<{
+  onClose: () => void;
+  onSuccess: (patient: PatientRecord) => void;
+}> = ({ onClose, onSuccess }) => {
+  const { addPatient, hospitalProfile } = useHospital();
+  const { getOrCreateCustomerAccount } = useApp();
+
+  const [form, setForm] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    age: '',
+    gender: 'Male',
+    bloodGroup: 'O+',
+    address: '',
+    city: hospitalProfile?.city || 'Bengaluru',
+    pinCode: hospitalProfile?.pinCode || '560095',
+    medicalHistory: '',
+    allergies: ''
+  });
+
+  const [error, setError] = useState('');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.name.trim() || !form.phone.trim() || !form.age) {
+      setError('Please fill in all mandatory fields (Name, Phone, Age).');
+      return;
+    }
+
+    const cleanPhone = form.phone.replace(/\D/g, '');
+    if (cleanPhone.length < 10) {
+      setError('Please enter a valid 10-digit mobile number.');
+      return;
+    }
+
+    const newPat = {
+      name: form.name.trim(),
+      phone: cleanPhone,
+      email: form.email.trim(),
+      age: parseInt(form.age, 10) || 25,
+      gender: form.gender,
+      bloodGroup: form.bloodGroup,
+      address: form.address.trim(),
+      city: form.city.trim(),
+      pinCode: form.pinCode.trim(),
+      familyMembers: [],
+      medicalHistory: form.medicalHistory ? [form.medicalHistory.trim()] : [],
+      allergies: form.allergies ? [form.allergies.trim()] : []
+    };
+
+    addPatient(newPat);
+
+    // Also link customer account in user store
+    if (getOrCreateCustomerAccount) {
+      getOrCreateCustomerAccount(form.name.trim(), cleanPhone);
+    }
+
+    const registeredPat: PatientRecord = {
+      ...newPat,
+      id: `pat-${Date.now()}`,
+      uhid: `APS${Math.floor(100000 + Math.random() * 900000)}`,
+      registeredOn: new Date().toISOString().split('T')[0],
+      totalVisits: 0,
+      lastVisit: '',
+      tokenHistory: []
+    };
+
+    onSuccess(registeredPat);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+              <UserPlus size={18} />
+            </div>
+            <div>
+              <h3 className="text-base font-black text-slate-800">Create Customer Account</h3>
+              <p className="text-[10px] text-slate-400 font-semibold">Register patient for hospital OPD and mobile app login</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1 rounded-lg hover:bg-slate-100 cursor-pointer border-none text-slate-400 font-bold"
+          >
+            ✕
+          </button>
+        </div>
+
+        {error && (
+          <div className="bg-red-50 border border-red-100 text-red-600 text-xs font-semibold px-3.5 py-2 rounded-xl flex items-center gap-2">
+            <AlertCircle size={14} />
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4 text-xs font-medium">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div>
+              <label className="text-[11px] font-bold text-slate-700 block mb-1">Patient Full Name *</label>
+              <div className="relative">
+                <User size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  required
+                  value={form.name}
+                  onChange={e => setForm({ ...form, name: e.target.value })}
+                  placeholder="e.g. Ramesh Kumar"
+                  className="w-full pl-8 pr-3 py-2 border border-slate-200 rounded-xl outline-none focus:border-blue-500 font-bold"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[11px] font-bold text-slate-700 block mb-1">10-Digit Mobile Number *</label>
+              <div className="relative">
+                <Phone size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="tel"
+                  required
+                  maxLength={10}
+                  value={form.phone}
+                  onChange={e => setForm({ ...form, phone: e.target.value.replace(/\D/g, '') })}
+                  placeholder="9876543210"
+                  className="w-full pl-8 pr-3 py-2 border border-slate-200 rounded-xl outline-none focus:border-blue-500 font-bold"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[11px] font-bold text-slate-700 block mb-1">Email Address</label>
+              <div className="relative">
+                <Mail size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="email"
+                  value={form.email}
+                  onChange={e => setForm({ ...form, email: e.target.value })}
+                  placeholder="ramesh@example.com"
+                  className="w-full pl-8 pr-3 py-2 border border-slate-200 rounded-xl outline-none focus:border-blue-500 font-bold"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-[11px] font-bold text-slate-700 block mb-1">Age *</label>
+                <input
+                  type="number"
+                  required
+                  min={1}
+                  max={120}
+                  value={form.age}
+                  onChange={e => setForm({ ...form, age: e.target.value })}
+                  placeholder="35"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none focus:border-blue-500 font-bold"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-bold text-slate-700 block mb-1">Gender *</label>
+                <select
+                  value={form.gender}
+                  onChange={e => setForm({ ...form, gender: e.target.value })}
+                  className="w-full px-2.5 py-2 border border-slate-200 rounded-xl outline-none focus:border-blue-500 bg-white font-bold"
+                >
+                  <option>Male</option>
+                  <option>Female</option>
+                  <option>Other</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[11px] font-bold text-slate-700 block mb-1">Blood Group</label>
+              <div className="relative">
+                <Droplets size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <select
+                  value={form.bloodGroup}
+                  onChange={e => setForm({ ...form, bloodGroup: e.target.value })}
+                  className="w-full pl-8 pr-3 py-2 border border-slate-200 rounded-xl outline-none focus:border-blue-500 bg-white font-bold"
+                >
+                  <option>A+</option><option>A-</option>
+                  <option>B+</option><option>B-</option>
+                  <option>O+</option><option>O-</option>
+                  <option>AB+</option><option>AB-</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[11px] font-bold text-slate-700 block mb-1">Residential Address</label>
+              <div className="relative">
+                <MapPin size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={form.address}
+                  onChange={e => setForm({ ...form, address: e.target.value })}
+                  placeholder="Koramangala 4th Block"
+                  className="w-full pl-8 pr-3 py-2 border border-slate-200 rounded-xl outline-none focus:border-blue-500 font-bold"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-[11px] font-bold text-slate-700 block mb-1">Known Medical Conditions / Allergies</label>
+            <div className="relative">
+              <FileText size={13} className="absolute left-3 top-3 text-slate-400" />
+              <textarea
+                rows={2}
+                value={form.medicalHistory}
+                onChange={e => setForm({ ...form, medicalHistory: e.target.value })}
+                placeholder="e.g. Hypertension, Diabetic, Penicillin allergy (optional)"
+                className="w-full pl-8 pr-3 py-2 border border-slate-200 rounded-xl outline-none focus:border-blue-500 font-medium"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black cursor-pointer border-none shadow-sm shadow-blue-500/20 flex items-center gap-1.5"
+            >
+              <Check size={14} /> Register & Select Patient
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
 // ─── Direct Walk-in Token Generator Component ─────────────────────────────
-const WalkInGenerator: React.FC<{ onCreated?: (token: TokenRecord) => void }> = ({ onCreated }) => {
-  const { generateWalkInToken, doctors, departments, scheduleConfig } = useHospital();
+const WalkInGenerator: React.FC<{
+  onCreated?: (token: TokenRecord) => void;
+  onRequestCreateAccount?: () => void;
+}> = ({ onCreated, onRequestCreateAccount }) => {
+  const { generateWalkInToken, doctors, departments, scheduleConfig, patients } = useHospital();
 
   const [form, setForm] = useState({
     patientName: '',
@@ -29,10 +276,56 @@ const WalkInGenerator: React.FC<{ onCreated?: (token: TokenRecord) => void }> = 
     departmentId: '',
     doctorId: '',
     session: 'morning' as 'morning' | 'afternoon' | 'evening',
-    isRevisit: false
+    isRevisit: false,
+    selectedPatientUhid: ''
   });
+
   const [generated, setGenerated] = useState<TokenRecord | null>(null);
   const [error, setError] = useState('');
+  const [successToast, setSuccessToast] = useState('');
+
+  // Patient Search State
+  const [patientSearchQuery, setPatientSearchQuery] = useState('');
+  const [showSearchResults, setShowSearchResults] = useState(false);
+
+  const matchedPatients = useMemo(() => {
+    if (!patientSearchQuery.trim() || patientSearchQuery.trim().length < 2) return [];
+    const q = patientSearchQuery.toLowerCase().trim();
+    return patients.filter(p =>
+      (p.name && p.name.toLowerCase().includes(q)) ||
+      (p.phone && p.phone.includes(q)) ||
+      (p.email && p.email.toLowerCase().includes(q)) ||
+      (p.uhid && p.uhid.toLowerCase().includes(q))
+    ).slice(0, 5);
+  }, [patients, patientSearchQuery]);
+
+  const handleSelectPatient = (p: PatientRecord) => {
+    setForm(prev => ({
+      ...prev,
+      patientName: p.name,
+      patientPhone: p.phone,
+      patientAge: String(p.age || 30),
+      patientGender: p.gender || 'Male',
+      address: p.address || p.city || '',
+      selectedPatientUhid: p.uhid
+    }));
+    setPatientSearchQuery('');
+    setShowSearchResults(false);
+    setSuccessToast(`Auto-filled details for ${p.name} (UHID: ${p.uhid})`);
+    setTimeout(() => setSuccessToast(''), 3000);
+  };
+
+  const handleClearSelectedPatient = () => {
+    setForm(prev => ({
+      ...prev,
+      patientName: '',
+      patientPhone: '',
+      patientAge: '',
+      patientGender: 'Male',
+      address: '',
+      selectedPatientUhid: ''
+    }));
+  };
 
   const activeDepts = departments.filter(d => d.active);
   const availDoctors = form.departmentId
@@ -84,15 +377,105 @@ const WalkInGenerator: React.FC<{ onCreated?: (token: TokenRecord) => void }> = 
       departmentId: '',
       doctorId: '',
       session: (activeSessions[0]?.name?.toLowerCase() || 'morning') as any,
-      isRevisit: false
+      isRevisit: false,
+      selectedPatientUhid: ''
     });
   };
 
   return (
-    <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 max-w-3xl">
+    <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 max-w-3xl space-y-5">
+      {/* Search Existing Patient Section */}
+      {!generated && (
+        <div className="bg-blue-50/60 border border-blue-100 rounded-2xl p-4 space-y-2 relative">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-black text-blue-900 flex items-center gap-1.5">
+              <Search size={14} className="text-blue-600" />
+              <span>Search Existing Patient Database</span>
+            </span>
+            {onRequestCreateAccount && (
+              <button
+                type="button"
+                onClick={onRequestCreateAccount}
+                className="text-[11px] font-extrabold text-blue-600 hover:text-blue-700 bg-white border border-blue-200 px-3 py-1 rounded-xl cursor-pointer shadow-2xs flex items-center gap-1"
+              >
+                <UserPlus size={12} /> + Create Customer Account
+              </button>
+            )}
+          </div>
+
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search by Patient Name, Phone (+91...), Email, or UHID..."
+              value={patientSearchQuery}
+              onChange={e => {
+                setPatientSearchQuery(e.target.value);
+                setShowSearchResults(true);
+              }}
+              onFocus={() => setShowSearchResults(true)}
+              className="w-full pl-9 pr-4 py-2 bg-white border border-blue-200 rounded-xl text-xs outline-none focus:border-blue-500 font-bold placeholder:font-medium text-slate-800"
+            />
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-400" />
+
+            {/* Auto-suggest Dropdown */}
+            {showSearchResults && matchedPatients.length > 0 && (
+              <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-slate-200 rounded-2xl shadow-xl z-30 overflow-hidden divide-y divide-slate-100">
+                {matchedPatients.map(p => (
+                  <div
+                    key={p.id}
+                    onClick={() => handleSelectPatient(p)}
+                    className="p-3 hover:bg-blue-50 cursor-pointer flex items-center justify-between transition-colors"
+                  >
+                    <div>
+                      <div className="text-xs font-black text-slate-800 flex items-center gap-2">
+                        <span>{p.name}</span>
+                        <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.2 rounded-full">
+                          UHID: {p.uhid}
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-slate-400 font-semibold mt-0.5 flex items-center gap-2">
+                        <span>Phone: {p.phone}</span>
+                        {p.email && <span>· {p.email}</span>}
+                        <span>· {p.age}y, {p.gender}</span>
+                      </div>
+                    </div>
+                    <span className="text-[11px] font-extrabold text-blue-600 bg-blue-50 hover:bg-blue-600 hover:text-white px-2.5 py-1 rounded-xl flex items-center gap-1 transition-all">
+                      Select <ArrowRight size={11} />
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Selected Patient Banner */}
+          {form.selectedPatientUhid && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 text-xs font-bold text-emerald-800 flex items-center justify-between animate-fadeIn">
+              <div className="flex items-center gap-1.5">
+                <CheckCircle size={14} className="text-emerald-600" />
+                <span>Existing Patient: <strong>{form.patientName}</strong> (UHID: {form.selectedPatientUhid})</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleClearSelectedPatient}
+                className="text-[10px] font-extrabold text-emerald-700 hover:text-red-600 cursor-pointer underline"
+              >
+                Clear / New Patient
+              </button>
+            </div>
+          )}
+
+          {successToast && (
+            <div className="text-[11px] font-bold text-emerald-700 flex items-center gap-1 animate-fadeIn">
+              <Check size={13} /> {successToast}
+            </div>
+          )}
+        </div>
+      )}
+
       {!generated ? (
         <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <div>
               <h3 className="text-base font-black text-slate-800">Walk-in Patient Token Form</h3>
               <p className="text-xs text-slate-400 mt-0.5">Register walk-in patient and generate instant digital queue slip</p>
@@ -249,74 +632,77 @@ const WalkInGenerator: React.FC<{ onCreated?: (token: TokenRecord) => void }> = 
           <div className="pt-2">
             <button
               type="submit"
-              className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs rounded-2xl cursor-pointer border-none shadow-md shadow-blue-500/20 flex items-center justify-center gap-2"
+              className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-2xl cursor-pointer border-none shadow-md shadow-blue-500/20 transition-all flex items-center justify-center gap-2"
             >
               <Plus size={16} /> Generate & Assign Token
             </button>
           </div>
         </form>
       ) : (
-        <div className="py-4 text-center space-y-6 animate-in fade-in">
-          <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto text-emerald-600">
-            <CheckCircle size={36} />
-          </div>
-          <div>
-            <h3 className="text-lg font-black text-slate-800">Token Generated Successfully!</h3>
-            <p className="text-xs text-slate-400 mt-1">Walk-in token is registered in the hospital live queue</p>
-          </div>
-
-          {/* Digital Token Slip Preview */}
-          <div className="bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-3xl p-6 max-w-md mx-auto shadow-lg text-left relative overflow-hidden">
-            <div className="flex justify-between items-start border-b border-white/20 pb-3 mb-4">
-              <div>
-                <p className="text-[10px] uppercase font-bold tracking-widest text-blue-200">Apollo Spectra Hospital</p>
-                <p className="text-xs font-semibold opacity-90">OPD Consultation Slip</p>
-              </div>
-              <span className="text-[10px] font-bold px-2 py-0.5 bg-white/20 rounded-full">Walk-in</span>
-            </div>
-
-            <div className="text-center py-2">
-              <span className="text-xs text-blue-200 block font-semibold">Token Number</span>
-              <h1 className="text-5xl font-black tracking-tight my-1">#{generated.tokenNo}</h1>
-              <span className="text-[11px] bg-white/20 px-3 py-1 rounded-full font-bold inline-block capitalize">
-                Session: {generated.session}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 pt-4 border-t border-white/20 text-xs">
-              <div>
-                <span className="text-[10px] text-blue-200 block">Patient Name</span>
-                <p className="font-bold truncate">{generated.patientName}</p>
-                <p className="text-[10px] text-blue-100">{generated.patientPhone}</p>
-              </div>
-              <div>
-                <span className="text-[10px] text-blue-200 block">Doctor</span>
-                <p className="font-bold truncate">{generated.doctorName}</p>
-                <p className="text-[10px] text-blue-100">{generated.departmentName}</p>
-              </div>
-              <div>
-                <span className="text-[10px] text-blue-200 block">Queue Position</span>
-                <p className="font-bold">#{generated.queuePosition}</p>
-              </div>
-              <div>
-                <span className="text-[10px] text-blue-200 block">Consultation Fee</span>
-                <p className="font-bold">₹{generated.consultationFee} (Pay at Cabin)</p>
-              </div>
+        /* Generated Token Receipt Preview */
+        <div className="space-y-6">
+          <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl p-4 flex items-center gap-3">
+            <CheckCircle size={20} className="text-emerald-600 shrink-0" />
+            <div>
+              <h4 className="font-extrabold text-sm">Token Generated Successfully!</h4>
+              <p className="text-xs text-emerald-700 mt-0.5">Token is now active in doctor's cabin queue.</p>
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-3 justify-center max-w-md mx-auto">
+          {/* Printable Ticket */}
+          <div className="bg-slate-50 border-2 border-dashed border-slate-300 rounded-3xl p-6 text-center space-y-4 max-w-md mx-auto">
+            <div className="text-xs font-black text-slate-400 uppercase tracking-widest">Apollo Spectra Hospital</div>
+            <div className="text-xs text-slate-600 font-medium">Walk-in OPD Queue Slip</div>
+
+            <div className="py-3 border-y border-dashed border-slate-200">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">YOUR TOKEN NUMBER</span>
+              <span className="text-6xl font-black text-blue-600 tracking-tight">#{generated.tokenNo}</span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 text-left text-xs">
+              <div>
+                <span className="text-slate-400 font-bold block text-[10px]">PATIENT</span>
+                <span className="font-extrabold text-slate-800">{generated.patientName}</span>
+              </div>
+              <div>
+                <span className="text-slate-400 font-bold block text-[10px]">PHONE</span>
+                <span className="font-extrabold text-slate-800">{generated.patientPhone}</span>
+              </div>
+              <div>
+                <span className="text-slate-400 font-bold block text-[10px]">DOCTOR</span>
+                <span className="font-extrabold text-slate-800">{generated.doctorName}</span>
+              </div>
+              <div>
+                <span className="text-slate-400 font-bold block text-[10px]">SESSION</span>
+                <span className="font-extrabold text-slate-800 uppercase">{generated.session} OPD</span>
+              </div>
+              <div>
+                <span className="text-slate-400 font-bold block text-[10px]">QUEUE POSITION</span>
+                <span className="font-extrabold text-blue-600">#{generated.queuePosition} in line</span>
+              </div>
+              <div>
+                <span className="text-slate-400 font-bold block text-[10px]">CONSULTATION FEE</span>
+                <span className="font-extrabold text-emerald-600">₹{generated.consultationFee}</span>
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-dashed border-slate-200 text-[10px] text-slate-400">
+              Generated on {generated.bookingDate} at {generated.time}
+            </div>
+          </div>
+
+          <div className="flex gap-3 justify-center">
             <button
               onClick={() => window.print()}
-              className="flex-1 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl cursor-pointer border-none flex items-center justify-center gap-1.5"
+              className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs rounded-xl cursor-pointer border-none flex items-center gap-2"
             >
               <Printer size={14} /> Print Token Slip
             </button>
             <button
               onClick={handleReset}
-              className="flex-1 py-2.5 bg-blue-50 text-blue-600 hover:bg-blue-100 font-bold text-xs rounded-xl cursor-pointer border-none"
+              className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl cursor-pointer border-none flex items-center gap-2"
             >
-              + Issue Another Token
+              <Plus size={14} /> Generate Another Token
             </button>
           </div>
         </div>
@@ -325,25 +711,13 @@ const WalkInGenerator: React.FC<{ onCreated?: (token: TokenRecord) => void }> = 
   );
 };
 
-// ─── Modal Wrapper ────────────────────────────────────────────────────────────
-const WalkInModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto relative">
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 p-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full cursor-pointer border-none z-10"
-        >
-          <X size={16} />
-        </button>
-        <WalkInGenerator onCreated={() => {}} />
-      </div>
-    </div>
-  );
-};
-
-// ─── Token Table ──────────────────────────────────────────────────────────────
-const TokenTable: React.FC<{ tokens: TokenRecord[]; title: string; subtitle: string; onAddClick: () => void }> = ({
+// ─── Token Management Table Component ─────────────────────────────────────
+const TokenTable: React.FC<{
+  tokens: TokenRecord[];
+  title: string;
+  subtitle: string;
+  onAddClick: () => void;
+}> = ({
   tokens: toks,
   title,
   subtitle,
@@ -356,7 +730,6 @@ const TokenTable: React.FC<{ tokens: TokenRecord[]; title: string; subtitle: str
   const [docFilter, setDocFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState(() => new Date().toISOString().split('T')[0]);
 
-  // Doctor list filtered by department if dept is chosen
   const filteredDocList = deptFilter === 'all'
     ? doctors
     : doctors.filter(d => d.departmentId === deptFilter);
@@ -376,7 +749,6 @@ const TokenTable: React.FC<{ tokens: TokenRecord[]; title: string; subtitle: str
     return matchesSearch && matchesStatus && matchesDept && matchesDoc && matchesDate;
   });
 
-  // Calculate filtered stats
   const totalCount = filtered.length;
   const completedCount = filtered.filter(t => t.status === 'completed').length;
   const inCabinCount = filtered.filter(t => t.status === 'checked-in' || (t.status as string) === 'in-cabin').length;
@@ -432,9 +804,8 @@ const TokenTable: React.FC<{ tokens: TokenRecord[]; title: string; subtitle: str
           </div>
         </div>
 
-        {/* Filter Controls: Department, Doctor, Date, Status, Search */}
+        {/* Filter Controls */}
         <div className="flex flex-wrap items-center gap-2 pt-1">
-          {/* Department Filter */}
           <select
             value={deptFilter}
             onChange={e => {
@@ -449,7 +820,6 @@ const TokenTable: React.FC<{ tokens: TokenRecord[]; title: string; subtitle: str
             ))}
           </select>
 
-          {/* Doctor Filter */}
           <select
             value={docFilter}
             onChange={e => setDocFilter(e.target.value)}
@@ -461,129 +831,140 @@ const TokenTable: React.FC<{ tokens: TokenRecord[]; title: string; subtitle: str
             ))}
           </select>
 
-          {/* Date Picker */}
-          <input
-            type="date"
-            value={dateFilter}
-            onChange={e => setDateFilter(e.target.value)}
-            className="text-xs font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 outline-none cursor-pointer"
-          />
+          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5">
+            <Calendar size={13} className="text-slate-400" />
+            <input
+              type="date"
+              value={dateFilter}
+              onChange={e => setDateFilter(e.target.value)}
+              className="text-xs font-bold text-slate-700 bg-transparent outline-none cursor-pointer"
+            />
+            {dateFilter && (
+              <button
+                onClick={() => setDateFilter('')}
+                className="text-[10px] font-bold text-slate-400 hover:text-slate-600 ml-1"
+                title="Clear date"
+              >
+                ✕
+              </button>
+            )}
+          </div>
 
-          {/* Status Filter */}
           <select
             value={statusFilter}
             onChange={e => setStatusFilter(e.target.value)}
             className="text-xs font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none cursor-pointer"
           >
             <option value="all">All Statuses</option>
-            <option value="booked">Booked</option>
-            <option value="checked-in">Checked In / In-Cabin</option>
-            <option value="waiting">Waiting</option>
+            <option value="booked">Booked / Waiting</option>
+            <option value="checked-in">In-Cabin</option>
             <option value="completed">Completed</option>
-            <option value="cancelled">Cancelled</option>
             <option value="skipped">Skipped</option>
+            <option value="cancelled">Cancelled</option>
           </select>
 
-          {/* Search bar */}
           <div className="relative flex-1 min-w-[200px]">
             <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
+              type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Search token #, patient, phone..."
-              className="w-full pl-8 pr-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-blue-500 bg-slate-50"
+              placeholder="Search token #, patient name, phone, doctor..."
+              className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-blue-500 focus:bg-white transition-all"
             />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs"
+              >
+                ✕
+              </button>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Table Content */}
+      {/* Table Body */}
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[780px]">
-          <thead className="bg-slate-50 border-b border-slate-100">
-            <tr>
-              {['Token #', 'Type', 'Patient Details', 'Doctor & Dept', 'Session / Date', 'Time', 'Fee', 'Status', 'Actions'].map(h => (
-                <th key={h} className="px-4 py-3 text-left text-[10px] font-black text-slate-500 uppercase tracking-wider">
-                  {h}
-                </th>
-              ))}
+        <table className="w-full text-left text-xs border-collapse">
+          <thead>
+            <tr className="border-b border-slate-100 bg-slate-50/50 text-[10px] font-black text-slate-400 uppercase tracking-wider">
+              <th className="py-3 px-4">Token #</th>
+              <th className="py-3 px-4">Type</th>
+              <th className="py-3 px-4">Patient</th>
+              <th className="py-3 px-4">Doctor & Dept</th>
+              <th className="py-3 px-4">Session & Time</th>
+              <th className="py-3 px-4">Queue</th>
+              <th className="py-3 px-4">Fee</th>
+              <th className="py-3 px-4">Status</th>
+              <th className="py-3 px-4 text-right">Actions</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-slate-100">
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={9} className="text-center py-16">
-                  <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto text-slate-400 mb-3">
-                    <Calendar size={22} />
-                  </div>
-                  <p className="text-xs font-bold text-slate-700">No tokens found in this category</p>
-                  <p className="text-[11px] text-slate-400 mt-1 max-w-sm mx-auto">
-                    Tokens booked by customers online or generated at the reception desk will automatically populate here in real-time.
-                  </p>
-                  <button
-                    onClick={onAddClick}
-                    className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl cursor-pointer border-none inline-flex items-center gap-1.5"
-                  >
-                    <Plus size={13} /> Add Walk-in Token
-                  </button>
+                <td colSpan={9} className="py-12 text-center text-slate-400 font-bold">
+                  No tokens matching the filters.
                 </td>
               </tr>
             ) : (
               filtered.map(t => (
-                <tr key={t.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
-                  <td className="px-4 py-3 font-black text-slate-800 text-sm">
-                    #{t.tokenNo}
+                <tr key={t.id} className="hover:bg-slate-50/80 transition-colors">
+                  <td className="py-3 px-4">
+                    <span className="font-black text-slate-800 text-sm">#{t.tokenNo}</span>
                   </td>
-                  <td className="px-4 py-3">
-                    <span className={`text-[10px] font-bold px-2 py-1 rounded-full inline-flex items-center gap-1 ${
-                      t.type === 'online' ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-600'
-                    }`}>
-                      {t.type === 'online' ? <Wifi size={10} /> : <WifiOff size={10} />}
-                      {t.type === 'online' ? 'Online' : 'Walk-in'}
+                  <td className="py-3 px-4">
+                    {t.type === 'online' ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">
+                        <Wifi size={10} /> Online
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
+                        <WifiOff size={10} /> Walk-in
+                      </span>
+                    )}
+                  </td>
+                  <td className="py-3 px-4">
+                    <p className="font-bold text-slate-800">{t.patientName}</p>
+                    <p className="text-[10px] text-slate-400 font-medium">{t.patientPhone} · {t.patientAge}y, {t.patientGender}</p>
+                  </td>
+                  <td className="py-3 px-4">
+                    <p className="font-bold text-slate-800">{t.doctorName}</p>
+                    <p className="text-[10px] text-slate-400 font-medium">{t.departmentName}</p>
+                  </td>
+                  <td className="py-3 px-4">
+                    <p className="font-bold text-slate-700 capitalize">{t.session} OPD</p>
+                    <p className="text-[10px] text-slate-400 font-medium">{t.time} · {t.bookingDate}</p>
+                  </td>
+                  <td className="py-3 px-4">
+                    <span className="font-black text-blue-600">#{t.queuePosition}</span>
+                    <span className="text-[10px] text-slate-400 block">{t.estimatedWait}m wait</span>
+                  </td>
+                  <td className="py-3 px-4">
+                    <span className="font-bold text-slate-800">₹{t.consultationFee}</span>
+                    <span className={`text-[9px] font-bold block ${t.paymentStatus === 'paid' ? 'text-emerald-600' : 'text-amber-600'}`}>
+                      {t.paymentStatus.toUpperCase()}
                     </span>
                   </td>
-                  <td className="px-4 py-3">
-                    <p className="text-xs font-bold text-slate-800">{t.patientName}</p>
-                    <p className="text-[10px] text-slate-400 font-semibold">{t.patientPhone} · {t.patientGender}, {t.patientAge}Y</p>
-                  </td>
-                  <td className="px-4 py-3">
-                    <p className="text-xs font-bold text-slate-700">{t.doctorName}</p>
-                    <p className="text-[10px] text-blue-600 font-semibold">{t.departmentName}</p>
-                  </td>
-                  <td className="px-4 py-3">
-                    <p className="text-xs font-bold text-slate-700 capitalize">{t.session}</p>
-                    <p className="text-[10px] text-slate-400">{t.bookingDate || 'Today'}</p>
-                  </td>
-                  <td className="px-4 py-3 text-xs font-semibold text-slate-700">
-                    {t.time}
-                  </td>
-                  <td className="px-4 py-3">
-                    <p className="text-xs font-black text-slate-800">₹{t.consultationFee}</p>
-                    <span className={`text-[9px] font-bold capitalize ${t.paymentStatus === 'paid' ? 'text-emerald-600' : 'text-amber-600'}`}>
-                      {t.paymentStatus}
+                  <td className="py-3 px-4">
+                    <span className={`text-[10px] font-extrabold px-2.5 py-1 rounded-full ${statusColors[t.status] || 'bg-slate-100 text-slate-600'}`}>
+                      {t.status}
                     </span>
                   </td>
-                  <td className="px-4 py-3">
-                    <span className={`text-[10px] font-black px-2.5 py-1 rounded-full capitalize ${statusColors[t.status] || 'bg-slate-100 text-slate-700'}`}>
-                      {t.status.replace('-', ' ')}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1">
-                      {t.status === 'booked' && (
+                  <td className="py-3 px-4 text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      {['booked', 'waiting'].includes(t.status) && (
                         <button
                           onClick={() => updateTokenStatus(t.id, 'checked-in')}
-                          title="Check In Patient"
-                          className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 font-bold rounded-lg text-[10px] cursor-pointer border-none transition-colors"
+                          className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[10px] font-bold cursor-pointer border-none"
                         >
                           Check In
                         </button>
                       )}
-                      {(t.status === 'checked-in' || t.status === 'waiting') && (
+                      {t.status === 'checked-in' && (
                         <button
                           onClick={() => updateTokenStatus(t.id, 'completed')}
-                          title="Mark Consultation Completed"
-                          className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold rounded-lg text-[10px] cursor-pointer border-none transition-colors"
+                          className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-bold cursor-pointer border-none"
                         >
                           Complete
                         </button>
@@ -591,19 +972,12 @@ const TokenTable: React.FC<{ tokens: TokenRecord[]; title: string; subtitle: str
                       {t.status !== 'completed' && t.status !== 'cancelled' && (
                         <button
                           onClick={() => cancelToken(t.id)}
-                          title="Cancel Token"
-                          className="p-1.5 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-lg cursor-pointer border-none transition-colors"
+                          className="p-1 text-slate-400 hover:text-red-600 rounded-lg cursor-pointer transition-colors"
+                          title="Cancel token"
                         >
-                          <XCircle size={13} />
+                          <XCircle size={14} />
                         </button>
                       )}
-                      <button
-                        onClick={() => window.print()}
-                        title="Print Token Slip"
-                        className="p-1.5 hover:bg-blue-50 text-slate-400 hover:text-blue-600 rounded-lg cursor-pointer border-none transition-colors"
-                      >
-                        <Printer size={13} />
-                      </button>
                     </div>
                   </td>
                 </tr>
@@ -616,42 +990,50 @@ const TokenTable: React.FC<{ tokens: TokenRecord[]; title: string; subtitle: str
   );
 };
 
-// ─── Main TokenManagement View ────────────────────────────────────────────────
+// ─── Walk-In Modal Wrapper ────────────────────────────────────────────────
+const WalkInModal: React.FC<{ onClose: () => void; onRequestCreateAccount: () => void }> = ({ onClose, onRequestCreateAccount }) => (
+  <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl p-6 relative max-h-[90vh] overflow-y-auto">
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 cursor-pointer border-none"
+      >
+        <X size={18} />
+      </button>
+      <WalkInGenerator onCreated={() => {}} onRequestCreateAccount={onRequestCreateAccount} />
+    </div>
+  </div>
+);
+
+// ─── Main TokenManagement Component ───────────────────────────────────────
 export const TokenManagement: React.FC = () => {
+  const location = useLocation();
   const { tokens } = useHospital();
   const [showWalkInModal, setShowWalkInModal] = useState(false);
-  const location = useLocation();
+  const [showCreateCustomerModal, setShowCreateCustomerModal] = useState(false);
 
   const getTokenSet = () => {
     const path = location.pathname;
-    const today = new Date().toISOString().split('T')[0];
-
     if (path.includes('online')) {
       return {
-        title: 'Online Tokens',
-        subtitle: 'Real-time patient bookings from the customer app and web portal',
+        title: 'Online Booked Tokens',
+        subtitle: 'Tokens scheduled via mobile customer app & web portal',
         toks: tokens.filter(t => t.type === 'online')
       };
     }
     if (path.includes('offline')) {
       return {
-        title: 'Offline / Walk-in Tokens',
-        subtitle: 'Tokens generated directly at the hospital reception counter',
+        title: 'Hospital Counter Walk-in Tokens',
+        subtitle: 'Tokens registered at hospital desk counter',
         toks: tokens.filter(t => t.type === 'offline')
       };
     }
     if (path.includes('today')) {
+      const today = new Date().toISOString().split('T')[0];
       return {
-        title: "Today's Tokens",
-        subtitle: `All scheduled OPD consultations for today (${today})`,
-        toks: tokens.filter(t => !t.bookingDate || t.bookingDate === today)
-      };
-    }
-    if (path.includes('upcoming')) {
-      return {
-        title: 'Upcoming Tokens',
-        subtitle: 'Advance appointments scheduled for future dates',
-        toks: tokens.filter(t => (t.bookingDate && t.bookingDate > today) || (t.status === 'booked' && t.bookingDate >= today))
+        title: "Today's Live Tokens",
+        subtitle: `Tokens booked for today (${today})`,
+        toks: tokens.filter(t => t.bookingDate === today || !t.bookingDate)
       };
     }
     if (path.includes('completed')) {
@@ -691,13 +1073,32 @@ export const TokenManagement: React.FC = () => {
   if (!tokenSet) {
     return (
       <div className="p-6 space-y-6 max-w-4xl mx-auto">
-        <div>
-          <h2 className="text-xl font-black text-slate-800">Add Walk-in Token</h2>
-          <p className="text-xs text-slate-400 mt-1">
-            Register an offline / walk-in patient and immediately assign a queue token number
-          </p>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-black text-slate-800">Add Walk-in Token</h2>
+            <p className="text-xs text-slate-400 mt-1">
+              Register an offline / walk-in patient and immediately assign a queue token number
+            </p>
+          </div>
+
+          <button
+            onClick={() => setShowCreateCustomerModal(true)}
+            className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl cursor-pointer border-none shadow-sm shadow-blue-500/20 flex items-center gap-2 self-start sm:self-auto transition-colors"
+          >
+            <UserPlus size={15} /> + Create Customer Account
+          </button>
         </div>
-        <WalkInGenerator />
+
+        <WalkInGenerator onRequestCreateAccount={() => setShowCreateCustomerModal(true)} />
+
+        {showCreateCustomerModal && (
+          <CreateCustomerModal
+            onClose={() => setShowCreateCustomerModal(false)}
+            onSuccess={() => {
+              setShowCreateCustomerModal(false);
+            }}
+          />
+        )}
       </div>
     );
   }
@@ -709,12 +1110,20 @@ export const TokenManagement: React.FC = () => {
           <h2 className="text-xl font-black text-slate-800">{tokenSet.title}</h2>
           <p className="text-xs text-slate-400 mt-1">{tokenSet.subtitle}</p>
         </div>
-        <button
-          onClick={() => setShowWalkInModal(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2.5 rounded-xl cursor-pointer border-none flex items-center gap-2 text-xs shadow-md shadow-blue-500/20 self-start sm:self-auto"
-        >
-          <Plus size={14} /> Add Walk-in Token
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowCreateCustomerModal(true)}
+            className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-bold px-3.5 py-2.5 rounded-xl cursor-pointer flex items-center gap-1.5 text-xs shadow-2xs"
+          >
+            <UserPlus size={14} className="text-blue-600" /> Create Customer Account
+          </button>
+          <button
+            onClick={() => setShowWalkInModal(true)}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2.5 rounded-xl cursor-pointer border-none flex items-center gap-2 text-xs shadow-md shadow-blue-500/20 self-start sm:self-auto"
+          >
+            <Plus size={14} /> Add Walk-in Token
+          </button>
+        </div>
       </div>
 
       <TokenTable
@@ -724,7 +1133,24 @@ export const TokenManagement: React.FC = () => {
         onAddClick={() => setShowWalkInModal(true)}
       />
 
-      {showWalkInModal && <WalkInModal onClose={() => setShowWalkInModal(false)} />}
+      {showWalkInModal && (
+        <WalkInModal
+          onClose={() => setShowWalkInModal(false)}
+          onRequestCreateAccount={() => {
+            setShowWalkInModal(false);
+            setShowCreateCustomerModal(true);
+          }}
+        />
+      )}
+
+      {showCreateCustomerModal && (
+        <CreateCustomerModal
+          onClose={() => setShowCreateCustomerModal(false)}
+          onSuccess={() => {
+            setShowCreateCustomerModal(false);
+          }}
+        />
+      )}
     </div>
   );
 };
