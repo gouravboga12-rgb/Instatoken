@@ -5,13 +5,13 @@ interface SplashScreenProps {
   duration?: number;
 }
 
-export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish, duration = 600 }) => {
+export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish, duration = 400 }) => {
   const [fading, setFading] = useState(false);
 
   useEffect(() => {
     const fadeTimer = setTimeout(() => {
       setFading(true);
-    }, Math.max(100, duration - 150));
+    }, Math.max(50, duration - 100));
 
     const finishTimer = setTimeout(() => {
       onFinish();
@@ -33,7 +33,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish, duration =
   return (
     <div 
       onClick={handleDismiss}
-      className={`fixed inset-0 bg-[#0257f2] flex items-center justify-center text-white z-50 overflow-hidden cursor-pointer select-none transition-opacity duration-150 ${
+      className={`fixed inset-0 bg-[#0257f2] flex items-center justify-center text-white z-50 overflow-hidden cursor-pointer select-none transition-opacity duration-100 ${
         fading ? 'opacity-0 pointer-events-none' : 'opacity-100'
       }`}
     >

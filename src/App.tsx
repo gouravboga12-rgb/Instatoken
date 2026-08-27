@@ -180,8 +180,20 @@ const AppContent: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // App load Splash Screen state
-  const [showSplash, setShowSplash] = useState<boolean>(true);
+  // Management routes: Admin and Hospital panels (never show splash or onboarding)
+  const isHospitalRoute = location.pathname.startsWith('/hospital') || location.pathname.startsWith('/hospital-login') || location.pathname.startsWith('/hospital-signup');
+  const isAdminRoute = location.pathname.startsWith('/admin') || location.pathname.startsWith('/admin-login');
+  const isManagementRoute = isHospitalRoute || isAdminRoute;
+
+  // App load Splash Screen state - ONLY for customer/patient entry, under 1s (400ms)
+  const [showSplash, setShowSplash] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const path = window.location.pathname;
+    if (path.startsWith('/hospital') || path.startsWith('/hospital-login') || path.startsWith('/hospital-signup') || path.startsWith('/admin')) {
+      return false;
+    }
+    return !sessionStorage.getItem('insta_splash_viewed');
+  });
 
   // Onboarding completion state
   const [onboarded, setOnboarded] = useState<boolean>(() => {
@@ -192,22 +204,28 @@ const AppContent: React.FC = () => {
     localStorage.setItem('insta_onboarded', String(onboarded));
   }, [onboarded]);
 
-  const isHospitalRoute = location.pathname.startsWith('/hospital') && !location.pathname.startsWith('/hospital-login') && !location.pathname.startsWith('/hospital-signup') && location.pathname !== '/hospital/login' && location.pathname !== '/hospital/signup';
-  const isHospitalLoginRoute = location.pathname === '/hospital-login' || location.pathname === '/hospital-signup' || location.pathname === '/hospital/login' || location.pathname === '/hospital/signup';
-
-  // Always show Splash Screen first when opening website (under 1 second)
-  if (showSplash && !isHospitalRoute && !isHospitalLoginRoute) {
-    return <SplashScreen duration={600} onFinish={() => setShowSplash(false)} />;
+  // Always show Splash Screen first only for customer account routes (400ms ultra-short)
+  if (showSplash && !isManagementRoute) {
+    return (
+      <SplashScreen 
+        duration={400} 
+        onFinish={() => {
+          sessionStorage.setItem('insta_splash_viewed', 'true');
+          setShowSplash(false);
+        }} 
+      />
+    );
   }
 
-  if (!onboarded && !isHospitalRoute && !isHospitalLoginRoute) {
+  if (!onboarded && !isManagementRoute) {
     return <Onboarding onComplete={() => setOnboarded(true)} />;
   }
 
-  if (!user && !isHospitalRoute && !isHospitalLoginRoute) {
+  if (!user && !isManagementRoute) {
     return (
       <Login 
         onSuccess={() => {
+          sessionStorage.setItem('insta_splash_viewed', 'true');
           setShowSplash(false);
           navigate('/');
         }} 
@@ -215,11 +233,8 @@ const AppContent: React.FC = () => {
     );
   }
 
-  // If on admin or hospital routes, do not wrap in patient responsive frame
-  const isAdminRoute = location.pathname.startsWith('/admin') || isHospitalRoute || isHospitalLoginRoute;
-
   // Show bottom nav bar on all patient routes (non-admin routes)
-  const showBottomNav = !isAdminRoute;
+  const showBottomNav = !isManagementRoute;
 
   // Determine active nav item
   const isHomeActive = location.pathname === '/';
