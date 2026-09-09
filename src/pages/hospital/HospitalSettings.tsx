@@ -17,7 +17,7 @@ const COMMON_FACILITIES = [
 ];
 
 export const HospitalSettings: React.FC = () => {
-  const { hospitalProfile, updateHospitalProfile } = useHospital();
+  const { hospitalProfile, updateHospitalProfile, switchHospital, availableHospitals } = useHospital();
   const [activeTab, setActiveTab] = useState<'basic' | 'contact' | 'location' | 'about'>('basic');
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isGeocoding, setIsGeocoding] = useState(false);
@@ -44,8 +44,8 @@ export const HospitalSettings: React.FC = () => {
     area: hospitalProfile?.area || 'Koramangala 5th Block',
     address: hospitalProfile?.address || '143, 1st Cross Rd, 5th Block, Koramangala, Bengaluru, Karnataka 560034',
     pinCode: hospitalProfile?.pinCode || '560034',
-    lat: String(hospitalProfile?.lat || 12.9348),
-    lng: String(hospitalProfile?.lng || 77.6189),
+    lat: String(hospitalProfile?.lat ?? 12.9348),
+    lng: String(hospitalProfile?.lng ?? 77.6189),
     about: hospitalProfile?.about || 'Apollo Spectra Hospital is a state-of-the-art multi-speciality hospital offering world-class healthcare, advanced surgical care, and OPD consultations.',
     mission: hospitalProfile?.mission || 'To provide high quality patient-centric clinical excellence with zero waiting time.',
     vision: hospitalProfile?.vision || 'To be the most trusted healthcare institution in the region.',
@@ -58,6 +58,41 @@ export const HospitalSettings: React.FC = () => {
       'Ambulance Service'
     ]
   });
+
+  // Keep form synchronized when hospitalProfile changes or hospital is switched
+  React.useEffect(() => {
+    if (hospitalProfile) {
+      setForm({
+        name: hospitalProfile.name || '',
+        logo: hospitalProfile.logo || '',
+        coverImage: hospitalProfile.coverImage || '',
+        registrationNumber: hospitalProfile.registrationNumber || '',
+        accreditation: hospitalProfile.accreditation || '',
+        gstNumber: hospitalProfile.gstNumber || '',
+        licenseNumber: hospitalProfile.licenseNumber || '',
+        type: hospitalProfile.type || 'Multi Speciality Hospital',
+        ownershipType: hospitalProfile.ownershipType || 'Private Corporate',
+        phone: hospitalProfile.phone || '',
+        whatsapp: hospitalProfile.whatsapp || '',
+        email: hospitalProfile.email || '',
+        website: hospitalProfile.website || '',
+        emergencyNumber: hospitalProfile.emergencyNumber || '',
+        country: hospitalProfile.country || 'India',
+        state: hospitalProfile.state || '',
+        city: hospitalProfile.city || '',
+        area: hospitalProfile.area || '',
+        address: hospitalProfile.address || '',
+        pinCode: hospitalProfile.pinCode || '',
+        lat: String(hospitalProfile.lat ?? 12.9348),
+        lng: String(hospitalProfile.lng ?? 77.6189),
+        about: hospitalProfile.about || '',
+        mission: hospitalProfile.mission || '',
+        vision: hospitalProfile.vision || '',
+        brandColor: hospitalProfile.brandColor || '#2563EB',
+        facilities: hospitalProfile.facilities || []
+      });
+    }
+  }, [hospitalProfile]);
 
   const handleFacilityToggle = (fac: string) => {
     setForm(prev => {
@@ -119,18 +154,23 @@ export const HospitalSettings: React.FC = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!form.name.trim()) {
+      alert('Please provide a Hospital Name.');
+      return;
+    }
     updateHospitalProfile({
       ...form,
+      id: hospitalProfile?.id,
       lat: parseFloat(form.lat) || 12.9348,
       lng: parseFloat(form.lng) || 77.6189
     });
     setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 2500);
+    setTimeout(() => setSaveSuccess(false), 3000);
   };
 
   return (
     <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-xs">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-xs">
         <div className="flex items-center gap-3">
           <div className="p-3 bg-blue-600 text-white rounded-2xl shadow-sm shadow-blue-500/20">
             <Building2 size={22} />
@@ -142,6 +182,24 @@ export const HospitalSettings: React.FC = () => {
             </p>
           </div>
         </div>
+
+        {/* Hospital Switcher Selector */}
+        {availableHospitals && availableHospitals.length > 0 && (
+          <div className="flex items-center gap-2.5 bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-2xl">
+            <span className="text-xs font-bold text-slate-500 whitespace-nowrap">Active Hospital:</span>
+            <select
+              value={hospitalProfile?.id || ''}
+              onChange={(e) => switchHospital && switchHospital(e.target.value)}
+              className="bg-white border border-slate-200 text-slate-800 text-xs font-black rounded-xl px-3 py-1.5 outline-none cursor-pointer focus:border-blue-500 shadow-xs"
+            >
+              {availableHospitals.map(h => (
+                <option key={h.id} value={h.id}>
+                  {h.name} {h.category ? `• ${h.category}` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
@@ -179,7 +237,7 @@ export const HospitalSettings: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="md:col-span-2">
                     <label className="text-xs font-extrabold text-slate-700 block mb-1.5">Hospital Name</label>
-                    <input type="text" value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500" required />
+                    <input type="text" value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500" />
                   </div>
                   <div>
                     <label className="text-xs font-extrabold text-slate-700 block mb-1.5">Hospital Category / Type</label>
@@ -211,7 +269,7 @@ export const HospitalSettings: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="text-xs font-extrabold text-slate-700 block mb-1.5">Main Reception Phone</label>
-                    <input type="text" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-blue-500" required />
+                    <input type="text" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-blue-500" />
                   </div>
                   <div>
                     <label className="text-xs font-extrabold text-slate-700 block mb-1.5">WhatsApp OPD Assistance Number</label>
@@ -219,7 +277,7 @@ export const HospitalSettings: React.FC = () => {
                   </div>
                   <div>
                     <label className="text-xs font-extrabold text-slate-700 block mb-1.5">Official Email Address</label>
-                    <input type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-blue-500" required />
+                    <input type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-blue-500" />
                   </div>
                   <div>
                     <label className="text-xs font-extrabold text-slate-700 block mb-1.5">Official Website</label>
@@ -259,7 +317,7 @@ export const HospitalSettings: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="md:col-span-2">
                     <label className="text-xs font-extrabold text-slate-700 block mb-1.5">Full Physical Address</label>
-                    <input type="text" value={form.address} onChange={e => setForm({...form, address: e.target.value})} className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500" required />
+                    <input type="text" value={form.address} onChange={e => setForm({...form, address: e.target.value})} className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500" />
                   </div>
                   <div>
                     <label className="text-xs font-extrabold text-slate-700 block mb-1.5">City</label>
@@ -293,11 +351,11 @@ export const HospitalSettings: React.FC = () => {
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="text-[11px] font-extrabold text-slate-600 block mb-1">Latitude</label>
-                        <input type="text" value={form.lat} onChange={e => setForm({...form, lat: e.target.value})} className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500" required />
+                        <input type="text" value={form.lat} onChange={e => setForm({...form, lat: e.target.value})} className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500" />
                       </div>
                       <div>
                         <label className="text-[11px] font-extrabold text-slate-600 block mb-1">Longitude</label>
-                        <input type="text" value={form.lng} onChange={e => setForm({...form, lng: e.target.value})} className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500" required />
+                        <input type="text" value={form.lng} onChange={e => setForm({...form, lng: e.target.value})} className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500" />
                       </div>
                     </div>
                   </div>

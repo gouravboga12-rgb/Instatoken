@@ -369,11 +369,11 @@ export const SearchHospitals: React.FC<SearchHospitalsProps> = ({
                     </div>
 
                     {/* Doctor preview strip */}
-                    <div className="bg-slate-50/80 px-4 py-3 border-t border-slate-100 flex items-center justify-between gap-2">
-                      <span className="text-[10px] sm:text-xs text-slate-500 font-bold uppercase tracking-wider">
-                        {hosp.doctors.length} Doctors Available
+                    <div className="bg-slate-50/80 px-3 sm:px-4 py-2.5 border-t border-slate-100 flex items-center justify-between gap-1.5 sm:gap-2">
+                      <span className="text-[11px] sm:text-xs text-slate-500 font-bold tracking-tight truncate min-w-0">
+                        {hosp.doctors.length} {hosp.doctors.length === 1 ? 'Doctor' : 'Doctors'} Available
                       </span>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                         <a 
                           href={hosp.lat && hosp.lng 
                             ? `https://www.google.com/maps/dir/?api=1&destination=${hosp.lat},${hosp.lng}`
@@ -382,10 +382,10 @@ export const SearchHospitals: React.FC<SearchHospitalsProps> = ({
                           target="_blank" 
                           rel="noopener noreferrer"
                           onClick={(e) => e.stopPropagation()}
-                          className="text-xs font-bold text-slate-600 hover:text-blue-600 bg-white border border-slate-200 hover:border-blue-300 px-3 py-2 rounded-xl flex items-center gap-1 transition-all cursor-pointer shrink-0"
+                          className="text-[11px] sm:text-xs font-bold text-slate-600 hover:text-blue-600 bg-white border border-slate-200 hover:border-blue-300 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl flex items-center gap-1 transition-all cursor-pointer shrink-0"
                           title="Open in Google Maps"
                         >
-                          <Navigation size={12} className="text-blue-600 fill-blue-600" />
+                          <Navigation size={11} className="text-blue-600 fill-blue-600" />
                           <span>Map</span>
                         </a>
                         <button 
@@ -393,7 +393,7 @@ export const SearchHospitals: React.FC<SearchHospitalsProps> = ({
                             e.stopPropagation();
                             onHospitalSelect(hosp.id);
                           }}
-                          className="text-xs sm:text-sm text-white font-black bg-blue-600 hover:bg-blue-700 px-4.5 py-2.5 rounded-xl flex items-center gap-1.5 cursor-pointer shadow-md shadow-blue-500/25 hover:shadow-blue-500/40 transition-all hover:scale-105 active:scale-95 shrink-0"
+                          className="text-[11px] sm:text-xs text-white font-extrabold bg-blue-600 hover:bg-blue-700 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl flex items-center gap-1 cursor-pointer shadow-sm shadow-blue-500/25 hover:shadow-blue-500/40 transition-all hover:scale-105 active:scale-95 shrink-0 whitespace-nowrap"
                         >
                           Book OPD Token
                         </button>

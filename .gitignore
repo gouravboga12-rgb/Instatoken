@@ -27,6 +27,9 @@ dist-ssr
 implementation_plan_plan
 implementation_plan_backend
 .env
+# Temporary Assets & Documents
+*.pdf
+image copy*.png
 .env.*
 !server/.env.example
 *.pem

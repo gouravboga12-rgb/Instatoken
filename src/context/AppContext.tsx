@@ -202,13 +202,14 @@ export const getHydratedHospitals = (): Hospital[] => {
         ...h,
         ...(hospitalPanelProfile ? {
           name: hospitalPanelProfile.name || h.name,
+          category: hospitalPanelProfile.type || h.category,
           address: hospitalPanelProfile.address || h.address,
-          contact: hospitalPanelProfile.phone || h.contact,
+          contact: hospitalPanelProfile.phone || hospitalPanelProfile.emergencyNumber || h.contact,
           about: hospitalPanelProfile.about || h.about,
-          facilities: hospitalPanelProfile.facilities || h.facilities,
+          facilities: (hospitalPanelProfile.facilities && hospitalPanelProfile.facilities.length > 0) ? hospitalPanelProfile.facilities : h.facilities,
           image: hospitalPanelProfile.coverImage || hospitalPanelProfile.logo || h.image,
-          lat: hospitalPanelProfile.lat !== undefined ? Number(hospitalPanelProfile.lat) : h.lat,
-          lng: hospitalPanelProfile.lng !== undefined ? Number(hospitalPanelProfile.lng) : h.lng,
+          lat: (hospitalPanelProfile.lat !== undefined && !isNaN(Number(hospitalPanelProfile.lat))) ? Number(hospitalPanelProfile.lat) : h.lat,
+          lng: (hospitalPanelProfile.lng !== undefined && !isNaN(Number(hospitalPanelProfile.lng))) ? Number(hospitalPanelProfile.lng) : h.lng,
         } : {}),
         departments: (hospitalPanelDepts && hospitalPanelDepts.length > 0) ? hospitalPanelDepts : h.departments,
         doctors: (hospitalPanelDoctors && hospitalPanelDoctors.length > 0) ? hospitalPanelDoctors : h.doctors

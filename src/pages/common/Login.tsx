@@ -8,13 +8,13 @@ interface LoginProps {
 }
 
 const specializations = [
-  { name: "Cardiology", image: "/cardiology.png" },
-  { name: "Dermatology", image: "/dermatology.png" },
-  { name: "Orthopedics", image: "/orthopedics.png" },
-  { name: "Pediatrics", image: "/pediatrics.png" },
-  { name: "Dentistry", image: "/dentistry.png" },
-  { name: "Neurology", image: "/neurology.png" },
-  { name: "Ophthalmology", image: "/ophthalmology.png" },
+  { name: "Cardiology", image: "/cardiology.webp", fallback: "/cardiology.png" },
+  { name: "Dermatology", image: "/dermatology.webp", fallback: "/dermatology.png" },
+  { name: "Orthopedics", image: "/orthopedics.webp", fallback: "/orthopedics.png" },
+  { name: "Pediatrics", image: "/pediatrics.webp", fallback: "/pediatrics.png" },
+  { name: "Dentistry", image: "/dentistry.webp", fallback: "/dentistry.png" },
+  { name: "Neurology", image: "/neurology.webp", fallback: "/neurology.png" },
+  { name: "Ophthalmology", image: "/ophthalmology.webp", fallback: "/ophthalmology.png" },
 ];
 
 import { useGoogleLogin } from '@react-oauth/google';
@@ -144,8 +144,21 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
                       key={index}
                       className="flex-shrink-0 flex flex-col items-center w-[72px] text-center"
                     >
-                      <div className="w-[72px] h-[72px] rounded-2xl overflow-hidden shadow-sm border border-slate-100 hover:scale-105 transition-all duration-300">
-                        <img src={spec.image} alt={spec.name} className="w-full h-full object-cover" />
+                      <div className="w-[72px] h-[72px] rounded-2xl overflow-hidden shadow-sm border border-slate-100 hover:scale-105 transition-all duration-300 bg-slate-100 flex items-center justify-center">
+                        <img 
+                          src={spec.image} 
+                          alt={spec.name} 
+                          loading="eager"
+                          fetchPriority="high"
+                          decoding="async"
+                          className="w-full h-full object-cover" 
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            if (target.src !== spec.fallback) {
+                              target.src = spec.fallback;
+                            }
+                          }}
+                        />
                       </div>
                       <span className="text-[10px] font-black text-slate-700 tracking-tight mt-1.5 block truncate w-full">{spec.name}</span>
                     </div>
@@ -221,8 +234,21 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
                         key={index}
                         className="flex-shrink-0 flex flex-col items-center w-[64px] text-center"
                       >
-                        <div className="w-[64px] h-[64px] rounded-xl overflow-hidden shadow-xs border border-slate-100">
-                          <img src={spec.image} alt={spec.name} className="w-full h-full object-cover" />
+                        <div className="w-[64px] h-[64px] rounded-xl overflow-hidden shadow-xs border border-slate-100 bg-slate-100 flex items-center justify-center">
+                          <img 
+                            src={spec.image} 
+                            alt={spec.name} 
+                            loading="eager"
+                            fetchPriority="high"
+                            decoding="async"
+                            className="w-full h-full object-cover" 
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              if (target.src !== spec.fallback) {
+                                target.src = spec.fallback;
+                              }
+                            }}
+                          />
                         </div>
                         <span className="text-[9px] font-black text-slate-700 tracking-tight mt-1 block truncate w-full">{spec.name}</span>
                       </div>

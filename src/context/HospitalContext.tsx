@@ -263,8 +263,10 @@ interface HospitalContextType {
   deleteStaffMember: (id: string) => void;
   markStaffAttendance: (staffId: string, date: string, status: StaffAttendanceRecord['status'], checkIn?: string, checkOut?: string, notes?: string) => void;
 
-  // Profile
+  // Profile & Hospital Switcher
   updateHospitalProfile: (updates: Partial<HospitalProfile>) => void;
+  switchHospital: (hospitalId: string) => void;
+  availableHospitals: { id: string; name: string; category?: string }[];
 }
 
 // ─── Mock credentials ─────────────────────────────────────────────────────────
@@ -490,7 +492,7 @@ export const useHospital = () => {
 };
 
 export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { updateHospital, updateHospitalDoctors, updateHospitalDepartments, getOrCreateCustomerAccount } = useApp();
+  const { hospitals, updateHospital, updateHospitalDoctors, updateHospitalDepartments, getOrCreateCustomerAccount } = useApp();
 
   const [hospitalUser, setHospitalUser] = useState<HospitalUser | null>(MOCK_USERS[0]);
 
@@ -643,6 +645,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (updateHospital) {
       updateHospital(targetHospId, {
         name: hospitalProfile.name,
+        category: hospitalProfile.type,
         address: hospitalProfile.address,
         contact: hospitalProfile.phone,
         about: hospitalProfile.about,
@@ -1070,12 +1073,139 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setNotifications(prev => [...prev, { ...msg, id: `notif-${Date.now()}`, sentAt: new Date().toISOString(), status: 'sent' }]);
   };
 
+  const availableHospitals = (hospitals || []).map(h => ({ id: h.id, name: h.name, category: h.category }));
+
+  const switchHospital = (hospId: string) => {
+    const target = hospitals.find(h => h.id === hospId);
+    if (!target) return;
+
+    let customProf: HospitalProfile | null = null;
+    const savedCustom = localStorage.getItem(`insta_hospital_profile_${hospId}`);
+    if (savedCustom) {
+      try { customProf = JSON.parse(savedCustom); } catch (e) {}
+    }
+
+    const newProfile: HospitalProfile = customProf || {
+      ...INITIAL_PROFILE,
+      id: target.id,
+      name: target.name,
+      type: target.category || 'Multi Speciality',
+      address: target.address,
+      lat: target.lat,
+      lng: target.lng,
+      phone: target.contact || '+91 80 4668 8888',
+      about: target.about || 'Specialist healthcare provider offering advanced OPD care.',
+      facilities: (target.facilities && target.facilities.length > 0) ? target.facilities : [
+        '24x7 Emergency & Trauma',
+        'Intensive Care Unit (ICU)',
+        '24x7 In-House Pharmacy',
+        'Advanced Diagnostics & Lab',
+        'Ambulance Service'
+      ],
+      coverImage: target.image || '',
+      logo: target.image || '',
+    };
+
+    setHospitalProfile(newProfile);
+    localStorage.setItem('insta_hospital_profile', JSON.stringify(newProfile));
+    localStorage.setItem(`insta_hospital_profile_${hospId}`, JSON.stringify(newProfile));
+
+    setHospitalUser(prev => ({
+      id: `huser-${target.id}`,
+      name: prev?.name || 'Dr. Rajesh Kumar',
+      email: prev?.email || `admin@${target.id.replace('hosp-', '')}.com`,
+      role: 'owner',
+      hospitalId: target.id,
+      hospitalName: target.name,
+      avatar: prev?.avatar || '',
+      isOnline: true
+    }));
+
+    if (target.doctors && target.doctors.length > 0) {
+      const convertedDocs: HospitalDoctor[] = target.doctors.map(d => ({
+        id: d.id,
+        name: d.name,
+        photo: d.image,
+        qualification: d.qualification,
+        specialization: d.specialty,
+        departmentId: d.departmentId,
+        departmentName: d.specialty,
+        experience: d.experience,
+        consultationFee: d.consultationFee,
+        languages: ['English', 'Hindi'],
+        gender: 'Male',
+        biography: `${d.name} is a renowned medical specialist with ${d.experience} years of clinical expertise.`,
+        opdDays: d.availability.days,
+        opdStartTime: '09:00 AM',
+        opdEndTime: '05:00 PM',
+        consultationDuration: d.estimatedWaitPerPatient || 15,
+        maxTokensPerDay: 50,
+        onlineConsult: true,
+        offlineConsult: true,
+        active: true,
+        rating: d.rating,
+        totalPatients: d.reviewsCount || 100,
+        sessions: (d.sessions || []).map((s, idx) => ({
+          id: s.id || `sess-${idx}`,
+          name: s.name || 'General Session',
+          startTime: s.startTime || '09:00 AM',
+          endTime: s.endTime || '01:00 PM',
+          maxTokens: s.maxTokens || 25,
+          consultationDuration: s.consultationDuration || 15,
+          breakTime: s.breakTime || 0,
+          active: s.active !== false
+        }))
+      }));
+      setDoctors(convertedDocs);
+      localStorage.setItem('insta_hospital_doctors', JSON.stringify(convertedDocs));
+    }
+
+    if (target.departments && target.departments.length > 0) {
+      const convertedDepts: HospitalDepartment[] = target.departments.map(dep => ({
+        id: dep.id,
+        name: dep.name,
+        icon: dep.icon || '🩺',
+        headDoctor: '',
+        totalDoctors: target.doctors.filter(d => d.departmentId === dep.id).length,
+        active: true
+      }));
+      setDepartments(convertedDepts);
+      localStorage.setItem('insta_hospital_departments', JSON.stringify(convertedDepts));
+    }
+
+    broadcastGlobalSync('HOSPITAL_PROFILE_UPDATED', newProfile);
+  };
+
   // Profile
   const updateHospitalProfile = (updates: Partial<HospitalProfile>) => {
     setHospitalProfile(prev => {
       const updated = { ...prev, ...updates };
+      const activeId = updated.id || targetHospId;
       localStorage.setItem('insta_hospital_profile', JSON.stringify(updated));
+      localStorage.setItem(`insta_hospital_profile_${activeId}`, JSON.stringify(updated));
+
+      // Also update hospitalUser name immediately
+      if (updated.name) {
+        setHospitalUser(currUser => currUser ? { ...currUser, hospitalName: updated.name } : null);
+      }
+
+      // Update AppContext hospital directly so website user side reflects immediately!
+      if (updateHospital) {
+        updateHospital(activeId, {
+          name: updated.name,
+          category: updated.type || (updated as any).category,
+          address: updated.address,
+          contact: updated.phone || updated.emergencyNumber,
+          about: updated.about,
+          facilities: updated.facilities,
+          image: updated.coverImage || updated.logo,
+          lat: updated.lat !== undefined ? Number(updated.lat) : undefined,
+          lng: updated.lng !== undefined ? Number(updated.lng) : undefined,
+        });
+      }
+
       broadcastGlobalSync('HOSPITAL_PROFILE_UPDATED', updated);
+      broadcastGlobalSync('HOSPITAL_UPDATED', { hospitalId: activeId, updates: updated });
       return updated;
     });
   };
@@ -1094,6 +1224,8 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       updateScheduleConfig, updateSession,
       sendNotification,
       updateHospitalProfile,
+      switchHospital,
+      availableHospitals,
     }}>
       {children}
     </HospitalContext.Provider>

@@ -179,7 +179,7 @@ const Sidebar: React.FC<{ collapsed: boolean; onToggle: () => void }> = ({ colla
 
 // ─── Top Header ───────────────────────────────────────────────────────────────
 const TopHeader: React.FC<{ onMenuToggle: () => void }> = ({ onMenuToggle }) => {
-  const { hospitalUser, hospitalLogout, tokens } = useHospital();
+  const { hospitalUser, hospitalLogout, tokens, hospitalProfile, availableHospitals, switchHospital } = useHospital();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const todayStr = new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
@@ -213,7 +213,22 @@ const TopHeader: React.FC<{ onMenuToggle: () => void }> = ({ onMenuToggle }) => 
           Welcome, {hospitalUser?.name?.split(' ')[0]} 👋
         </p>
         <div className="flex items-center gap-2 mt-0.5">
-          <p className="text-[10px] text-slate-400 font-semibold truncate">{hospitalUser?.hospitalName}</p>
+          {availableHospitals && availableHospitals.length > 1 ? (
+            <select
+              value={hospitalProfile?.id || ''}
+              onChange={(e) => switchHospital(e.target.value)}
+              className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-2 py-0.5 outline-none cursor-pointer hover:bg-blue-100 transition-colors max-w-[190px] truncate"
+              title="Switch Hospital Branch"
+            >
+              {availableHospitals.map(h => (
+                <option key={h.id} value={h.id}>
+                  {h.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <p className="text-[10px] text-slate-400 font-semibold truncate">{hospitalUser?.hospitalName}</p>
+          )}
           <span className="text-slate-200">·</span>
           <span className={`text-[9px] font-black px-2 py-0.5 rounded-full capitalize ${roleColor}`}>
             {hospitalUser?.role}
