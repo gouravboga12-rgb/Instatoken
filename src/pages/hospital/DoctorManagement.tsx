@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useHospital } from '../../context/HospitalContext';
 import type { HospitalDoctor, HospitalDepartment } from '../../context/HospitalContext';
 import { Plus, Edit3, Trash2, Eye, EyeOff, Search, Upload, User } from 'lucide-react';
@@ -20,6 +21,7 @@ export const DoctorManagement: React.FC<DoctorManagementProps> = ({ tab: initial
     deleteDepartment,
     toggleDepartmentActive
   } = useHospital();
+  const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState<'doctors' | 'departments'>(initialTab);
   const [doctorSearch, setDoctorSearch] = useState('');
@@ -223,7 +225,7 @@ const to12Hour = (timeStr?: string): string => {
             Doctors ({doctors.length})
           </button>
           <button
-            onClick={() => setActiveTab('departments')}
+            onClick={() => navigate('/hospital/departments')}
             className={`px-4 py-2 text-xs font-bold rounded-lg cursor-pointer transition-all border-none ${
               activeTab === 'departments' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'
             }`}

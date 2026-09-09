@@ -648,9 +648,16 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         about: hospitalProfile.about,
         facilities: hospitalProfile.facilities,
         image: hospitalProfile.coverImage || hospitalProfile.logo,
+        lat: hospitalProfile.lat !== undefined ? Number(hospitalProfile.lat) : undefined,
+        lng: hospitalProfile.lng !== undefined ? Number(hospitalProfile.lng) : undefined,
       });
     }
     broadcastGlobalSync('HOSPITAL_PROFILE_UPDATED', { hospitalId: targetHospId, profile: hospitalProfile });
+    fetch(`/api/hospitals/${targetHospId}/profile`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profile: hospitalProfile })
+    }).catch(() => {});
   }, [hospitalProfile, targetHospId]);
 
   useEffect(() => {
@@ -677,13 +684,19 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       currentQueue: tokens.filter(t => t.doctorId === d.id && ['completed'].includes(t.status)).length,
       nextAvailableToken: Math.max(1, tokens.filter(t => t.doctorId === d.id).length + 1),
       estimatedWaitPerPatient: Number(d.consultationDuration) || 12,
-      active: d.active !== false
+      active: d.active !== false,
+      sessions: d.sessions || []
     }));
 
     if (updateHospitalDoctors) {
       updateHospitalDoctors(targetHospId, mappedAppDoctors);
     }
     broadcastGlobalSync('HOSPITAL_DOCTORS_UPDATED', { hospitalId: targetHospId, doctors: mappedAppDoctors });
+    fetch(`/api/hospitals/${targetHospId}/doctors`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ doctors: mappedAppDoctors })
+    }).catch(() => {});
   }, [doctors, targetHospId, tokens]);
 
   useEffect(() => {
@@ -697,6 +710,11 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       updateHospitalDepartments(targetHospId, mappedDepts);
     }
     broadcastGlobalSync('HOSPITAL_DEPARTMENTS_UPDATED', { hospitalId: targetHospId, departments: mappedDepts });
+    fetch(`/api/hospitals/${targetHospId}/departments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ departments: mappedDepts })
+    }).catch(() => {});
   }, [departments, targetHospId]);
 
   useEffect(() => {
@@ -730,7 +748,19 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   // Doctors
   const addDoctor = (doc: Omit<HospitalDoctor, 'id' | 'totalPatients' | 'rating'>) => {
     setDoctors(prev => {
-      const updated = [...prev, { ...doc, id: `doc-${Date.now()}`, totalPatients: 0, rating: 0 }];
+      const newDocId = `doc-${Date.now()}`;
+      const sessions = doc.sessions && doc.sessions.length > 0 ? doc.sessions : [
+        { id: `sess-${newDocId}-1`, name: 'Morning', startTime: doc.opdStartTime || '09:00 AM', endTime: doc.opdEndTime || '01:00 PM', maxTokens: Math.round((doc.maxTokensPerDay || 50) * 0.6) || 30, consultationDuration: doc.consultationDuration || 15, breakTime: 5, active: true },
+        { id: `sess-${newDocId}-2`, name: 'Evening', startTime: '05:00 PM', endTime: '09:00 PM', maxTokens: Math.round((doc.maxTokensPerDay || 50) * 0.4) || 20, consultationDuration: doc.consultationDuration || 15, breakTime: 5, active: true }
+      ];
+      const newDoc: HospitalDoctor = {
+        ...doc,
+        id: newDocId,
+        totalPatients: 0,
+        rating: 5.0,
+        sessions
+      };
+      const updated = [...prev, newDoc];
       localStorage.setItem('insta_hospital_doctors', JSON.stringify(updated));
       broadcastGlobalSync('HOSPITAL_DOCTORS_UPDATED', updated);
       return updated;

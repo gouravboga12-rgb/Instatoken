@@ -10,7 +10,7 @@ import {
   Smile, ShieldAlert, Award, Loader2, FileText,
   Menu, BellRing, ShieldCheck, 
   Zap, ChevronDown, Building2, Share2,
-  Users, ArrowRight,
+  Users, ArrowRight, Navigation,
   X, Home as HomeIcon, LogOut
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -773,12 +773,26 @@ export const Home: React.FC<HomeProps> = ({
                         )}
                       </div>
 
-                      {/* Distance Badges */}
-                      <div className="flex items-center gap-2 flex-wrap">
+                      {/* Distance Badges & Navigation Action */}
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50/90 text-blue-700 border border-blue-200/80 text-[11px] font-extrabold shadow-2xs">
                           <MapPin size={13} className="text-blue-600 shrink-0" />
                           <span>{hosp.distance} km away</span>
                         </span>
+
+                        <a 
+                          href={hosp.lat && hosp.lng 
+                            ? `https://www.google.com/maps/dir/?api=1&destination=${hosp.lat},${hosp.lng}`
+                            : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(hosp.name + ' ' + hosp.address)}`
+                          } 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-[11px] font-extrabold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100/80 px-2.5 py-1 rounded-lg border border-blue-200 flex items-center gap-1 transition-all cursor-pointer"
+                        >
+                          <Navigation size={11} className="text-blue-600 fill-blue-600" />
+                          <span>Navigate</span>
+                        </a>
                       </div>
                     </div>
                   </div>
@@ -788,15 +802,31 @@ export const Home: React.FC<HomeProps> = ({
                     <span className="text-[10px] sm:text-xs text-slate-500 font-bold uppercase tracking-wider">
                       {hosp.doctors.length} Doctors Available
                     </span>
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onHospitalSelect(hosp.id);
-                      }}
-                      className="text-xs sm:text-sm text-white font-black bg-blue-600 hover:bg-blue-700 px-4.5 py-2.5 rounded-xl flex items-center gap-1.5 cursor-pointer shadow-md shadow-blue-500/25 hover:shadow-blue-500/40 transition-all hover:scale-105 active:scale-95 shrink-0"
-                    >
-                      Book OPD Token
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <a 
+                        href={hosp.lat && hosp.lng 
+                          ? `https://www.google.com/maps/dir/?api=1&destination=${hosp.lat},${hosp.lng}`
+                          : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(hosp.name + ' ' + hosp.address)}`
+                        } 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-xs font-bold text-slate-600 hover:text-blue-600 bg-white border border-slate-200 hover:border-blue-300 px-3 py-2 rounded-xl flex items-center gap-1 transition-all cursor-pointer shrink-0"
+                        title="Open in Google Maps"
+                      >
+                        <Navigation size={12} className="text-blue-600 fill-blue-600" />
+                        <span>Map</span>
+                      </a>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onHospitalSelect(hosp.id);
+                        }}
+                        className="text-xs sm:text-sm text-white font-black bg-blue-600 hover:bg-blue-700 px-4.5 py-2.5 rounded-xl flex items-center gap-1.5 cursor-pointer shadow-md shadow-blue-500/25 hover:shadow-blue-500/40 transition-all hover:scale-105 active:scale-95 shrink-0"
+                      >
+                        Book OPD Token
+                      </button>
+                    </div>
                   </div>
                 </Card>
               );

@@ -15,6 +15,7 @@ import { BillingPayments } from './BillingPayments';
 import { ReportsAnalytics } from './ReportsAnalytics';
 import { HospitalSettings } from './HospitalSettings';
 import { HospitalStaff } from './HospitalStaff';
+import { DepartmentManagement } from './DepartmentManagement';
 import {
   LayoutDashboard, Plus, List, Wifi, WifiOff, Calendar, RefreshCw,
   Users, Stethoscope, Building2,
@@ -324,7 +325,8 @@ export const HospitalLayout: React.FC = () => {
             <Route path="tokens/*" element={<TokenManagement />} />
             <Route path="revenue" element={<RevenueOverview />} />
             <Route path="doctors" element={<DoctorManagement tab="doctors" />} />
-            <Route path="departments" element={<DoctorManagement tab="departments" />} />
+            <Route path="departments" element={<DepartmentManagement />} />
+            <Route path="departments/:deptId" element={<DepartmentManagement />} />
             <Route path="schedule" element={<TokenManage />} />
             <Route path="staff" element={<HospitalStaff />} />
             <Route path="patients" element={<PatientManagement />} />
