@@ -471,10 +471,10 @@ const WalkInGenerator: React.FC<{
     }));
   };
 
-  const activeDepts = departments.filter(d => d.active || d.id === form.departmentId);
+  const activeDepts = departments.filter(d => (d.active !== false) || d.id === form.departmentId);
   const availDoctors = form.departmentId
-    ? doctors.filter(d => d.departmentId === form.departmentId && (d.active || d.id === form.doctorId))
-    : doctors.filter(d => d.active || d.id === form.doctorId);
+    ? doctors.filter(d => d.departmentId === form.departmentId && ((d.active !== false) || d.id === form.doctorId))
+    : doctors.filter(d => (d.active !== false) || d.id === form.doctorId);
 
   const selectedDoctor = doctors.find(d => d.id === form.doctorId);
 

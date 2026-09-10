@@ -336,8 +336,8 @@ const INITIAL_DEPARTMENTS: HospitalDepartment[] = [
   { id: 'dept-pedia', name: 'Pediatrics', icon: '👶', headDoctor: 'Dr. Anjali Sharma', totalDoctors: 1, active: true },
   { id: 'dept-gynaec', name: 'Gynecology', icon: '🌸', headDoctor: 'Dr. Meera Nair', totalDoctors: 1, active: true },
   { id: 'dept-general', name: 'General Medicine', icon: '🩺', headDoctor: 'Dr. Vivek Singh', totalDoctors: 3, active: true },
-  { id: 'dept-eye', name: 'Ophthalmology', icon: '👁️', headDoctor: '', totalDoctors: 0, active: false },
-  { id: 'dept-dental', name: 'Dental', icon: '🦷', headDoctor: '', totalDoctors: 0, active: false },
+  { id: 'dept-eye', name: 'Ophthalmology', icon: '👁️', headDoctor: '', totalDoctors: 0, active: true },
+  { id: 'dept-dental', name: 'Dental', icon: '🦷', headDoctor: '', totalDoctors: 0, active: true },
 ];
 
 const INITIAL_DOCTORS: HospitalDoctor[] = [
@@ -525,7 +525,19 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const [departments, setDepartments] = useState<HospitalDepartment[]>(() => {
     const saved = localStorage.getItem('insta_hospital_departments');
-    return saved ? JSON.parse(saved) : INITIAL_DEPARTMENTS;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((d: any) => ({
+            ...d,
+            icon: d.icon || '🩺',
+            active: d.active !== false
+          }));
+        }
+      } catch (e) {}
+    }
+    return INITIAL_DEPARTMENTS;
   });
 
   const [doctors, setDoctors] = useState<HospitalDoctor[]>(() => {
@@ -781,7 +793,16 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         }
         const savedDepts = localStorage.getItem('insta_hospital_departments');
         if (savedDepts) {
-          try { setDepartments(JSON.parse(savedDepts)); } catch (e) {}
+          try {
+            const parsed = JSON.parse(savedDepts);
+            if (Array.isArray(parsed)) {
+              setDepartments(parsed.map((d: any) => ({
+                ...d,
+                icon: d.icon || '🩺',
+                active: d.active !== false
+              })));
+            }
+          } catch (e) {}
         }
         const savedToks = localStorage.getItem('insta_hospital_tokens');
         if (savedToks) {
@@ -877,7 +898,10 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const mappedDepts = departments.map(d => ({
       id: d.id,
       name: d.name,
-      icon: d.icon || '🩺'
+      icon: d.icon || '🩺',
+      active: d.active !== false,
+      headDoctor: d.headDoctor || '',
+      totalDoctors: d.totalDoctors || 0
     }));
     if (updateHospitalDepartments) {
       updateHospitalDepartments(targetHospId, mappedDepts);

@@ -172,9 +172,13 @@ export const subscribeGlobalSync = (callback: SyncCallback) => {
           const targetHospId = Object.keys(serverData.hospitalDepartments)[0] || 'hosp-apollo';
           const depts = serverData.hospitalDepartments[targetHospId];
           if (depts && Array.isArray(depts)) {
+            const normalizedDepts = depts.map((d: any) => ({
+              ...d,
+              active: d.active !== false
+            }));
             const currentDepts = localStorage.getItem('insta_hospital_departments');
-            if (JSON.stringify(depts) !== currentDepts) {
-              localStorage.setItem('insta_hospital_departments', JSON.stringify(depts));
+            if (JSON.stringify(normalizedDepts) !== currentDepts) {
+              localStorage.setItem('insta_hospital_departments', JSON.stringify(normalizedDepts));
               hasChanged = true;
             }
           }

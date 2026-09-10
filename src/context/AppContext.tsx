@@ -171,7 +171,7 @@ export const getHydratedHospitals = (): Hospital[] => {
     } catch (e) {}
   }
 
-  let hospitalPanelDepts: { id: string; name: string; icon: string }[] | null = null;
+  let hospitalPanelDepts: { id: string; name: string; icon: string; active?: boolean }[] | null = null;
   if (savedHDeptsRaw) {
     try {
       const parsedDepts = JSON.parse(savedHDeptsRaw);
@@ -179,7 +179,8 @@ export const getHydratedHospitals = (): Hospital[] => {
         hospitalPanelDepts = parsedDepts.map((dep: any) => ({
           id: dep.id,
           name: dep.name,
-          icon: dep.icon || '🩺'
+          icon: dep.icon || '🩺',
+          active: dep.active !== false
         }));
       }
     } catch (e) {}

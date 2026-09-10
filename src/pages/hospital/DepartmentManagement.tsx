@@ -100,13 +100,13 @@ export const DepartmentManagement: React.FC = () => {
   const filteredDepts = departments.filter(d => {
     const matchesSearch = d.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (d.headDoctor && d.headDoctor.toLowerCase().includes(searchQuery.toLowerCase()));
-    if (filterActive === 'active') return matchesSearch && d.active;
-    if (filterActive === 'inactive') return matchesSearch && !d.active;
+    if (filterActive === 'active') return matchesSearch && (d.active !== false);
+    if (filterActive === 'inactive') return matchesSearch && (d.active === false);
     return matchesSearch;
   });
 
   const totalDoctorsCount = doctors.length;
-  const activeDeptsCount = departments.filter(d => d.active).length;
+  const activeDeptsCount = departments.filter(d => d.active !== false).length;
 
   // ─────────────────────────────────────────────────────────────────────────────
   // RENDER: DEDICATED DEPARTMENT DETAIL VIEW (Phase 16)

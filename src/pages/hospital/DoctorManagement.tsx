@@ -8,6 +8,17 @@ interface DoctorManagementProps {
   tab?: 'doctors' | 'departments';
 }
 
+const DEFAULT_FALLBACK_DEPTS: HospitalDepartment[] = [
+  { id: 'dept-cardio', name: 'Cardiology', icon: '❤️', headDoctor: 'Dr. Arvind Sharma', totalDoctors: 2, active: true },
+  { id: 'dept-neuro', name: 'Neurology', icon: '🧠', headDoctor: 'Dr. Sarah Jenkins', totalDoctors: 1, active: true },
+  { id: 'dept-ortho', name: 'Orthopedics', icon: '🦴', headDoctor: 'Dr. Ramesh Patel', totalDoctors: 2, active: true },
+  { id: 'dept-pedia', name: 'Pediatrics', icon: '👶', headDoctor: 'Dr. Anjali Sharma', totalDoctors: 1, active: true },
+  { id: 'dept-gynaec', name: 'Gynecology', icon: '🌸', headDoctor: 'Dr. Meera Nair', totalDoctors: 1, active: true },
+  { id: 'dept-general', name: 'General Medicine', icon: '🩺', headDoctor: 'Dr. Vivek Singh', totalDoctors: 3, active: true },
+  { id: 'dept-eye', name: 'Ophthalmology', icon: '👁️', headDoctor: '', totalDoctors: 0, active: true },
+  { id: 'dept-dental', name: 'Dental', icon: '🦷', headDoctor: '', totalDoctors: 0, active: true },
+];
+
 export const DoctorManagement: React.FC<DoctorManagementProps> = ({ tab: initialTab = 'doctors' }) => {
   const {
     doctors,
@@ -22,6 +33,13 @@ export const DoctorManagement: React.FC<DoctorManagementProps> = ({ tab: initial
     toggleDepartmentActive
   } = useHospital();
   const navigate = useNavigate();
+
+  const availableDepartments = React.useMemo(() => {
+    const list = (departments || []).filter(d => d.active !== false);
+    if (list.length > 0) return list;
+    if (departments && departments.length > 0) return departments;
+    return DEFAULT_FALLBACK_DEPTS;
+  }, [departments]);
 
   const [activeTab, setActiveTab] = useState<'doctors' | 'departments'>(initialTab);
   const [doctorSearch, setDoctorSearch] = useState('');
@@ -109,14 +127,14 @@ const to12Hour = (timeStr?: string): string => {
 
   const handleDocSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const dept = departments.find(d => d.id === docForm.departmentId);
+    const dept = availableDepartments.find(d => d.id === docForm.departmentId) || departments.find(d => d.id === docForm.departmentId);
     const docData = {
       name: docForm.name.trim(),
       photo: docForm.photo.trim(),
       qualification: docForm.qualification.trim(),
       specialization: docForm.specialization.trim(),
       departmentId: docForm.departmentId,
-      departmentName: dept ? dept.name : '',
+      departmentName: dept ? dept.name : (docForm.specialization || 'General Medicine'),
       experience: parseInt(docForm.experience) || 5,
       consultationFee: parseFloat(docForm.consultationFee) || 500,
       languages: docForm.languages ? docForm.languages.split(',').map(l => l.trim()).filter(Boolean) : ['English'],
@@ -253,7 +271,7 @@ const to12Hour = (timeStr?: string): string => {
               onClick={() => {
                 setEditingDoc(null);
                 setDocForm({
-                  name: '', photo: '', qualification: '', specialization: '', departmentId: departments[0]?.id || '',
+                  name: '', photo: '', qualification: '', specialization: '', departmentId: availableDepartments[0]?.id || departments[0]?.id || '',
                   experience: '5', consultationFee: '500', languages: 'English, Hindi', gender: 'Male', biography: '',
                   opdDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'], opdStartTime: '09:00', opdEndTime: '13:00',
                   consultationDuration: '15', maxTokensPerDay: '50', onlineConsult: true, offlineConsult: true, active: true
@@ -523,13 +541,21 @@ const to12Hour = (timeStr?: string): string => {
                       </button>
                     )}
                   </div>
-                  <input
-                    type="text"
-                    value={docForm.photo}
-                    onChange={e => setDocForm(prev => ({ ...prev, photo: e.target.value }))}
-                    placeholder="Or paste image URL (https://...)"
-                    className="w-full mt-1 px-3 py-1.5 border border-slate-200 rounded-xl text-[11px] outline-none focus:border-blue-500 bg-white"
-                  />
+                  {docForm.photo && docForm.photo.startsWith('data:') ? (
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 inline-flex items-center gap-1">
+                        ✓ Photo uploaded from local device
+                      </span>
+                    </div>
+                  ) : (
+                    <input
+                      type="text"
+                      value={docForm.photo}
+                      onChange={e => setDocForm(prev => ({ ...prev, photo: e.target.value }))}
+                      placeholder="Or paste image URL (https://...)"
+                      className="w-full mt-1 px-3 py-1.5 border border-slate-200 rounded-xl text-[11px] outline-none focus:border-blue-500 bg-white"
+                    />
+                  )}
                 </div>
               </div>
 
@@ -540,9 +566,26 @@ const to12Hour = (timeStr?: string): string => {
                 </div>
                 <div className="col-span-2 sm:col-span-1">
                   <label className="text-xs font-bold text-slate-700 block mb-1.5">Department</label>
-                  <select value={docForm.departmentId} onChange={e => setDocForm({...docForm, departmentId: e.target.value})} required className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 bg-white">
+                  <select
+                    value={docForm.departmentId}
+                    onChange={e => {
+                      const selectedDeptId = e.target.value;
+                      const foundDept = availableDepartments.find(d => d.id === selectedDeptId);
+                      setDocForm({
+                        ...docForm,
+                        departmentId: selectedDeptId,
+                        specialization: docForm.specialization || (foundDept ? `${foundDept.name} Specialist` : '')
+                      });
+                    }}
+                    required
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 bg-white"
+                  >
                     <option value="">Select Department</option>
-                    {departments.filter(d => d.active).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    {availableDepartments.map(d => (
+                      <option key={d.id} value={d.id}>
+                        {d.name} {d.active === false ? '(Inactive)' : ''}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div>
