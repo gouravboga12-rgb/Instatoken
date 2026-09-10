@@ -87,11 +87,12 @@ const TopNavbar: React.FC = () => {
           <div className="relative">
             <button 
               onClick={() => setShowLocationsDropdown(!showLocationsDropdown)}
-              className="flex items-center gap-1 text-[11px] font-extrabold text-slate-655 bg-slate-50 border border-slate-100 hover:border-slate-200 rounded-xl px-3 py-1.5 cursor-pointer hover:bg-slate-100/80 transition-all"
+              className="flex items-center gap-1.5 text-[11px] font-extrabold text-slate-700 bg-slate-50 border border-slate-150 hover:border-slate-300 rounded-xl px-3 py-1.5 cursor-pointer hover:bg-slate-100/80 transition-all max-w-[260px]"
+              title={currentLocation}
             >
-              <MapPin size={11} className="text-blue-600" />
-              <span>{currentLocation}</span>
-              <ChevronDown size={10} className={`text-slate-400 transition-transform ${showLocationsDropdown ? 'rotate-180' : ''}`} />
+              <MapPin size={12} className="text-blue-600 shrink-0" />
+              <span className="truncate">{currentLocation}</span>
+              <ChevronDown size={10} className={`text-slate-400 shrink-0 transition-transform ${showLocationsDropdown ? 'rotate-180' : ''}`} />
             </button>
 
             {showLocationsDropdown && (

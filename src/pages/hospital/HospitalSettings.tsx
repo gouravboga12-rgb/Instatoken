@@ -145,58 +145,17 @@ export const HospitalSettings: React.FC = () => {
     }
   };
 
-  // Fallback to IP Geolocation if browser GPS is denied, timed out, or desktop without GPS hardware
-  const resolveLocationViaIP = async (): Promise<boolean> => {
-    try {
-      setGeocodeNotice('Resolving location via network IP...');
-      const res = await fetch('https://api.bigdatacloud.net/data/reverse-geocode-client');
-      const ipData = await res.json();
-      if (ipData && (ipData.latitude || ipData.city)) {
-        const lat = ipData.latitude || 12.9348;
-        const lng = ipData.longitude || 77.6189;
-        
-        const details = await reverseGeocodeAddressDetails(lat, lng);
-        const resolvedAddress = details.address || [ipData.locality, ipData.city, ipData.principalSubdivision, ipData.postcode].filter(Boolean).join(', ');
-        const resolvedCity = details.city || ipData.city || 'Bengaluru';
-        const resolvedState = details.state || ipData.principalSubdivision || 'Karnataka';
-        const resolvedArea = details.area || ipData.locality || resolvedCity;
-        const resolvedPin = details.pinCode || ipData.postcode || '560095';
-
-        const updated = {
-          ...form,
-          lat: String(lat),
-          lng: String(lng),
-          address: resolvedAddress || form.address,
-          city: resolvedCity,
-          state: resolvedState,
-          area: resolvedArea,
-          pinCode: resolvedPin,
-          country: details.country || ipData.countryName || 'India'
-        };
-
-        setForm(updated);
-        updateHospitalProfile({
-          ...updated,
-          id: hospitalProfile?.id,
-          lat,
-          lng
-        });
-
-        setGeocodeNotice(`✓ Location detected via Network GPS: ${resolvedArea}, ${resolvedCity} (${resolvedPin})`);
-        return true;
-      }
-    } catch (e) {
-      console.warn('Network location fallback error:', e);
-    }
-    return false;
-  };
-
   const handleUseDeviceLocation = () => {
     setIsLocating(true);
-    setGeocodeNotice('Detecting device location...');
+    setGeocodeNotice('Requesting high-accuracy GPS from device...');
 
-    const onLocationResolved = async (latitude: number, longitude: number) => {
-      setGeocodeNotice(`GPS detected: Lat ${latitude.toFixed(4)}, Lng ${longitude.toFixed(4)}. Fetching address via Geocoding API...`);
+    const onLocationResolved = async (latitude: number, longitude: number, accuracy: number) => {
+      const isIpCentroid = accuracy > 4000;
+      setGeocodeNotice(
+        isIpCentroid 
+          ? `📍 Network location acquired (±${Math.round(accuracy / 1000)}km). Geocoding address...` 
+          : `✓ Live GPS acquired (±${accuracy}m). Geocoding address...`
+      );
 
       try {
         const details = await reverseGeocodeAddressDetails(latitude, longitude);
@@ -221,7 +180,11 @@ export const HospitalSettings: React.FC = () => {
         });
 
         const summary = [details.area, details.city, details.state, details.pinCode].filter(Boolean).join(', ');
-        setGeocodeNotice(`✓ Address & GPS updated: ${summary || 'Coordinates saved'}`);
+        if (isIpCentroid) {
+          setGeocodeNotice(`📍 Detected Network Location: ${summary || 'Address filled'}. (Accuracy: ±${Math.round(accuracy / 1000)}km. If not accurate, enter address and click Auto-Geocode).`);
+        } else {
+          setGeocodeNotice(`✓ High-accuracy GPS updated: ${summary || 'Coordinates saved'}`);
+        }
       } catch (err) {
         const updated = {
           ...form,
@@ -238,32 +201,35 @@ export const HospitalSettings: React.FC = () => {
         setGeocodeNotice(`GPS coordinates detected: Lat ${latitude.toFixed(4)}, Lng ${longitude.toFixed(4)}`);
       } finally {
         setIsLocating(false);
-        setTimeout(() => setGeocodeNotice(null), 5000);
+        setTimeout(() => setGeocodeNotice(null), 6000);
       }
     };
 
     if (!navigator.geolocation) {
-      resolveLocationViaIP().finally(() => {
-        setIsLocating(false);
-        setTimeout(() => setGeocodeNotice(null), 4000);
-      });
+      setGeocodeNotice('⚠️ Your browser does not support Geolocation. Please type your address and click Auto-Geocode.');
+      setIsLocating(false);
+      setTimeout(() => setGeocodeNotice(null), 5000);
       return;
     }
 
+    // Query live high-accuracy GPS with zero cache (maximumAge: 0)
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        onLocationResolved(pos.coords.latitude, pos.coords.longitude);
+        const accuracy = Math.round(pos.coords.accuracy || 0);
+        console.log(`Live GPS acquired with accuracy ±${accuracy}m: Lat ${pos.coords.latitude}, Lng ${pos.coords.longitude}`);
+        onLocationResolved(pos.coords.latitude, pos.coords.longitude, accuracy);
       },
-      async (_err) => {
-        // Fallback to Network IP geolocation when browser hardware GPS is unavailable or restricted
-        const ipResolved = await resolveLocationViaIP();
-        if (!ipResolved) {
-          setGeocodeNotice('Could not detect GPS location. Please check browser permissions or enter address manually.');
+      (err) => {
+        console.warn('High-accuracy GPS attempt failed:', err);
+        if (err.code === 1) { // PERMISSION_DENIED
+          setGeocodeNotice('⚠️ Location permission is blocked in your browser. Click the lock/tune icon in the URL bar to allow location.');
+        } else {
+          setGeocodeNotice('⚠️ Could not acquire GPS fix on this device. Please type your hospital address above and click Auto-Geocode.');
         }
         setIsLocating(false);
-        setTimeout(() => setGeocodeNotice(null), 5000);
+        setTimeout(() => setGeocodeNotice(null), 6000);
       },
-      { enableHighAccuracy: false, timeout: 6000, maximumAge: 300000 }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
   };
 
@@ -273,14 +239,29 @@ export const HospitalSettings: React.FC = () => {
       alert('Please provide a Hospital Name.');
       return;
     }
-    updateHospitalProfile({
+    const lat = parseFloat(form.lat) || 12.9348;
+    const lng = parseFloat(form.lng) || 77.6189;
+    const updated = {
       ...form,
       id: hospitalProfile?.id,
-      lat: parseFloat(form.lat) || 12.9348,
-      lng: parseFloat(form.lng) || 77.6189
-    });
+      lat,
+      lng
+    };
+    updateHospitalProfile(updated);
+
+    // Explicit direct post to backend endpoint for instantaneous global persistence
+    fetch(`/api/hospitals/${hospitalProfile?.id || 'hosp-apollo'}/profile`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profile: updated })
+    }).catch(err => console.warn('Failed to post profile:', err));
+
     setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 3000);
+    setGeocodeNotice('✓ Hospital address & coordinates saved and published globally to all patients!');
+    setTimeout(() => {
+      setSaveSuccess(false);
+      setGeocodeNotice(null);
+    }, 4000);
   };
 
   return (

@@ -197,22 +197,28 @@ export const getHydratedHospitals = (): Hospital[] => {
 
   const targetHospitalId = hospitalPanelProfile?.id || 'hosp-apollo';
   return baseHospitals.map(h => {
-    if (h.id === targetHospitalId || (h.id === 'hosp-apollo' && !hospitalPanelProfile?.id)) {
+    let specificProfile: any = null;
+    try {
+      const specificRaw = localStorage.getItem(`insta_hospital_profile_${h.id}`);
+      if (specificRaw) specificProfile = JSON.parse(specificRaw);
+    } catch (e) {}
+
+    const prof = (h.id === targetHospitalId ? hospitalPanelProfile : specificProfile) || (h.id === 'hosp-apollo' ? hospitalPanelProfile : null);
+
+    if (prof) {
       return {
         ...h,
-        ...(hospitalPanelProfile ? {
-          name: hospitalPanelProfile.name || h.name,
-          category: hospitalPanelProfile.type || h.category,
-          address: hospitalPanelProfile.address || h.address,
-          contact: hospitalPanelProfile.phone || hospitalPanelProfile.emergencyNumber || h.contact,
-          about: hospitalPanelProfile.about || h.about,
-          facilities: (hospitalPanelProfile.facilities && hospitalPanelProfile.facilities.length > 0) ? hospitalPanelProfile.facilities : h.facilities,
-          image: hospitalPanelProfile.coverImage || hospitalPanelProfile.logo || h.image,
-          lat: (hospitalPanelProfile.lat !== undefined && !isNaN(Number(hospitalPanelProfile.lat))) ? Number(hospitalPanelProfile.lat) : h.lat,
-          lng: (hospitalPanelProfile.lng !== undefined && !isNaN(Number(hospitalPanelProfile.lng))) ? Number(hospitalPanelProfile.lng) : h.lng,
-        } : {}),
-        departments: (hospitalPanelDepts && hospitalPanelDepts.length > 0) ? hospitalPanelDepts : h.departments,
-        doctors: (hospitalPanelDoctors && hospitalPanelDoctors.length > 0) ? hospitalPanelDoctors : h.doctors
+        name: prof.name || h.name,
+        category: prof.type || (prof.category || h.category),
+        address: prof.address || h.address,
+        contact: prof.phone || prof.emergencyNumber || h.contact,
+        about: prof.about || h.about,
+        facilities: (prof.facilities && prof.facilities.length > 0) ? prof.facilities : h.facilities,
+        image: prof.coverImage || prof.logo || h.image,
+        lat: (prof.lat !== undefined && !isNaN(Number(prof.lat))) ? Number(prof.lat) : h.lat,
+        lng: (prof.lng !== undefined && !isNaN(Number(prof.lng))) ? Number(prof.lng) : h.lng,
+        departments: (h.id === targetHospitalId && hospitalPanelDepts && hospitalPanelDepts.length > 0) ? hospitalPanelDepts : h.departments,
+        doctors: (h.id === targetHospitalId && hospitalPanelDoctors && hospitalPanelDoctors.length > 0) ? hospitalPanelDoctors : h.doctors
       };
     }
     return h;
@@ -402,7 +408,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // --- Cross-tab & Real-time Global Sync ---
   useEffect(() => {
-    const unsubscribe = subscribeGlobalSync(() => {
+    const unsubscribe = subscribeGlobalSync((event) => {
+      if (event && (event.type === 'HOSPITAL_PROFILE_UPDATED' || event.type === 'HOSPITAL_UPDATED')) {
+        const payload = event.data;
+        const profile = payload?.profile || payload?.updates || payload;
+        const hospId = payload?.hospitalId || profile?.id || 'hosp-apollo';
+
+        if (profile) {
+          setHospitals(prev => {
+            const updated = prev.map(h => {
+              if (h.id === hospId) {
+                return {
+                  ...h,
+                  name: profile.name || h.name,
+                  category: profile.type || (profile.category || h.category),
+                  address: profile.address || h.address,
+                  contact: profile.phone || profile.emergencyNumber || h.contact,
+                  about: profile.about || h.about,
+                  image: profile.coverImage || profile.logo || h.image,
+                  lat: (profile.lat !== undefined && !isNaN(Number(profile.lat))) ? Number(profile.lat) : h.lat,
+                  lng: (profile.lng !== undefined && !isNaN(Number(profile.lng))) ? Number(profile.lng) : h.lng,
+                };
+              }
+              return h;
+            });
+            localStorage.setItem('insta_hospitals', JSON.stringify(updated));
+            return updated;
+          });
+        }
+      }
+
       setHospitals(getHydratedHospitals());
 
       const savedAppts = localStorage.getItem('insta_appointments');
@@ -891,6 +926,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setHospitals(prev => {
       const updated = prev.map(h => h.id === hospitalId ? { ...h, ...updates } : h);
       localStorage.setItem('insta_hospitals', JSON.stringify(updated));
+      // Push updated hospitals list to backend so all users get updated address
+      fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hospitals: updated })
+      }).catch(() => {});
       return updated;
     });
     broadcastGlobalSync('HOSPITAL_UPDATED', { hospitalId, updates });
@@ -1119,7 +1160,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     navigator.geolocation.getCurrentPosition(
       async (position) => {
-        const { latitude, longitude } = position.coords;
+        const { latitude, longitude, accuracy } = position.coords;
         const coords = { lat: latitude, lng: longitude };
         setUserCoords(coords);
         localStorage.setItem('insta_user_coords', JSON.stringify(coords));
@@ -1153,19 +1194,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           return updated;
         });
 
+        const isIpEstimate = (accuracy || 0) > 4000;
+        const accuracyNote = isIpEstimate 
+          ? ` (Approximate network estimate ±${Math.round((accuracy || 0) / 1000)}km)` 
+          : '';
+
         addNotification(
           "Customer Location Recorded",
-          `Live GPS recorded: ${areaName}. Hospital distances updated in real-time.`,
+          `Live location: ${areaName}${accuracyNote}. Hospital distances updated in real-time.`,
           "success"
         );
       },
       (err) => {
         const msg = err.code === 1
-          ? "Location permission was denied. Please allow access in browser settings."
-          : "Unable to retrieve your location. Please try again.";
+          ? "Location permission was denied. Please allow access in browser address bar settings."
+          : "Unable to retrieve device GPS. Please choose your city/area from the location menu.";
         addNotification("Location Error", msg, "warning");
       },
-      { timeout: 10000, maximumAge: 60000, enableHighAccuracy: true }
+      { timeout: 15000, maximumAge: 0, enableHighAccuracy: true }
     );
   };
 

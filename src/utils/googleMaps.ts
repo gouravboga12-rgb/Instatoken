@@ -411,8 +411,17 @@ export async function reverseGeocode(
   apiKey?: string
 ): Promise<string> {
   const details = await reverseGeocodeAddressDetails(lat, lng, apiKey);
-  if (details.area && details.city && !details.area.includes(details.city)) {
+  if (details.area && details.city && !details.area.toLowerCase().includes(details.city.toLowerCase())) {
     return `${details.area}, ${details.city}`;
   }
-  return details.area || details.city || details.address;
+  if (details.area) return details.area;
+  if (details.city) return `${details.city}${details.state ? ', ' + details.state : ''}`;
+  if (details.address) {
+    const parts = details.address.split(',').map(s => s.trim()).filter(Boolean);
+    if (parts.length >= 2) {
+      return `${parts[0]}, ${parts[1]}`;
+    }
+    return details.address;
+  }
+  return "Current Location";
 }

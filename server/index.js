@@ -137,10 +137,80 @@ const INITIAL_DEPARTMENTS = [
   { id: 'dept-dental', name: 'Dental', icon: '🦷', headDoctor: '', totalDoctors: 0, active: false },
 ];
 
+const INITIAL_HOSPITALS = [
+  {
+    id: "hosp-apollo",
+    name: "Apollo Spectra Hospital",
+    category: "Multi Speciality",
+    rating: 4.8,
+    reviewsCount: 1240,
+    distance: 1.8,
+    baseWaitingTime: 20,
+    address: "Koramangala 5th Block, near Sony World Signal, Bengaluru",
+    image: "https://images.unsplash.com/photo-1587351021759-3e566b6af7cc?w=800&auto=format&fit=crop&q=80",
+    about: "Apollo Spectra is a state-of-the-art multi-specialty hospital committed to bringing you the best clinical outcomes in a simplified, service-oriented environment.",
+    facilities: ["24/7 Emergency", "ICU", "Pharmacy", "Ambulance", "Lab Testing", "Cafeteria"],
+    contact: "+91 80 4668 8888",
+    lat: 12.9348,
+    lng: 77.6189
+  },
+  {
+    id: "hosp-rainbow",
+    name: "Rainbow Children's Hospital",
+    category: "Children Hospital",
+    rating: 4.7,
+    reviewsCount: 932,
+    distance: 3.2,
+    baseWaitingTime: 15,
+    address: "HSR Layout Sector 2, Bengaluru",
+    image: "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=800&auto=format&fit=crop&q=80",
+    about: "Leading pediatric and maternal healthcare hospital with dedicated neonatal ICU and pediatric emergency services.",
+    facilities: ["Pediatric ICU", "24/7 Emergency", "Pharmacy", "NICU", "Vaccination Center"],
+    contact: "+91 80 4241 1234",
+    lat: 12.9116,
+    lng: 77.6474
+  },
+  {
+    id: "hosp-fortis",
+    name: "Fortis Hospital",
+    category: "Cardiology",
+    rating: 4.6,
+    reviewsCount: 884,
+    distance: 5.4,
+    baseWaitingTime: 45,
+    address: "Bannerghatta Road, Bengaluru",
+    image: "https://images.unsplash.com/photo-1629909613654-28e377c37b09?w=800&auto=format&fit=crop&q=80",
+    about: "Comprehensive tertiary care hospital renowned for cardiology, cardiac surgery, and oncology excellence.",
+    facilities: ["Cath Lab", "ICU", "Blood Bank", "24/7 Trauma", "MRI & CT Scan"],
+    contact: "+91 80 6621 4444",
+    lat: 12.8942,
+    lng: 77.5986
+  },
+  {
+    id: "hosp-nethra",
+    name: "Narayana Nethralaya",
+    category: "Eye Hospital",
+    rating: 4.9,
+    reviewsCount: 1650,
+    distance: 4.1,
+    baseWaitingTime: 35,
+    address: "Indiranagar 100ft Road, Bengaluru",
+    image: "https://images.unsplash.com/photo-1516549655169-df83a0774514?w=800&auto=format&fit=crop&q=80",
+    about: "Premier super-specialty eye care hospital providing state-of-the-art diagnostic and surgical facilities.",
+    facilities: ["Lasik Laser", "Retina Clinic", "Cornea Bank", "Pharmacy", "Optical Shop"],
+    contact: "+91 80 6612 1618",
+    lat: 12.9784,
+    lng: 77.6408
+  }
+];
+
 function loadStore() {
   try {
     if (fs.existsSync(STORE_FILE)) {
       const data = JSON.parse(fs.readFileSync(STORE_FILE, 'utf-8'));
+      if (!data.hospitals || !Array.isArray(data.hospitals) || data.hospitals.length === 0) {
+        data.hospitals = INITIAL_HOSPITALS;
+      }
       if (!data.hospitalDoctors || Object.keys(data.hospitalDoctors).length === 0) {
         data.hospitalDoctors = { 'hosp-apollo': INITIAL_DOCTORS };
       }
@@ -156,7 +226,7 @@ function loadStore() {
     console.error('Error reading store.json:', e);
   }
   return {
-    hospitals: [],
+    hospitals: INITIAL_HOSPITALS,
     hospitalDoctors: { 'hosp-apollo': INITIAL_DOCTORS },
     hospitalProfiles: { 'hosp-apollo': INITIAL_PROFILE },
     hospitalDepartments: { 'hosp-apollo': INITIAL_DEPARTMENTS },
@@ -245,100 +315,182 @@ const isDummyTokenRecord = (t) =>
 const isDummyApptRecord = (a) =>
   !a || a.id === 'tok-1001' || a.patientName === 'Guest Patient';
 
-// GET all synced data
-app.get('/api/sync', async (req, res) => {
+function ensureHospitalProfilesSynced(store) {
+  if (!store || !store.hospitalProfiles) return;
+  Object.entries(store.hospitalProfiles).forEach(([id, prof]) => {
+    if (prof && (prof.address || prof.name)) {
+      syncProfileToHospitalsList(store, id, prof);
+    }
+  });
+}
+
+async function getUnifiedStore() {
   if (isDbConnected) {
     try {
       const dbRes = await query(`SELECT data FROM sync_store WHERE key = 'global_store'`);
-      if (dbRes.rows.length > 0) {
+      if (dbRes.rows.length > 0 && dbRes.rows[0].data) {
         const store = dbRes.rows[0].data;
-        store.tokens = (store.tokens || []).filter(t => !isDummyTokenRecord(t));
-        store.appointments = (store.appointments || []).filter(a => !isDummyApptRecord(a));
-        return res.json(store);
+        if (!store.hospitals || !Array.isArray(store.hospitals) || store.hospitals.length === 0) {
+          store.hospitals = INITIAL_HOSPITALS;
+        }
+        if (!store.hospitalDoctors || Object.keys(store.hospitalDoctors).length === 0) {
+          store.hospitalDoctors = { 'hosp-apollo': INITIAL_DOCTORS };
+        }
+        if (!store.hospitalProfiles || Object.keys(store.hospitalProfiles).length === 0) {
+          store.hospitalProfiles = { 'hosp-apollo': INITIAL_PROFILE };
+        }
+        if (!store.hospitalDepartments || Object.keys(store.hospitalDepartments).length === 0) {
+          store.hospitalDepartments = { 'hosp-apollo': INITIAL_DEPARTMENTS };
+        }
+        ensureHospitalProfilesSynced(store);
+        return store;
       }
     } catch (e) {
-      console.error('Error fetching sync from RDS, using fallback:', e.message);
+      console.warn('Error fetching sync from RDS, using fallback:', e.message);
     }
   }
+  const fileStore = loadStore();
+  ensureHospitalProfilesSynced(fileStore);
+  return fileStore;
+}
 
-  const store = loadStore();
+async function saveUnifiedStore(store) {
+  ensureHospitalProfilesSynced(store);
+  saveStore(store);
+  if (isDbConnected) {
+    try {
+      console.log('Saving unified store to RDS... Apollo addr:', store.hospitals?.find(h => h.id === 'hosp-apollo')?.address);
+      const res = await query(
+        `INSERT INTO sync_store (key, data, last_updated) 
+         VALUES ('global_store', $1, NOW()) 
+         ON CONFLICT (key) DO UPDATE SET data = $1, last_updated = NOW() RETURNING key`,
+        [JSON.stringify(store)]
+      );
+      console.log('Saved to RDS successfully:', res.rowCount);
+    } catch (e) {
+      console.error('Error syncing to RDS:', e.message);
+    }
+  }
+}
+
+// GET all synced data
+app.get('/api/sync', async (req, res) => {
+  const store = await getUnifiedStore();
   store.tokens = (store.tokens || []).filter(t => !isDummyTokenRecord(t));
   store.appointments = (store.appointments || []).filter(a => !isDummyApptRecord(a));
   res.json(store);
 });
 
+function syncProfileToHospitalsList(store, hospitalId, profile) {
+  if (!store || !profile) return;
+  if (!store.hospitals || !Array.isArray(store.hospitals)) {
+    store.hospitals = [];
+  }
+  const idx = store.hospitals.findIndex(h => h.id === hospitalId);
+  const updatedData = {
+    id: hospitalId,
+    name: profile.name,
+    category: profile.type || profile.category,
+    address: profile.address,
+    city: profile.city,
+    state: profile.state,
+    area: profile.area,
+    pinCode: profile.pinCode,
+    contact: profile.phone || profile.emergencyNumber,
+    about: profile.about,
+    facilities: profile.facilities,
+    image: profile.coverImage || profile.logo,
+    lat: profile.lat !== undefined ? Number(profile.lat) : undefined,
+    lng: profile.lng !== undefined ? Number(profile.lng) : undefined
+  };
+
+  Object.keys(updatedData).forEach(k => updatedData[k] === undefined && delete updatedData[k]);
+
+  if (idx !== -1) {
+    store.hospitals[idx] = { ...store.hospitals[idx], ...updatedData };
+  } else {
+    store.hospitals.push({
+      rating: 4.8,
+      reviewsCount: 120,
+      distance: 2.5,
+      baseWaitingTime: 20,
+      departments: [],
+      doctors: [],
+      gallery: [],
+      timings: '09:00 AM - 08:00 PM',
+      ...updatedData
+    });
+  }
+}
+
 // POST to update global sync data
 app.post('/api/sync', async (req, res) => {
-  const store = loadStore();
+  const store = await getUnifiedStore();
   const { hospitals, hospitalDoctors, hospitalProfiles, hospitalDepartments, tokens, appointments } = req.body;
 
   if (hospitals) store.hospitals = hospitals;
   if (hospitalDoctors) store.hospitalDoctors = { ...store.hospitalDoctors, ...hospitalDoctors };
-  if (hospitalProfiles) store.hospitalProfiles = { ...store.hospitalProfiles, ...hospitalProfiles };
+  if (hospitalProfiles) {
+    store.hospitalProfiles = { ...store.hospitalProfiles, ...hospitalProfiles };
+  }
+  ensureHospitalProfilesSynced(store);
+
   if (hospitalDepartments) store.hospitalDepartments = { ...store.hospitalDepartments, ...hospitalDepartments };
   if (tokens) store.tokens = tokens.filter(t => !isDummyTokenRecord(t));
   if (appointments) store.appointments = appointments.filter(a => !isDummyApptRecord(a));
 
-  saveStore(store);
-
-  if (isDbConnected) {
-    try {
-      await query(
-        `INSERT INTO sync_store (key, data, last_updated) 
-         VALUES ('global_store', $1, NOW()) 
-         ON CONFLICT (key) DO UPDATE SET data = $1, last_updated = NOW()`,
-        [JSON.stringify(store)]
-      );
-    } catch (e) {
-      console.error('Error syncing to RDS:', e.message);
-    }
-  }
+  await saveUnifiedStore(store);
 
   res.json({ success: true, store });
 });
 
 // GET hospitals
-app.get('/api/hospitals', (req, res) => {
-  const store = loadStore();
+app.get('/api/hospitals', async (req, res) => {
+  const store = await getUnifiedStore();
   res.json({ success: true, hospitals: store.hospitals, store });
 });
 
 // POST hospital doctors
-app.post('/api/hospitals/:id/doctors', (req, res) => {
+app.post('/api/hospitals/:id/doctors', async (req, res) => {
   const { id } = req.params;
   const { doctors } = req.body;
-  const store = loadStore();
+  const store = await getUnifiedStore();
 
   store.hospitalDoctors = store.hospitalDoctors || {};
   store.hospitalDoctors[id] = doctors;
 
-  saveStore(store);
+  await saveUnifiedStore(store);
   res.json({ success: true, hospitalId: id, doctors });
 });
 
 // POST hospital profile
-app.post('/api/hospitals/:id/profile', (req, res) => {
+app.post('/api/hospitals/:id/profile', async (req, res) => {
   const { id } = req.params;
   const { profile } = req.body;
-  const store = loadStore();
+  console.log(`[POST /api/hospitals/${id}/profile] received profile:`, profile?.name, profile?.address);
+  const store = await getUnifiedStore();
 
   store.hospitalProfiles = store.hospitalProfiles || {};
   store.hospitalProfiles[id] = profile;
 
-  saveStore(store);
-  res.json({ success: true, hospitalId: id, profile });
+  // Synchronize profile into store.hospitals so all customer users see the new address immediately
+  syncProfileToHospitalsList(store, id, profile);
+
+  await saveUnifiedStore(store);
+
+  res.json({ success: true, hospitalId: id, profile, hospitals: store.hospitals });
 });
 
 // POST hospital departments
-app.post('/api/hospitals/:id/departments', (req, res) => {
+app.post('/api/hospitals/:id/departments', async (req, res) => {
   const { id } = req.params;
   const { departments } = req.body;
-  const store = loadStore();
+  const store = await getUnifiedStore();
 
   store.hospitalDepartments = store.hospitalDepartments || {};
   store.hospitalDepartments[id] = departments;
 
-  saveStore(store);
+  await saveUnifiedStore(store);
   res.json({ success: true, hospitalId: id, departments });
 });
 

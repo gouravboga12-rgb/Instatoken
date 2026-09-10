@@ -1204,7 +1204,14 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         });
       }
 
-      broadcastGlobalSync('HOSPITAL_PROFILE_UPDATED', updated);
+      // Post immediately to backend endpoint to ensure global persistence on EC2 server
+      fetch(`/api/hospitals/${activeId}/profile`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profile: updated })
+      }).catch(e => console.warn('Failed to post profile to backend:', e));
+
+      broadcastGlobalSync('HOSPITAL_PROFILE_UPDATED', { hospitalId: activeId, profile: updated });
       broadcastGlobalSync('HOSPITAL_UPDATED', { hospitalId: activeId, updates: updated });
       return updated;
     });
