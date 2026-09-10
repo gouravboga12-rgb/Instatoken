@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useHospital } from '../../context/HospitalContext';
 import type { HospitalDoctor } from '../../context/HospitalContext';
 import {
@@ -8,13 +8,14 @@ import {
 } from 'lucide-react';
 
 export const RevenueOverview: React.FC = () => {
-  const { doctors, tokens, updateTokenStatus, deleteToken } = useHospital();
+  const { doctors, tokens, updateTokenStatus, deleteToken, fetchHospitalRevenue } = useHospital();
 
   // Filters State
   const [dateFilter, setDateFilter] = useState<'today' | 'week' | 'month' | 'all' | 'custom'>('today');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [searchDoctor, setSearchDoctor] = useState('');
+  const [backendRevenue, setBackendRevenue] = useState<{ totals: any; doctorStats: any[] } | null>(null);
 
   // Selected Doctor for Detailed History Modal / Drawer
   const [selectedDoctor, setSelectedDoctor] = useState<HospitalDoctor | null>(null);
@@ -22,6 +23,21 @@ export const RevenueOverview: React.FC = () => {
   const [detailStatusFilter, setDetailStatusFilter] = useState<'all' | 'visited' | 'not-visited' | 'waiting'>('all');
 
   const todayStr = new Date().toISOString().split('T')[0];
+
+  // Fetch backend revenue calculation (Phase 21: Backend/Data Integrity)
+  useEffect(() => {
+    let isMounted = true;
+    if (fetchHospitalRevenue) {
+      fetchHospitalRevenue(dateFilter, customStartDate, customEndDate)
+        .then(res => {
+          if (isMounted && res && res.totals) {
+            setBackendRevenue(res);
+          }
+        })
+        .catch(() => {});
+    }
+    return () => { isMounted = false; };
+  }, [dateFilter, customStartDate, customEndDate, tokens]);
 
   // Helper date checker
   const isDateInFilter = (dateStr?: string) => {
@@ -80,20 +96,24 @@ export const RevenueOverview: React.FC = () => {
   }, [doctors, dateFilteredTokens]);
 
   const filteredDoctorStats = useMemo(() => {
-    if (!searchDoctor.trim()) return doctorRevenueStats;
-    const q = searchDoctor.toLowerCase();
-    return doctorRevenueStats.filter(s =>
-      s.doctor.name.toLowerCase().includes(q) ||
-      s.doctor.specialization.toLowerCase().includes(q) ||
-      s.doctor.departmentName.toLowerCase().includes(q)
-    );
-  }, [doctorRevenueStats, searchDoctor]);
+    const baseStats = (backendRevenue?.doctorStats && backendRevenue.doctorStats.length > 0)
+      ? backendRevenue.doctorStats
+      : doctorRevenueStats;
 
-  // Global Totals
-  const totalEarnedRevenue = doctorRevenueStats.reduce((acc, d) => acc + d.earnedRevenue, 0);
-  const totalCompletedVisits = doctorRevenueStats.reduce((acc, d) => acc + d.completedVisits, 0);
-  const totalNotVisitedCount = doctorRevenueStats.reduce((acc, d) => acc + d.notVisitedCount, 0);
-  const avgRevenuePerDoctor = doctors.length > 0 ? Math.round(totalEarnedRevenue / doctors.length) : 0;
+    if (!searchDoctor.trim()) return baseStats;
+    const q = searchDoctor.toLowerCase();
+    return baseStats.filter((s: any) =>
+      s.doctor?.name?.toLowerCase().includes(q) ||
+      s.doctor?.specialization?.toLowerCase().includes(q) ||
+      s.doctor?.departmentName?.toLowerCase().includes(q)
+    );
+  }, [backendRevenue, doctorRevenueStats, searchDoctor]);
+
+  // Global Totals (Derived from backend calculation engine or fallback)
+  const totalEarnedRevenue = backendRevenue?.totals?.totalEarnedRevenue ?? doctorRevenueStats.reduce((acc, d) => acc + d.earnedRevenue, 0);
+  const totalCompletedVisits = backendRevenue?.totals?.totalCompletedVisits ?? doctorRevenueStats.reduce((acc, d) => acc + d.completedVisits, 0);
+  const totalNotVisitedCount = backendRevenue?.totals?.totalNotVisitedCount ?? doctorRevenueStats.reduce((acc, d) => acc + d.notVisitedCount, 0);
+  const avgRevenuePerDoctor = backendRevenue?.totals?.avgRevenuePerDoctor ?? (doctors.length > 0 ? Math.round(totalEarnedRevenue / doctors.length) : 0);
 
   // Detailed tokens for selected doctor
   const selectedDoctorTokens = useMemo(() => {

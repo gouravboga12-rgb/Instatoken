@@ -178,7 +178,7 @@ export const HOSPITALS: Hospital[] = [
     reviewsCount: 1240,
     distance: 1.8,
     baseWaitingTime: 20,
-    address: "Koramangala 5th Block, near Sony World Signal, Bengaluru",
+    address: "15-57/2, RAMkrishna Raju Residency, Pratap Nagar, Kothapet, Hyderabad, Telangana 500060, India",
     image: "https://images.unsplash.com/photo-1587351021759-3e566b6af7cc?w=800&auto=format&fit=crop&q=80",
     gallery: [
       "https://images.unsplash.com/photo-1587351021759-3e566b6af7cc?w=800&auto=format&fit=crop&q=80",
@@ -197,8 +197,8 @@ export const HOSPITALS: Hospital[] = [
     ],
     timings: "Open 24 Hours (OPD: 09:00 AM - 05:00 PM)",
     contact: "+91 80 4668 8888",
-    lat: 12.9348,
-    lng: 77.6189,
+    lat: 17.37336200634615,
+    lng: 78.53855589118986,
     doctors: [
       {
         id: "doc-arvind",

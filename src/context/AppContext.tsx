@@ -2,7 +2,8 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { HOSPITALS, DEPARTMENTS, HEALTH_ARTICLES, MOCK_CUSTOMERS } from '../utils/mockData';
 import type { Hospital, Doctor, HealthArticle, CustomerAccount } from '../utils/mockData';
 import { broadcastGlobalSync, subscribeGlobalSync, formatTimeSlot } from '../utils/syncBus';
-import { geocodeLocation, reverseGeocode } from '../utils/googleMaps';
+import { geocodeLocation, reverseGeocode, reverseGeocodeAddressDetails } from '../utils/googleMaps';
+import type { GeoLocationDetails, BannerRecord } from '../utils/geoHierarchy';
 
 export interface FamilyMember {
   id: string;
@@ -117,6 +118,10 @@ interface AppContextType {
   detectAndSetLocation: () => void;
   deleteAppointment: (id: string) => void;
   clearPastHistory: () => void;
+  userGeoHierarchy: GeoLocationDetails | null;
+  setUserGeoHierarchy: (geo: GeoLocationDetails | null) => void;
+  activeBanners: BannerRecord[];
+  fetchActiveBanners: (geo?: GeoLocationDetails) => Promise<BannerRecord[]>;
 }
 
 export const getHydratedHospitals = (): Hospital[] => {
@@ -344,6 +349,136 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? Number(saved) : 50; // Default 50 km radius
   });
 
+  const [userGeoHierarchy, setUserGeoHierarchy] = useState<GeoLocationDetails | null>(() => {
+    const saved = localStorage.getItem('insta_user_geo_hierarchy');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return {
+      country: 'India',
+      state: 'Telangana',
+      district: 'Karimnagar',
+      mandal: 'Karimnagar Mandal',
+      city: 'Karimnagar',
+      formattedAddress: 'Karimnagar, Telangana'
+    };
+  });
+
+  const [activeBanners, setActiveBanners] = useState<BannerRecord[]>([]);
+
+  const fetchActiveBanners = async (geo?: GeoLocationDetails): Promise<BannerRecord[]> => {
+    const targetGeo = geo || userGeoHierarchy || {
+      country: 'India',
+      state: 'Telangana',
+      district: 'Karimnagar'
+    };
+
+    try {
+      const params = new URLSearchParams({
+        panel: 'customer',
+        country: targetGeo.country || 'India',
+        ...(targetGeo.state ? { state: targetGeo.state } : {}),
+        ...(targetGeo.district ? { district: targetGeo.district } : {}),
+        ...(targetGeo.mandal ? { mandal: targetGeo.mandal } : {}),
+        ...(targetGeo.village ? { village: targetGeo.village } : {}),
+        ...(targetGeo.city ? { city: targetGeo.city } : {}),
+        ...(targetGeo.formattedAddress ? { address: targetGeo.formattedAddress } : {})
+      });
+
+      const res = await fetch(`/api/banners/active?${params.toString()}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.banners)) {
+          setActiveBanners(data.banners);
+          return data.banners;
+        }
+      }
+    } catch (e) {
+      console.warn('Error fetching active location banners:', e);
+    }
+    return [];
+  };
+
+  useEffect(() => {
+    fetchActiveBanners(userGeoHierarchy || undefined);
+  }, [userGeoHierarchy?.district, userGeoHierarchy?.mandal, userGeoHierarchy?.village, userGeoHierarchy?.state]);
+
+  const parseLocationToHierarchy = (locName: string): GeoLocationDetails => {
+    const lower = locName.toLowerCase();
+    if (lower.includes('choppadandi')) {
+      return {
+        country: 'India',
+        state: 'Telangana',
+        district: 'Karimnagar',
+        mandal: 'Choppadandi',
+        village: 'Choppadandi Village',
+        city: 'Karimnagar',
+        formattedAddress: locName
+      };
+    }
+    if (lower.includes('karimnagar')) {
+      return {
+        country: 'India',
+        state: 'Telangana',
+        district: 'Karimnagar',
+        mandal: 'Karimnagar Mandal',
+        city: 'Karimnagar',
+        formattedAddress: locName
+      };
+    }
+    if (lower.includes('warangal') || lower.includes('hanamkonda')) {
+      return {
+        country: 'India',
+        state: 'Telangana',
+        district: 'Warangal',
+        mandal: lower.includes('hanamkonda') ? 'Hanamkonda' : 'Warangal Mandal',
+        city: 'Warangal',
+        village: lower.includes('hanamkonda') ? 'Hanamkonda Town' : 'Warangal City',
+        formattedAddress: locName
+      };
+    }
+    if (lower.includes('gachibowli') || lower.includes('madhapur') || lower.includes('hyderabad')) {
+      return {
+        country: 'India',
+        state: 'Telangana',
+        district: 'Hyderabad',
+        mandal: 'Serilingampally',
+        city: 'Hyderabad',
+        village: lower.includes('gachibowli') ? 'Gachibowli' : 'Madhapur',
+        formattedAddress: locName
+      };
+    }
+    if (lower.includes('vijayawada')) {
+      return {
+        country: 'India',
+        state: 'Andhra Pradesh',
+        district: 'Krishna',
+        mandal: 'Vijayawada Urban',
+        city: 'Vijayawada',
+        formattedAddress: locName
+      };
+    }
+    if (lower.includes('visakhapatnam') || lower.includes('vizag') || lower.includes('ram nagar')) {
+      return {
+        country: 'India',
+        state: 'Andhra Pradesh',
+        district: 'Visakhapatnam',
+        mandal: 'Visakhapatnam Urban',
+        city: 'Visakhapatnam',
+        formattedAddress: locName
+      };
+    }
+    return {
+      country: 'India',
+      state: 'Karnataka',
+      district: 'Bengaluru Urban',
+      mandal: 'Bengaluru South',
+      city: 'Bengaluru',
+      village: 'Koramangala',
+      formattedAddress: locName
+    };
+  };
+
   const setSearchRadiusKm = (km: number) => {
     setSearchRadiusKmState(km);
     localStorage.setItem('insta_search_radius_km', km.toString());
@@ -352,6 +487,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const setCurrentLocation = (loc: string) => {
     setCurrentLocationState(loc);
     localStorage.setItem('insta_location', loc);
+
+    const parsed = parseLocationToHierarchy(loc);
+    setUserGeoHierarchy(parsed);
+    localStorage.setItem('insta_user_geo_hierarchy', JSON.stringify(parsed));
+    fetchActiveBanners(parsed);
 
     // Asynchronously geocode location for real-time customer distance calculations
     geocodeLocation(loc).then(geo => {
@@ -406,6 +546,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return newCust;
   };
 
+  // --- Fetch Live Hospitals on Mount from AWS Backend ---
+  useEffect(() => {
+    fetch('/api/hospitals')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.hospitals) && data.hospitals.length > 0) {
+          setHospitals(data.hospitals);
+          localStorage.setItem('insta_hospitals', JSON.stringify(data.hospitals));
+          if (data.store?.hospitalProfiles) {
+            Object.entries(data.store.hospitalProfiles).forEach(([hospId, prof]: [string, any]) => {
+              if (prof) {
+                localStorage.setItem(`insta_hospital_profile_${hospId}`, JSON.stringify(prof));
+                if (hospId === 'hosp-apollo') {
+                  localStorage.setItem('insta_hospital_profile', JSON.stringify(prof));
+                }
+              }
+            });
+          }
+        }
+      })
+      .catch(err => console.warn('Failed to fetch hospitals from server:', err));
+  }, []);
+
   // --- Cross-tab & Real-time Global Sync ---
   useEffect(() => {
     const unsubscribe = subscribeGlobalSync((event) => {
@@ -436,22 +599,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             return updated;
           });
         }
-      }
+      } else {
+        const savedAppts = localStorage.getItem('insta_appointments');
+        if (savedAppts) {
+          try {
+            setAppointments(JSON.parse(savedAppts));
+          } catch (e) {}
+        }
 
-      setHospitals(getHydratedHospitals());
-
-      const savedAppts = localStorage.getItem('insta_appointments');
-      if (savedAppts) {
-        try {
-          setAppointments(JSON.parse(savedAppts));
-        } catch (e) {}
-      }
-
-      const savedCusts = localStorage.getItem('insta_customers');
-      if (savedCusts) {
-        try {
-          setCustomers(JSON.parse(savedCusts));
-        } catch (e) {}
+        const savedCusts = localStorage.getItem('insta_customers');
+        if (savedCusts) {
+          try {
+            setCustomers(JSON.parse(savedCusts));
+          } catch (e) {}
+        }
       }
     });
 
@@ -732,7 +893,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       consultationFee: newAppt.fee,
       paymentStatus: 'paid' as const,
       paymentMethod: newAppt.paymentMethod || 'Online',
-      isRevisit: false
+      isRevisit: false,
+      hospitalId
     };
 
     // Save to local hospital tokens store
@@ -743,8 +905,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (e) {}
     const updatedHospitalTokens = [newHospitalToken, ...currentHospitalTokens.filter((t: any) => t.id !== newHospitalToken.id)];
     localStorage.setItem('insta_hospital_tokens', JSON.stringify(updatedHospitalTokens));
+    localStorage.setItem(`insta_hospital_tokens_${hospitalId}`, JSON.stringify(updatedHospitalTokens));
 
-    // Register patient in hospital patients store
+    // Post token to backend hospital endpoint
+    fetch(`/api/hospitals/${hospitalId}/tokens`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-hospital-token': `htok_${hospitalId}_default`
+      },
+      body: JSON.stringify(newHospitalToken)
+    }).catch(() => {});
+
+    // Register patient in hospital patients store (Phase 20)
     try {
       const savedPats = localStorage.getItem('insta_hospital_patients');
       let currentPats = savedPats ? JSON.parse(savedPats) : [];
@@ -752,14 +925,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (exists) {
         currentPats = currentPats.map((p: any) => (p.phone === patientDetails.phone || p.email === patientDetails.email) ? {
           ...p,
+          hospitalId,
           totalVisits: (p.totalVisits || 0) + 1,
           lastVisit: newAppt.date || todayStr,
-          tokenHistory: [newHospitalToken.id, ...(p.tokenHistory || [])]
+          tokenHistory: [newHospitalToken, ...(p.tokenHistory || [])],
+          doctorVisits: p.doctorVisits ? (
+            p.doctorVisits.some((d: any) => d.doctorId === doctorId)
+              ? p.doctorVisits.map((d: any) => d.doctorId === doctorId ? { ...d, visitCount: d.visitCount + 1, lastVisitDate: newAppt.date || todayStr } : d)
+              : [...p.doctorVisits, { doctorId: targetDoc.id, doctorName: targetDoc.name, departmentName: newAppt.departmentName, visitCount: 1, lastVisitDate: newAppt.date || todayStr }]
+          ) : [{ doctorId: targetDoc.id, doctorName: targetDoc.name, departmentName: newAppt.departmentName, visitCount: 1, lastVisitDate: newAppt.date || todayStr }]
         } : p);
       } else {
         const newPat = {
           id: `pat-${Date.now()}`,
           uhid: `APS${String(currentPats.length + 1001).padStart(6, '0')}`,
+          hospitalId,
           name: patientDetails.name,
           phone: patientDetails.phone,
           email: patientDetails.email,
@@ -771,15 +951,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           pinCode: '',
           registeredOn: todayStr,
           totalVisits: 1,
-          lastVisit: todayStr,
+          lastVisit: newAppt.date || todayStr,
           familyMembers: [],
           medicalHistory: [],
           allergies: [],
-          tokenHistory: [newHospitalToken.id]
+          tokenHistory: [newHospitalToken],
+          doctorVisits: [{ doctorId: targetDoc.id, doctorName: targetDoc.name, departmentName: newAppt.departmentName, visitCount: 1, lastVisitDate: newAppt.date || todayStr }]
         };
         currentPats = [newPat, ...currentPats];
+
+        fetch(`/api/hospitals/${hospitalId}/patients`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-hospital-token': `htok_${hospitalId}_default`
+          },
+          body: JSON.stringify(newPat)
+        }).catch(() => {});
       }
       localStorage.setItem('insta_hospital_patients', JSON.stringify(currentPats));
+      localStorage.setItem(`insta_hospital_patients_${hospitalId}`, JSON.stringify(currentPats));
     } catch (e) {}
 
     // Update doctor's token state in the local hospital store
@@ -1170,6 +1361,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setCurrentLocationState(areaName);
         localStorage.setItem('insta_location', areaName);
 
+        // Extract structured 5-level hierarchy
+        const details = await reverseGeocodeAddressDetails(latitude, longitude);
+        const geoObj: GeoLocationDetails = {
+          country: details.country || 'India',
+          state: details.state || 'Telangana',
+          district: details.district || details.city || 'Karimnagar',
+          mandal: details.mandal || '',
+          village: details.village || details.area || '',
+          city: details.city || '',
+          formattedAddress: areaName,
+          lat: latitude,
+          lng: longitude
+        };
+        setUserGeoHierarchy(geoObj);
+        localStorage.setItem('insta_user_geo_hierarchy', JSON.stringify(geoObj));
+        fetchActiveBanners(geoObj);
+
         // Record in Customer Profile and Account list
         setUser(prev => {
           if (!prev) return null;
@@ -1257,7 +1465,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       purchaseSubscription,
       detectAndSetLocation,
       deleteAppointment,
-      clearPastHistory
+      clearPastHistory,
+      userGeoHierarchy,
+      setUserGeoHierarchy,
+      activeBanners,
+      fetchActiveBanners
     }}>
       {children}
     </AppContext.Provider>

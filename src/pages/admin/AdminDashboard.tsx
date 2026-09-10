@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
@@ -10,11 +10,18 @@ import {
   TrendingUp, ShieldCheck, Activity, Bell,
   DollarSign, Building2, CheckCircle2, Search, Plus,
   Users, UserCheck, UserX,
-  AlertTriangle, Download, X, Calendar, Upload, User
+  AlertTriangle, Download, X, Calendar, Upload, User,
+  MapPin
 } from 'lucide-react';
+import { LocationBanners } from './LocationBanners';
 
-export const AdminDashboard: React.FC = () => {
+interface AdminDashboardProps {
+  initialTab?: 'stats' | 'hospitals' | 'customers' | 'financials' | 'add-hospital' | 'add-doctor' | 'banners';
+}
+
+export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { 
     hospitals, appointments, customers, addHospital, addDoctor, 
     toggleDisableHospital, toggleCustomerStatus, notifications, addNotification,
@@ -22,8 +29,12 @@ export const AdminDashboard: React.FC = () => {
   } = useApp();
 
   const [adminTab, setAdminTab] = useState<
-    'stats' | 'hospitals' | 'customers' | 'financials' | 'add-hospital' | 'add-doctor'
-  >('stats');
+    'stats' | 'hospitals' | 'customers' | 'financials' | 'add-hospital' | 'add-doctor' | 'banners'
+  >(() => {
+    if (initialTab) return initialTab;
+    if (location.pathname === '/admin/banners') return 'banners';
+    return 'stats';
+  });
 
   // --- Add Hospital Form State ---
   const [hospName, setHospName] = useState('');
@@ -258,6 +269,20 @@ export const AdminDashboard: React.FC = () => {
             >
               <DollarSign size={15} /> Financials & Revenue
             </button>
+
+            <button
+              onClick={() => setAdminTab('banners')}
+              className={`w-full text-left px-3.5 py-2 text-xs font-bold rounded-xl flex items-center justify-between transition-all cursor-pointer border-none ${
+                adminTab === 'banners' ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <MapPin size={15} /> Location Banners
+              </div>
+              <span className="bg-blue-500/20 text-[9px] font-extrabold px-2 py-0.5 rounded-full text-blue-300">
+                Geo
+              </span>
+            </button>
           </div>
         </div>
 
@@ -303,7 +328,7 @@ export const AdminDashboard: React.FC = () => {
 
         {/* Mobile Nav Tabs */}
         <div className="flex overflow-x-auto px-2 border-b border-slate-800 text-[10px] font-bold uppercase tracking-wider no-scrollbar">
-          {(['stats', 'hospitals', 'customers', 'financials'] as const).map(tab => (
+          {(['stats', 'hospitals', 'customers', 'banners', 'financials'] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setAdminTab(tab)}
@@ -311,7 +336,7 @@ export const AdminDashboard: React.FC = () => {
                 adminTab === tab ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400'
               }`}
             >
-              {tab === 'stats' ? 'Overview' : tab === 'hospitals' ? 'Hospitals' : tab === 'customers' ? 'Customers' : 'Revenue'}
+              {tab === 'stats' ? 'Overview' : tab === 'hospitals' ? 'Hospitals' : tab === 'customers' ? 'Customers' : tab === 'banners' ? 'Banners' : 'Revenue'}
             </button>
           ))}
         </div>
@@ -1257,7 +1282,12 @@ export const AdminDashboard: React.FC = () => {
           </Card>
         )}
 
-
+        {/* ── TAB: LOCATION-BASED BANNERS ───────────────────────────────── */}
+        {adminTab === 'banners' && (
+          <div className="animate-in fade-in duration-200">
+            <LocationBanners />
+          </div>
+        )}
 
       </div>
 

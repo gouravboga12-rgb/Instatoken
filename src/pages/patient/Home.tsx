@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { getHospitalSVGImage } from '../../utils/mockData';
 import { calculateDistanceKm } from '../../utils/googleMaps';
@@ -27,7 +27,7 @@ export const Home: React.FC<HomeProps> = ({
   onHospitalSelect, 
   onOpenNotifications 
 }) => {
-  const { user, hospitals, notifications, currentLocation, setCurrentLocation, detectAndSetLocation, addNotification, userCoords } = useApp();
+  const { user, hospitals, notifications, currentLocation, setCurrentLocation, detectAndSetLocation, addNotification, userCoords, activeBanners } = useApp();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -42,12 +42,12 @@ export const Home: React.FC<HomeProps> = ({
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
 
   const locations = [
+    "Karimnagar, Telangana",
+    "Choppadandi, Karimnagar",
+    "Warangal, Telangana",
     "Gachibowli, Hyderabad",
     "Vijayawada, Andhra Pradesh",
-    "Koramangala, Bengaluru", 
-    "HSR Layout, Bengaluru", 
-    "Ram Nagar, Visakhapatnam",
-    "Indiranagar, Bengaluru"
+    "Koramangala, Bengaluru"
   ];
 
   // Dynamically resolve hospital details from hospitals context for live synchronization
@@ -108,16 +108,52 @@ export const Home: React.FC<HomeProps> = ({
     }
   ];
 
+  // Dynamic Location-Based Banners with fallback
+  const displayBanners = useMemo(() => {
+    if (activeBanners && activeBanners.length > 0) {
+      return activeBanners.map(b => {
+        let locLabel = 'All India Campaign';
+        if (b.targetLevel === 'village') locLabel = `${b.village}, ${b.mandal || b.district}`;
+        else if (b.targetLevel === 'mandal') locLabel = `${b.mandal} Mandal, ${b.district}`;
+        else if (b.targetLevel === 'district') locLabel = `${b.district} District, ${b.state}`;
+        else if (b.targetLevel === 'state') locLabel = `${b.state} State`;
+
+        return {
+          id: b.id,
+          badge: b.badge || `${b.targetLevel.toUpperCase()} SPECIAL`,
+          title: b.title,
+          location: locLabel,
+          description: b.description,
+          image: b.image,
+          cta: b.ctaText || 'Book Token',
+          targetLevel: b.targetLevel,
+          linkUrl: b.linkUrl || '/search',
+          isLocationTargeted: true,
+          rating: 4.9,
+          reviews: 1240
+        };
+      });
+    }
+    return featuredBanners.map(b => ({
+      ...b,
+      isLocationTargeted: false,
+      targetLevel: 'district' as const,
+      description: 'Instant token booking & live OPD queue tracking.',
+      linkUrl: `/hospital/${b.id}`
+    }));
+  }, [activeBanners, featuredBanners]);
+
   // Slide index state for Hero Slider
   const [currentSlide, setCurrentSlide] = useState(0);
 
   // Auto scroll slides
   useEffect(() => {
+    if (displayBanners.length <= 1) return;
     const timer = setInterval(() => {
-      setCurrentSlide(prev => (prev + 1) % featuredBanners.length);
+      setCurrentSlide(prev => (prev + 1) % displayBanners.length);
     }, 5000);
     return () => clearInterval(timer);
-  }, [featuredBanners.length]);
+  }, [displayBanners.length]);
 
   const isComingSoonCity = currentLocation.includes('Vijayawada');
 
@@ -531,15 +567,21 @@ export const Home: React.FC<HomeProps> = ({
           </button>
         </form>
 
-        {/* 3. Featured Hospitals Hero Carousel Banner with Full Background Image */}
-        {(() => {
-          const currentBanner = featuredBanners[currentSlide];
+        {/* 3. Featured Hospitals / Location-Based Banners Hero Carousel Banner */}
+        {displayBanners.length > 0 && (() => {
+          const currentBanner = displayBanners[currentSlide] || displayBanners[0];
           return (
             <div 
               className="relative rounded-3xl overflow-hidden shadow-xl text-white min-h-[220px] md:min-h-[290px] p-4 md:p-8 flex flex-col justify-between transition-all duration-700 group cursor-pointer border border-slate-800/40"
-              onClick={() => onHospitalSelect(currentBanner.id)}
+              onClick={() => {
+                if (currentBanner.isLocationTargeted && currentBanner.linkUrl) {
+                  navigate(currentBanner.linkUrl);
+                } else {
+                  onHospitalSelect(currentBanner.id);
+                }
+              }}
             >
-              {/* Full background hospital photo with smooth scale animation */}
+              {/* Full background photo with smooth scale animation */}
               <img 
                 key={currentBanner.id}
                 src={currentBanner.image} 
@@ -555,28 +597,32 @@ export const Home: React.FC<HomeProps> = ({
               <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent to-black/40 z-10" />
 
               {/* Left Arrow Navigation Button */}
-              <button 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setCurrentSlide((prev) => (prev - 1 + featuredBanners.length) % featuredBanners.length);
-                }}
-                className="absolute left-2 md:left-4 top-1/2 -translate-y-1/2 z-30 w-8 h-8 md:w-10 md:h-10 rounded-full bg-slate-950/50 hover:bg-slate-950/80 backdrop-blur-md border border-white/20 text-white flex items-center justify-center transition-all cursor-pointer hover:scale-110 shadow-lg"
-                aria-label="Previous Banner"
-              >
-                <ChevronLeft size={18} />
-              </button>
+              {displayBanners.length > 1 && (
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setCurrentSlide((prev) => (prev - 1 + displayBanners.length) % displayBanners.length);
+                  }}
+                  className="absolute left-2 md:left-4 top-1/2 -translate-y-1/2 z-30 w-8 h-8 md:w-10 md:h-10 rounded-full bg-slate-950/50 hover:bg-slate-950/80 backdrop-blur-md border border-white/20 text-white flex items-center justify-center transition-all cursor-pointer hover:scale-110 shadow-lg"
+                  aria-label="Previous Banner"
+                >
+                  <ChevronLeft size={18} />
+                </button>
+              )}
 
               {/* Right Arrow Navigation Button */}
-              <button 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setCurrentSlide((prev) => (prev + 1) % featuredBanners.length);
-                }}
-                className="absolute right-2 md:right-4 top-1/2 -translate-y-1/2 z-30 w-8 h-8 md:w-10 md:h-10 rounded-full bg-slate-950/50 hover:bg-slate-950/80 backdrop-blur-md border border-white/20 text-white flex items-center justify-center transition-all cursor-pointer hover:scale-110 shadow-lg"
-                aria-label="Next Banner"
-              >
-                <ChevronRight size={18} />
-              </button>
+              {displayBanners.length > 1 && (
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setCurrentSlide((prev) => (prev + 1) % displayBanners.length);
+                  }}
+                  className="absolute right-2 md:right-4 top-1/2 -translate-y-1/2 z-30 w-8 h-8 md:w-10 md:h-10 rounded-full bg-slate-950/50 hover:bg-slate-950/80 backdrop-blur-md border border-white/20 text-white flex items-center justify-center transition-all cursor-pointer hover:scale-110 shadow-lg"
+                  aria-label="Next Banner"
+                >
+                  <ChevronRight size={18} />
+                </button>
+              )}
 
               {/* Top Badges Header */}
               <div className="relative z-20 flex items-center justify-between gap-2 px-7 md:px-14">
@@ -584,6 +630,12 @@ export const Home: React.FC<HomeProps> = ({
                   <span className="bg-blue-600/90 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg border border-blue-400/30 shadow-md">
                     {currentBanner.badge}
                   </span>
+                  {currentBanner.isLocationTargeted && (
+                    <span className="bg-emerald-600/90 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg border border-emerald-400/30 shadow-md flex items-center gap-1">
+                      <MapPin size={10} />
+                      {currentBanner.location}
+                    </span>
+                  )}
                   <span className="bg-amber-400 text-slate-950 text-[10px] font-black px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-md">
                     <Star size={11} className="fill-slate-950 text-slate-950" />
                     {currentBanner.rating} ({currentBanner.reviews})
@@ -607,14 +659,24 @@ export const Home: React.FC<HomeProps> = ({
                   <span className="truncate">{currentBanner.location}</span>
                 </p>
 
-                {/* Banner CTA Button (Only Book Token Option) */}
+                {currentBanner.description && (
+                  <p className="text-slate-300 text-[11px] md:text-xs line-clamp-2 leading-relaxed drop-shadow-xs">
+                    {currentBanner.description}
+                  </p>
+                )}
+
+                {/* Banner CTA Button */}
                 <div className="pt-1">
                   <Button 
                     variant="secondary" 
                     size="sm" 
                     onClick={(e) => {
                       e.stopPropagation();
-                      onHospitalSelect(currentBanner.id);
+                      if (currentBanner.isLocationTargeted && currentBanner.linkUrl) {
+                        navigate(currentBanner.linkUrl);
+                      } else {
+                        onHospitalSelect(currentBanner.id);
+                      }
                     }}
                     className="bg-white text-blue-600 hover:bg-blue-50 py-2.5 px-5 rounded-xl font-black text-xs sm:text-sm flex items-center gap-2 cursor-pointer border-none shadow-lg shadow-black/30 hover:scale-105 transition-all"
                   >
@@ -625,23 +687,25 @@ export const Home: React.FC<HomeProps> = ({
               </div>
 
               {/* Bottom Carousel Dots */}
-              <div className="relative z-20 flex justify-center items-center gap-2 pt-1">
-                {featuredBanners.map((banner, idx) => (
-                  <button
-                    key={banner.id}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setCurrentSlide(idx);
-                    }}
-                    className={`transition-all cursor-pointer rounded-full ${
-                      currentSlide === idx 
-                        ? 'w-7 h-2 bg-blue-500 shadow-md shadow-blue-500/50' 
-                        : 'w-2 h-2 bg-white/40 hover:bg-white/80'
-                    }`}
-                    aria-label={`Go to ${banner.title}`}
-                  />
-                ))}
-              </div>
+              {displayBanners.length > 1 && (
+                <div className="relative z-20 flex justify-center items-center gap-2 pt-1">
+                  {displayBanners.map((banner, idx) => (
+                    <button
+                      key={banner.id}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCurrentSlide(idx);
+                      }}
+                      className={`transition-all cursor-pointer rounded-full ${
+                        currentSlide === idx 
+                          ? 'w-7 h-2 bg-blue-500 shadow-md shadow-blue-500/50' 
+                          : 'w-2 h-2 bg-white/40 hover:bg-white/80'
+                      }`}
+                      aria-label={`Go to ${banner.title}`}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           );
         })()}

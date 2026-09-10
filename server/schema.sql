@@ -89,7 +89,63 @@ CREATE TABLE IF NOT EXISTS appointments (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS hospital_patients (
+    id VARCHAR(100) PRIMARY KEY,
+    hospital_id VARCHAR(100) NOT NULL,
+    uhid VARCHAR(50) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    phone VARCHAR(50) NOT NULL,
+    email VARCHAR(255),
+    age INTEGER,
+    gender VARCHAR(20),
+    blood_group VARCHAR(10),
+    address TEXT,
+    city VARCHAR(100),
+    pin_code VARCHAR(20),
+    total_visits INTEGER DEFAULT 1,
+    last_visit DATE DEFAULT CURRENT_DATE,
+    data JSONB,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS hospital_schedules (
+    hospital_id VARCHAR(100) PRIMARY KEY,
+    schedule_data JSONB NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE INDEX IF NOT EXISTS idx_tokens_hospital_date ON tokens (hospital_id, token_date);
 CREATE INDEX IF NOT EXISTS idx_tokens_doctor_date ON tokens (doctor_id, token_date);
 CREATE INDEX IF NOT EXISTS idx_doctors_hospital ON hospital_doctors (hospital_id);
 CREATE INDEX IF NOT EXISTS idx_departments_hospital ON hospital_departments (hospital_id);
+CREATE INDEX IF NOT EXISTS idx_patients_hospital ON hospital_patients (hospital_id);
+CREATE INDEX IF NOT EXISTS idx_patients_phone ON hospital_patients (hospital_id, phone);
+
+-- ─── Location-Based Banners System ──────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS location_banners (
+    id VARCHAR(100) PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    image TEXT NOT NULL,
+    badge VARCHAR(64),
+    link_url TEXT,
+    cta_text VARCHAR(64) DEFAULT 'Book Token',
+    status VARCHAR(20) DEFAULT 'active',
+    start_date DATE,
+    end_date DATE,
+    target_level VARCHAR(32) NOT NULL, -- 'country', 'state', 'district', 'mandal', 'village'
+    country VARCHAR(100) DEFAULT 'India',
+    state VARCHAR(100),
+    district VARCHAR(100),
+    mandal VARCHAR(100),
+    village VARCHAR(100),
+    display_panels JSONB DEFAULT '["customer"]',
+    priority INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_banners_status ON location_banners (status);
+CREATE INDEX IF NOT EXISTS idx_banners_geo ON location_banners (target_level, state, district, mandal, village);
+

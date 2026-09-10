@@ -17,6 +17,8 @@ export const KNOWN_CITIES: Record<string, { lat: number; lng: number; name: stri
   'bangalore': { lat: 12.9716, lng: 77.5946, name: 'Bengaluru, Karnataka' },
   
   // Hyderabad & Telangana
+  'karimnagar': { lat: 18.4386, lng: 79.1288, name: 'Karimnagar, Telangana' },
+  'choppadandi': { lat: 18.5772, lng: 79.1764, name: 'Choppadandi, Karimnagar' },
   'gachibowli': { lat: 17.4401, lng: 78.3489, name: 'Gachibowli, Hyderabad' },
   'madhapur': { lat: 17.4483, lng: 78.3915, name: 'Madhapur, Hyderabad' },
   'hitec city': { lat: 17.4474, lng: 78.3762, name: 'HITEC City, Hyderabad' },
@@ -27,6 +29,7 @@ export const KNOWN_CITIES: Record<string, { lat: number; lng: number; name: stri
   'hyderabad': { lat: 17.3850, lng: 78.4867, name: 'Hyderabad, Telangana' },
   'khammam': { lat: 17.2473, lng: 80.1514, name: 'Khammam, Telangana' },
   'warangal': { lat: 17.9689, lng: 79.5941, name: 'Warangal, Telangana' },
+  'hanamkonda': { lat: 18.0135, lng: 79.5540, name: 'Hanamkonda, Warangal' },
   
   // Andhra Pradesh
   'vijayawada': { lat: 16.5062, lng: 80.6480, name: 'Vijayawada, Andhra Pradesh' },
@@ -76,6 +79,9 @@ export interface ReverseGeocodeDetails {
   city: string;
   state: string;
   area: string;
+  district?: string;
+  mandal?: string;
+  village?: string;
   pinCode: string;
   country: string;
   lat: number;
@@ -88,6 +94,9 @@ export interface GeocodeResult {
   formattedAddress: string;
   city?: string;
   state?: string;
+  district?: string;
+  mandal?: string;
+  village?: string;
   area?: string;
   pinCode?: string;
   country?: string;
@@ -105,7 +114,9 @@ function extractGoogleAddressComponents(result: any, lat: number, lng: number): 
 
   const pinCode = getComp('postal_code');
   const state = getComp('administrative_area_level_1');
-  const city = getComp('locality', 'postal_town', 'administrative_area_level_2', 'administrative_area_level_3');
+  const rawDistrict = getComp('administrative_area_level_2');
+  const rawMandal = getComp('administrative_area_level_3');
+  const city = getComp('locality', 'postal_town') || rawDistrict;
   
   const sub1 = getComp('sublocality_level_1');
   const sub2 = getComp('sublocality_level_2');
@@ -120,6 +131,10 @@ function extractGoogleAddressComponents(result: any, lat: number, lng: number): 
     area = sub1 || sub || neighborhood || sub2 || route || '';
   }
 
+  const district = rawDistrict || city;
+  const mandal = rawMandal || sub1 || '';
+  const village = sub2 || neighborhood || area || '';
+
   const country = getComp('country') || 'India';
   const address = result.formatted_address || '';
 
@@ -128,6 +143,9 @@ function extractGoogleAddressComponents(result: any, lat: number, lng: number): 
     city,
     state,
     area,
+    district,
+    mandal,
+    village,
     pinCode,
     country,
     lat,
@@ -154,6 +172,10 @@ function extractNominatimAddressComponents(data: any, lat: number, lng: number):
     area = neighbourhood || suburb || residential || cityDistrict || road || '';
   }
 
+  const district = a.state_district || a.county || a.city_district || city || '';
+  const mandal = a.subdistrict || a.municipality || a.taluk || suburb || '';
+  const village = a.village || a.hamlet || a.neighbourhood || area || '';
+
   const country = a.country || 'India';
   const address = data.display_name || '';
 
@@ -162,6 +184,9 @@ function extractNominatimAddressComponents(data: any, lat: number, lng: number):
     city,
     state,
     area,
+    district,
+    mandal,
+    village,
     pinCode,
     country,
     lat,
@@ -182,6 +207,9 @@ function extractBigDataCloudComponents(data: any, lat: number, lng: number): Rev
     city,
     state,
     area,
+    district: city,
+    mandal: area,
+    village: area,
     pinCode,
     country,
     lat,
@@ -203,14 +231,48 @@ function getKnownCityFallback(lat: number, lng: number): ReverseGeocodeDetails {
 
   const parts = closestCity.name.split(',');
   const area = parts[0]?.trim() || 'Koramangala';
-  const city = parts[1]?.trim() || 'Bengaluru';
+
+  let state = 'Karnataka';
+  let district = 'Bengaluru Urban';
+  let mandal = 'Bengaluru South';
+  let village = area;
+
+  if (closestCity.name.includes('Karimnagar')) {
+    state = 'Telangana';
+    district = 'Karimnagar';
+    mandal = closestCity.name.includes('Choppadandi') ? 'Choppadandi' : 'Karimnagar Mandal';
+    village = closestCity.name.includes('Choppadandi') ? 'Choppadandi Village' : 'Karimnagar City';
+  } else if (closestCity.name.includes('Warangal') || closestCity.name.includes('Hanamkonda')) {
+    state = 'Telangana';
+    district = 'Warangal';
+    mandal = closestCity.name.includes('Hanamkonda') ? 'Hanamkonda' : 'Warangal Mandal';
+    village = area;
+  } else if (closestCity.name.includes('Hyderabad') || closestCity.name.includes('Gachibowli') || closestCity.name.includes('Madhapur')) {
+    state = 'Telangana';
+    district = 'Hyderabad';
+    mandal = 'Serilingampally';
+    village = area;
+  } else if (closestCity.name.includes('Vijayawada')) {
+    state = 'Andhra Pradesh';
+    district = 'Krishna';
+    mandal = 'Vijayawada Urban';
+    village = area;
+  } else if (closestCity.name.includes('Visakhapatnam')) {
+    state = 'Andhra Pradesh';
+    district = 'Visakhapatnam';
+    mandal = 'Visakhapatnam Urban';
+    village = area;
+  }
 
   return {
     address: closestCity.name,
-    city,
-    state: 'Karnataka',
+    city: district,
+    state,
     area,
-    pinCode: '560095',
+    district,
+    mandal,
+    village,
+    pinCode: '500001',
     country: 'India',
     lat,
     lng

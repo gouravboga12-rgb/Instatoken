@@ -28,11 +28,14 @@ export const HospitalLogin: React.FC = () => {
     }
   };
 
-  const fillDemo = (role: string) => {
+  const fillDemo = (hosp: string) => {
     const creds: Record<string, { email: string; password: string }> = {
-      owner: { email: 'admin@apollo.com', password: 'password' },
+      apollo: { email: 'admin@apollo.com', password: 'password' },
+      rainbow: { email: 'admin@rainbow.com', password: 'password' },
+      fortis: { email: 'admin@fortis.com', password: 'password' },
+      nethra: { email: 'admin@nethra.com', password: 'password' },
     };
-    const c = creds[role];
+    const c = creds[hosp] || creds.apollo;
     if (c) { setEmail(c.email); setPassword(c.password); setError(''); }
   };
 
@@ -126,15 +129,42 @@ export const HospitalLogin: React.FC = () => {
             <p className="text-slate-500 text-sm mt-2">Sign in to your hospital management account</p>
           </div>
 
-          {/* Demo Quick Fill */}
-          <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 mb-6">
-            <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-2.5">Quick Demo Login</p>
-            <button
-              onClick={() => fillDemo('owner')}
-              className="w-full bg-purple-100 text-purple-750 hover:bg-purple-200 text-xs font-bold py-2.5 px-3 rounded-xl transition-colors cursor-pointer border-none text-center block"
-            >
-              Login as Hospital Admin
-            </button>
+          {/* Demo Quick Fill for Partner Hospitals (Phase 22 Multi-Tenant Testing) */}
+          <div className="bg-blue-50/80 border border-blue-100 rounded-2xl p-3.5 mb-6">
+            <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-2 flex items-center justify-between">
+              <span>Quick Partner Hospital Login</span>
+              <span className="text-[9px] font-bold text-blue-500 bg-blue-100/70 px-1.5 py-0.5 rounded">Phase 22 Security Test</span>
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => fillDemo('apollo')}
+                className="bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-extrabold py-2 px-2.5 rounded-xl transition-colors cursor-pointer border-none text-left truncate"
+              >
+                🏥 Apollo Spectra
+              </button>
+              <button
+                type="button"
+                onClick={() => fillDemo('rainbow')}
+                className="bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-extrabold py-2 px-2.5 rounded-xl transition-colors cursor-pointer border-none text-left truncate"
+              >
+                🌈 Rainbow Children
+              </button>
+              <button
+                type="button"
+                onClick={() => fillDemo('fortis')}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-extrabold py-2 px-2.5 rounded-xl transition-colors cursor-pointer border-none text-left truncate"
+              >
+                🩺 Fortis Hospital
+              </button>
+              <button
+                type="button"
+                onClick={() => fillDemo('nethra')}
+                className="bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-extrabold py-2 px-2.5 rounded-xl transition-colors cursor-pointer border-none text-left truncate"
+              >
+                👁️ Narayana Nethra
+              </button>
+            </div>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">

@@ -34,12 +34,12 @@ const TopNavbar: React.FC = () => {
   const [locating, setLocating] = useState(false);
 
   const locations = [
+    "Karimnagar, Telangana",
+    "Choppadandi, Karimnagar",
+    "Warangal, Telangana",
     "Gachibowli, Hyderabad",
     "Vijayawada, Andhra Pradesh",
-    "Koramangala, Bengaluru", 
-    "HSR Layout, Bengaluru", 
-    "Ram Nagar, Visakhapatnam",
-    "Indiranagar, Bengaluru"
+    "Koramangala, Bengaluru"
   ];
 
   return (
@@ -310,6 +310,7 @@ const AppContent: React.FC = () => {
           
           {/* Admin routes */}
           <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/admin/banners" element={<AdminDashboard initialTab="banners" />} />
 
           {/* Hospital Panel routes */}
           <Route path="/hospital-login" element={<HospitalLogin />} />

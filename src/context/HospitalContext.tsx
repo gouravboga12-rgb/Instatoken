@@ -77,11 +77,21 @@ export interface TokenRecord {
   isRevisit: boolean;
   revisitValidUpto?: string;
   notes?: string;
+  hospitalId?: string;
+}
+
+export interface DoctorVisitSummary {
+  doctorId: string;
+  doctorName: string;
+  departmentName: string;
+  visitCount: number;
+  lastVisitDate: string;
 }
 
 export interface PatientRecord {
   id: string;
   uhid: string;
+  hospitalId?: string;
   name: string;
   phone: string;
   email: string;
@@ -97,7 +107,8 @@ export interface PatientRecord {
   familyMembers: { name: string; relation: string; age: number }[];
   medicalHistory: string[];
   allergies: string[];
-  tokenHistory: string[]; // token IDs
+  tokenHistory: any[];
+  doctorVisits?: DoctorVisitSummary[];
 }
 
 export interface SessionConfig {
@@ -267,16 +278,27 @@ interface HospitalContextType {
   updateHospitalProfile: (updates: Partial<HospitalProfile>) => void;
   switchHospital: (hospitalId: string) => void;
   availableHospitals: { id: string; name: string; category?: string }[];
+
+  // Phase 20-22 Additions: Access Control, Backend Revenue & Patients
+  authToken: string;
+  fetchPatients: (doctorId?: string, search?: string, status?: string) => Promise<PatientRecord[]>;
+  fetchHospitalRevenue: (filter?: string, startDate?: string, endDate?: string, doctorId?: string) => Promise<{ totals: any; doctorStats: any[] }>;
 }
 
 // ─── Mock credentials ─────────────────────────────────────────────────────────
 
 const MOCK_CREDENTIALS = [
-  { email: 'admin@apollo.com', password: 'password', userId: 'huser-1' },
+  { email: 'admin@apollo.com', password: 'password', userId: 'huser-apollo' },
+  { email: 'admin@rainbow.com', password: 'password', userId: 'huser-rainbow' },
+  { email: 'admin@fortis.com', password: 'password', userId: 'huser-fortis' },
+  { email: 'admin@nethra.com', password: 'password', userId: 'huser-nethra' },
 ];
 
 const MOCK_USERS: HospitalUser[] = [
-  { id: 'huser-1', name: 'Dr. Rajesh Kumar', email: 'admin@apollo.com', role: 'owner', hospitalId: 'hosp-apollo', hospitalName: 'Apollo Spectra Hospital', avatar: '', isOnline: true },
+  { id: 'huser-apollo', name: 'Dr. Rajesh Kumar', email: 'admin@apollo.com', role: 'owner', hospitalId: 'hosp-apollo', hospitalName: 'Apollo Spectra Hospital', avatar: '', isOnline: true },
+  { id: 'huser-rainbow', name: 'Dr. Ramesh Babu', email: 'admin@rainbow.com', role: 'owner', hospitalId: 'hosp-rainbow', hospitalName: "Rainbow Children's Hospital", avatar: '', isOnline: true },
+  { id: 'huser-fortis', name: 'Dr. Sanjay Sharma', email: 'admin@fortis.com', role: 'owner', hospitalId: 'hosp-fortis', hospitalName: 'Fortis Hospital', avatar: '', isOnline: true },
+  { id: 'huser-nethra', name: 'Dr. Bhujang Shetty', email: 'admin@nethra.com', role: 'owner', hospitalId: 'hosp-nethra', hospitalName: 'Narayana Nethralaya', avatar: '', isOnline: true },
 ];
 
 
@@ -289,9 +311,9 @@ const INITIAL_PROFILE: HospitalProfile = {
   type: 'Multi Speciality', ownershipType: 'Private',
   phone: '+91 80 4668 8888', whatsapp: '+91 98765 43210',
   email: 'info@apollospectra.com', website: 'www.apollospectra.com', emergencyNumber: '+91 80 4668 9999',
-  country: 'India', state: 'Karnataka', city: 'Bengaluru', area: 'Koramangala',
-  address: 'Koramangala 5th Block, near Sony World Signal, Bengaluru', pinCode: '560095',
-  lat: 12.9348, lng: 77.6189,
+  country: 'India', state: 'Telangana', city: 'Hyderabad', area: 'Kothapet Pratap Nagar',
+  address: '15-57/2, RAMkrishna Raju Residency, Pratap Nagar, Kothapet, Hyderabad, Telangana 500060, India', pinCode: '500060',
+  lat: 17.37336200634615, lng: 78.53855589118986,
   about: 'Apollo Spectra is a state-of-the-art multi-specialty hospital committed to delivering world-class healthcare.',
   mission: 'To provide accessible, affordable, and high-quality healthcare to every patient.',
   vision: 'To be the most trusted and patient-centric hospital network in India.',
@@ -513,17 +535,24 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         const parsed: HospitalDoctor[] = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
           return parsed.map(d => {
-            if (!d.sessions || d.sessions.length === 0) {
-              const initDoc = INITIAL_DOCTORS.find(init => init.id === d.id);
-              return {
-                ...d,
-                sessions: initDoc?.sessions || [
-                  { id: `sess-${d.id}-1`, name: 'Morning', startTime: d.opdStartTime || '09:00 AM', endTime: d.opdEndTime || '01:00 PM', maxTokens: Math.round(d.maxTokensPerDay * 0.6) || 30, consultationDuration: d.consultationDuration || 15, breakTime: 5, active: true },
-                  { id: `sess-${d.id}-2`, name: 'Evening', startTime: '05:00 PM', endTime: '09:00 PM', maxTokens: Math.round(d.maxTokensPerDay * 0.4) || 20, consultationDuration: d.consultationDuration || 15, breakTime: 5, active: true }
-                ]
-              };
-            }
-            return d;
+            const initDoc = INITIAL_DOCTORS.find(init => init.id === d.id);
+            return {
+              ...initDoc,
+              ...d,
+              specialization: d.specialization || (d as any).specialty || initDoc?.specialization || 'Specialist',
+              photo: d.photo || (d as any).image || initDoc?.photo || '',
+              opdDays: (Array.isArray(d.opdDays) && d.opdDays.length > 0)
+                ? d.opdDays
+                : (Array.isArray((d as any).availability?.days) ? (d as any).availability.days : initDoc?.opdDays || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']),
+              opdStartTime: d.opdStartTime || initDoc?.opdStartTime || '09:00 AM',
+              opdEndTime: d.opdEndTime || initDoc?.opdEndTime || '05:00 PM',
+              consultationDuration: d.consultationDuration || initDoc?.consultationDuration || 15,
+              maxTokensPerDay: d.maxTokensPerDay || initDoc?.maxTokensPerDay || 50,
+              sessions: (d.sessions && d.sessions.length > 0) ? d.sessions : initDoc?.sessions || [
+                { id: `sess-${d.id}-1`, name: 'Morning', startTime: d.opdStartTime || '09:00 AM', endTime: d.opdEndTime || '01:00 PM', maxTokens: Math.round((d.maxTokensPerDay || 50) * 0.6) || 30, consultationDuration: d.consultationDuration || 15, breakTime: 5, active: true },
+                { id: `sess-${d.id}-2`, name: 'Evening', startTime: '05:00 PM', endTime: '09:00 PM', maxTokens: Math.round((d.maxTokensPerDay || 50) * 0.4) || 20, consultationDuration: d.consultationDuration || 15, breakTime: 5, active: true }
+              ]
+            };
           });
         }
       } catch (e) {}
@@ -577,6 +606,69 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const targetHospId = hospitalProfile?.id || hospitalUser?.hospitalId || 'hosp-apollo';
 
+  const [authToken, setAuthToken] = useState<string>(() => {
+    return localStorage.getItem('insta_hospital_auth_token') || `htok_${targetHospId}_default`;
+  });
+
+  // Dynamic fetch of hospital patients strictly for current hospital (Phase 20)
+  const fetchPatients = async (doctorId?: string, search?: string, status?: string): Promise<PatientRecord[]> => {
+    try {
+      const params = new URLSearchParams();
+      if (doctorId && doctorId !== 'all') params.append('doctorId', doctorId);
+      if (search) params.append('search', search);
+      if (status && status !== 'all') params.append('status', status);
+
+      const res = await fetch(`/api/hospitals/${targetHospId}/patients?${params.toString()}`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'x-hospital-token': authToken
+        }
+      });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.patients)) {
+        setPatients(data.patients);
+        localStorage.setItem(`insta_hospital_patients_${targetHospId}`, JSON.stringify(data.patients));
+        localStorage.setItem('insta_hospital_patients', JSON.stringify(data.patients));
+        return data.patients;
+      }
+    } catch (err) {
+      console.warn('Could not fetch patients from backend:', err);
+    }
+    return patients;
+  };
+
+  // Dynamic backend revenue calculation engine (Phase 21)
+  const fetchHospitalRevenue = async (filter = 'today', startDate?: string, endDate?: string, doctorId?: string) => {
+    try {
+      const params = new URLSearchParams();
+      params.append('filter', filter);
+      if (startDate) params.append('startDate', startDate);
+      if (endDate) params.append('endDate', endDate);
+      if (doctorId && doctorId !== 'all') params.append('doctorId', doctorId);
+
+      const res = await fetch(`/api/hospitals/${targetHospId}/revenue?${params.toString()}`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'x-hospital-token': authToken
+        }
+      });
+      const data = await res.json();
+      if (data.success) {
+        return { totals: data.totals, doctorStats: data.doctorStats };
+      }
+    } catch (err) {
+      console.warn('Could not fetch revenue from backend:', err);
+    }
+    return { totals: null, doctorStats: [] };
+  };
+
+  // Auto-fetch patients for current hospital on mount or whenever active hospital / token changes
+  useEffect(() => {
+    if (targetHospId && authToken) {
+      fetchPatients();
+    }
+  }, [targetHospId, authToken]);
+
   // ─── Cross-tab & Real-time Global Sync ─────────────────────────────────────
   useEffect(() => {
     const unsubscribe = subscribeGlobalSync((event) => {
@@ -611,10 +703,77 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           localStorage.setItem('insta_hospital_tokens', JSON.stringify(updated));
           return updated;
         });
+
+        // Also update patient record in hospital context (Phase 20)
+        setPatients(prev => {
+          const exists = prev.some(p => p.phone === appt.phone);
+          const tokenSummary = {
+            id: appt.id,
+            tokenNo: appt.tokenNumber,
+            type: 'online',
+            doctorId: appt.doctorId,
+            doctorName: appt.doctorName,
+            departmentName: appt.departmentName,
+            session: 'morning',
+            time: appt.time,
+            bookingDate: appt.date,
+            status: 'booked',
+            consultationFee: appt.fee,
+            paymentStatus: 'paid',
+            paymentMethod: appt.paymentMethod || 'Online'
+          };
+          if (exists) {
+            return prev.map(p => p.phone === appt.phone ? {
+              ...p,
+              totalVisits: (p.totalVisits || 0) + 1,
+              lastVisit: appt.date,
+              tokenHistory: [tokenSummary, ...(p.tokenHistory || [])]
+            } : p);
+          }
+          const newPat: PatientRecord = {
+            id: `pat-${Date.now()}`,
+            uhid: `APS${String(prev.length + 1001).padStart(6, '0')}`,
+            hospitalId: targetHospId,
+            name: appt.patientName,
+            phone: appt.phone,
+            email: appt.email || '',
+            age: appt.age,
+            gender: appt.gender,
+            bloodGroup: 'B+',
+            address: appt.address || '',
+            city: hospitalProfile?.city || 'Bengaluru',
+            pinCode: hospitalProfile?.pinCode || '',
+            registeredOn: appt.date,
+            totalVisits: 1,
+            lastVisit: appt.date,
+            familyMembers: [],
+            medicalHistory: [],
+            allergies: [],
+            tokenHistory: [tokenSummary],
+            doctorVisits: [{ doctorId: appt.doctorId, doctorName: appt.doctorName, departmentName: appt.departmentName, visitCount: 1, lastVisitDate: appt.date }]
+          };
+          return [newPat, ...prev];
+        });
       } else if (event.type === 'STORAGE_CHANGED' || event.type === 'CLOUD_SYNC_UPDATED' || event.type === 'HOSPITAL_DOCTORS_UPDATED' || event.type === 'HOSPITAL_PROFILE_UPDATED' || event.type === 'HOSPITAL_DEPARTMENTS_UPDATED' || event.type === 'HOSPITAL_TOKENS_UPDATED') {
         const savedDocs = localStorage.getItem('insta_hospital_doctors');
         if (savedDocs) {
-          try { setDoctors(JSON.parse(savedDocs)); } catch (e) {}
+          try {
+            const parsed = JSON.parse(savedDocs);
+            if (Array.isArray(parsed)) {
+              setDoctors(parsed.map(d => {
+                const initDoc = INITIAL_DOCTORS.find(init => init.id === d.id);
+                return {
+                  ...initDoc,
+                  ...d,
+                  specialization: d.specialization || (d as any).specialty || initDoc?.specialization || 'Specialist',
+                  photo: d.photo || (d as any).image || initDoc?.photo || '',
+                  opdDays: (Array.isArray(d.opdDays) && d.opdDays.length > 0)
+                    ? d.opdDays
+                    : (Array.isArray((d as any).availability?.days) ? (d as any).availability.days : initDoc?.opdDays || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']),
+                };
+              }));
+            }
+          } catch (e) {}
         }
         const savedProfile = localStorage.getItem('insta_hospital_profile');
         if (savedProfile) {
@@ -639,7 +798,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return unsubscribe;
   }, []);
 
-  // ─── Global Sync to AppContext & localStorage ──────────────────────────────
+  // ─── Local Sync to AppContext & localStorage ──────────────────────────────
   useEffect(() => {
     localStorage.setItem('insta_hospital_profile', JSON.stringify(hospitalProfile));
     if (updateHospital) {
@@ -655,13 +814,24 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         lng: hospitalProfile.lng !== undefined ? Number(hospitalProfile.lng) : undefined,
       });
     }
-    broadcastGlobalSync('HOSPITAL_PROFILE_UPDATED', { hospitalId: targetHospId, profile: hospitalProfile });
-    fetch(`/api/hospitals/${targetHospId}/profile`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ profile: hospitalProfile })
-    }).catch(() => {});
   }, [hospitalProfile, targetHospId]);
+
+  // Fetch latest saved profile from backend on mount so we never rely on stale defaults
+  useEffect(() => {
+    fetch('/api/hospitals')
+      .then(res => res.json())
+      .then(data => {
+        if (data?.store?.hospitalProfiles) {
+          const prof = data.store.hospitalProfiles[targetHospId] || data.store.hospitalProfiles['hosp-apollo'];
+          if (prof && prof.address) {
+            setHospitalProfile(prev => ({ ...prev, ...prof }));
+            localStorage.setItem('insta_hospital_profile', JSON.stringify(prof));
+            localStorage.setItem(`insta_hospital_profile_${targetHospId}`, JSON.stringify(prof));
+          }
+        }
+      })
+      .catch(err => console.warn('Could not load hospital profile from server:', err));
+  }, [targetHospId]);
 
   useEffect(() => {
     localStorage.setItem('insta_hospital_doctors', JSON.stringify(doctors));
@@ -736,17 +906,54 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     localStorage.setItem('insta_hospital_staff', JSON.stringify(staff));
   }, [staff]);
 
-  // Auth
+  // Auth (Phase 22)
   const hospitalLogin = (email: string, password: string) => {
-    const cred = MOCK_CREDENTIALS.find(c => c.email === email && c.password === password);
+    // Attempt backend login for real session token
+    fetch('/api/auth/hospital-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.token && data.user) {
+          setAuthToken(data.token);
+          localStorage.setItem('insta_hospital_auth_token', data.token);
+          setHospitalUser({
+            id: data.user.id,
+            name: data.user.name,
+            email: data.user.email,
+            role: data.user.role,
+            hospitalId: data.user.hospitalId,
+            hospitalName: data.user.hospitalName,
+            avatar: '',
+            isOnline: true
+          });
+          switchHospital(data.user.hospitalId);
+        }
+      })
+      .catch(() => {});
+
+    // Fast local verification for instant UI response
+    const cred = MOCK_CREDENTIALS.find(c => c.email.toLowerCase() === email.toLowerCase() && c.password === password);
     if (!cred) return { success: false, message: 'Invalid email or password.' };
     const user = MOCK_USERS.find(u => u.id === cred.userId);
     if (!user) return { success: false, message: 'User account not found.' };
+
+    const token = `htok_${user.hospitalId}_default`;
+    setAuthToken(token);
+    localStorage.setItem('insta_hospital_auth_token', token);
     setHospitalUser(user);
+    switchHospital(user.hospitalId);
     return { success: true, message: 'Login successful.' };
   };
 
-  const hospitalLogout = () => { setHospitalUser(null); setActiveSection('dashboard'); };
+  const hospitalLogout = () => {
+    setHospitalUser(null);
+    setAuthToken('');
+    localStorage.removeItem('insta_hospital_auth_token');
+    setActiveSection('dashboard');
+  };
 
   // Doctors
   const addDoctor = (doc: Omit<HospitalDoctor, 'id' | 'totalPatients' | 'rating'>) => {
@@ -917,11 +1124,23 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       paymentStatus: 'pending',
       paymentMethod: 'Cash',
       isRevisit: false,
+      hospitalId: targetHospId
     };
 
     const updated = [newToken, ...tokens];
     setTokens(updated);
     localStorage.setItem('insta_hospital_tokens', JSON.stringify(updated));
+    localStorage.setItem(`insta_hospital_tokens_${targetHospId}`, JSON.stringify(updated));
+
+    // Post token to backend with authorization header (Phase 21 & 22)
+    fetch(`/api/hospitals/${targetHospId}/tokens`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify(newToken)
+    }).catch(() => {});
 
     // Automatically create / link patient customer account
     if (getOrCreateCustomerAccount) {
@@ -958,7 +1177,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       localStorage.setItem('insta_appointments', JSON.stringify([newAppt, ...curAppts]));
     } catch (e) {}
 
-    // Register / update hospital patient record
+    // Register / update hospital patient record (Phase 20)
     setPatients(prev => {
       const exists = prev.some(p => p.phone === form.patientPhone);
       if (exists) {
@@ -966,8 +1185,14 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           ...p,
           totalVisits: (p.totalVisits || 0) + 1,
           lastVisit: todayStr,
-          tokenHistory: [newToken.id, ...(p.tokenHistory || [])]
+          tokenHistory: [newToken, ...(p.tokenHistory || [])],
+          doctorVisits: p.doctorVisits ? (
+            p.doctorVisits.some(d => d.doctorId === form.doctorId)
+              ? p.doctorVisits.map(d => d.doctorId === form.doctorId ? { ...d, visitCount: d.visitCount + 1, lastVisitDate: todayStr } : d)
+              : [...p.doctorVisits, { doctorId: form.doctorId, doctorName: doctor?.name || '', departmentName: dept?.name || '', visitCount: 1, lastVisitDate: todayStr }]
+          ) : [{ doctorId: form.doctorId, doctorName: doctor?.name || '', departmentName: dept?.name || '', visitCount: 1, lastVisitDate: todayStr }]
         } : p);
+        localStorage.setItem(`insta_hospital_patients_${targetHospId}`, JSON.stringify(updatedPatients));
         localStorage.setItem('insta_hospital_patients', JSON.stringify(updatedPatients));
         return updatedPatients;
       }
@@ -975,6 +1200,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const newPat: PatientRecord = {
         id: `pat-${Date.now()}`,
         uhid,
+        hospitalId: targetHospId,
         name: form.patientName,
         phone: form.patientPhone,
         email: '',
@@ -990,10 +1216,19 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         familyMembers: [],
         medicalHistory: [],
         allergies: [],
-        tokenHistory: [newToken.id]
+        tokenHistory: [newToken],
+        doctorVisits: [{ doctorId: form.doctorId, doctorName: doctor?.name || '', departmentName: dept?.name || '', visitCount: 1, lastVisitDate: todayStr }]
       };
       const updatedPatients = [newPat, ...prev];
+      localStorage.setItem(`insta_hospital_patients_${targetHospId}`, JSON.stringify(updatedPatients));
       localStorage.setItem('insta_hospital_patients', JSON.stringify(updatedPatients));
+
+      fetch(`/api/hospitals/${targetHospId}/patients`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+        body: JSON.stringify(newPat)
+      }).catch(() => {});
+
       return updatedPatients;
     });
 
@@ -1009,9 +1244,20 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         paymentStatus: status === 'cancelled' ? ('refunded' as const) : status === 'completed' ? ('paid' as const) : t.paymentStatus
       } : t);
       localStorage.setItem('insta_hospital_tokens', JSON.stringify(updated));
+      localStorage.setItem(`insta_hospital_tokens_${targetHospId}`, JSON.stringify(updated));
       broadcastGlobalSync('HOSPITAL_TOKENS_UPDATED', updated);
       return updated;
     });
+
+    // Post status update to backend (Phase 21 & 22)
+    fetch(`/api/hospitals/${targetHospId}/tokens/${id}/status`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify({ status })
+    }).catch(() => {});
   };
 
   const cancelToken = (id: string) => {
@@ -1022,18 +1268,36 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setTokens(prev => {
       const updated = prev.filter(t => t.id !== id);
       localStorage.setItem('insta_hospital_tokens', JSON.stringify(updated));
+      localStorage.setItem(`insta_hospital_tokens_${targetHospId}`, JSON.stringify(updated));
       broadcastGlobalSync('HOSPITAL_TOKENS_UPDATED', updated);
       return updated;
     });
   };
 
-  // Patients
+  // Patients (Phase 20)
   const addPatient = (p: Omit<PatientRecord, 'id' | 'uhid' | 'registeredOn' | 'totalVisits' | 'lastVisit' | 'tokenHistory'>) => {
     const uhid = `APS${String(patients.length + 1001).padStart(6, '0')}`;
-    const newPat: PatientRecord = { ...p, id: `pat-${Date.now()}`, uhid, registeredOn: new Date().toISOString().split('T')[0], totalVisits: 0, lastVisit: '', tokenHistory: [] };
+    const newPat: PatientRecord = {
+      ...p,
+      id: `pat-${Date.now()}`,
+      uhid,
+      hospitalId: targetHospId,
+      registeredOn: new Date().toISOString().split('T')[0],
+      totalVisits: 0,
+      lastVisit: '',
+      tokenHistory: [],
+      doctorVisits: p.doctorVisits || []
+    };
     const updated = [newPat, ...patients];
     setPatients(updated);
+    localStorage.setItem(`insta_hospital_patients_${targetHospId}`, JSON.stringify(updated));
     localStorage.setItem('insta_hospital_patients', JSON.stringify(updated));
+
+    fetch(`/api/hospitals/${targetHospId}/patients`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+      body: JSON.stringify(newPat)
+    }).catch(() => {});
   };
   const updatePatient = (id: string, updates: Partial<PatientRecord>) =>
     setPatients(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
@@ -1079,6 +1343,10 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const target = hospitals.find(h => h.id === hospId);
     if (!target) return;
 
+    const newAuthToken = `htok_${hospId}_default`;
+    setAuthToken(newAuthToken);
+    localStorage.setItem('insta_hospital_auth_token', newAuthToken);
+
     let customProf: HospitalProfile | null = null;
     const savedCustom = localStorage.getItem(`insta_hospital_profile_${hospId}`);
     if (savedCustom) {
@@ -1120,6 +1388,38 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       avatar: prev?.avatar || '',
       isOnline: true
     }));
+
+    // Isolate patients & tokens strictly for the newly active hospital (Phase 20 & 22)
+    fetch(`/api/hospitals/${hospId}/patients`, {
+      headers: { 'Authorization': `Bearer ${newAuthToken}` }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.patients)) {
+          setPatients(data.patients);
+          localStorage.setItem(`insta_hospital_patients_${hospId}`, JSON.stringify(data.patients));
+        } else {
+          const savedPats = localStorage.getItem(`insta_hospital_patients_${hospId}`);
+          setPatients(savedPats ? JSON.parse(savedPats) : []);
+        }
+      })
+      .catch(() => {
+        const savedPats = localStorage.getItem(`insta_hospital_patients_${hospId}`);
+        setPatients(savedPats ? JSON.parse(savedPats) : []);
+      });
+
+    // Isolate tokens for this hospital
+    fetch(`/api/hospitals/${hospId}/tokens`, {
+      headers: { 'Authorization': `Bearer ${newAuthToken}` }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.tokens)) {
+          setTokens(data.tokens);
+          localStorage.setItem(`insta_hospital_tokens_${hospId}`, JSON.stringify(data.tokens));
+        }
+      })
+      .catch(() => {});
 
     if (target.doctors && target.doctors.length > 0) {
       const convertedDocs: HospitalDoctor[] = target.doctors.map(d => ({
@@ -1204,10 +1504,13 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         });
       }
 
-      // Post immediately to backend endpoint to ensure global persistence on EC2 server
+      // Post immediately to backend endpoint with authorization header
       fetch(`/api/hospitals/${activeId}/profile`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
         body: JSON.stringify({ profile: updated })
       }).catch(e => console.warn('Failed to post profile to backend:', e));
 
@@ -1233,6 +1536,9 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       updateHospitalProfile,
       switchHospital,
       availableHospitals,
+      authToken,
+      fetchPatients,
+      fetchHospitalRevenue
     }}>
       {children}
     </HospitalContext.Provider>

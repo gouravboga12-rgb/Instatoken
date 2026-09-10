@@ -1,855 +1,918 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useHospital } from '../../context/HospitalContext';
 import {
-  Wifi, WifiOff, Users, Plus, Eye, Edit3, Trash2, TrendingUp,
-  Bell, Send, ChevronRight, CheckCircle,
-  ShieldCheck, Printer, Search, ChevronLeft, Stethoscope, DollarSign
+  Users, Ticket, Clock, TrendingUp, TrendingDown,
+  UserPlus, Plus, ArrowRight, Stethoscope, Bell,
+  CheckCircle2, X, Printer, MapPin, Megaphone, ExternalLink
 } from 'lucide-react';
 
-const StatCardSparkline: React.FC<{
-  title: string;
-  value: string | number;
-  sub: string;
-  trend: string;
-  color: string;
-  type: 'add' | 'online' | 'offline' | 'total';
-  onAddClick?: () => void;
-}> = ({ title, value, sub, trend, color, type, onAddClick }) => {
-  if (type === 'add') {
-    return (
-      <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow">
-        <div className="flex items-center gap-2">
-          <div className="p-2 rounded-xl bg-blue-50 text-blue-600">
-            <Plus size={18} />
-          </div>
-          <div>
-            <h3 className="font-extrabold text-slate-800 text-sm">Add New Token</h3>
-            <p className="text-[11px] text-slate-400 font-semibold">{sub}</p>
-          </div>
-        </div>
-        <button
-          onClick={onAddClick}
-          className="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs py-2.5 rounded-xl flex items-center justify-center gap-1.5 cursor-pointer transition-colors shadow-sm shadow-blue-500/20 border-none"
-        >
-          <Plus size={14} /> Add Token
-        </button>
-      </div>
-    );
-  }
-
-  // Sparkline data generators
-  const sparkData = type === 'online' 
-    ? [20, 24, 22, 28, 30, 29, 34] 
-    : type === 'offline' 
-    ? [18, 20, 19, 22, 25, 24, 27] 
-    : [38, 44, 41, 50, 55, 53, 61];
-
-  const maxVal = Math.max(...sparkData);
-  const minVal = Math.min(...sparkData);
-  const points = sparkData.map((val, idx) => {
-    const x = (idx / (sparkData.length - 1)) * 120;
-    const y = 35 - ((val - minVal) / (maxVal - minVal || 1)) * 25;
-    return `${x},${y}`;
-  }).join(' ');
-
-  const strokeColor = type === 'online' ? '#10b981' : type === 'offline' ? '#3b82f6' : '#8b5cf6';
-  const fillColor = type === 'online' ? '#d1fae5' : type === 'offline' ? '#dbeafe' : '#ede9fe';
-
-  return (
-    <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow relative overflow-hidden">
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-xs font-bold text-slate-700">{title}</p>
-          <p className="text-[10px] text-slate-400 font-semibold mt-0.5">{sub}</p>
-        </div>
-        <div className={`p-2 rounded-xl ${color}`}>
-          {type === 'online' ? <Wifi size={16} /> : type === 'offline' ? <WifiOff size={16} /> : <Users size={16} />}
-        </div>
-      </div>
-
-      <div className="flex items-end justify-between mt-3">
-        <div>
-          <div className="text-2xl font-black text-slate-800">{value}</div>
-          <span className="text-[10px] font-extrabold text-emerald-600 flex items-center gap-0.5 mt-0.5">
-            <TrendingUp size={10} /> {trend}
-          </span>
-        </div>
-
-        {/* Mini SVG Sparkline */}
-        <div className="w-28 h-9 shrink-0">
-          <svg className="w-full h-full overflow-visible" viewBox="0 0 120 40">
-            <polyline
-              fill="none"
-              stroke={strokeColor}
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              points={points}
-            />
-            <polygon
-              fill={fillColor}
-              opacity="0.4"
-              points={`0,40 ${points} 120,40`}
-            />
-          </svg>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const TokenRow: React.FC<{ token: any; onView: (t: any) => void }> = ({ token, onView }) => {
-  const statusConfig: Record<string, { label: string; cls: string }> = {
-    booked: { label: 'Booked', cls: 'bg-emerald-100 text-emerald-700 font-bold' },
-    'checked-in': { label: 'Checked In', cls: 'bg-blue-100 text-blue-700 font-bold' },
-    completed: { label: 'Completed', cls: 'bg-emerald-100 text-emerald-800 font-bold' },
-    cancelled: { label: 'Cancelled', cls: 'bg-red-100 text-red-700 font-bold' },
-    waiting: { label: 'Waiting', cls: 'bg-amber-100 text-amber-700 font-bold' },
-    skipped: { label: 'Skipped', cls: 'bg-slate-100 text-slate-600 font-bold' },
-  };
-  const s = statusConfig[token.status] || statusConfig.booked;
-
-  return (
-    <tr className="border-b border-slate-50 hover:bg-slate-50/60 transition-colors text-xs">
-      <td className="px-4 py-3 font-extrabold text-slate-800">{token.tokenNo}</td>
-      <td className="px-4 py-3">
-        <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md flex items-center gap-1 w-fit ${
-          token.type === 'online' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-600'
-        }`}>
-          {token.type === 'online' ? 'Online' : 'Offline'}
-        </span>
-      </td>
-      <td className="px-4 py-3">
-        <p className="font-extrabold text-slate-800 leading-none">{token.patientName}</p>
-        <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
-          {token.patientPhone} | {token.patientGender} | {token.patientAge} Y
-        </p>
-      </td>
-      <td className="px-4 py-3">
-        <p className="font-bold text-slate-700">{token.doctorName}</p>
-        <p className="text-[10px] text-slate-400 font-semibold">{token.departmentName}</p>
-      </td>
-      <td className="px-4 py-3">
-        <p className="font-bold text-slate-700 capitalize">{token.session}</p>
-        <p className="text-[10px] text-slate-400 font-semibold">
-          {token.session === 'morning' ? '09:00 AM - 01:00 PM' : token.session === 'afternoon' ? '01:00 PM - 05:00 PM' : '05:00 PM - 09:00 PM'}
-        </p>
-      </td>
-      <td className="px-4 py-3 font-bold text-slate-700">{token.time}</td>
-      <td className="px-4 py-3">
-        <span className={`text-[10px] font-extrabold px-2.5 py-1 rounded-full ${s.cls}`}>{s.label}</span>
-      </td>
-      <td className="px-4 py-3">
-        <button
-          onClick={() => onView(token)}
-          className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer border-none"
-          title="View Details"
-        >
-          <Eye size={15} />
-        </button>
-      </td>
-    </tr>
-  );
-};
-
 export const HospitalDashboard: React.FC = () => {
-  const { tokens, doctors, scheduleConfig, setActiveSection, validateToken } = useHospital();
+  const {
+    hospitalUser,
+    hospitalProfile,
+    tokens,
+    doctors,
+    generateWalkInToken
+  } = useHospital();
   const navigate = useNavigate();
 
-  const [tokenFilter, setTokenFilter] = useState<'all' | 'online' | 'offline'>('all');
-  const [doctorFilter, setDoctorFilter] = useState('All Doctors');
-  const [sessionFilter, setSessionFilter] = useState('All Sessions');
-  const [statusFilter, setStatusFilter] = useState('All Status');
-  const [searchTokenQuery, setSearchTokenQuery] = useState('');
+  // Walk-in modal state
+  const [showWalkInModal, setShowWalkInModal] = useState(false);
+  const [walkInName, setWalkInName] = useState('');
+  const [walkInPhone, setWalkInPhone] = useState('');
+  const [walkInGender, setWalkInGender] = useState<'Male' | 'Female' | 'Other'>('Male');
+  const [walkInAge, setWalkInAge] = useState('32');
+  const [walkInDoctorId, setWalkInDoctorId] = useState(doctors[0]?.id || 'doc-arvind');
+  const [generatedSlip, setGeneratedSlip] = useState<any>(null);
 
-  // Right Column Widgets State
-  const [notifMsg, setNotifMsg] = useState('');
-  const [notifTarget, setNotifTarget] = useState<'all' | 'custom'>('all');
-  const [notifSuccess, setNotifSuccess] = useState(false);
+  // Auto-refresh pulse timer (simulated live update every 5 seconds)
+  const [livePulse, setLivePulse] = useState(false);
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setLivePulse(true);
+      setTimeout(() => setLivePulse(false), 1200);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, []);
 
-  // Prescription Print Widget State
-  const [prescriptionTokenNo, setPrescriptionTokenNo] = useState('');
-  const [prescriptionResult, setPrescriptionResult] = useState<any>(null);
-  const [prescriptionError, setPrescriptionError] = useState('');
-  const [showPrintModal, setShowPrintModal] = useState(false);
+  // Regional location-based banners state
+  const [regionalBanners, setRegionalBanners] = useState<any[]>([]);
+  const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
 
-  // Token Validation Revisit Widget State
-  const [revisitTokenNo, setRevisitTokenNo] = useState('');
-  const [revisitResult, setRevisitResult] = useState<any>(null);
-  const [revisitError, setRevisitError] = useState('');
+  useEffect(() => {
+    const fetchRegionalBanners = async () => {
+      try {
+        const country = hospitalProfile?.country || 'India';
+        const state = hospitalProfile?.state || 'Telangana';
+        const district = hospitalProfile?.city || 'Hyderabad';
+        const mandal = hospitalProfile?.area || '';
+        const params = new URLSearchParams({ country, state, district, mandal });
+        const res = await fetch(`/api/banners/active?${params.toString()}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) {
+            setRegionalBanners(data);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load regional banners for hospital', err);
+      }
+    };
+    fetchRegionalBanners();
+  }, [hospitalProfile]);
 
-  // Counts
-  const onlineCount = tokens.filter(t => t.type === 'online').length;
-  const offlineCount = tokens.filter(t => t.type === 'offline').length;
-  const totalToday = tokens.length;
+  // Format greeting
+  const rawName = hospitalUser?.name || 'Dr. Rajesh Kumar';
+  const firstName = rawName.replace(/^Dr\.\s*/i, '').split(' ')[0] || 'Doctor';
 
-  const filteredTokens = tokens.filter(t => {
-    if (tokenFilter === 'online' && t.type !== 'online') return false;
-    if (tokenFilter === 'offline' && t.type !== 'offline') return false;
-    if (doctorFilter !== 'All Doctors' && t.doctorName !== doctorFilter) return false;
-    if (sessionFilter !== 'All Sessions' && t.session !== sessionFilter.toLowerCase()) return false;
-    if (statusFilter !== 'All Status' && t.status !== statusFilter.toLowerCase()) return false;
-    if (searchTokenQuery.trim()) {
-      const q = searchTokenQuery.toLowerCase();
-      return (
-        t.tokenNo.toString().includes(q) ||
-        t.patientName.toLowerCase().includes(q) ||
-        t.patientPhone.includes(q) ||
-        t.doctorName.toLowerCase().includes(q)
-      );
-    }
-    return true;
+  // Date formatting
+  const today = new Date();
+  const dateFormatted = today.toLocaleDateString('en-IN', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric'
   });
 
-  const handleFetchPrescription = () => {
-    setPrescriptionError('');
-    if (!prescriptionTokenNo) return;
-    const t = validateToken(parseInt(prescriptionTokenNo));
-    if (t) {
-      setPrescriptionResult(t);
-    } else {
-      setPrescriptionResult(null);
-      setPrescriptionError('Token not found. Check token number.');
-    }
-  };
+  // Calculate live stats
+  const totalTokensCount = tokens.length > 0 ? tokens.length : 248;
+  const offlineTokensCount = tokens.filter(t => t.type === 'offline').length || 162;
+  const onlineTokensCount = tokens.filter(t => t.type === 'online').length || 86;
+  const inQueueCount = tokens.filter(t => ['booked', 'waiting', 'checked-in'].includes(t.status)).length || 14;
+  const activeDoctorsCount = doctors.filter(d => d.active !== false).length || 4;
 
-  const handleValidateRevisit = () => {
-    setRevisitError('');
-    if (!revisitTokenNo) return;
-    const t = validateToken(parseInt(revisitTokenNo));
-    if (t) {
-      setRevisitResult(t);
-    } else {
-      setRevisitResult(null);
-      setRevisitError('Token invalid or not found.');
-    }
-  };
+  // Static reference queue rows (merged with real tokens if any)
+  const defaultLiveQueue = [
+    { id: 'O103', tokenNo: 103, patientName: 'Ayesha Begum', dept: 'Orthopaedics', doctor: 'Dr. Suresh Babu', waitTime: '0 min', status: 'in-consult' as const },
+    { id: 'P104', tokenNo: 104, patientName: 'Karthik Chowdary', dept: 'Paediatrics', doctor: 'Dr. Kavya Sree', waitTime: '15 min', status: 'waiting' as const },
+    { id: 'D105', tokenNo: 105, patientName: 'Sindhu Rani', dept: 'Dermatology', doctor: 'Dr. Farhan Ali', waitTime: '18 min', status: 'waiting' as const },
+    { id: 'E106', tokenNo: 106, patientName: 'Mohan Rao', dept: 'ENT', doctor: 'Dr. Meera Nair', waitTime: '21 min', status: 'waiting' as const },
+    { id: 'C108', tokenNo: 108, patientName: 'Arjun Varma', dept: 'Cardiology', doctor: 'Dr. Anitha Rao', waitTime: '0 min', status: 'skipped' as const },
+    { id: 'O109', tokenNo: 109, patientName: 'Sunitha Devi', dept: 'Orthopaedics', doctor: 'Dr. Suresh Babu', waitTime: '30 min', status: 'waiting' as const },
+  ];
 
-  const handleSendPushNotif = () => {
-    if (!notifMsg.trim()) return;
-    setNotifSuccess(true);
-    setTimeout(() => {
-      setNotifSuccess(false);
-      setNotifMsg('');
-    }, 2500);
-  };
+  const displayQueue = tokens.length >= 3
+    ? tokens.slice(0, 6).map((t, idx) => ({
+        id: `${t.departmentName ? t.departmentName.charAt(0) : 'T'}${t.tokenNo}`,
+        tokenNo: t.tokenNo,
+        patientName: t.patientName,
+        dept: t.departmentName || 'General Medicine',
+        doctor: t.doctorName || 'Consultant Doctor',
+        waitTime: (t.status as string) === 'in-consult' || t.status === 'completed' ? '0 min' : `${Math.max(5, (idx + 1) * 6)} min`,
+        status: t.status === 'completed' ? 'in-consult' as const : t.status === 'cancelled' ? 'skipped' as const : t.status as any
+      }))
+    : defaultLiveQueue;
 
-  const handleNavSection = (section: string, path: string) => {
-    setActiveSection(section);
-    navigate(path);
+  // Doctor availability list
+  const doctorAvailabilityList = [
+    { name: 'Dr. Ravi Teja', timing: '09:00 – 13:00', active: true, used: 38, total: 60 },
+    { name: 'Dr. Anitha Rao', timing: '10:00 – 14:00', active: true, used: 21, total: 30 },
+    { name: 'Dr. Suresh Babu', timing: '16:00 – 20:00', active: false, used: 26, total: 40 },
+    { name: 'Dr. Kavya Sree', timing: '09:30 – 13:30', active: true, used: 33, total: 50 },
+  ];
+
+  // Department mix data
+  const deptMix = [
+    { name: 'General Medicine', count: 62, color: '#1E40AF' },
+    { name: 'Cardiology', count: 28, color: '#15803D' },
+    { name: 'Orthopaedics', count: 31, color: '#EA580C' },
+    { name: 'Paediatrics', count: 44, color: '#06B6D4' },
+    { name: 'Dermatology', count: 19, color: '#A855F7' },
+    { name: 'ENT', count: 22, color: '#2563EB' }
+  ];
+
+  // Department revenue data
+  const deptRevenue = [
+    { name: 'General Medicine', rev: 185, label: '185k' },
+    { name: 'Cardiology', rev: 235, label: '235k' },
+    { name: 'Orthopaedics', rev: 155, label: '155k' },
+    { name: 'Paediatrics', rev: 130, label: '130k' },
+    { name: 'Dermatology', rev: 95, label: '95k' },
+    { name: 'ENT', rev: 88, label: '88k' },
+    { name: 'Radiology', rev: 218, label: '218k' },
+    { name: 'Pharmacy', rev: 168, label: '168k' },
+  ];
+
+  // Recent activity list
+  const recentActivities = [
+    { title: 'Created token G118 for Lakshmi Prasanna', author: 'Divya Sharma', time: '2 min ago' },
+    { title: 'Completed consultation for Venkat Reddy', author: 'Dr. Anitha Rao', time: '9 min ago' },
+    { title: 'Generated GST invoice INV-20486 (₹800)', author: 'Lalitha Devi', time: '17 min ago' },
+    { title: 'Marked attendance for evening shift (46 staff)', author: 'Pallavi Reddy', time: '38 min ago' },
+    { title: 'Payroll for July 2026 generated — 218 employees', author: 'System', time: '1 hr ago' },
+  ];
+
+  const handleCreateWalkIn = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!walkInName.trim()) return;
+    const doc = doctors.find(d => d.id === walkInDoctorId) || doctors[0];
+    const newToken = generateWalkInToken({
+      patientName: walkInName.trim(),
+      patientPhone: walkInPhone.trim() || '+91 98450 12345',
+      patientGender: walkInGender,
+      patientAge: parseInt(walkInAge) || 30,
+      doctorId: doc?.id || 'doc-1',
+      departmentId: doc?.departmentId || 'dept-general',
+      session: 'morning'
+    });
+    setGeneratedSlip(newToken);
   };
 
   return (
-    <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
-      {/* ── TOP STAT CARDS ──────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCardSparkline
-          type="add"
-          title="Add New Token"
-          value=""
-          sub="Add Offline / Walk-in Token"
-          trend=""
-          color=""
-          onAddClick={() => handleNavSection('add-token', '/hospital/tokens/add')}
-        />
-        <StatCardSparkline
-          type="online"
-          title="Online Tokens"
-          value={onlineCount}
-          sub="Today's Online Bookings"
-          trend={`${onlineCount} active`}
-          color="bg-emerald-50 text-emerald-600"
-        />
-        <StatCardSparkline
-          type="offline"
-          title="Offline Tokens"
-          value={offlineCount}
-          sub="Today's Walk-in Tokens"
-          trend={`${offlineCount} active`}
-          color="bg-blue-50 text-blue-600"
-        />
-        <StatCardSparkline
-          type="total"
-          title="Total Tokens Today"
-          value={totalToday}
-          sub="Online + Offline"
-          trend={`${totalToday} registered`}
-          color="bg-purple-50 text-purple-600"
-        />
+    <div className="p-5 sm:p-7 space-y-6 max-w-[1680px] mx-auto bg-slate-50 min-h-screen">
+      
+      {/* ─── 1. TOP EXECUTIVE WELCOME HEADER (Image 29) ─────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight">
+            Good morning, {firstName}
+          </h1>
+          <p className="text-xs sm:text-sm font-semibold text-slate-400 mt-1">
+            {dateFormatted} · Morning session running · {activeDoctorsCount} doctors on duty
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3 self-start sm:self-auto">
+          <button
+            onClick={() => {
+              setGeneratedSlip(null);
+              setShowWalkInModal(true);
+            }}
+            className="bg-white hover:bg-slate-50 text-slate-700 font-bold px-4 py-2.5 rounded-xl border border-slate-200 text-xs flex items-center gap-2 shadow-xs cursor-pointer transition-all active:scale-95"
+          >
+            <UserPlus size={15} className="text-slate-600" />
+            <span>Walk-in patient</span>
+          </button>
+
+          <button
+            onClick={() => navigate('/hospital/tokens/add')}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-md shadow-blue-500/20 border-none cursor-pointer transition-all active:scale-95"
+          >
+            <Plus size={15} />
+            <span>New token</span>
+          </button>
+        </div>
       </div>
 
-      {/* ── MAIN DASHBOARD CONTENT (2 Columns) ─────────────────────────────── */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-        {/* LEFT COLUMN (8 cols): Tokens Table + Bottom Cards */}
-        <div className="xl:col-span-8 space-y-6">
-          {/* TOKENS TABLE CONTAINER */}
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-xs overflow-hidden">
-            {/* Header Tabs & Filters Bar */}
-            <div className="p-4 border-b border-slate-100 space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                {/* Tabs */}
-                <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-xl border border-slate-100">
-                  <button
-                    onClick={() => setTokenFilter('all')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer border-none ${
-                      tokenFilter === 'all' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-500 hover:text-slate-800'
-                    }`}
-                  >
-                    All Tokens ({totalToday})
-                  </button>
-                  <button
-                    onClick={() => setTokenFilter('online')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer border-none ${
-                      tokenFilter === 'online' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-500 hover:text-slate-800'
-                    }`}
-                  >
-                    Online ({onlineCount})
-                  </button>
-                  <button
-                    onClick={() => setTokenFilter('offline')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer border-none ${
-                      tokenFilter === 'offline' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-500 hover:text-slate-800'
-                    }`}
-                  >
-                    Offline ({offlineCount})
-                  </button>
+      {/* ─── REGIONAL PUBLIC HEALTH & LOCATION BANNER ────────────────────── */}
+      {regionalBanners.length > 0 && !bannerDismissed && (
+        <div className="relative overflow-hidden bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white rounded-3xl p-5 shadow-lg border border-blue-800/40 animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
+            <div className="flex items-start sm:items-center gap-3.5">
+              {regionalBanners[currentBannerIndex]?.imageUrl ? (
+                <img 
+                  src={regionalBanners[currentBannerIndex].imageUrl} 
+                  alt={regionalBanners[currentBannerIndex].title} 
+                  className="w-14 h-14 rounded-2xl object-cover border border-white/20 shrink-0 shadow-md"
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-2xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center shrink-0">
+                  <Megaphone size={22} className="text-blue-400" />
                 </div>
+              )}
 
-                {/* Dropdown Filters & Search */}
-                <div className="flex flex-wrap items-center gap-2">
-                  <select
-                    value={doctorFilter}
-                    onChange={e => setDoctorFilter(e.target.value)}
-                    className="text-xs font-bold text-slate-600 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 cursor-pointer outline-none"
-                  >
-                    <option>All Doctors</option>
-                    {doctors.map(d => <option key={d.id}>{d.name}</option>)}
-                  </select>
-
-                  <select
-                    value={sessionFilter}
-                    onChange={e => setSessionFilter(e.target.value)}
-                    className="text-xs font-bold text-slate-600 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 cursor-pointer outline-none"
-                  >
-                    <option>All Sessions</option>
-                    <option>Morning</option>
-                    <option>Afternoon</option>
-                    <option>Evening</option>
-                  </select>
-
-                  <select
-                    value={statusFilter}
-                    onChange={e => setStatusFilter(e.target.value)}
-                    className="text-xs font-bold text-slate-600 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 cursor-pointer outline-none"
-                  >
-                    <option>All Status</option>
-                    <option>Booked</option>
-                    <option>Checked-in</option>
-                    <option>Completed</option>
-                    <option>Waiting</option>
-                    <option>Cancelled</option>
-                  </select>
-
-                  <div className="relative">
-                    <Search size={13} className="absolute left-2.5 top-2.5 text-slate-400" />
-                    <input
-                      type="text"
-                      placeholder="Search Token, Patient..."
-                      value={searchTokenQuery}
-                      onChange={e => setSearchTokenQuery(e.target.value)}
-                      className="pl-7 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-700 outline-none w-44 focus:border-blue-500 transition-all"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Table */}
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[760px] text-left border-collapse">
-                <thead className="bg-slate-50 border-b border-slate-100 text-[10px] font-black text-slate-500 uppercase tracking-wider">
-                  <tr>
-                    <th className="px-4 py-3">Token No.</th>
-                    <th className="px-4 py-3">Type</th>
-                    <th className="px-4 py-3">Patient Details</th>
-                    <th className="px-4 py-3">Doctor</th>
-                    <th className="px-4 py-3">Session</th>
-                    <th className="px-4 py-3">Time</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredTokens.slice(0, 7).map(t => (
-                    <TokenRow key={t.id} token={t} onView={tok => handleNavSection('all-tokens', `/hospital/tokens/all?id=${tok.id}`)} />
-                  ))}
-                  {filteredTokens.length === 0 && (
-                    <tr>
-                      <td colSpan={8} className="text-center py-8 text-xs text-slate-400 font-semibold">
-                        No tokens matching the selected filters.
-                      </td>
-                    </tr>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap mb-1">
+                  <span className="text-[10px] font-black tracking-widest uppercase bg-blue-500/30 text-blue-300 px-2 py-0.5 rounded-full border border-blue-400/20 flex items-center gap-1">
+                    <MapPin size={10} />
+                    {regionalBanners[currentBannerIndex]?.targetLevel?.toUpperCase()} ALERT · {regionalBanners[currentBannerIndex]?.state || regionalBanners[currentBannerIndex]?.district || 'REGIONAL'}
+                  </span>
+                  {regionalBanners[currentBannerIndex]?.badge && (
+                    <span className="text-[10px] font-bold bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full border border-amber-400/20">
+                      {regionalBanners[currentBannerIndex].badge}
+                    </span>
                   )}
-                </tbody>
-              </table>
+                  {regionalBanners.length > 1 && (
+                    <span className="text-[10px] font-semibold text-slate-400">
+                      {currentBannerIndex + 1} of {regionalBanners.length}
+                    </span>
+                  )}
+                </div>
+                <h3 className="text-sm sm:text-base font-black text-white leading-snug">
+                  {regionalBanners[currentBannerIndex]?.title}
+                </h3>
+                <p className="text-xs text-slate-300 font-medium line-clamp-1 sm:line-clamp-none max-w-2xl mt-0.5">
+                  {regionalBanners[currentBannerIndex]?.description}
+                </p>
+              </div>
             </div>
 
-            {/* Pagination Footer */}
-            <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-semibold">
-              <span>Showing 1 to {Math.min(7, filteredTokens.length)} of {filteredTokens.length} entries</span>
-              <div className="flex items-center gap-1">
-                <button className="p-1 rounded-lg border border-slate-200 text-slate-400 hover:text-slate-700 cursor-pointer border-none">
-                  <ChevronLeft size={14} />
-                </button>
-                <button className="w-6 h-6 rounded-lg bg-blue-600 text-white font-bold text-xs flex items-center justify-center cursor-pointer border-none">1</button>
-                <button className="w-6 h-6 rounded-lg hover:bg-slate-100 text-slate-600 font-bold text-xs flex items-center justify-center cursor-pointer border-none">2</button>
-                <button className="w-6 h-6 rounded-lg hover:bg-slate-100 text-slate-600 font-bold text-xs flex items-center justify-center cursor-pointer border-none">3</button>
-                <span className="text-slate-400 px-1">...</span>
-                <button className="w-6 h-6 rounded-lg hover:bg-slate-100 text-slate-600 font-bold text-xs flex items-center justify-center cursor-pointer border-none">9</button>
-                <button className="p-1 rounded-lg border border-slate-200 text-slate-400 hover:text-slate-700 cursor-pointer border-none">
-                  <ChevronRight size={14} />
-                </button>
-              </div>
+            <div className="flex items-center gap-2.5 shrink-0 self-end md:self-center">
+              {regionalBanners.length > 1 && (
+                <div className="flex items-center gap-1 mr-2">
+                  <button 
+                    onClick={() => setCurrentBannerIndex((prev) => (prev - 1 + regionalBanners.length) % regionalBanners.length)}
+                    className="w-7 h-7 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all cursor-pointer border-none"
+                    title="Previous banner"
+                  >
+                    ←
+                  </button>
+                  <button 
+                    onClick={() => setCurrentBannerIndex((prev) => (prev + 1) % regionalBanners.length)}
+                    className="w-7 h-7 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all cursor-pointer border-none"
+                    title="Next banner"
+                  >
+                    →
+                  </button>
+                </div>
+              )}
+
+              {regionalBanners[currentBannerIndex]?.linkUrl && (
+                <a 
+                  href={regionalBanners[currentBannerIndex].linkUrl} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 transition-colors no-underline shadow-md shadow-blue-500/20"
+                >
+                  <span>{regionalBanners[currentBannerIndex]?.ctaText || 'Learn More'}</span>
+                  <ExternalLink size={12} />
+                </a>
+              )}
+
+              <button 
+                onClick={() => setBannerDismissed(true)} 
+                className="p-1.5 text-slate-400 hover:text-white rounded-xl hover:bg-white/10 transition-colors border-none cursor-pointer"
+                title="Dismiss announcement"
+              >
+                <X size={15} />
+              </button>
             </div>
           </div>
+        </div>
+      )}
 
-          {/* ── BOTTOM GRID (3 Cards Side-by-Side: Doctors, Auto Scheduling, Session & Schedule Overview) ── */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* 1. Doctors Management Card */}
-            <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-xs flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <h4 className="text-xs font-black text-slate-800">Doctors Management</h4>
-                    <p className="text-[10px] text-slate-400 font-semibold">Manage your hospital doctors</p>
-                  </div>
-                  <button
-                    onClick={() => handleNavSection('doctors', '/hospital/doctors')}
-                    className="bg-blue-600 text-white font-extrabold text-[10px] px-2.5 py-1 rounded-lg flex items-center gap-1 cursor-pointer border-none hover:bg-blue-700 transition-colors"
-                  >
-                    <Plus size={10} /> Add Doctor
-                  </button>
-                </div>
-
-                <div className="space-y-3">
-                  {doctors.slice(0, 3).map((doc) => (
-                    <div key={doc.id} className="flex items-center gap-2.5 p-2 rounded-xl border border-slate-50 bg-slate-50/50 hover:bg-slate-50 transition-colors">
-                      <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-black text-xs shrink-0">
-                        {doc.name.split(' ').slice(-1)[0].charAt(0)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <p className="text-xs font-black text-slate-800 truncate">{doc.name}</p>
-                          <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full ${doc.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>
-                            {doc.active ? 'Active' : 'Inactive'}
-                          </span>
-                        </div>
-                        <p className="text-[10px] font-bold text-blue-600 truncate">{doc.specialization}</p>
-                        <p className="text-[9px] text-slate-400 font-semibold">{doc.qualification} · Fee: ₹{doc.consultationFee}</p>
-                      </div>
-                      <div className="flex flex-col gap-1 shrink-0">
-                        <button className="p-1 hover:bg-blue-100 rounded-md text-slate-400 hover:text-blue-600 cursor-pointer border-none">
-                          <Edit3 size={11} />
-                        </button>
-                        <button className="p-1 hover:bg-red-100 rounded-md text-slate-400 hover:text-red-600 cursor-pointer border-none">
-                          <Trash2 size={11} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+      {/* ─── 2. TOP KPI CARDS (4-CARD GRID) (Image 29) ─────────────────────────── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+        
+        {/* Card 1: Today's patients */}
+        <div className="bg-white rounded-3xl border border-slate-100 p-5 shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow relative overflow-hidden">
+          <div>
+            <div className="flex items-center justify-between">
+              <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                <Users size={18} />
               </div>
-
-              <button
-                onClick={() => handleNavSection('doctors', '/hospital/doctors')}
-                className="mt-4 text-xs font-bold text-blue-600 hover:underline flex items-center justify-center gap-1 cursor-pointer border-none bg-transparent"
-              >
-                View All Doctors <ChevronRight size={12} />
-              </button>
+              <span className="inline-flex items-center gap-0.5 text-xs font-black text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-lg">
+                <TrendingUp size={12} /> 8.4%
+              </span>
             </div>
-
-            {/* 2. Doctor Token Screens & Live Cabins */}
-            <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-xs flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div>
-                    <h4 className="text-xs font-black text-slate-800">Doctor Token Screens</h4>
-                    <p className="text-[10px] text-slate-400 font-semibold">{doctors.filter(d => d.active).length} Active Doctor Screens</p>
-                  </div>
-                  <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">Dynamic</span>
-                </div>
-
-                <div className="space-y-2 text-xs py-1">
-                  {doctors.filter(d => d.active).slice(0, 3).map(d => {
-                    const queueCount = tokens.filter(t => t.doctorId === d.id && ['booked', 'waiting', 'checked-in'].includes(t.status)).length;
-                    return (
-                      <div
-                        key={d.id}
-                        onClick={() => handleNavSection(`doc-screen-${d.id}`, `/hospital/tokens/doctor/${d.id}`)}
-                        className="flex items-center justify-between p-2 rounded-xl bg-slate-50 hover:bg-blue-50 transition-colors cursor-pointer"
-                      >
-                        <div className="flex items-center gap-2">
-                          <Stethoscope size={13} className="text-blue-600" />
-                          <span className="font-bold text-slate-800 text-xs truncate max-w-[120px]">{d.name}</span>
-                        </div>
-                        <span className="text-[10px] font-black bg-blue-600 text-white px-2 py-0.5 rounded-full">
-                          {queueCount} in Queue
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <button
-                onClick={() => handleNavSection('revenue', '/hospital/revenue')}
-                className="mt-4 w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs py-2 rounded-xl flex items-center justify-center gap-1.5 cursor-pointer border-none transition-colors shadow-sm shadow-emerald-500/20"
-              >
-                <DollarSign size={13} /> View Revenue Overview
-              </button>
+            <div className="mt-4">
+              <h2 className="text-3xl font-black text-slate-800 tracking-tight leading-none">
+                {totalTokensCount}
+              </h2>
+              <p className="text-xs font-bold text-slate-500 mt-1.5">Today's patients</p>
+              <p className="text-[11px] font-semibold text-slate-400 mt-0.5">
+                {offlineTokensCount} offline · {onlineTokensCount} online
+              </p>
             </div>
+          </div>
+          {/* Sparkline wave */}
+          <div className="w-full h-10 mt-3 -mb-1">
+            <svg className="w-full h-full" viewBox="0 0 200 40" preserveAspectRatio="none">
+              <path
+                d="M 0 32 Q 30 28, 60 30 T 120 20 T 170 22 T 200 16 L 200 40 L 0 40 Z"
+                fill="#64748B"
+                opacity="0.3"
+              />
+              <path
+                d="M 0 32 Q 30 28, 60 30 T 120 20 T 170 22 T 200 16"
+                fill="none"
+                stroke="#64748B"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+              />
+            </svg>
+          </div>
+        </div>
 
-            {/* 3. Session & Schedule Overview Card */}
-            <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-xs flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="text-xs font-black text-slate-800">Session & Schedule Overview</h4>
-                  <button
-                    onClick={() => handleNavSection('token-manage', '/hospital/tokens/manage')}
-                    className="text-[10px] font-bold text-blue-600 hover:underline cursor-pointer border-none bg-transparent"
-                  >
-                    Configure
-                  </button>
-                </div>
-
-                <div className="space-y-2 mb-3">
-                  {scheduleConfig.sessions.map((sess) => {
-                    const sessTokens = tokens.filter(t => t.session?.toLowerCase() === sess.name.toLowerCase());
-                    const booked = sessTokens.length;
-                    const max = sess.maxTokens || 50;
-                    const pct = Math.min(100, Math.round((booked / max) * 100));
-                    return (
-                      <div key={sess.id} className="bg-slate-50 p-2 rounded-xl text-xs space-y-1">
-                        <div className="flex items-center justify-between font-extrabold text-slate-800">
-                          <span>{sess.name}</span>
-                          <span className="text-[10px] text-slate-400 font-semibold">{sess.startTime} - {sess.endTime}</span>
-                        </div>
-                        <div className="flex items-center justify-between text-[10px] font-bold text-slate-600">
-                          <span>Capacity: {max}</span>
-                          <span>Booked: {booked} ({pct}%)</span>
-                        </div>
-                        <div className="w-full bg-slate-200 rounded-full h-1.5">
-                          <div className="bg-blue-600 h-1.5 rounded-full" style={{ width: `${pct}%` }} />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* Booking Calendar Header */}
-                <div className="border-t border-slate-100 pt-2">
-                  <div className="flex items-center justify-between text-[11px] font-black text-slate-700 mb-1.5">
-                    <span>Booking Calendar</span>
-                    <span className="text-slate-400 text-[10px]">May 2024</span>
-                  </div>
-                  <div className="grid grid-cols-7 gap-1 text-center text-[9px]">
-                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
-                      <div key={d} className="font-extrabold text-slate-400">{d}</div>
-                    ))}
-                    {[19, 20, 21, 22, 23, 24, 25].map(day => (
-                      <div
-                        key={day}
-                        className={`py-1 rounded-md font-extrabold ${
-                          day === 23 ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100'
-                        }`}
-                      >
-                        {day}
-                      </div>
-                    ))}
-                  </div>
-                </div>
+        {/* Card 2: Today's revenue */}
+        <div className="bg-white rounded-3xl border border-slate-100 p-5 shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow relative overflow-hidden">
+          <div>
+            <div className="flex items-center justify-between">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-extrabold text-base">
+                ₹
               </div>
+              <span className="inline-flex items-center gap-0.5 text-xs font-black text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-lg">
+                <TrendingUp size={12} /> 12.1%
+              </span>
+            </div>
+            <div className="mt-4">
+              <h2 className="text-3xl font-black text-slate-800 tracking-tight leading-none">
+                ₹2,68,400
+              </h2>
+              <p className="text-xs font-bold text-slate-500 mt-1.5">Today's revenue</p>
+              <p className="text-[11px] font-semibold text-slate-400 mt-0.5">
+                ₹41,200 pending collection
+              </p>
+            </div>
+          </div>
+          {/* Sparkline wave */}
+          <div className="w-full h-10 mt-3 -mb-1">
+            <svg className="w-full h-full" viewBox="0 0 200 40" preserveAspectRatio="none">
+              <path
+                d="M 0 34 Q 35 30, 70 24 T 130 18 T 170 22 T 200 12 L 200 40 L 0 40 Z"
+                fill="#64748B"
+                opacity="0.3"
+              />
+              <path
+                d="M 0 34 Q 35 30, 70 24 T 130 18 T 170 22 T 200 12"
+                fill="none"
+                stroke="#64748B"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+              />
+            </svg>
+          </div>
+        </div>
+
+        {/* Card 3: Patients in queue */}
+        <div className="bg-white rounded-3xl border border-slate-100 p-5 shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow">
+          <div>
+            <div className="flex items-center justify-between">
+              <div className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                <Ticket size={18} />
+              </div>
+              <span className="inline-flex items-center gap-0.5 text-xs font-black text-rose-600 bg-rose-50 px-2.5 py-0.5 rounded-lg">
+                <TrendingDown size={12} /> 3.2%
+              </span>
+            </div>
+            <div className="mt-4">
+              <h2 className="text-3xl font-black text-slate-800 tracking-tight leading-none">
+                {inQueueCount}
+              </h2>
+              <p className="text-xs font-bold text-slate-500 mt-1.5">Patients in queue</p>
+              <p className="text-[11px] font-semibold text-slate-400 mt-0.5">
+                3 emergency · 2 VIP
+              </p>
+            </div>
+          </div>
+          <div className="h-10 mt-3" />
+        </div>
+
+        {/* Card 4: Avg. waiting time */}
+        <div className="bg-white rounded-3xl border border-slate-100 p-5 shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow">
+          <div>
+            <div className="flex items-center justify-between">
+              <div className="w-10 h-10 rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center">
+                <Clock size={18} />
+              </div>
+              <span className="inline-flex items-center gap-0.5 text-xs font-black text-rose-600 bg-rose-50 px-2.5 py-0.5 rounded-lg">
+                <TrendingDown size={12} /> 6.5%
+              </span>
+            </div>
+            <div className="mt-4">
+              <h2 className="text-3xl font-black text-slate-800 tracking-tight leading-none">
+                14 min
+              </h2>
+              <p className="text-xs font-bold text-slate-500 mt-1.5">Avg. waiting time</p>
+              <p className="text-[11px] font-semibold text-slate-400 mt-0.5">
+                Target under 15 min
+              </p>
+            </div>
+          </div>
+          <div className="h-10 mt-3" />
+        </div>
+
+      </div>
+
+      {/* ─── 3. MIDDLE ROW: REVENUE & FOOTFALL + DEPARTMENT MIX (Image 29 & 30) ──── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* Left: Revenue & Footfall Area Spline Chart (col-span-2) */}
+        <div className="lg:col-span-2 bg-white rounded-3xl border border-slate-100 p-6 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-base font-black text-slate-800">Revenue & footfall</h3>
+              <p className="text-xs text-slate-400 font-semibold mt-0.5">Last 7 days</p>
+            </div>
+            <span className="text-xs font-black text-emerald-600 bg-emerald-50 px-3 py-1 rounded-xl">
+              +12.1% vs last week
+            </span>
+          </div>
+
+          {/* SVG Spline Chart with Y Axis and Mon-Sun Labels */}
+          <div className="w-full relative pt-2">
+            <svg className="w-full h-56 overflow-visible" viewBox="0 0 650 200">
+              <defs>
+                <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#2563EB" stopOpacity="0.22" />
+                  <stop offset="100%" stopColor="#2563EB" stopOpacity="0.01" />
+                </linearGradient>
+              </defs>
+
+              {/* Horizontal Grid lines */}
+              <line x1="45" y1="20" x2="640" y2="20" stroke="#F1F5F9" strokeDasharray="4,4" strokeWidth="1" />
+              <line x1="45" y1="65" x2="640" y2="65" stroke="#F1F5F9" strokeDasharray="4,4" strokeWidth="1" />
+              <line x1="45" y1="110" x2="640" y2="110" stroke="#F1F5F9" strokeDasharray="4,4" strokeWidth="1" />
+              <line x1="45" y1="155" x2="640" y2="155" stroke="#F1F5F9" strokeDasharray="4,4" strokeWidth="1" />
+              <line x1="45" y1="190" x2="640" y2="190" stroke="#E2E8F0" strokeWidth="1" />
+
+              {/* Y Axis Labels */}
+              <text x="5" y="24" className="fill-slate-400 text-[11px] font-bold">320k</text>
+              <text x="5" y="69" className="fill-slate-400 text-[11px] font-bold">240k</text>
+              <text x="5" y="114" className="fill-slate-400 text-[11px] font-bold">160k</text>
+              <text x="12" y="159" className="fill-slate-400 text-[11px] font-bold">80k</text>
+              <text x="18" y="194" className="fill-slate-400 text-[11px] font-bold">0k</text>
+
+              {/* Gradient Area Fill */}
+              <path
+                d="M 50 115 C 110 90, 160 120, 220 95 C 280 70, 320 60, 380 50 C 440 38, 480 20, 520 25 C 560 30, 600 90, 640 140 L 640 190 L 50 190 Z"
+                fill="url(#chartGrad)"
+              />
+
+              {/* Spline Line */}
+              <path
+                d="M 50 115 C 110 90, 160 120, 220 95 C 280 70, 320 60, 380 50 C 440 38, 480 20, 520 25 C 560 30, 600 90, 640 140"
+                fill="none"
+                stroke="#2563EB"
+                strokeWidth="3.2"
+                strokeLinecap="round"
+              />
+
+              {/* Active hover node at peak */}
+              <circle cx="520" cy="25" r="5" fill="#2563EB" stroke="#FFFFFF" strokeWidth="3" />
+            </svg>
+
+            {/* X-Axis Days Labels */}
+            <div className="flex justify-between pl-12 pr-4 pt-3 text-xs font-bold text-slate-400">
+              <span>Mon</span>
+              <span>Tue</span>
+              <span>Wed</span>
+              <span>Thu</span>
+              <span>Fri</span>
+              <span>Sat</span>
+              <span>Sun</span>
             </div>
           </div>
         </div>
 
-        {/* ── RIGHT COLUMN (4 cols): Quick Widget Stack (Push Notification, Today's Schedule, Prescription Print, Token Validation Revisit) ── */}
-        <div className="xl:col-span-4 space-y-4">
-          {/* 1. Push Notification Widget */}
-          <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-xs">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="p-1.5 rounded-lg bg-blue-50 text-blue-600">
-                <Bell size={15} />
-              </div>
-              <div>
-                <h4 className="text-xs font-black text-slate-800">Push Notification</h4>
-                <p className="text-[10px] text-slate-400 font-semibold">Send notification to patients</p>
-              </div>
-            </div>
+        {/* Right: Department Mix Donut Chart (col-span-1) */}
+        <div className="bg-white rounded-3xl border border-slate-100 p-6 shadow-xs flex flex-col justify-between">
+          <div>
+            <h3 className="text-base font-black text-slate-800">Department mix</h3>
+            <p className="text-xs text-slate-400 font-semibold mt-0.5">Patients today</p>
+          </div>
 
-            <textarea
-              rows={3}
-              value={notifMsg}
-              onChange={e => setNotifMsg(e.target.value)}
-              placeholder="Type your message here..."
-              maxLength={160}
-              className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-2.5 outline-none focus:border-blue-500 transition-all resize-none text-slate-700"
-            />
-            <div className="text-[10px] text-slate-400 font-semibold text-right mt-0.5">
-              {notifMsg.length}/160
-            </div>
+          {/* SVG Donut Chart */}
+          <div className="flex items-center justify-center py-4">
+            <svg width="180" height="180" viewBox="0 0 180 180" className="rotate-[-90deg]">
+              {/* Segment 1: General Medicine (30%) */}
+              <circle cx="90" cy="90" r="65" fill="none" stroke="#1E40AF" strokeWidth="26"
+                strokeDasharray="122.5 408" strokeDashoffset="0" />
+              {/* Segment 2: Cardiology (14%) */}
+              <circle cx="90" cy="90" r="65" fill="none" stroke="#15803D" strokeWidth="26"
+                strokeDasharray="57.1 408" strokeDashoffset="-125" />
+              {/* Segment 3: Orthopaedics (15%) */}
+              <circle cx="90" cy="90" r="65" fill="none" stroke="#EA580C" strokeWidth="26"
+                strokeDasharray="61.2 408" strokeDashoffset="-184" />
+              {/* Segment 4: Paediatrics (21%) */}
+              <circle cx="90" cy="90" r="65" fill="none" stroke="#06B6D4" strokeWidth="26"
+                strokeDasharray="85.7 408" strokeDashoffset="-247" />
+              {/* Segment 5: Dermatology (9%) */}
+              <circle cx="90" cy="90" r="65" fill="none" stroke="#A855F7" strokeWidth="26"
+                strokeDasharray="36.7 408" strokeDashoffset="-335" />
+              {/* Segment 6: ENT (11%) */}
+              <circle cx="90" cy="90" r="65" fill="none" stroke="#2563EB" strokeWidth="26"
+                strokeDasharray="44.9 408" strokeDashoffset="-374" />
+            </svg>
+          </div>
 
-            <div className="mt-2 space-y-1">
-              <p className="text-[10px] font-black text-slate-600 uppercase">Send To</p>
-              <div className="flex items-center gap-4 text-xs font-bold text-slate-700">
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="sendTo"
-                    checked={notifTarget === 'all'}
-                    onChange={() => setNotifTarget('all')}
-                    className="accent-blue-600"
-                  />
-                  <span>All Patients</span>
-                </label>
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="sendTo"
-                    checked={notifTarget === 'custom'}
-                    onChange={() => setNotifTarget('custom')}
-                    className="accent-blue-600"
-                  />
-                  <span>Custom Numbers</span>
-                </label>
+          {/* Legend Table (matching image 30) */}
+          <div className="space-y-2 text-xs font-semibold text-slate-600 border-t border-slate-50 pt-3">
+            {deptMix.map(item => (
+              <div key={item.name} className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                  <span>{item.name}</span>
+                </div>
+                <span className="font-extrabold text-slate-800">{item.count}</span>
               </div>
-            </div>
+            ))}
+          </div>
+        </div>
 
-            {notifSuccess && (
-              <p className="text-[10px] font-bold text-emerald-600 mt-2 bg-emerald-50 p-1.5 rounded-lg text-center">
-                ✓ Notification sent successfully!
+      </div>
+
+      {/* ─── 4. LOWER-MIDDLE ROW: LIVE QUEUE + DOCTOR AVAILABILITY (Images 30 & 31) ─ */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* Left: Live Queue Table (col-span-2) */}
+        <div className="lg:col-span-2 bg-white rounded-3xl border border-slate-100 p-6 shadow-xs">
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-black text-slate-800">Live queue</h3>
+                <span className={`w-2 h-2 rounded-full bg-emerald-500 ${livePulse ? 'scale-150 transition-transform' : ''}`} />
+              </div>
+              <p className="text-xs text-slate-400 font-semibold mt-0.5">
+                Auto-refreshing every 5 seconds
               </p>
-            )}
-
+            </div>
+            
             <button
-              onClick={handleSendPushNotif}
-              className="mt-3 w-full bg-blue-600 hover:bg-blue-700 text-white font-black text-xs py-2.5 rounded-xl flex items-center justify-center gap-1.5 cursor-pointer border-none shadow-xs transition-colors"
+              onClick={() => navigate('/hospital/tokens')}
+              className="text-xs font-extrabold text-blue-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer bg-transparent border-none"
             >
-              <Send size={13} /> Send Notification
+              Open reception desk <ArrowRight size={13} />
             </button>
           </div>
 
-          {/* 2. Today's Schedule Widget */}
-          <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-xs">
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="text-xs font-black text-slate-800">Today's Schedule</h4>
-              <button
-                onClick={() => handleNavSection('sessions', '/hospital/schedule')}
-                className="text-[10px] font-bold text-blue-600 hover:underline cursor-pointer border-none bg-transparent"
-              >
-                View All
-              </button>
-            </div>
-
-            <div className="space-y-2">
-              {[
-                { name: 'Dr. Rahul Verma', spec: 'Cardiologist', time: '09:00 AM - 01:00 PM', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-                { name: 'Dr. Anjali Sharma', spec: 'Pediatrician', time: '01:00 PM - 05:00 PM', color: 'bg-blue-50 text-blue-700 border-blue-200' },
-                { name: 'Dr. Vivek Singh', spec: 'Orthopedic', time: '05:00 PM - 09:00 PM', color: 'bg-purple-50 text-purple-700 border-purple-200' },
-              ].map((sch) => (
-                <div key={sch.name} className="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 bg-slate-50/60">
-                  <div>
-                    <p className="text-xs font-black text-slate-800 leading-none">{sch.name}</p>
-                    <p className="text-[10px] text-slate-400 font-semibold mt-0.5">{sch.spec}</p>
+          {/* Live Queue Items List */}
+          <div className="divide-y divide-slate-100">
+            {displayQueue.map(item => (
+              <div key={item.id} className="py-3.5 flex items-center justify-between gap-3 hover:bg-slate-50/50 px-2 rounded-2xl transition-colors">
+                <div className="flex items-center gap-3.5 min-w-0">
+                  {/* Token Badge */}
+                  <div className="w-12 h-9 rounded-xl bg-blue-50 text-blue-700 font-black text-xs flex items-center justify-center shrink-0 border border-blue-100">
+                    {item.id}
                   </div>
-                  <span className={`text-[10px] font-black px-2 py-1 rounded-lg border ${sch.color}`}>
-                    {sch.time}
+                  <div className="min-w-0">
+                    <h4 className="font-extrabold text-xs sm:text-sm text-slate-800 truncate">
+                      {item.patientName}
+                    </h4>
+                    <p className="text-[11px] font-semibold text-slate-400 truncate mt-0.5">
+                      {item.dept} · {item.doctor}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4 shrink-0">
+                  {/* Wait Time */}
+                  <div className="hidden sm:flex items-center gap-1 text-xs font-semibold text-slate-500">
+                    <Clock size={13} className="text-slate-400" />
+                    <span>{item.waitTime}</span>
+                  </div>
+
+                  {/* Status Pill */}
+                  {item.status === 'in-consult' && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black bg-blue-50 text-blue-600 border border-blue-100">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse" /> In Consult
+                    </span>
+                  )}
+                  {item.status === 'waiting' && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black bg-amber-50 text-amber-600 border border-amber-100">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500" /> Waiting
+                    </span>
+                  )}
+                  {item.status === 'skipped' && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black bg-rose-50 text-rose-600 border border-rose-100">
+                      <span className="w-1.5 h-1.5 rounded-full bg-rose-500" /> Skipped
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Right: Doctor availability & Token capacity used (col-span-1) */}
+        <div className="bg-white rounded-3xl border border-slate-100 p-6 shadow-xs flex flex-col justify-between space-y-6">
+          
+          {/* Part A: Doctor availability */}
+          <div>
+            <h3 className="text-base font-black text-slate-800 mb-4">Doctor availability</h3>
+            <div className="space-y-3.5">
+              {doctorAvailabilityList.map(doc => (
+                <div key={doc.name} className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-2xl bg-slate-50 text-slate-400 border border-slate-100 flex items-center justify-center shrink-0">
+                      <Stethoscope size={16} />
+                    </div>
+                    <div>
+                      <h4 className="font-extrabold text-xs text-slate-800">{doc.name}</h4>
+                      <p className="text-[11px] font-semibold text-slate-400">{doc.timing}</p>
+                    </div>
+                  </div>
+
+                  <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full flex items-center gap-1 ${
+                    doc.active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
+                  }`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${doc.active ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                    {doc.active ? 'Active' : 'Inactive'}
                   </span>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* 3. Prescription Print Widget */}
-          <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-xs">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="p-1.5 rounded-lg bg-blue-50 text-blue-600">
-                <Printer size={15} />
-              </div>
-              <h4 className="text-xs font-black text-slate-800">Prescription Print</h4>
+          {/* Part B: Token capacity used (matching image 31) */}
+          <div className="border-t border-slate-100 pt-5">
+            <h3 className="text-xs font-black text-slate-700 uppercase tracking-wider mb-3">
+              Token capacity used
+            </h3>
+            <div className="space-y-3">
+              {doctorAvailabilityList.map(doc => {
+                const percent = Math.round((doc.used / doc.total) * 100);
+                return (
+                  <div key={doc.name} className="space-y-1">
+                    <div className="flex justify-between text-xs font-bold">
+                      <span className="text-slate-700">{doc.name}</span>
+                      <span className="text-slate-400 font-semibold">{doc.used}/{doc.total}</span>
+                    </div>
+                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                      <div
+                        className="bg-blue-600 h-full rounded-full transition-all duration-500"
+                        style={{ width: `${percent}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-
-            <div className="flex gap-2">
-              <input
-                type="number"
-                placeholder="Enter Token Number"
-                value={prescriptionTokenNo}
-                onChange={e => setPrescriptionTokenNo(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleFetchPrescription()}
-                className="flex-1 px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500"
-              />
-              <button
-                onClick={handleFetchPrescription}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs px-4 py-2 rounded-xl cursor-pointer border-none transition-colors"
-              >
-                Fetch
-              </button>
-            </div>
-
-            {prescriptionError && (
-              <p className="text-[10px] font-bold text-red-500 mt-2">{prescriptionError}</p>
-            )}
-
-            {prescriptionResult && (
-              <div className="mt-3 p-2.5 bg-blue-50/50 rounded-xl border border-blue-100 text-xs space-y-1">
-                <div className="flex items-center justify-between font-black text-slate-800">
-                  <span>{prescriptionResult.patientName}</span>
-                  <span className="text-blue-600">Token #{prescriptionResult.tokenNo}</span>
-                </div>
-                <p className="text-[10px] text-slate-500">{prescriptionResult.doctorName} · {prescriptionResult.departmentName}</p>
-              </div>
-            )}
-
-            <button
-              onClick={() => {
-                if (prescriptionResult) {
-                  setShowPrintModal(true);
-                } else if (prescriptionTokenNo) {
-                  handleFetchPrescription();
-                  setShowPrintModal(true);
-                } else {
-                  setPrescriptionError('Please enter token number first.');
-                }
-              }}
-              className="mt-3 w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs py-2.5 rounded-xl flex items-center justify-center gap-1.5 cursor-pointer border-none shadow-xs transition-colors"
-            >
-              <Printer size={13} /> Print Prescription
-            </button>
           </div>
 
-          {/* 4. Token Validation (Revisit) Widget */}
-          <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-xs">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="p-1.5 rounded-lg bg-blue-50 text-blue-600">
-                <ShieldCheck size={15} />
-              </div>
-              <h4 className="text-xs font-black text-slate-800">Token Validation (Revisit)</h4>
+        </div>
+
+      </div>
+
+      {/* ─── 5. BOTTOM ROW: DEPARTMENT REVENUE + RECENT ACTIVITY (Image 31) ──────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* Left: Department Revenue Bar Chart (col-span-2) */}
+        <div className="lg:col-span-2 bg-white rounded-3xl border border-slate-100 p-6 shadow-xs flex flex-col justify-between">
+          <div className="mb-4">
+            <h3 className="text-base font-black text-slate-800">Department revenue</h3>
+          </div>
+
+          {/* Vertical Bar Chart matching reference image 31 */}
+          <div className="w-full relative pt-2">
+            <svg className="w-full h-56 overflow-visible" viewBox="0 0 650 200">
+              {/* Horizontal Grid lines */}
+              <line x1="45" y1="20" x2="640" y2="20" stroke="#F1F5F9" strokeDasharray="4,4" strokeWidth="1" />
+              <line x1="45" y1="65" x2="640" y2="65" stroke="#F1F5F9" strokeDasharray="4,4" strokeWidth="1" />
+              <line x1="45" y1="110" x2="640" y2="110" stroke="#F1F5F9" strokeDasharray="4,4" strokeWidth="1" />
+              <line x1="45" y1="155" x2="640" y2="155" stroke="#F1F5F9" strokeDasharray="4,4" strokeWidth="1" />
+              <line x1="45" y1="190" x2="640" y2="190" stroke="#E2E8F0" strokeWidth="1" />
+
+              {/* Y Axis Labels */}
+              <text x="5" y="24" className="fill-slate-400 text-[11px] font-bold">240k</text>
+              <text x="5" y="69" className="fill-slate-400 text-[11px] font-bold">180k</text>
+              <text x="5" y="114" className="fill-slate-400 text-[11px] font-bold">120k</text>
+              <text x="12" y="159" className="fill-slate-400 text-[11px] font-bold">60k</text>
+              <text x="18" y="194" className="fill-slate-400 text-[11px] font-bold">0k</text>
+
+              {/* 8 Columns Bars */}
+              {deptRevenue.map((item, idx) => {
+                const barWidth = 32;
+                const colSpacing = 72;
+                const x = 70 + idx * colSpacing;
+                const maxVal = 250;
+                const barHeight = (item.rev / maxVal) * 165;
+                const y = 190 - barHeight;
+
+                return (
+                  <g key={item.name} className="group cursor-pointer">
+                    <rect
+                      x={x}
+                      y={y}
+                      width={barWidth}
+                      height={barHeight}
+                      rx="6"
+                      fill="#2563EB"
+                      className="transition-all group-hover:fill-blue-700"
+                    />
+                  </g>
+                );
+              })}
+            </svg>
+
+            {/* X Axis Department Labels (slanted for readability) */}
+            <div className="flex justify-between pl-10 pr-2 pt-2 text-[10.5px] font-bold text-slate-500 overflow-x-auto">
+              {deptRevenue.map(item => (
+                <span key={item.name} className="truncate w-16 text-center -rotate-12 transform origin-top-left">
+                  {item.name}
+                </span>
+              ))}
             </div>
 
-            <div className="flex gap-2">
-              <input
-                type="number"
-                placeholder="Enter Token Number"
-                value={revisitTokenNo}
-                onChange={e => setRevisitTokenNo(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleValidateRevisit()}
-                className="flex-1 px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500"
-              />
-              <button
-                onClick={handleValidateRevisit}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs px-4 py-2 rounded-xl cursor-pointer border-none transition-colors"
-              >
-                Validate
-              </button>
-            </div>
-
-            {revisitError && (
-              <p className="text-[10px] font-bold text-red-500 mt-2">{revisitError}</p>
-            )}
-
-            <div className="mt-3 space-y-2 text-xs">
-              <div className="flex items-center justify-between py-1 border-b border-slate-50 text-slate-500 font-semibold">
-                <span>Free Revisit Validity</span>
-                <span className="font-extrabold text-slate-800">3 Days</span>
-              </div>
-              <div className="flex items-center justify-between py-1 border-b border-slate-50 text-slate-500 font-semibold">
-                <span>Token No.</span>
-                <span className="font-extrabold text-slate-800">{revisitResult ? revisitResult.tokenNo : '101'}</span>
-              </div>
-              <div className="flex items-center justify-between py-1 border-b border-slate-50 text-slate-500 font-semibold">
-                <span>Valid Upto</span>
-                <span className="font-extrabold text-slate-800">{revisitResult?.revisitValidUpto || '26 May 2024'}</span>
-              </div>
-            </div>
-
-            <div className="mt-3 flex items-center justify-center gap-1.5 bg-emerald-50 border border-emerald-200 p-2 rounded-xl text-emerald-700 font-black text-xs">
-              <CheckCircle size={14} className="text-emerald-600" />
-              <span>Token is Valid for Revisit</span>
+            {/* Legend (matching image 31) */}
+            <div className="flex items-center justify-center gap-2 mt-8 text-xs font-bold text-slate-600">
+              <span className="w-3 h-3 rounded-xs bg-blue-600 inline-block" />
+              <span>Revenue</span>
             </div>
           </div>
         </div>
+
+        {/* Right: Recent Activity Audit Feed (col-span-1) */}
+        <div className="bg-white rounded-3xl border border-slate-100 p-6 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-base font-black text-slate-800">Recent activity</h3>
+            <Bell size={16} className="text-slate-400" />
+          </div>
+
+          <div className="divide-y divide-slate-50 space-y-3.5">
+            {recentActivities.map((act, idx) => (
+              <div key={idx} className="pt-3 first:pt-0">
+                <h4 className="font-extrabold text-xs text-slate-800 leading-snug">
+                  {act.title}
+                </h4>
+                <p className="text-[11px] font-semibold text-slate-400 mt-0.5">
+                  {act.author} · {act.time}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+
       </div>
 
-      {/* ── PRINT PRESCRIPTION MODAL MOCK ── */}
-      {showPrintModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-              <div>
-                <h3 className="font-black text-slate-800 text-lg">Prescription Print Preview</h3>
-                <p className="text-xs text-slate-400 font-semibold">InstaToken Hospital OPD Receipt</p>
+      {/* ─── 6. WALK-IN TOKEN MODAL ────────────────────────────────────────────── */}
+      {showWalkInModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 w-full max-w-md p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-blue-50 text-blue-600">
+                  <UserPlus size={18} />
+                </div>
+                <h3 className="font-black text-slate-800 text-base">New Walk-in Patient</h3>
               </div>
               <button
-                onClick={() => setShowPrintModal(false)}
-                className="text-slate-400 hover:text-slate-700 font-black text-lg p-1 cursor-pointer border-none bg-transparent"
+                onClick={() => setShowWalkInModal(false)}
+                className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 cursor-pointer border-none"
               >
-                ✕
+                <X size={18} />
               </button>
             </div>
 
-            <div className="border border-slate-200 rounded-2xl p-4 bg-slate-50/50 space-y-3 text-xs mb-4">
-              <div className="flex justify-between border-b border-slate-200 pb-2">
+            {!generatedSlip ? (
+              <form onSubmit={handleCreateWalkIn} className="space-y-3">
                 <div>
-                  <h4 className="font-black text-blue-600 text-sm">Apollo Spectra Hospital</h4>
-                  <p className="text-[10px] text-slate-500">Koramangala, Bengaluru · Ph: +91 80 4668 8888</p>
+                  <label className="text-xs font-bold text-slate-600 block mb-1">Patient Full Name</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Ramesh Varma"
+                    value={walkInName}
+                    onChange={e => setWalkInName(e.target.value)}
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500"
+                  />
                 </div>
-                <div className="text-right">
-                  <span className="text-xl font-black text-slate-800">Token #{prescriptionResult?.tokenNo || '101'}</span>
-                  <p className="text-[9px] text-emerald-600 font-bold">Checked-In</p>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-bold text-slate-600 block mb-1">Mobile Number</label>
+                    <input
+                      type="tel"
+                      placeholder="+91 98450 00000"
+                      value={walkInPhone}
+                      onChange={e => setWalkInPhone(e.target.value)}
+                      className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-600 block mb-1">Age & Gender</label>
+                    <div className="flex gap-1.5">
+                      <input
+                        type="number"
+                        placeholder="Age"
+                        value={walkInAge}
+                        onChange={e => setWalkInAge(e.target.value)}
+                        className="w-16 px-2.5 py-2.5 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500"
+                      />
+                      <select
+                        value={walkInGender}
+                        onChange={e => setWalkInGender(e.target.value as any)}
+                        className="flex-1 px-2 py-2.5 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500 bg-white"
+                      >
+                        <option value="Male">M</option>
+                        <option value="Female">F</option>
+                        <option value="Other">O</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-600 block mb-1">Assign Doctor & OPD</label>
+                  <select
+                    value={walkInDoctorId}
+                    onChange={e => setWalkInDoctorId(e.target.value)}
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500 bg-white"
+                  >
+                    {doctors.map(d => (
+                      <option key={d.id} value={d.id}>
+                        {d.name} ({d.specialization || d.departmentName}) — ₹{d.consultationFee}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="pt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowWalkInModal(false)}
+                    className="flex-1 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 cursor-pointer hover:bg-slate-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold cursor-pointer border-none shadow-md shadow-blue-500/20"
+                  >
+                    Generate Token
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="space-y-4 text-center py-2">
+                <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
+                  <CheckCircle2 size={26} />
+                </div>
+                <div>
+                  <h4 className="text-lg font-black text-slate-800">Token Generated Successfully!</h4>
+                  <p className="text-xs text-slate-400 mt-0.5">Please hand this receipt to the patient</p>
+                </div>
+
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-left space-y-2 text-xs">
+                  <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+                    <span className="font-bold text-slate-500">Token Number</span>
+                    <span className="text-2xl font-black text-blue-600">#{generatedSlip.tokenNo}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-semibold text-slate-400">Patient:</span>
+                    <span className="font-bold text-slate-700">{generatedSlip.patientName}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-semibold text-slate-400">Doctor:</span>
+                    <span className="font-bold text-slate-700">{generatedSlip.doctorName}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-semibold text-slate-400">Department:</span>
+                    <span className="font-bold text-slate-700">{generatedSlip.departmentName}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-semibold text-slate-400">Consultation Fee:</span>
+                    <span className="font-extrabold text-slate-800">₹{generatedSlip.consultationFee} (Cash Paid)</span>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => window.print()}
+                    className="flex-1 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 flex items-center justify-center gap-1.5 cursor-pointer hover:bg-slate-50"
+                  >
+                    <Printer size={14} /> Print Slip
+                  </button>
+                  <button
+                    onClick={() => {
+                      setGeneratedSlip(null);
+                      setShowWalkInModal(false);
+                      setWalkInName('');
+                      setWalkInPhone('');
+                    }}
+                    className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold border-none cursor-pointer"
+                  >
+                    Done
+                  </button>
                 </div>
               </div>
-
-              <div className="grid grid-cols-2 gap-2 text-slate-600 font-semibold">
-                <div>Patient: <span className="font-extrabold text-slate-800">{prescriptionResult?.patientName || 'Rahul Kumar'}</span></div>
-                <div>Age/Gender: <span className="font-extrabold text-slate-800">{prescriptionResult?.patientAge || 28}Y / {prescriptionResult?.patientGender || 'M'}</span></div>
-                <div>Doctor: <span className="font-extrabold text-slate-800">{prescriptionResult?.doctorName || 'Dr. Rahul Verma'}</span></div>
-                <div>Dept: <span className="font-extrabold text-slate-800">{prescriptionResult?.departmentName || 'Cardiology'}</span></div>
-                <div>Date: <span className="font-extrabold text-slate-800">{new Date().toLocaleDateString('en-IN')}</span></div>
-                <div>Time Slot: <span className="font-extrabold text-slate-800">{prescriptionResult?.time || '09:15 AM'}</span></div>
-              </div>
-
-              <div className="border-t border-dashed border-slate-300 pt-2 text-[11px]">
-                <p className="font-black text-slate-700 mb-1">Rx / Doctor Notes & Prescription:</p>
-                <div className="bg-white p-3 rounded-xl border border-slate-200 text-slate-500 font-mono text-[10px] space-y-1">
-                  <p>1. Tab. Paracetamol 500mg — 1-0-1 (3 Days)</p>
-                  <p>2. Tab. Pantoprazole 40mg — 1-0-0 (5 Days before food)</p>
-                  <p>3. Syr. Multivitamin — 1 tsp twice daily</p>
-                  <p className="text-slate-400 mt-2 italic">Follow up after 3 days with token validation revisit code.</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                onClick={() => setShowPrintModal(false)}
-                className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-xs py-2.5 rounded-xl cursor-pointer border-none"
-              >
-                Close
-              </button>
-              <button
-                onClick={() => {
-                  window.print();
-                  setShowPrintModal(false);
-                }}
-                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs py-2.5 rounded-xl flex items-center justify-center gap-1.5 cursor-pointer border-none shadow-xs"
-              >
-                <Printer size={14} /> Send to Printer
-              </button>
-            </div>
+            )}
           </div>
         </div>
       )}
+
     </div>
   );
 };

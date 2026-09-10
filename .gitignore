@@ -35,4 +35,5 @@ image copy*.png
 *.pem
 server/scripts/ec2-deploy.sh
 server/scripts/test-aws.js
+server/data/
 

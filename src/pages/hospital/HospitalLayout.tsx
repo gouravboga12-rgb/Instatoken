@@ -20,13 +20,13 @@ import {
   LayoutDashboard, Plus, List, Wifi, WifiOff, Calendar, RefreshCw,
   Users, Stethoscope, Building2,
   Printer, ShieldCheck, MessageSquare, BarChart2, Download, Settings,
-  UserCog, ChevronLeft, ChevronRight, Bell, Search, LogOut, Menu, X, Activity,
-  Layers, CreditCard, DollarSign, Sliders
+  ChevronLeft, ChevronRight, Bell, Search, LogOut, Menu, X, Activity,
+  CreditCard, DollarSign, Sliders
 } from 'lucide-react';
 
 // ─── RBAC permission map ──────────────────────────────────────────────────────
 const ROLE_SECTIONS: Record<string, string[]> = {
-  owner:        ['dashboard','doctor-screens','token-manage','tokens','add-token','all-tokens','online-tokens','offline-tokens','today-tokens','upcoming-tokens','completed-tokens','cancelled-tokens','revisit-tokens','revenue','doctors','departments','sessions','staff','patients','token-validation','prescription','communication','billing','reports','settings','users','general'],
+  owner:        ['dashboard','doctor-screens','token-manage','tokens','add-token','all-tokens','online-tokens','offline-tokens','today-tokens','upcoming-tokens','completed-tokens','cancelled-tokens','revisit-tokens','revenue','doctors','departments','sessions','staff','patients','token-validation','prescription','communication','billing','reports','settings'],
   admin:        ['dashboard','doctor-screens','token-manage','tokens','add-token','all-tokens','online-tokens','offline-tokens','today-tokens','upcoming-tokens','completed-tokens','cancelled-tokens','revisit-tokens','revenue','doctors','departments','sessions','staff','patients','token-validation','reports'],
   receptionist: ['dashboard','doctor-screens','token-manage','add-token','all-tokens','today-tokens','staff','patients','token-validation','prescription'],
   doctor:       ['dashboard','doctor-screens','today-tokens','patients'],
@@ -95,8 +95,6 @@ const buildNav = (doctors: HospitalDoctor[], tokens: TokenRecord[]): { section: 
     ]},
     { section: 'Settings', items: [
       { id: 'settings', label: 'Hospital Settings', icon: <Settings size={15} />, path: '/hospital/settings' },
-      { id: 'users', label: 'Users & Roles', icon: <UserCog size={15} />, path: '/hospital/settings?tab=users' },
-      { id: 'general', label: 'General Settings', icon: <Layers size={15} />, path: '/hospital/settings?tab=general' },
     ]},
   ];
 };
@@ -179,7 +177,7 @@ const Sidebar: React.FC<{ collapsed: boolean; onToggle: () => void }> = ({ colla
 
 // ─── Top Header ───────────────────────────────────────────────────────────────
 const TopHeader: React.FC<{ onMenuToggle: () => void }> = ({ onMenuToggle }) => {
-  const { hospitalUser, hospitalLogout, tokens, hospitalProfile, availableHospitals, switchHospital } = useHospital();
+  const { hospitalUser, hospitalLogout, tokens, hospitalProfile } = useHospital();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const todayStr = new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
@@ -213,22 +211,9 @@ const TopHeader: React.FC<{ onMenuToggle: () => void }> = ({ onMenuToggle }) => 
           Welcome, {hospitalUser?.name?.split(' ')[0]} 👋
         </p>
         <div className="flex items-center gap-2 mt-0.5">
-          {availableHospitals && availableHospitals.length > 1 ? (
-            <select
-              value={hospitalProfile?.id || ''}
-              onChange={(e) => switchHospital(e.target.value)}
-              className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-2 py-0.5 outline-none cursor-pointer hover:bg-blue-100 transition-colors max-w-[190px] truncate"
-              title="Switch Hospital Branch"
-            >
-              {availableHospitals.map(h => (
-                <option key={h.id} value={h.id}>
-                  {h.name}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <p className="text-[10px] text-slate-400 font-semibold truncate">{hospitalUser?.hospitalName}</p>
-          )}
+          <p className="text-[11px] font-extrabold text-slate-700 truncate max-w-[240px]">
+            {hospitalProfile?.name || hospitalUser?.hospitalName || 'Apollo Spectra Hospital'}
+          </p>
           <span className="text-slate-200">·</span>
           <span className={`text-[9px] font-black px-2 py-0.5 rounded-full capitalize ${roleColor}`}>
             {hospitalUser?.role}

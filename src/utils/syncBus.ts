@@ -87,16 +87,10 @@ export const broadcastGlobalSync = (type: string, data?: any) => {
     }
   }
 
-  // 3. Automatically push changes to AWS EC2 Backend
+  // 3. Automatically push tokens/appointments changes to AWS EC2 Backend
   if (typeof window !== 'undefined') {
-    const savedHospitals = localStorage.getItem('insta_hospitals');
-    const savedHDocs = localStorage.getItem('insta_hospital_doctors');
-    const savedHProfile = localStorage.getItem('insta_hospital_profile');
-    const savedHDepts = localStorage.getItem('insta_hospital_departments');
     const savedHToks = localStorage.getItem('insta_hospital_tokens');
     const savedAppts = localStorage.getItem('insta_appointments');
-
-    const targetHospId = savedHProfile ? (JSON.parse(savedHProfile).id || 'hosp-apollo') : 'hosp-apollo';
 
     const isDummyToken = (t: any) =>
       !t ||
@@ -107,10 +101,6 @@ export const broadcastGlobalSync = (type: string, data?: any) => {
     const cleanAppts = savedAppts ? (JSON.parse(savedAppts) as any[]).filter(t => !isDummyToken(t)) : [];
 
     pushCloudSync({
-      hospitals: savedHospitals ? JSON.parse(savedHospitals) : undefined,
-      hospitalDoctors: savedHDocs ? { [targetHospId]: JSON.parse(savedHDocs) } : undefined,
-      hospitalProfiles: savedHProfile ? { [targetHospId]: JSON.parse(savedHProfile) } : undefined,
-      hospitalDepartments: savedHDepts ? { [targetHospId]: JSON.parse(savedHDepts) } : undefined,
       tokens: cleanTokens,
       appointments: cleanAppts,
     }).catch(() => {});

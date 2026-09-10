@@ -17,7 +17,7 @@ const COMMON_FACILITIES = [
 ];
 
 export const HospitalSettings: React.FC = () => {
-  const { hospitalProfile, updateHospitalProfile, switchHospital, availableHospitals } = useHospital();
+  const { hospitalProfile, updateHospitalProfile } = useHospital();
   const [activeTab, setActiveTab] = useState<'basic' | 'contact' | 'location' | 'about'>('basic');
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isGeocoding, setIsGeocoding] = useState(false);
@@ -40,13 +40,13 @@ export const HospitalSettings: React.FC = () => {
     website: hospitalProfile?.website || 'https://www.apollospectra.com',
     emergencyNumber: hospitalProfile?.emergencyNumber || '1066 / +91 80 4668 8899',
     country: hospitalProfile?.country || 'India',
-    state: hospitalProfile?.state || 'Karnataka',
-    city: hospitalProfile?.city || 'Bengaluru',
-    area: hospitalProfile?.area || 'Koramangala 5th Block',
-    address: hospitalProfile?.address || '143, 1st Cross Rd, 5th Block, Koramangala, Bengaluru, Karnataka 560034',
-    pinCode: hospitalProfile?.pinCode || '560034',
-    lat: String(hospitalProfile?.lat ?? 12.9348),
-    lng: String(hospitalProfile?.lng ?? 77.6189),
+    state: hospitalProfile?.state || 'Telangana',
+    city: hospitalProfile?.city || 'Hyderabad',
+    area: hospitalProfile?.area || 'Kothapet Pratap Nagar',
+    address: hospitalProfile?.address || '15-57/2, RAMkrishna Raju Residency, Pratap Nagar, Kothapet, Hyderabad, Telangana 500060, India',
+    pinCode: hospitalProfile?.pinCode || '500060',
+    lat: String(hospitalProfile?.lat ?? 17.37336200634615),
+    lng: String(hospitalProfile?.lng ?? 78.53855589118986),
     about: hospitalProfile?.about || 'Apollo Spectra Hospital is a state-of-the-art multi-speciality hospital offering world-class healthcare, advanced surgical care, and OPD consultations.',
     mission: hospitalProfile?.mission || 'To provide high quality patient-centric clinical excellence with zero waiting time.',
     vision: hospitalProfile?.vision || 'To be the most trusted healthcare institution in the region.',
@@ -60,43 +60,46 @@ export const HospitalSettings: React.FC = () => {
     ]
   });
 
-  // Only initialize form on initial mount or when hospital is explicitly switched
-  const loadedHospitalIdRef = React.useRef<string | null>(null);
+  // Synchronize form with loaded hospital profile
+  const loadedKeyRef = React.useRef<string>('');
 
   React.useEffect(() => {
-    if (hospitalProfile && hospitalProfile.id !== loadedHospitalIdRef.current) {
-      loadedHospitalIdRef.current = hospitalProfile.id || 'hosp-apollo';
-      setForm({
-        name: hospitalProfile.name || '',
-        logo: hospitalProfile.logo || '',
-        coverImage: hospitalProfile.coverImage || '',
-        registrationNumber: hospitalProfile.registrationNumber || '',
-        accreditation: hospitalProfile.accreditation || '',
-        gstNumber: hospitalProfile.gstNumber || '',
-        licenseNumber: hospitalProfile.licenseNumber || '',
-        type: hospitalProfile.type || 'Multi Speciality Hospital',
-        ownershipType: hospitalProfile.ownershipType || 'Private Corporate',
-        phone: hospitalProfile.phone || '',
-        whatsapp: hospitalProfile.whatsapp || '',
-        email: hospitalProfile.email || '',
-        website: hospitalProfile.website || '',
-        emergencyNumber: hospitalProfile.emergencyNumber || '',
-        country: hospitalProfile.country || 'India',
-        state: hospitalProfile.state || '',
-        city: hospitalProfile.city || '',
-        area: hospitalProfile.area || '',
-        address: hospitalProfile.address || '',
-        pinCode: hospitalProfile.pinCode || '',
-        lat: String(hospitalProfile.lat ?? 12.9348),
-        lng: String(hospitalProfile.lng ?? 77.6189),
-        about: hospitalProfile.about || '',
-        mission: hospitalProfile.mission || '',
-        vision: hospitalProfile.vision || '',
-        brandColor: hospitalProfile.brandColor || '#2563EB',
-        facilities: hospitalProfile.facilities || []
-      });
+    if (hospitalProfile) {
+      const syncKey = `${hospitalProfile.id}_${hospitalProfile.address}_${hospitalProfile.lat}_${hospitalProfile.lng}`;
+      if (syncKey !== loadedKeyRef.current) {
+        loadedKeyRef.current = syncKey;
+        setForm({
+          name: hospitalProfile.name || '',
+          logo: hospitalProfile.logo || '',
+          coverImage: hospitalProfile.coverImage || '',
+          registrationNumber: hospitalProfile.registrationNumber || '',
+          accreditation: hospitalProfile.accreditation || '',
+          gstNumber: hospitalProfile.gstNumber || '',
+          licenseNumber: hospitalProfile.licenseNumber || '',
+          type: hospitalProfile.type || 'Multi Speciality Hospital',
+          ownershipType: hospitalProfile.ownershipType || 'Private Corporate',
+          phone: hospitalProfile.phone || '',
+          whatsapp: hospitalProfile.whatsapp || '',
+          email: hospitalProfile.email || '',
+          website: hospitalProfile.website || '',
+          emergencyNumber: hospitalProfile.emergencyNumber || '',
+          country: hospitalProfile.country || 'India',
+          state: hospitalProfile.state || '',
+          city: hospitalProfile.city || '',
+          area: hospitalProfile.area || '',
+          address: hospitalProfile.address || '',
+          pinCode: hospitalProfile.pinCode || '',
+          lat: String(hospitalProfile.lat ?? 17.37336200634615),
+          lng: String(hospitalProfile.lng ?? 78.53855589118986),
+          about: hospitalProfile.about || '',
+          mission: hospitalProfile.mission || '',
+          vision: hospitalProfile.vision || '',
+          brandColor: hospitalProfile.brandColor || '#2563EB',
+          facilities: hospitalProfile.facilities || []
+        });
+      }
     }
-  }, [hospitalProfile?.id]);
+  }, [hospitalProfile]);
 
   const handleFacilityToggle = (fac: string) => {
     setForm(prev => {
@@ -279,23 +282,11 @@ export const HospitalSettings: React.FC = () => {
           </div>
         </div>
 
-        {/* Hospital Switcher Selector */}
-        {availableHospitals && availableHospitals.length > 0 && (
-          <div className="flex items-center gap-2.5 bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-2xl">
-            <span className="text-xs font-bold text-slate-500 whitespace-nowrap">Active Hospital:</span>
-            <select
-              value={hospitalProfile?.id || ''}
-              onChange={(e) => switchHospital && switchHospital(e.target.value)}
-              className="bg-white border border-slate-200 text-slate-800 text-xs font-black rounded-xl px-3 py-1.5 outline-none cursor-pointer focus:border-blue-500 shadow-xs"
-            >
-              {availableHospitals.map(h => (
-                <option key={h.id} value={h.id}>
-                  {h.name} {h.category ? `• ${h.category}` : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
+        {/* Active Hospital Badge */}
+        <div className="flex items-center gap-2.5 bg-blue-50/80 border border-blue-100 px-4 py-2.5 rounded-2xl">
+          <span className="text-xs font-bold text-slate-500 whitespace-nowrap">Active Hospital:</span>
+          <span className="text-xs font-black text-blue-700">{hospitalProfile?.name || 'Apollo Spectra Hospital'}</span>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
