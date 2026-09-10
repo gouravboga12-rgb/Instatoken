@@ -1,7 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useHospital } from '../../context/HospitalContext';
 import { geocodeLocation, reverseGeocodeAddressDetails } from '../../utils/googleMaps';
-import { Building2, Save, Check, MapPin, Info, Layers, Compass, ExternalLink, Sparkles, Loader2 } from 'lucide-react';
+import {
+  Building2, Save, Check, MapPin, Layers, Compass,
+  ExternalLink, Sparkles, Loader2, Upload, ImageIcon, Phone,
+  AlertCircle
+} from 'lucide-react';
 
 const COMMON_FACILITIES = [
   '24x7 Emergency & Trauma',
@@ -13,16 +17,21 @@ const COMMON_FACILITIES = [
   'Cafeteria / Canteen',
   'Blood Bank',
   'Operation Theatres',
-  'Cashless TPA Insurance Desk'
+  'Cashless TPA Insurance Desk',
+  'NICU / Paediatric ICU',
+  'Physiotherapy & Rehabilitation',
 ];
 
 export const HospitalSettings: React.FC = () => {
-  const { hospitalProfile, updateHospitalProfile } = useHospital();
+  const { hospitalProfile, updateHospitalProfile, authToken } = useHospital();
   const [activeTab, setActiveTab] = useState<'basic' | 'contact' | 'location' | 'about'>('basic');
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const [geocodeNotice, setGeocodeNotice] = useState<string | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
     name: hospitalProfile?.name || 'Apollo Spectra Hospital',
@@ -62,7 +71,6 @@ export const HospitalSettings: React.FC = () => {
 
   // Synchronize form with loaded hospital profile
   const loadedKeyRef = React.useRef<string>('');
-
   React.useEffect(() => {
     if (hospitalProfile) {
       const syncKey = `${hospitalProfile.id}_${hospitalProfile.address}_${hospitalProfile.lat}_${hospitalProfile.lng}`;
@@ -109,6 +117,35 @@ export const HospitalSettings: React.FC = () => {
     });
   };
 
+  // Upload photo to S3 via backend, fallback to base64
+  const handlePhotoUpload = async (file: File, field: 'coverImage' | 'logo') => {
+    if (!file) return;
+    setUploadingPhoto(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('folder', 'hospital-photos');
+      const res = await fetch('/api/media/upload', { method: 'POST', body: formData });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.url) {
+          setForm(prev => ({ ...prev, [field]: data.url }));
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn('S3 upload failed, using base64 fallback:', e);
+    }
+    // Base64 fallback
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const b64 = ev.target?.result as string;
+      setForm(prev => ({ ...prev, [field]: b64 }));
+    };
+    reader.readAsDataURL(file);
+    setUploadingPhoto(false);
+  };
+
   const handleAutoGeocode = async () => {
     if (!form.address.trim()) {
       setGeocodeNotice('Please enter the hospital address first.');
@@ -130,12 +167,7 @@ export const HospitalSettings: React.FC = () => {
           country: geo.country || form.country
         };
         setForm(updatedForm);
-        updateHospitalProfile({
-          ...updatedForm,
-          id: hospitalProfile?.id,
-          lat: geo.lat,
-          lng: geo.lng
-        });
+        updateHospitalProfile({ ...updatedForm, id: hospitalProfile?.id, lat: geo.lat, lng: geo.lng });
         setGeocodeNotice(`✓ Coordinates found: Lat ${geo.lat.toFixed(4)}, Lng ${geo.lng.toFixed(4)}`);
       } else {
         setGeocodeNotice('Could not find exact coordinates. Using default city center.');
@@ -155,17 +187,15 @@ export const HospitalSettings: React.FC = () => {
     const onLocationResolved = async (latitude: number, longitude: number, accuracy: number) => {
       const isIpCentroid = accuracy > 4000;
       setGeocodeNotice(
-        isIpCentroid 
-          ? `📍 Network location acquired (±${Math.round(accuracy / 1000)}km). Geocoding address...` 
+        isIpCentroid
+          ? `📍 Network location acquired (±${Math.round(accuracy / 1000)}km). Geocoding address...`
           : `✓ Live GPS acquired (±${accuracy}m). Geocoding address...`
       );
 
       try {
         const details = await reverseGeocodeAddressDetails(latitude, longitude);
         const updated = {
-          ...form,
-          lat: String(latitude),
-          lng: String(longitude),
+          ...form, lat: String(latitude), lng: String(longitude),
           address: details.address || form.address,
           city: details.city || form.city,
           state: details.state || form.state,
@@ -173,35 +203,17 @@ export const HospitalSettings: React.FC = () => {
           pinCode: details.pinCode || form.pinCode,
           country: details.country || form.country || 'India'
         };
-
         setForm(updated);
-        updateHospitalProfile({
-          ...updated,
-          id: hospitalProfile?.id,
-          lat: latitude,
-          lng: longitude
-        });
-
+        updateHospitalProfile({ ...updated, id: hospitalProfile?.id, lat: latitude, lng: longitude });
         const summary = [details.area, details.city, details.state, details.pinCode].filter(Boolean).join(', ');
-        if (isIpCentroid) {
-          setGeocodeNotice(`📍 Detected Network Location: ${summary || 'Address filled'}. (Accuracy: ±${Math.round(accuracy / 1000)}km. If not accurate, enter address and click Auto-Geocode).`);
-        } else {
-          setGeocodeNotice(`✓ High-accuracy GPS updated: ${summary || 'Coordinates saved'}`);
-        }
+        setGeocodeNotice(isIpCentroid
+          ? `📍 Detected: ${summary || 'Address filled'} (Accuracy: ±${Math.round(accuracy / 1000)}km)`
+          : `✓ GPS updated: ${summary || 'Coordinates saved'}`);
       } catch (err) {
-        const updated = {
-          ...form,
-          lat: String(latitude),
-          lng: String(longitude)
-        };
+        const updated = { ...form, lat: String(latitude), lng: String(longitude) };
         setForm(updated);
-        updateHospitalProfile({
-          ...updated,
-          id: hospitalProfile?.id,
-          lat: latitude,
-          lng: longitude
-        });
-        setGeocodeNotice(`GPS coordinates detected: Lat ${latitude.toFixed(4)}, Lng ${longitude.toFixed(4)}`);
+        updateHospitalProfile({ ...updated, id: hospitalProfile?.id, lat: latitude, lng: longitude });
+        setGeocodeNotice(`GPS: Lat ${latitude.toFixed(4)}, Lng ${longitude.toFixed(4)}`);
       } finally {
         setIsLocating(false);
         setTimeout(() => setGeocodeNotice(null), 6000);
@@ -209,25 +221,19 @@ export const HospitalSettings: React.FC = () => {
     };
 
     if (!navigator.geolocation) {
-      setGeocodeNotice('⚠️ Your browser does not support Geolocation. Please type your address and click Auto-Geocode.');
+      setGeocodeNotice('⚠️ Browser does not support Geolocation. Enter address and click Auto-Geocode.');
       setIsLocating(false);
       setTimeout(() => setGeocodeNotice(null), 5000);
       return;
     }
 
-    // Query live high-accuracy GPS with zero cache (maximumAge: 0)
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const accuracy = Math.round(pos.coords.accuracy || 0);
-        console.log(`Live GPS acquired with accuracy ±${accuracy}m: Lat ${pos.coords.latitude}, Lng ${pos.coords.longitude}`);
-        onLocationResolved(pos.coords.latitude, pos.coords.longitude, accuracy);
-      },
+      (pos) => onLocationResolved(pos.coords.latitude, pos.coords.longitude, Math.round(pos.coords.accuracy || 0)),
       (err) => {
-        console.warn('High-accuracy GPS attempt failed:', err);
-        if (err.code === 1) { // PERMISSION_DENIED
-          setGeocodeNotice('⚠️ Location permission is blocked in your browser. Click the lock/tune icon in the URL bar to allow location.');
+        if (err.code === 1) {
+          setGeocodeNotice('⚠️ Location permission blocked. Click the lock icon in the URL bar to allow location.');
         } else {
-          setGeocodeNotice('⚠️ Could not acquire GPS fix on this device. Please type your hospital address above and click Auto-Geocode.');
+          setGeocodeNotice('⚠️ Could not get GPS fix. Enter address above and click Auto-Geocode.');
         }
         setIsLocating(false);
         setTimeout(() => setGeocodeNotice(null), 6000);
@@ -244,45 +250,52 @@ export const HospitalSettings: React.FC = () => {
     }
     const lat = parseFloat(form.lat) || 12.9348;
     const lng = parseFloat(form.lng) || 77.6189;
-    const updated = {
-      ...form,
-      id: hospitalProfile?.id,
-      lat,
-      lng
-    };
+    const updated = { ...form, id: hospitalProfile?.id, lat, lng };
+    // updateHospitalProfile calls updateHospital in AppContext → propagates globally
     updateHospitalProfile(updated);
 
-    // Explicit direct post to backend endpoint for instantaneous global persistence
-    fetch(`/api/hospitals/${hospitalProfile?.id || 'hosp-apollo'}/profile`, {
+    // Explicit direct post to backend with auth for instantaneous global persistence
+    const targetHId = hospitalProfile?.id || 'hosp-apollo';
+    fetch(`/api/hospitals/${targetHId}/profile`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
       body: JSON.stringify({ profile: updated })
     }).catch(err => console.warn('Failed to post profile:', err));
 
+    fetch('/api/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        hospitalProfiles: { [targetHId]: updated }
+      })
+    }).catch(() => {});
+
     setSaveSuccess(true);
-    setGeocodeNotice('✓ Hospital address & coordinates saved and published globally to all patients!');
-    setTimeout(() => {
-      setSaveSuccess(false);
-      setGeocodeNotice(null);
-    }, 4000);
+    setGeocodeNotice('✓ Hospital profile saved and published globally to all patients!');
+    setTimeout(() => { setSaveSuccess(false); setGeocodeNotice(null); }, 4000);
   };
+
+  const inputCls = 'w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all';
+  const labelCls = 'text-xs font-extrabold text-slate-700 block mb-1.5';
 
   return (
     <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
+      {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-xs">
         <div className="flex items-center gap-3">
           <div className="p-3 bg-blue-600 text-white rounded-2xl shadow-sm shadow-blue-500/20">
             <Building2 size={22} />
           </div>
           <div>
-            <h2 className="text-xl font-black text-slate-800">Hospital Profile & Geocoding</h2>
+            <h2 className="text-xl font-black text-slate-800">Hospital Settings</h2>
             <p className="text-xs text-slate-400 font-semibold mt-0.5">
-              Manage hospital identity, photos, emergency lines, GPS coordinates, and real-time customer navigation.
+              Update profile, contacts, GPS & amenities — changes reflect globally on patient side.
             </p>
           </div>
         </div>
-
-        {/* Active Hospital Badge */}
         <div className="flex items-center gap-2.5 bg-blue-50/80 border border-blue-100 px-4 py-2.5 rounded-2xl">
           <span className="text-xs font-bold text-slate-500 whitespace-nowrap">Active Hospital:</span>
           <span className="text-xs font-black text-blue-700">{hospitalProfile?.name || 'Apollo Spectra Hospital'}</span>
@@ -290,11 +303,12 @@ export const HospitalSettings: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+        {/* Sidebar Tabs */}
         <div className="space-y-2">
           {[
-            { id: 'basic', label: 'Basic Profile & Logo', desc: 'Name, registration, branding', icon: <Building2 size={16} /> },
-            { id: 'contact', label: 'Emergency & Contacts', desc: 'WhatsApp, emergency helpline', icon: <Info size={16} /> },
-            { id: 'location', label: 'GPS Location & Maps', desc: 'Geocoding, coordinates, directions', icon: <MapPin size={16} /> },
+            { id: 'basic', label: 'Basic Profile & Photo', desc: 'Name, photo, registration', icon: <Building2 size={16} /> },
+            { id: 'contact', label: 'Contacts & Emergency', desc: 'Phone, WhatsApp, helpline', icon: <Phone size={16} /> },
+            { id: 'location', label: 'GPS Location & Maps', desc: 'Address, geocoding, coordinates', icon: <MapPin size={16} /> },
             { id: 'about', label: 'About & Amenities', desc: 'Facilities, mission, description', icon: <Layers size={16} /> }
           ].map(t => (
             <button
@@ -315,85 +329,218 @@ export const HospitalSettings: React.FC = () => {
           ))}
         </div>
 
+        {/* Main Content */}
         <div className="xl:col-span-3">
           <form onSubmit={handleSubmit} className="bg-white border border-slate-100 rounded-3xl p-6 sm:p-8 shadow-xs space-y-6">
-            
+
+            {/* ─── BASIC PROFILE & PHOTO ─── */}
             {activeTab === 'basic' && (
-              <div className="space-y-4">
-                <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider mb-2">Hospital Identity & Branding</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-6">
+                <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Hospital Identity & Main Photo</h3>
+
+                {/* Main Hospital Photo Upload */}
+                <div>
+                  <label className={labelCls}>Hospital Main Photo <span className="text-blue-600">(shown on patient search & booking pages)</span></label>
+                  <div className="flex gap-4 items-start">
+                    {/* Preview */}
+                    <div className="w-32 h-24 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center shrink-0 relative">
+                      {form.coverImage ? (
+                        <img src={form.coverImage} alt="Hospital" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="flex flex-col items-center gap-1 text-slate-400">
+                          <ImageIcon size={24} />
+                          <span className="text-[10px] font-bold">No Photo</span>
+                        </div>
+                      )}
+                      {uploadingPhoto && (
+                        <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
+                          <Loader2 size={20} className="animate-spin text-blue-600" />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex-1 space-y-2">
+                      <input
+                        type="file"
+                        ref={photoInputRef}
+                        accept="image/*"
+                        className="hidden"
+                        onChange={e => {
+                          const file = e.target.files?.[0];
+                          if (file) handlePhotoUpload(file, 'coverImage');
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => photoInputRef.current?.click()}
+                        disabled={uploadingPhoto}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold rounded-xl cursor-pointer border-none shadow-xs shadow-blue-500/20 transition-colors disabled:opacity-50"
+                      >
+                        <Upload size={13} />
+                        {uploadingPhoto ? 'Uploading...' : 'Upload Hospital Photo'}
+                      </button>
+                      <p className="text-[10px] text-slate-400 font-semibold">Recommended: 1200×600px, JPG/PNG/WEBP, max 5MB</p>
+                      <div>
+                        <label className="text-[10px] font-extrabold text-slate-500 block mb-1">Or paste image URL:</label>
+                        <input
+                          type="text"
+                          value={form.coverImage}
+                          onChange={e => setForm({ ...form, coverImage: e.target.value })}
+                          className={inputCls}
+                          placeholder="https://example.com/hospital-photo.jpg"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Hospital Logo Upload */}
+                <div>
+                  <label className={labelCls}>Hospital Logo</label>
+                  <div className="flex gap-4 items-start">
+                    <div className="w-16 h-16 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center shrink-0">
+                      {form.logo ? (
+                        <img src={form.logo} alt="Logo" className="w-full h-full object-cover" />
+                      ) : (
+                        <Building2 size={20} className="text-slate-300" />
+                      )}
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <input
+                        type="file"
+                        ref={logoInputRef}
+                        accept="image/*"
+                        className="hidden"
+                        onChange={e => {
+                          const file = e.target.files?.[0];
+                          if (file) handlePhotoUpload(file, 'logo');
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => logoInputRef.current?.click()}
+                        className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl cursor-pointer border-none transition-colors"
+                      >
+                        <Upload size={12} /> Upload Logo
+                      </button>
+                      <input
+                        type="text"
+                        value={form.logo}
+                        onChange={e => setForm({ ...form, logo: e.target.value })}
+                        className={inputCls}
+                        placeholder="Logo URL"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
                   <div className="md:col-span-2">
-                    <label className="text-xs font-extrabold text-slate-700 block mb-1.5">Hospital Name</label>
-                    <input type="text" value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500" />
+                    <label className={labelCls}>Hospital Name *</label>
+                    <input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className={inputCls} required />
                   </div>
                   <div>
-                    <label className="text-xs font-extrabold text-slate-700 block mb-1.5">Hospital Category / Type</label>
-                    <input type="text" value={form.type} onChange={e => setForm({...form, type: e.target.value})} className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-blue-500" placeholder="e.g. Multi Speciality Hospital" />
+                    <label className={labelCls}>Hospital Category / Type</label>
+                    <input type="text" value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} className={inputCls} placeholder="e.g. Multi Speciality Hospital" />
                   </div>
                   <div>
-                    <label className="text-xs font-extrabold text-slate-700 block mb-1.5">Accreditation (NABH / JCI)</label>
-                    <input type="text" value={form.accreditation} onChange={e => setForm({...form, accreditation: e.target.value})} className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-blue-500" />
-                  </div>
-                  <div>
-                    <label className="text-xs font-extrabold text-slate-700 block mb-1.5">Registration Number</label>
-                    <input type="text" value={form.registrationNumber} onChange={e => setForm({...form, registrationNumber: e.target.value})} className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-blue-500" />
-                  </div>
-                  <div>
-                    <label className="text-xs font-extrabold text-slate-700 block mb-1.5">GST Number</label>
-                    <input type="text" value={form.gstNumber} onChange={e => setForm({...form, gstNumber: e.target.value})} className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-blue-500" />
+                    <label className={labelCls}>Accreditation (NABH / JCI)</label>
+                    <input type="text" value={form.accreditation} onChange={e => setForm({ ...form, accreditation: e.target.value })} className={inputCls} />
                   </div>
                   <div className="md:col-span-2">
-                    <label className="text-xs font-extrabold text-slate-700 block mb-1.5">Hospital Cover Photo / Banner URL</label>
-                    <input type="text" value={form.coverImage} onChange={e => setForm({...form, coverImage: e.target.value})} className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-blue-500" />
+                    <label className={labelCls}>Hospital Full Address <span className="text-slate-400 font-semibold">(displayed on patient portal)</span></label>
+                    <input
+                      type="text"
+                      value={form.address}
+                      onChange={e => setForm({ ...form, address: e.target.value })}
+                      className={inputCls}
+                      placeholder="Street address, building name, locality"
+                    />
+                  </div>
+                  <div>
+                    <label className={labelCls}>City / District</label>
+                    <input
+                      type="text"
+                      value={form.city}
+                      onChange={e => setForm({ ...form, city: e.target.value })}
+                      className={inputCls}
+                      placeholder="e.g. Hyderabad, Karimnagar"
+                    />
+                  </div>
+                  <div>
+                    <label className={labelCls}>State</label>
+                    <input
+                      type="text"
+                      value={form.state}
+                      onChange={e => setForm({ ...form, state: e.target.value })}
+                      className={inputCls}
+                      placeholder="e.g. Telangana"
+                    />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Registration Number</label>
+                    <input type="text" value={form.registrationNumber} onChange={e => setForm({ ...form, registrationNumber: e.target.value })} className={inputCls} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>GST Number</label>
+                    <input type="text" value={form.gstNumber} onChange={e => setForm({ ...form, gstNumber: e.target.value })} className={inputCls} />
                   </div>
                 </div>
               </div>
             )}
 
+            {/* ─── CONTACTS & EMERGENCY ─── */}
             {activeTab === 'contact' && (
-              <div className="space-y-4">
-                <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider mb-2">Hospital Contacts & Emergency Lines</h3>
+              <div className="space-y-5">
+                <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Hospital Contacts & Emergency Lines</h3>
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-2">
+                  <AlertCircle size={14} className="text-amber-600 mt-0.5 shrink-0" />
+                  <p className="text-xs text-amber-800 font-semibold">These contact numbers are displayed on patient-facing hospital pages and booking confirmation pages.</p>
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="text-xs font-extrabold text-slate-700 block mb-1.5">Main Reception Phone</label>
-                    <input type="text" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-blue-500" />
+                    <label className={labelCls}>Main Reception Phone</label>
+                    <input type="text" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} className={inputCls} placeholder="+91 80 4668 8888" />
                   </div>
                   <div>
-                    <label className="text-xs font-extrabold text-slate-700 block mb-1.5">WhatsApp OPD Assistance Number</label>
-                    <input type="text" value={form.whatsapp} onChange={e => setForm({...form, whatsapp: e.target.value})} className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-blue-500" />
+                    <label className={labelCls}>WhatsApp OPD Number</label>
+                    <input type="text" value={form.whatsapp} onChange={e => setForm({ ...form, whatsapp: e.target.value })} className={inputCls} placeholder="+91 98450 12345" />
                   </div>
                   <div>
-                    <label className="text-xs font-extrabold text-slate-700 block mb-1.5">Official Email Address</label>
-                    <input type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-blue-500" />
+                    <label className={labelCls}>Official Email Address</label>
+                    <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className={inputCls} />
                   </div>
                   <div>
-                    <label className="text-xs font-extrabold text-slate-700 block mb-1.5">Official Website</label>
-                    <input type="text" value={form.website} onChange={e => setForm({...form, website: e.target.value})} className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-blue-500" />
+                    <label className={labelCls}>Official Website</label>
+                    <input type="text" value={form.website} onChange={e => setForm({ ...form, website: e.target.value })} className={inputCls} placeholder="https://www.hospital.com" />
                   </div>
                   <div className="md:col-span-2">
-                    <label className="text-xs font-extrabold text-red-700 block mb-1.5">24/7 Emergency Helpline Number</label>
-                    <input type="text" value={form.emergencyNumber} onChange={e => setForm({...form, emergencyNumber: e.target.value})} className="w-full px-3.5 py-2.5 border border-red-200 bg-red-50/20 rounded-xl text-xs font-black text-red-800 outline-none focus:border-red-500" />
+                    <label className="text-xs font-extrabold text-red-700 block mb-1.5">
+                      🚨 24/7 Emergency Helpline Number <span className="text-red-400 font-semibold">(shown prominently on patient pages)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={form.emergencyNumber}
+                      onChange={e => setForm({ ...form, emergencyNumber: e.target.value })}
+                      className="w-full px-3.5 py-3 border-2 border-red-300 bg-red-50/30 rounded-xl text-sm font-black text-red-800 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 transition-all"
+                      placeholder="e.g. 1066 / +91 80 4668 8899"
+                    />
                   </div>
                 </div>
               </div>
             )}
 
+            {/* ─── GPS LOCATION & ADDRESS ─── */}
             {activeTab === 'location' && (
               <div className="space-y-5">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Hospital Physical Address & GPS Coordinates</h3>
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                  <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Hospital Address & GPS Coordinates</h3>
                   <div className="flex items-center gap-2">
                     <button type="button" onClick={handleAutoGeocode} disabled={isGeocoding} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-extrabold cursor-pointer border-none shadow-xs flex items-center gap-1.5 transition-colors disabled:opacity-50">
                       <Sparkles size={13} />
                       <span>{isGeocoding ? 'Geocoding...' : 'Auto-Geocode'}</span>
                     </button>
-                    <button
-                      type="button"
-                      onClick={handleUseDeviceLocation}
-                      disabled={isLocating}
-                      className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold cursor-pointer border border-slate-200 flex items-center gap-1.5 transition-colors disabled:opacity-50"
-                      title="Fetch live GPS coordinates and auto-fill address, city, state, area, and pin code"
-                    >
+                    <button type="button" onClick={handleUseDeviceLocation} disabled={isLocating} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold cursor-pointer border border-slate-200 flex items-center gap-1.5 transition-colors disabled:opacity-50" title="Fetch live GPS and auto-fill address">
                       {isLocating ? <Loader2 size={13} className="animate-spin text-blue-600" /> : <Compass size={13} />}
                       <span>{isLocating ? 'Detecting...' : 'Use Device GPS'}</span>
                     </button>
@@ -409,34 +556,34 @@ export const HospitalSettings: React.FC = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="md:col-span-2">
-                    <label className="text-xs font-extrabold text-slate-700 block mb-1.5">Full Physical Address</label>
-                    <input type="text" value={form.address} onChange={e => setForm({...form, address: e.target.value})} className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500" />
+                    <label className={labelCls}>Full Physical Address</label>
+                    <input type="text" value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} className={inputCls} placeholder="Door No., Street, Area, City, State, PIN" />
                   </div>
                   <div>
-                    <label className="text-xs font-extrabold text-slate-700 block mb-1.5">City</label>
-                    <input type="text" value={form.city} onChange={e => setForm({...form, city: e.target.value})} className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-blue-500" />
+                    <label className={labelCls}>City</label>
+                    <input type="text" value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} className={inputCls} />
                   </div>
                   <div>
-                    <label className="text-xs font-extrabold text-slate-700 block mb-1.5">State</label>
-                    <input type="text" value={form.state} onChange={e => setForm({...form, state: e.target.value})} className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-blue-500" />
+                    <label className={labelCls}>State</label>
+                    <input type="text" value={form.state} onChange={e => setForm({ ...form, state: e.target.value })} className={inputCls} />
                   </div>
                   <div>
-                    <label className="text-xs font-extrabold text-slate-700 block mb-1.5">Area / Landmark</label>
-                    <input type="text" value={form.area} onChange={e => setForm({...form, area: e.target.value})} className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-blue-500" />
+                    <label className={labelCls}>Area / Landmark</label>
+                    <input type="text" value={form.area} onChange={e => setForm({ ...form, area: e.target.value })} className={inputCls} />
                   </div>
                   <div>
-                    <label className="text-xs font-extrabold text-slate-700 block mb-1.5">PIN Code</label>
-                    <input type="text" value={form.pinCode} onChange={e => setForm({...form, pinCode: e.target.value})} className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-blue-500" />
+                    <label className={labelCls}>PIN Code</label>
+                    <input type="text" value={form.pinCode} onChange={e => setForm({ ...form, pinCode: e.target.value })} className={inputCls} />
                   </div>
                   <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3 md:col-span-2">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
                         <MapPin size={14} className="text-blue-600" />
-                        <span>Live GPS Navigation Coordinates</span>
+                        <span>GPS Coordinates (for directions & map on patient side)</span>
                       </span>
                       {form.lat && form.lng && (
                         <a href={`https://www.google.com/maps?q=${form.lat},${form.lng}`} target="_blank" rel="noopener noreferrer" className="text-xs font-extrabold text-blue-600 hover:underline flex items-center gap-1">
-                          <span>Test on Google Maps</span>
+                          <span>Test on Maps</span>
                           <ExternalLink size={12} />
                         </a>
                       )}
@@ -444,11 +591,11 @@ export const HospitalSettings: React.FC = () => {
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="text-[11px] font-extrabold text-slate-600 block mb-1">Latitude</label>
-                        <input type="text" value={form.lat} onChange={e => setForm({...form, lat: e.target.value})} className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500" />
+                        <input type="text" value={form.lat} onChange={e => setForm({ ...form, lat: e.target.value })} className={inputCls} />
                       </div>
                       <div>
                         <label className="text-[11px] font-extrabold text-slate-600 block mb-1">Longitude</label>
-                        <input type="text" value={form.lng} onChange={e => setForm({...form, lng: e.target.value})} className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500" />
+                        <input type="text" value={form.lng} onChange={e => setForm({ ...form, lng: e.target.value })} className={inputCls} />
                       </div>
                     </div>
                   </div>
@@ -456,16 +603,36 @@ export const HospitalSettings: React.FC = () => {
               </div>
             )}
 
+            {/* ─── ABOUT & AMENITIES ─── */}
             {activeTab === 'about' && (
               <div className="space-y-5">
-                <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider mb-2">Hospital Amenities & Profile Narrative</h3>
-                <div>
-                  <label className="text-xs font-extrabold text-slate-700 block mb-1.5">About Hospital Description</label>
-                  <textarea value={form.about} onChange={e => setForm({...form, about: e.target.value})} rows={3} className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-blue-500 resize-none" />
+                <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Hospital Amenities & Profile Narrative</h3>
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-start gap-2">
+                  <Check size={14} className="text-emerald-600 mt-0.5 shrink-0" />
+                  <p className="text-xs text-emerald-800 font-semibold">These details are shown on the hospital's patient-facing page and search results. Save to update globally.</p>
                 </div>
                 <div>
-                  <label className="text-xs font-extrabold text-slate-700 block mb-2">Hospital Amenities & Clinical Facilities</label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <label className={labelCls}>About Hospital <span className="text-slate-400 font-semibold">(shown in search results & hospital page)</span></label>
+                  <textarea
+                    value={form.about}
+                    onChange={e => setForm({ ...form, about: e.target.value })}
+                    rows={4}
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 resize-none transition-all"
+                    placeholder="Describe the hospital, specialties, and unique services..."
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Mission Statement</label>
+                  <textarea
+                    value={form.mission}
+                    onChange={e => setForm({ ...form, mission: e.target.value })}
+                    rows={2}
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 resize-none transition-all"
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Hospital Amenities & Clinical Facilities <span className="text-slate-400 font-semibold">(shown on patient-facing page)</span></label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-2">
                     {COMMON_FACILITIES.map(fac => {
                       const isChecked = form.facilities.includes(fac);
                       return (
@@ -480,18 +647,21 @@ export const HospitalSettings: React.FC = () => {
               </div>
             )}
 
+            {/* Save Button */}
             <div className="flex items-center gap-3 pt-4 border-t border-slate-100">
-              <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold px-6 py-3 rounded-xl cursor-pointer border-none flex items-center gap-2 text-xs shadow-md shadow-blue-500/20">
+              <button
+                type="submit"
+                className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold px-6 py-3 rounded-xl cursor-pointer border-none flex items-center gap-2 text-xs shadow-md shadow-blue-500/20 transition-colors"
+              >
                 <Save size={14} />
-                Save Hospital Profile Settings
+                Save & Publish Globally
               </button>
               {saveSuccess && (
-                <span className="text-xs font-bold text-emerald-600 flex items-center gap-1">
-                  <Check size={16} /> Profile Saved!
+                <span className="text-xs font-bold text-emerald-600 flex items-center gap-1 bg-emerald-50 px-3 py-2 rounded-xl border border-emerald-200">
+                  <Check size={16} /> Profile saved & published to all patients!
                 </span>
               )}
             </div>
-
           </form>
         </div>
       </div>

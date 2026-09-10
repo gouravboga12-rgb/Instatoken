@@ -51,6 +51,8 @@ export interface Hospital {
   doctors: Doctor[];
   timings: string;
   contact: string;
+  emergencyContact?: string;
+  whatsapp?: string;
   lat: number;
   lng: number;
   status?: 'active' | 'disabled';

@@ -979,6 +979,113 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setActiveSection('dashboard');
   };
 
+  // Helper to sync doctors changes to AppContext (website patient side) and AWS backend
+  const syncDoctorsGlobally = (updatedDocs: HospitalDoctor[]) => {
+    localStorage.setItem('insta_hospital_doctors', JSON.stringify(updatedDocs));
+    localStorage.setItem(`insta_hospital_doctors_${targetHospId}`, JSON.stringify(updatedDocs));
+
+    const patientDocs: Doctor[] = updatedDocs.filter(d => d.active !== false).map(d => ({
+      id: d.id,
+      name: d.name,
+      specialty: d.specialization || d.departmentName || 'Specialist',
+      departmentId: d.departmentId || 'dept-general',
+      qualification: d.qualification || 'MBBS, MD',
+      experience: Number(d.experience) || 5,
+      consultationFee: Number(d.consultationFee) || 500,
+      rating: Number(d.rating) || 5.0,
+      reviewsCount: Number(d.totalPatients) || 100,
+      image: d.photo || '',
+      availability: {
+        days: (d.opdDays && d.opdDays.length > 0) ? d.opdDays : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+        slots: (d.sessions && d.sessions.length > 0)
+          ? d.sessions.filter(s => s.active !== false).map(s => `${s.startTime} - ${s.endTime}`)
+          : ['09:00 AM - 01:00 PM', '05:00 PM - 09:00 PM']
+      },
+      currentQueue: 0,
+      nextAvailableToken: 1,
+      estimatedWaitPerPatient: Number(d.consultationDuration) || 15,
+      sessions: (d.sessions || []).map(s => ({
+        id: s.id,
+        name: s.name,
+        startTime: s.startTime,
+        endTime: s.endTime,
+        maxTokens: s.maxTokens,
+        consultationDuration: s.consultationDuration,
+        breakTime: s.breakTime,
+        active: s.active !== false
+      }))
+    }));
+
+    // Update AppContext hospital directly so website user side reflects immediately!
+    if (updateHospitalDoctors) {
+      updateHospitalDoctors(targetHospId, patientDocs);
+    }
+
+    // Post to backend doctors endpoint
+    fetch(`/api/hospitals/${targetHospId}/doctors`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify({ doctors: updatedDocs })
+    }).catch(e => console.warn('Failed to sync doctors to server:', e));
+
+    // Also sync to global sync endpoint
+    fetch('/api/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        hospitalDoctors: { [targetHospId]: updatedDocs }
+      })
+    }).catch(() => {});
+
+    broadcastGlobalSync('HOSPITAL_DOCTORS_UPDATED', {
+      hospitalId: targetHospId,
+      doctors: patientDocs,
+      rawDoctors: updatedDocs
+    });
+  };
+
+  // Helper to sync departments changes to AppContext and AWS backend
+  const syncDepartmentsGlobally = (updatedDepts: HospitalDepartment[]) => {
+    localStorage.setItem('insta_hospital_departments', JSON.stringify(updatedDepts));
+    localStorage.setItem(`insta_hospital_departments_${targetHospId}`, JSON.stringify(updatedDepts));
+
+    const patientDepts = updatedDepts.filter(d => d.active !== false).map(d => ({
+      id: d.id,
+      name: d.name,
+      icon: d.icon || '🩺'
+    }));
+
+    if (updateHospitalDepartments) {
+      updateHospitalDepartments(targetHospId, patientDepts);
+    }
+
+    fetch(`/api/hospitals/${targetHospId}/departments`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify({ departments: updatedDepts })
+    }).catch(e => console.warn('Failed to sync departments to server:', e));
+
+    fetch('/api/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        hospitalDepartments: { [targetHospId]: updatedDepts }
+      })
+    }).catch(() => {});
+
+    broadcastGlobalSync('HOSPITAL_DEPARTMENTS_UPDATED', {
+      hospitalId: targetHospId,
+      departments: patientDepts,
+      rawDepartments: updatedDepts
+    });
+  };
+
   // Doctors
   const addDoctor = (doc: Omit<HospitalDoctor, 'id' | 'totalPatients' | 'rating'>) => {
     setDoctors(prev => {
@@ -995,32 +1102,28 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         sessions
       };
       const updated = [...prev, newDoc];
-      localStorage.setItem('insta_hospital_doctors', JSON.stringify(updated));
-      broadcastGlobalSync('HOSPITAL_DOCTORS_UPDATED', updated);
+      syncDoctorsGlobally(updated);
       return updated;
     });
   };
   const updateDoctor = (id: string, updates: Partial<HospitalDoctor>) => {
     setDoctors(prev => {
       const updated = prev.map(d => d.id === id ? { ...d, ...updates } : d);
-      localStorage.setItem('insta_hospital_doctors', JSON.stringify(updated));
-      broadcastGlobalSync('HOSPITAL_DOCTORS_UPDATED', updated);
+      syncDoctorsGlobally(updated);
       return updated;
     });
   };
   const deleteDoctor = (id: string) => {
     setDoctors(prev => {
       const updated = prev.filter(d => d.id !== id);
-      localStorage.setItem('insta_hospital_doctors', JSON.stringify(updated));
-      broadcastGlobalSync('HOSPITAL_DOCTORS_UPDATED', updated);
+      syncDoctorsGlobally(updated);
       return updated;
     });
   };
   const toggleDoctorActive = (id: string) => {
     setDoctors(prev => {
       const updated = prev.map(d => d.id === id ? { ...d, active: !d.active } : d);
-      localStorage.setItem('insta_hospital_doctors', JSON.stringify(updated));
-      broadcastGlobalSync('HOSPITAL_DOCTORS_UPDATED', updated);
+      syncDoctorsGlobally(updated);
       return updated;
     });
   };
@@ -1029,32 +1132,28 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const addDepartment = (dept: Omit<HospitalDepartment, 'id'>) => {
     setDepartments(prev => {
       const updated = [...prev, { ...dept, id: `dept-${Date.now()}` }];
-      localStorage.setItem('insta_hospital_departments', JSON.stringify(updated));
-      broadcastGlobalSync('HOSPITAL_DEPARTMENTS_UPDATED', updated);
+      syncDepartmentsGlobally(updated);
       return updated;
     });
   };
   const updateDepartment = (id: string, updates: Partial<HospitalDepartment>) => {
     setDepartments(prev => {
       const updated = prev.map(d => d.id === id ? { ...d, ...updates } : d);
-      localStorage.setItem('insta_hospital_departments', JSON.stringify(updated));
-      broadcastGlobalSync('HOSPITAL_DEPARTMENTS_UPDATED', updated);
+      syncDepartmentsGlobally(updated);
       return updated;
     });
   };
   const deleteDepartment = (id: string) => {
     setDepartments(prev => {
       const updated = prev.filter(d => d.id !== id);
-      localStorage.setItem('insta_hospital_departments', JSON.stringify(updated));
-      broadcastGlobalSync('HOSPITAL_DEPARTMENTS_UPDATED', updated);
+      syncDepartmentsGlobally(updated);
       return updated;
     });
   };
   const toggleDepartmentActive = (id: string) => {
     setDepartments(prev => {
       const updated = prev.map(d => d.id === id ? { ...d, active: !d.active } : d);
-      localStorage.setItem('insta_hospital_departments', JSON.stringify(updated));
-      broadcastGlobalSync('HOSPITAL_DEPARTMENTS_UPDATED', updated);
+      syncDepartmentsGlobally(updated);
       return updated;
     });
   };
@@ -1537,6 +1636,14 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         },
         body: JSON.stringify({ profile: updated })
       }).catch(e => console.warn('Failed to post profile to backend:', e));
+
+      fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          hospitalProfiles: { [activeId]: updated }
+        })
+      }).catch(() => {});
 
       broadcastGlobalSync('HOSPITAL_PROFILE_UPDATED', { hospitalId: activeId, profile: updated });
       broadcastGlobalSync('HOSPITAL_UPDATED', { hospitalId: activeId, updates: updated });

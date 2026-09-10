@@ -543,6 +543,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (data.success && Array.isArray(data.hospitals) && data.hospitals.length > 0) {
           setHospitals(data.hospitals);
           localStorage.setItem('insta_hospitals', JSON.stringify(data.hospitals));
+          if (data.store?.hospitalDoctors) {
+            Object.entries(data.store.hospitalDoctors).forEach(([hId, docs]: [string, any]) => {
+              if (docs && Array.isArray(docs)) {
+                localStorage.setItem(`insta_hospital_doctors_${hId}`, JSON.stringify(docs));
+                if (hId === 'hosp-apollo') {
+                  localStorage.setItem('insta_hospital_doctors', JSON.stringify(docs));
+                }
+              }
+            });
+          }
+          if (data.store?.hospitalDepartments) {
+            Object.entries(data.store.hospitalDepartments).forEach(([hId, depts]: [string, any]) => {
+              if (depts && Array.isArray(depts)) {
+                localStorage.setItem(`insta_hospital_departments_${hId}`, JSON.stringify(depts));
+                if (hId === 'hosp-apollo') {
+                  localStorage.setItem('insta_hospital_departments', JSON.stringify(depts));
+                }
+              }
+            });
+          }
           if (data.store?.hospitalProfiles) {
             Object.entries(data.store.hospitalProfiles).forEach(([hospId, prof]: [string, any]) => {
               if (prof) {
@@ -561,11 +581,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // --- Cross-tab & Real-time Global Sync ---
   useEffect(() => {
     const unsubscribe = subscribeGlobalSync((event) => {
-      if (event && (event.type === 'HOSPITAL_PROFILE_UPDATED' || event.type === 'HOSPITAL_UPDATED')) {
+      if (!event) return;
+
+      if (event.type === 'HOSPITAL_PROFILE_UPDATED' || event.type === 'HOSPITAL_UPDATED') {
+        // Profile/address/contact/facilities changes from hospital panel
         const payload = event.data;
         const profile = payload?.profile || payload?.updates || payload;
         const hospId = payload?.hospitalId || profile?.id || 'hosp-apollo';
-
         if (profile) {
           setHospitals(prev => {
             const updated = prev.map(h => {
@@ -573,10 +595,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 return {
                   ...h,
                   name: profile.name || h.name,
-                  category: profile.type || (profile.category || h.category),
+                  category: profile.type || profile.category || h.category,
                   address: profile.address || h.address,
                   contact: profile.phone || profile.emergencyNumber || h.contact,
+                  emergencyContact: profile.emergencyNumber || h.emergencyContact,
+                  whatsapp: profile.whatsapp || h.whatsapp,
                   about: profile.about || h.about,
+                  facilities: (profile.facilities && profile.facilities.length > 0) ? profile.facilities : h.facilities,
                   image: profile.coverImage || profile.logo || h.image,
                   lat: (profile.lat !== undefined && !isNaN(Number(profile.lat))) ? Number(profile.lat) : h.lat,
                   lng: (profile.lng !== undefined && !isNaN(Number(profile.lng))) ? Number(profile.lng) : h.lng,
@@ -588,19 +613,72 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             return updated;
           });
         }
-      } else {
-        const savedAppts = localStorage.getItem('insta_appointments');
-        if (savedAppts) {
-          try {
-            setAppointments(JSON.parse(savedAppts));
-          } catch (e) {}
+
+      } else if (event.type === 'HOSPITAL_DOCTORS_UPDATED') {
+        // Doctor list changed — propagate immediately to customer-facing pages
+        const payload = event.data;
+        const hospitalId = payload?.hospitalId || 'hosp-apollo';
+        const rawDocs = Array.isArray(payload) ? payload : (payload?.doctors || payload?.rawDoctors || []);
+        if (Array.isArray(rawDocs)) {
+          const newDoctors: Doctor[] = rawDocs.map((d: any) => ({
+            id: d.id,
+            name: d.name,
+            specialty: d.specialty || d.specialization || d.departmentName || 'Specialist',
+            departmentId: d.departmentId || 'dept-general',
+            qualification: d.qualification || 'MBBS',
+            experience: Number(d.experience) || 5,
+            consultationFee: Number(d.consultationFee) || 500,
+            rating: Number(d.rating) || 4.9,
+            reviewsCount: Number(d.reviewsCount || d.totalPatients) || 100,
+            image: d.image || d.photo || '',
+            availability: d.availability || {
+              days: Array.isArray(d.opdDays) && d.opdDays.length > 0 ? d.opdDays : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+              slots: ['09:00 AM - 01:00 PM', '05:00 PM - 09:00 PM']
+            },
+            currentQueue: d.currentQueue || 0,
+            nextAvailableToken: d.nextAvailableToken || 1,
+            estimatedWaitPerPatient: d.estimatedWaitPerPatient || Number(d.consultationDuration) || 15,
+            active: d.active !== false,
+            sessions: d.sessions || []
+          }));
+          setHospitals(prev => {
+            const updated = prev.map(h => h.id === hospitalId ? { ...h, doctors: newDoctors } : h);
+            localStorage.setItem('insta_hospitals', JSON.stringify(updated));
+            return updated;
+          });
         }
 
+      } else if (event.type === 'HOSPITAL_DEPARTMENTS_UPDATED') {
+        // Department list changed — propagate immediately
+        const payload = event.data;
+        const hospitalId = payload?.hospitalId || 'hosp-apollo';
+        const rawDepts = Array.isArray(payload) ? payload : (payload?.departments || payload?.rawDepartments || []);
+        if (Array.isArray(rawDepts)) {
+          const newDepts = rawDepts.map((d: any) => ({
+            id: d.id,
+            name: d.name,
+            icon: d.icon || '🩺'
+          }));
+          setHospitals(prev => {
+            const updated = prev.map(h => h.id === hospitalId ? { ...h, departments: newDepts } : h);
+            localStorage.setItem('insta_hospitals', JSON.stringify(updated));
+            return updated;
+          });
+        }
+
+      } else if (event.type === 'CLOUD_SYNC_UPDATED') {
+        // Backend poller found newer data — re-hydrate from updated localStorage
+        setHospitals(getHydratedHospitals());
+
+      } else {
+        // Generic sync: reload appointments and customers
+        const savedAppts = localStorage.getItem('insta_appointments');
+        if (savedAppts) {
+          try { setAppointments(JSON.parse(savedAppts)); } catch (e) {}
+        }
         const savedCusts = localStorage.getItem('insta_customers');
         if (savedCusts) {
-          try {
-            setCustomers(JSON.parse(savedCusts));
-          } catch (e) {}
+          try { setCustomers(JSON.parse(savedCusts)); } catch (e) {}
         }
       }
     });

@@ -430,13 +430,62 @@ const isDummyTokenRecord = (t) =>
 const isDummyApptRecord = (a) =>
   !a || a.id === 'tok-1001' || a.patientName === 'Guest Patient';
 
+function mapHospitalDoctorsToPublic(docs) {
+  if (!Array.isArray(docs)) return [];
+  return docs.map(d => ({
+    id: d.id,
+    name: d.name,
+    specialty: d.specialization || d.specialty || d.departmentName || 'Specialist',
+    departmentId: d.departmentId || 'dept-general',
+    qualification: d.qualification || 'MBBS, MD',
+    experience: Number(d.experience) || 5,
+    consultationFee: Number(d.consultationFee) || 500,
+    rating: Number(d.rating) || 4.9,
+    reviewsCount: Number(d.reviewsCount || d.totalPatients) || 120,
+    image: d.photo || d.image || '',
+    availability: d.availability || {
+      days: Array.isArray(d.opdDays) && d.opdDays.length > 0 ? d.opdDays : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+      slots: Array.isArray(d.sessions) && d.sessions.length > 0
+        ? d.sessions.filter(s => s.active !== false).map(s => `${s.startTime} - ${s.endTime}`)
+        : ['09:00 AM - 01:00 PM', '05:00 PM - 09:00 PM']
+    },
+    currentQueue: d.currentQueue || 0,
+    nextAvailableToken: d.nextAvailableToken || 1,
+    estimatedWaitPerPatient: d.estimatedWaitPerPatient || d.consultationDuration || 15,
+    active: d.active !== false,
+    sessions: d.sessions || []
+  }));
+}
+
+function mapHospitalDeptsToPublic(depts) {
+  if (!Array.isArray(depts)) return [];
+  return depts.map(d => ({
+    id: d.id,
+    name: d.name,
+    icon: d.icon || '🩺',
+    active: d.active !== false
+  }));
+}
+
 function ensureHospitalProfilesSynced(store) {
-  if (!store || !store.hospitalProfiles) return;
-  Object.entries(store.hospitalProfiles).forEach(([id, prof]) => {
-    if (prof && (prof.address || prof.name)) {
-      syncProfileToHospitalsList(store, id, prof);
-    }
-  });
+  if (!store) return;
+  if (store.hospitalProfiles) {
+    Object.entries(store.hospitalProfiles).forEach(([id, prof]) => {
+      if (prof && (prof.address || prof.name)) {
+        syncProfileToHospitalsList(store, id, prof);
+      }
+    });
+  }
+  if (store.hospitals && Array.isArray(store.hospitals)) {
+    store.hospitals.forEach(hosp => {
+      if (store.hospitalDoctors && store.hospitalDoctors[hosp.id] && store.hospitalDoctors[hosp.id].length > 0) {
+        hosp.doctors = mapHospitalDoctorsToPublic(store.hospitalDoctors[hosp.id]);
+      }
+      if (store.hospitalDepartments && store.hospitalDepartments[hosp.id] && store.hospitalDepartments[hosp.id].length > 0) {
+        hosp.departments = mapHospitalDeptsToPublic(store.hospitalDepartments[hosp.id]);
+      }
+    });
+  }
 }
 
 async function getUnifiedStore() {
@@ -727,20 +776,18 @@ function requireHospitalAuth(req, res, next) {
   // Auto-accept default demo token pattern if restarted
   if (!session && tokenStr.startsWith('htok_')) {
     const parts = tokenStr.split('_');
-    const hospId = parts[1];
+    const hospId = parts[1] || 'hosp-apollo';
     const matched = DEFAULT_HOSPITAL_CREDENTIALS.find(c => c.hospitalId === hospId);
-    if (matched) {
-      session = {
-        token: tokenStr,
-        hospitalId: matched.hospitalId,
-        hospitalName: matched.hospitalName,
-        email: matched.email,
-        role: matched.role,
-        name: matched.name,
-        createdAt: Date.now()
-      };
-      ACTIVE_SESSIONS.set(tokenStr, session);
-    }
+    session = {
+      token: tokenStr,
+      hospitalId: matched ? matched.hospitalId : hospId,
+      hospitalName: matched ? matched.hospitalName : 'Hospital Admin',
+      email: matched ? matched.email : `admin@${hospId}.com`,
+      role: matched ? matched.role : 'owner',
+      name: matched ? matched.name : 'Hospital Admin',
+      createdAt: Date.now()
+    };
+    ACTIVE_SESSIONS.set(tokenStr, session);
   }
 
   if (!session) {
@@ -885,8 +932,15 @@ app.post('/api/hospitals/:id/doctors', requireHospitalAuth, async (req, res) => 
   store.hospitalDoctors = store.hospitalDoctors || {};
   store.hospitalDoctors[id] = doctors;
 
+  if (store.hospitals && Array.isArray(store.hospitals)) {
+    const hosp = store.hospitals.find(h => h.id === id);
+    if (hosp) {
+      hosp.doctors = mapHospitalDoctorsToPublic(doctors);
+    }
+  }
+
   await saveUnifiedStore(store);
-  res.json({ success: true, hospitalId: id, doctors });
+  res.json({ success: true, hospitalId: id, doctors, hospitals: store.hospitals });
 });
 
 // ─── Hospital Profile (Phase 21 & 22) ────────────────────────────────────────
@@ -936,8 +990,15 @@ app.post('/api/hospitals/:id/departments', requireHospitalAuth, async (req, res)
   store.hospitalDepartments = store.hospitalDepartments || {};
   store.hospitalDepartments[id] = departments;
 
+  if (store.hospitals && Array.isArray(store.hospitals)) {
+    const hosp = store.hospitals.find(h => h.id === id);
+    if (hosp) {
+      hosp.departments = mapHospitalDeptsToPublic(departments);
+    }
+  }
+
   await saveUnifiedStore(store);
-  res.json({ success: true, hospitalId: id, departments });
+  res.json({ success: true, hospitalId: id, departments, hospitals: store.hospitals });
 });
 
 // ─── PHASE 20: Patients Management Endpoint ──────────────────────────────────

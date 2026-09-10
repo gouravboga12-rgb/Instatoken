@@ -301,6 +301,12 @@ export const HospitalDetails: React.FC<HospitalDetailsProps> = ({ onDoctorSelect
                 <Phone size={14} className="text-blue-600 shrink-0" />
                 <span>Contact: {hospital.contact}</span>
               </div>
+              {hospital.emergencyContact && (
+                <div className="flex items-center gap-2 text-red-600 font-bold">
+                  <AlertTriangle size={14} className="text-red-600 shrink-0" />
+                  <span>24/7 Emergency: {hospital.emergencyContact}</span>
+                </div>
+              )}
               <div className="flex items-center gap-2 pt-1 border-t border-slate-50">
                 <Navigation size={14} className="text-blue-600 shrink-0" />
                 <a 
