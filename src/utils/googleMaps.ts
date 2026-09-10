@@ -71,23 +71,174 @@ export function calculateDistanceKm(
   return Math.round(roadEstimate * 10) / 10;
 }
 
+export interface ReverseGeocodeDetails {
+  address: string;
+  city: string;
+  state: string;
+  area: string;
+  pinCode: string;
+  country: string;
+  lat: number;
+  lng: number;
+}
+
+export interface GeocodeResult {
+  lat: number;
+  lng: number;
+  formattedAddress: string;
+  city?: string;
+  state?: string;
+  area?: string;
+  pinCode?: string;
+  country?: string;
+}
+
+function extractGoogleAddressComponents(result: any, lat: number, lng: number): ReverseGeocodeDetails {
+  const comps: any[] = result.address_components || [];
+  const getComp = (...types: string[]): string => {
+    for (const type of types) {
+      const match = comps.find((c: any) => c.types && c.types.includes(type));
+      if (match) return match.long_name || match.short_name || '';
+    }
+    return '';
+  };
+
+  const pinCode = getComp('postal_code');
+  const state = getComp('administrative_area_level_1');
+  const city = getComp('locality', 'postal_town', 'administrative_area_level_2', 'administrative_area_level_3');
+  
+  const sub1 = getComp('sublocality_level_1');
+  const sub2 = getComp('sublocality_level_2');
+  const sub = getComp('sublocality');
+  const neighborhood = getComp('neighborhood');
+  const route = getComp('route');
+
+  let area = '';
+  if (sub1 && sub2 && !sub1.toLowerCase().includes(sub2.toLowerCase())) {
+    area = `${sub1} ${sub2}`;
+  } else {
+    area = sub1 || sub || neighborhood || sub2 || route || '';
+  }
+
+  const country = getComp('country') || 'India';
+  const address = result.formatted_address || '';
+
+  return {
+    address,
+    city,
+    state,
+    area,
+    pinCode,
+    country,
+    lat,
+    lng
+  };
+}
+
+function extractNominatimAddressComponents(data: any, lat: number, lng: number): ReverseGeocodeDetails {
+  const a = data.address || {};
+  const pinCode = a.postcode || '';
+  const state = a.state || '';
+  const city = a.city || a.town || a.village || a.county || '';
+  
+  const suburb = a.suburb || '';
+  const neighbourhood = a.neighbourhood || '';
+  const residential = a.residential || '';
+  const cityDistrict = a.city_district || '';
+  const road = a.road || '';
+
+  let area = '';
+  if (neighbourhood && suburb && !neighbourhood.toLowerCase().includes(suburb.toLowerCase())) {
+    area = `${neighbourhood}, ${suburb}`;
+  } else {
+    area = neighbourhood || suburb || residential || cityDistrict || road || '';
+  }
+
+  const country = a.country || 'India';
+  const address = data.display_name || '';
+
+  return {
+    address,
+    city,
+    state,
+    area,
+    pinCode,
+    country,
+    lat,
+    lng
+  };
+}
+
+function extractBigDataCloudComponents(data: any, lat: number, lng: number): ReverseGeocodeDetails {
+  const pinCode = data.postcode || '';
+  const state = data.principalSubdivision || '';
+  const city = data.city || data.locality || '';
+  const area = data.locality || '';
+  const country = data.countryName || 'India';
+  const address = [area, city, state, pinCode, country].filter(Boolean).join(', ');
+
+  return {
+    address,
+    city,
+    state,
+    area,
+    pinCode,
+    country,
+    lat,
+    lng
+  };
+}
+
+function getKnownCityFallback(lat: number, lng: number): ReverseGeocodeDetails {
+  let minDistance = Infinity;
+  let closestCity = { lat: 12.9348, lng: 77.6189, name: 'Koramangala, Bengaluru' };
+
+  for (const item of Object.values(KNOWN_CITIES)) {
+    const dist = calculateDistanceKm(lat, lng, item.lat, item.lng);
+    if (dist < minDistance) {
+      minDistance = dist;
+      closestCity = item;
+    }
+  }
+
+  const parts = closestCity.name.split(',');
+  const area = parts[0]?.trim() || 'Koramangala';
+  const city = parts[1]?.trim() || 'Bengaluru';
+
+  return {
+    address: closestCity.name,
+    city,
+    state: 'Karnataka',
+    area,
+    pinCode: '560095',
+    country: 'India',
+    lat,
+    lng
+  };
+}
+
 /**
  * Geocodes an address or city query using Google Geocoding API / Nominatim / offline cache
  */
 export async function geocodeLocation(
   query: string,
   apiKey?: string
-): Promise<{ lat: number; lng: number; formattedAddress: string } | null> {
+): Promise<GeocodeResult | null> {
   if (!query || !query.trim()) return null;
   const cleanQuery = query.trim().toLowerCase();
   
   // 1. Check known cities/localities first for instant responsiveness
   for (const [key, val] of Object.entries(KNOWN_CITIES)) {
     if (cleanQuery.includes(key) || key.includes(cleanQuery)) {
+      const parts = val.name.split(',');
       return {
         lat: val.lat,
         lng: val.lng,
-        formattedAddress: val.name
+        formattedAddress: val.name,
+        area: parts[0]?.trim(),
+        city: parts[1]?.trim() || 'Bengaluru',
+        state: 'Karnataka',
+        country: 'India'
       };
     }
   }
@@ -101,11 +252,18 @@ export async function geocodeLocation(
       );
       const data = await response.json();
       if (data.status === 'OK' && data.results && data.results.length > 0) {
-        const location = data.results[0].geometry.location;
+        const first = data.results[0];
+        const location = first.geometry.location;
+        const details = extractGoogleAddressComponents(first, location.lat, location.lng);
         return {
           lat: location.lat,
           lng: location.lng,
-          formattedAddress: data.results[0].formatted_address
+          formattedAddress: details.address,
+          city: details.city,
+          state: details.state,
+          area: details.area,
+          pinCode: details.pinCode,
+          country: details.country
         };
       }
     } catch (err) {
@@ -117,18 +275,21 @@ export async function geocodeLocation(
   try {
     const res = await fetch(
       `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&addressdetails=1`,
-      { headers: { 'Accept-Language': 'en' } }
+      { headers: { 'Accept-Language': 'en', 'User-Agent': 'InstaToken/1.0' } }
     );
     const data = await res.json();
     if (Array.isArray(data) && data.length > 0) {
       const item = data[0];
-      const address = item.address;
-      const locality = address.suburb || address.neighbourhood || address.city_district || address.city || address.town || address.village || query;
-      const state = address.state ? `, ${address.state}` : '';
+      const parsed = extractNominatimAddressComponents(item, parseFloat(item.lat), parseFloat(item.lon));
       return {
         lat: parseFloat(item.lat),
         lng: parseFloat(item.lon),
-        formattedAddress: `${locality}${state}`
+        formattedAddress: parsed.address,
+        city: parsed.city,
+        state: parsed.state,
+        area: parsed.area,
+        pinCode: parsed.pinCode,
+        country: parsed.country
       };
     }
   } catch (e) {
@@ -139,8 +300,68 @@ export async function geocodeLocation(
   return {
     lat: 12.9352,
     lng: 77.6244,
-    formattedAddress: query
+    formattedAddress: query,
+    city: 'Bengaluru',
+    state: 'Karnataka',
+    area: 'Koramangala',
+    pinCode: '560095',
+    country: 'India'
   };
+}
+
+/**
+ * Detailed reverse geocoding to full address, city, state, area, pincode, coordinates
+ */
+export async function reverseGeocodeAddressDetails(
+  lat: number,
+  lng: number,
+  apiKey?: string
+): Promise<ReverseGeocodeDetails> {
+  // 1. Google Geocoding API if key available
+  const key = apiKey || (import.meta as any).env?.VITE_GOOGLE_MAPS_API_KEY;
+  if (key && key !== 'YOUR_GOOGLE_MAPS_KEY') {
+    try {
+      const response = await fetch(
+        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${key}`
+      );
+      const data = await response.json();
+      if (data.status === 'OK' && data.results && data.results.length > 0) {
+        return extractGoogleAddressComponents(data.results[0], lat, lng);
+      }
+    } catch (err) {
+      console.warn('Google Reverse Geocoding error:', err);
+    }
+  }
+
+  // 2. OpenStreetMap Nominatim Reverse Geocoding
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
+      { headers: { 'Accept-Language': 'en', 'User-Agent': 'InstaToken/1.0' } }
+    );
+    const data = await res.json();
+    if (data && (data.address || data.display_name)) {
+      return extractNominatimAddressComponents(data, lat, lng);
+    }
+  } catch (e) {
+    // Fallback to next provider
+  }
+
+  // 3. BigDataCloud Client Reverse Geocoding
+  try {
+    const res = await fetch(
+      `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`
+    );
+    const data = await res.json();
+    if (data && (data.city || data.locality || data.principalSubdivision)) {
+      return extractBigDataCloudComponents(data, lat, lng);
+    }
+  } catch (e) {
+    // Fallback to closest centroid
+  }
+
+  // 4. Fallback: Closest centroid from KNOWN_CITIES
+  return getKnownCityFallback(lat, lng);
 }
 
 /**
@@ -151,48 +372,9 @@ export async function reverseGeocode(
   lng: number,
   apiKey?: string
 ): Promise<string> {
-  // 1. Google Geocoding API if key available
-  const key = apiKey || (import.meta as any).env?.VITE_GOOGLE_MAPS_API_KEY;
-  if (key && key !== 'YOUR_GOOGLE_MAPS_KEY') {
-    try {
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${key}`
-      );
-      const data = await response.json();
-      if (data.status === 'OK' && data.results && data.results.length > 0) {
-        return data.results[0].formatted_address;
-      }
-    } catch (err) {
-      console.warn('Google Reverse Geocoding error:', err);
-    }
+  const details = await reverseGeocodeAddressDetails(lat, lng, apiKey);
+  if (details.area && details.city && !details.area.includes(details.city)) {
+    return `${details.area}, ${details.city}`;
   }
-
-  // 2. OpenStreetMap Nominatim Reverse Geocoding
-  try {
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=14&addressdetails=1`,
-      { headers: { 'Accept-Language': 'en' } }
-    );
-    const data = await res.json();
-    if (data && data.address) {
-      const a = data.address;
-      const area = a.suburb || a.neighbourhood || a.residential || a.city_district || a.road || a.city || a.town || 'Nearby Area';
-      const city = a.city || a.town || a.county || a.state || '';
-      return city ? `${area}, ${city}` : area;
-    }
-  } catch (e) {
-    // Fallback to closest known centroid
-  }
-
-  // 3. Fallback: Determine closest known city/locality from KNOWN_CITIES
-  let minDistance = Infinity;
-  let closestName = 'Koramangala, Bengaluru';
-  for (const city of Object.values(KNOWN_CITIES)) {
-    const dist = calculateDistanceKm(lat, lng, city.lat, city.lng);
-    if (dist < minDistance) {
-      minDistance = dist;
-      closestName = city.name;
-    }
-  }
-  return closestName;
+  return details.area || details.city || details.address;
 }

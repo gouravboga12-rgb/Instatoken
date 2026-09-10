@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useHospital } from '../../context/HospitalContext';
-import { geocodeLocation } from '../../utils/googleMaps';
-import { Building2, Save, Check, MapPin, Info, Layers, Compass, ExternalLink, Sparkles } from 'lucide-react';
+import { geocodeLocation, reverseGeocodeAddressDetails } from '../../utils/googleMaps';
+import { Building2, Save, Check, MapPin, Info, Layers, Compass, ExternalLink, Sparkles, Loader2 } from 'lucide-react';
 
 const COMMON_FACILITIES = [
   '24x7 Emergency & Trauma',
@@ -21,6 +21,7 @@ export const HospitalSettings: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'basic' | 'contact' | 'location' | 'about'>('basic');
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isGeocoding, setIsGeocoding] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
   const [geocodeNotice, setGeocodeNotice] = useState<string | null>(null);
 
   const [form, setForm] = useState({
@@ -108,16 +109,21 @@ export const HospitalSettings: React.FC = () => {
       return;
     }
     setIsGeocoding(true);
-    setGeocodeNotice('Looking up precise GPS coordinates...');
+    setGeocodeNotice('Looking up precise GPS coordinates & address details...');
     try {
       const geo = await geocodeLocation(`${form.address}, ${form.city}, ${form.state}`);
       if (geo && geo.lat && geo.lng) {
         setForm(prev => ({
           ...prev,
           lat: String(geo.lat),
-          lng: String(geo.lng)
+          lng: String(geo.lng),
+          city: geo.city || prev.city,
+          state: geo.state || prev.state,
+          area: geo.area || prev.area,
+          pinCode: geo.pinCode || prev.pinCode,
+          country: geo.country || prev.country
         }));
-        setGeocodeNotice(`Coordinates found: Lat ${geo.lat.toFixed(4)}, Lng ${geo.lng.toFixed(4)}`);
+        setGeocodeNotice(`✓ Coordinates found: Lat ${geo.lat.toFixed(4)}, Lng ${geo.lng.toFixed(4)}`);
       } else {
         setGeocodeNotice('Could not find exact coordinates. Using default city center.');
       }
@@ -134,21 +140,47 @@ export const HospitalSettings: React.FC = () => {
       alert('Geolocation is not supported by your browser.');
       return;
     }
-    setGeocodeNotice('Detecting device location...');
+    setIsLocating(true);
+    setGeocodeNotice('Detecting device GPS coordinates...');
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setForm(prev => ({
-          ...prev,
-          lat: String(pos.coords.latitude),
-          lng: String(pos.coords.longitude)
-        }));
-        setGeocodeNotice(`Device GPS detected: Lat ${pos.coords.latitude.toFixed(4)}, Lng ${pos.coords.longitude.toFixed(4)}`);
-        setTimeout(() => setGeocodeNotice(null), 3000);
+      async (pos) => {
+        const latitude = pos.coords.latitude;
+        const longitude = pos.coords.longitude;
+        setGeocodeNotice(`GPS detected: Lat ${latitude.toFixed(4)}, Lng ${longitude.toFixed(4)}. Fetching full address via Geocoding API...`);
+
+        try {
+          const details = await reverseGeocodeAddressDetails(latitude, longitude);
+          setForm(prev => ({
+            ...prev,
+            lat: String(latitude),
+            lng: String(longitude),
+            address: details.address || prev.address,
+            city: details.city || prev.city,
+            state: details.state || prev.state,
+            area: details.area || prev.area,
+            pinCode: details.pinCode || prev.pinCode,
+            country: details.country || prev.country || 'India'
+          }));
+          const summary = [details.area, details.city, details.state, details.pinCode].filter(Boolean).join(', ');
+          setGeocodeNotice(`✓ Address & GPS updated: ${summary || 'Coordinates saved'}`);
+        } catch (err) {
+          setForm(prev => ({
+            ...prev,
+            lat: String(latitude),
+            lng: String(longitude)
+          }));
+          setGeocodeNotice(`GPS coordinates detected: Lat ${latitude.toFixed(4)}, Lng ${longitude.toFixed(4)}`);
+        } finally {
+          setIsLocating(false);
+          setTimeout(() => setGeocodeNotice(null), 5000);
+        }
       },
       (err) => {
+        setIsLocating(false);
         setGeocodeNotice('Could not get GPS permission: ' + err.message);
-        setTimeout(() => setGeocodeNotice(null), 3000);
-      }
+        setTimeout(() => setGeocodeNotice(null), 4000);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   };
 
@@ -300,9 +332,15 @@ export const HospitalSettings: React.FC = () => {
                       <Sparkles size={13} />
                       <span>{isGeocoding ? 'Geocoding...' : 'Auto-Geocode'}</span>
                     </button>
-                    <button type="button" onClick={handleUseDeviceLocation} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold cursor-pointer border border-slate-200 flex items-center gap-1.5 transition-colors">
-                      <Compass size={13} />
-                      <span>Use Device GPS</span>
+                    <button
+                      type="button"
+                      onClick={handleUseDeviceLocation}
+                      disabled={isLocating}
+                      className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold cursor-pointer border border-slate-200 flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                      title="Fetch live GPS coordinates and auto-fill address, city, state, area, and pin code"
+                    >
+                      {isLocating ? <Loader2 size={13} className="animate-spin text-blue-600" /> : <Compass size={13} />}
+                      <span>{isLocating ? 'Detecting...' : 'Use Device GPS'}</span>
                     </button>
                   </div>
                 </div>
