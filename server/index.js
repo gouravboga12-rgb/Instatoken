@@ -351,6 +351,44 @@ app.post('/api/tokens', (req, res) => {
   res.json({ success: true, tokens });
 });
 
+// Proxy Reverse Geocode endpoint
+app.get('/api/reverse-geocode', async (req, res) => {
+  const { lat, lng } = req.query;
+  if (!lat || !lng) {
+    return res.status(400).json({ success: false, message: 'lat and lng query parameters required' });
+  }
+  const key = process.env.VITE_GOOGLE_MAPS_API_KEY || 'AIzaSyBxRr6Tj-K-hk1xpqp9ltZrAw5yiwv2Y6A';
+  try {
+    const gRes = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${key}`);
+    const gData = await gRes.json();
+    if (gData.status === 'OK' && gData.results && gData.results.length > 0) {
+      return res.json({ success: true, result: gData.results[0] });
+    }
+  } catch (err) {
+    console.warn('Server reverse-geocode error:', err.message);
+  }
+  res.json({ success: false });
+});
+
+// Proxy Geocode endpoint
+app.get('/api/geocode', async (req, res) => {
+  const { query: queryParam } = req.query;
+  if (!queryParam) {
+    return res.status(400).json({ success: false, message: 'query parameter required' });
+  }
+  const key = process.env.VITE_GOOGLE_MAPS_API_KEY || 'AIzaSyBxRr6Tj-K-hk1xpqp9ltZrAw5yiwv2Y6A';
+  try {
+    const gRes = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(queryParam)}&key=${key}`);
+    const gData = await gRes.json();
+    if (gData.status === 'OK' && gData.results && gData.results.length > 0) {
+      return res.json({ success: true, result: gData.results[0] });
+    }
+  } catch (err) {
+    console.warn('Server geocode error:', err.message);
+  }
+  res.json({ success: false });
+});
+
 // Nodemailer SMTP Transporter setup for token.in1999@gmail.com
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || 'smtp.gmail.com',

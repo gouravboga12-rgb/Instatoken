@@ -243,7 +243,32 @@ export async function geocodeLocation(
     }
   }
 
-  // 2. Google Geocoding API if key provided
+  // 2. Try Backend API Proxy first (avoids CORS / key restrictions in browser)
+  try {
+    const proxyRes = await fetch(`/api/geocode?query=${encodeURIComponent(query)}`);
+    if (proxyRes.ok) {
+      const proxyData = await proxyRes.json();
+      if (proxyData.success && proxyData.result) {
+        const first = proxyData.result;
+        const location = first.geometry?.location || { lat: 12.9348, lng: 77.6189 };
+        const details = extractGoogleAddressComponents(first, location.lat, location.lng);
+        return {
+          lat: location.lat,
+          lng: location.lng,
+          formattedAddress: details.address,
+          city: details.city,
+          state: details.state,
+          area: details.area,
+          pinCode: details.pinCode,
+          country: details.country
+        };
+      }
+    }
+  } catch (err) {
+    // Continue to direct Google API
+  }
+
+  // 3. Direct Google Geocoding API if key provided
   const key = apiKey || (import.meta as any).env?.VITE_GOOGLE_MAPS_API_KEY;
   if (key && key !== 'YOUR_GOOGLE_MAPS_KEY') {
     try {
@@ -271,11 +296,11 @@ export async function geocodeLocation(
     }
   }
 
-  // 3. Free OpenStreetMap Nominatim Geocoding API
+  // 4. Free OpenStreetMap Nominatim Geocoding API
   try {
     const res = await fetch(
       `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&addressdetails=1`,
-      { headers: { 'Accept-Language': 'en', 'User-Agent': 'InstaToken/1.0' } }
+      { headers: { 'Accept-Language': 'en' } }
     );
     const data = await res.json();
     if (Array.isArray(data) && data.length > 0) {
@@ -296,7 +321,7 @@ export async function geocodeLocation(
     // Network or CORS fallback
   }
 
-  // 4. Default fallback: Koramangala Bengaluru
+  // 5. Default fallback: Koramangala Bengaluru
   return {
     lat: 12.9352,
     lng: 77.6244,
@@ -317,7 +342,20 @@ export async function reverseGeocodeAddressDetails(
   lng: number,
   apiKey?: string
 ): Promise<ReverseGeocodeDetails> {
-  // 1. Google Geocoding API if key available
+  // 1. Try Backend API Proxy first (cleanest, reliable, no browser restriction)
+  try {
+    const proxyRes = await fetch(`/api/reverse-geocode?lat=${lat}&lng=${lng}`);
+    if (proxyRes.ok) {
+      const proxyData = await proxyRes.json();
+      if (proxyData.success && proxyData.result) {
+        return extractGoogleAddressComponents(proxyData.result, lat, lng);
+      }
+    }
+  } catch (err) {
+    // Continue to direct Google API
+  }
+
+  // 2. Direct Google Geocoding API if key available
   const key = apiKey || (import.meta as any).env?.VITE_GOOGLE_MAPS_API_KEY;
   if (key && key !== 'YOUR_GOOGLE_MAPS_KEY') {
     try {
@@ -333,11 +371,11 @@ export async function reverseGeocodeAddressDetails(
     }
   }
 
-  // 2. OpenStreetMap Nominatim Reverse Geocoding
+  // 3. OpenStreetMap Nominatim Reverse Geocoding
   try {
     const res = await fetch(
       `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
-      { headers: { 'Accept-Language': 'en', 'User-Agent': 'InstaToken/1.0' } }
+      { headers: { 'Accept-Language': 'en' } }
     );
     const data = await res.json();
     if (data && (data.address || data.display_name)) {
@@ -347,7 +385,7 @@ export async function reverseGeocodeAddressDetails(
     // Fallback to next provider
   }
 
-  // 3. BigDataCloud Client Reverse Geocoding
+  // 4. BigDataCloud Client Reverse Geocoding
   try {
     const res = await fetch(
       `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`
@@ -360,7 +398,7 @@ export async function reverseGeocodeAddressDetails(
     // Fallback to closest centroid
   }
 
-  // 4. Fallback: Closest centroid from KNOWN_CITIES
+  // 5. Fallback: Closest centroid from KNOWN_CITIES
   return getKnownCityFallback(lat, lng);
 }
 

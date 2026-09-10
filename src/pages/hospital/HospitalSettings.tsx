@@ -60,9 +60,12 @@ export const HospitalSettings: React.FC = () => {
     ]
   });
 
-  // Keep form synchronized when hospitalProfile changes or hospital is switched
+  // Only initialize form on initial mount or when hospital is explicitly switched
+  const loadedHospitalIdRef = React.useRef<string | null>(null);
+
   React.useEffect(() => {
-    if (hospitalProfile) {
+    if (hospitalProfile && hospitalProfile.id !== loadedHospitalIdRef.current) {
+      loadedHospitalIdRef.current = hospitalProfile.id || 'hosp-apollo';
       setForm({
         name: hospitalProfile.name || '',
         logo: hospitalProfile.logo || '',
@@ -93,7 +96,7 @@ export const HospitalSettings: React.FC = () => {
         facilities: hospitalProfile.facilities || []
       });
     }
-  }, [hospitalProfile]);
+  }, [hospitalProfile?.id]);
 
   const handleFacilityToggle = (fac: string) => {
     setForm(prev => {
@@ -113,16 +116,23 @@ export const HospitalSettings: React.FC = () => {
     try {
       const geo = await geocodeLocation(`${form.address}, ${form.city}, ${form.state}`);
       if (geo && geo.lat && geo.lng) {
-        setForm(prev => ({
-          ...prev,
+        const updatedForm = {
+          ...form,
           lat: String(geo.lat),
           lng: String(geo.lng),
-          city: geo.city || prev.city,
-          state: geo.state || prev.state,
-          area: geo.area || prev.area,
-          pinCode: geo.pinCode || prev.pinCode,
-          country: geo.country || prev.country
-        }));
+          city: geo.city || form.city,
+          state: geo.state || form.state,
+          area: geo.area || form.area,
+          pinCode: geo.pinCode || form.pinCode,
+          country: geo.country || form.country
+        };
+        setForm(updatedForm);
+        updateHospitalProfile({
+          ...updatedForm,
+          id: hospitalProfile?.id,
+          lat: geo.lat,
+          lng: geo.lng
+        });
         setGeocodeNotice(`✓ Coordinates found: Lat ${geo.lat.toFixed(4)}, Lng ${geo.lng.toFixed(4)}`);
       } else {
         setGeocodeNotice('Could not find exact coordinates. Using default city center.');
@@ -135,52 +145,125 @@ export const HospitalSettings: React.FC = () => {
     }
   };
 
+  // Fallback to IP Geolocation if browser GPS is denied, timed out, or desktop without GPS hardware
+  const resolveLocationViaIP = async (): Promise<boolean> => {
+    try {
+      setGeocodeNotice('Resolving location via network IP...');
+      const res = await fetch('https://api.bigdatacloud.net/data/reverse-geocode-client');
+      const ipData = await res.json();
+      if (ipData && (ipData.latitude || ipData.city)) {
+        const lat = ipData.latitude || 12.9348;
+        const lng = ipData.longitude || 77.6189;
+        
+        const details = await reverseGeocodeAddressDetails(lat, lng);
+        const resolvedAddress = details.address || [ipData.locality, ipData.city, ipData.principalSubdivision, ipData.postcode].filter(Boolean).join(', ');
+        const resolvedCity = details.city || ipData.city || 'Bengaluru';
+        const resolvedState = details.state || ipData.principalSubdivision || 'Karnataka';
+        const resolvedArea = details.area || ipData.locality || resolvedCity;
+        const resolvedPin = details.pinCode || ipData.postcode || '560095';
+
+        const updated = {
+          ...form,
+          lat: String(lat),
+          lng: String(lng),
+          address: resolvedAddress || form.address,
+          city: resolvedCity,
+          state: resolvedState,
+          area: resolvedArea,
+          pinCode: resolvedPin,
+          country: details.country || ipData.countryName || 'India'
+        };
+
+        setForm(updated);
+        updateHospitalProfile({
+          ...updated,
+          id: hospitalProfile?.id,
+          lat,
+          lng
+        });
+
+        setGeocodeNotice(`✓ Location detected via Network GPS: ${resolvedArea}, ${resolvedCity} (${resolvedPin})`);
+        return true;
+      }
+    } catch (e) {
+      console.warn('Network location fallback error:', e);
+    }
+    return false;
+  };
+
   const handleUseDeviceLocation = () => {
+    setIsLocating(true);
+    setGeocodeNotice('Detecting device location...');
+
+    const onLocationResolved = async (latitude: number, longitude: number) => {
+      setGeocodeNotice(`GPS detected: Lat ${latitude.toFixed(4)}, Lng ${longitude.toFixed(4)}. Fetching address via Geocoding API...`);
+
+      try {
+        const details = await reverseGeocodeAddressDetails(latitude, longitude);
+        const updated = {
+          ...form,
+          lat: String(latitude),
+          lng: String(longitude),
+          address: details.address || form.address,
+          city: details.city || form.city,
+          state: details.state || form.state,
+          area: details.area || form.area,
+          pinCode: details.pinCode || form.pinCode,
+          country: details.country || form.country || 'India'
+        };
+
+        setForm(updated);
+        updateHospitalProfile({
+          ...updated,
+          id: hospitalProfile?.id,
+          lat: latitude,
+          lng: longitude
+        });
+
+        const summary = [details.area, details.city, details.state, details.pinCode].filter(Boolean).join(', ');
+        setGeocodeNotice(`✓ Address & GPS updated: ${summary || 'Coordinates saved'}`);
+      } catch (err) {
+        const updated = {
+          ...form,
+          lat: String(latitude),
+          lng: String(longitude)
+        };
+        setForm(updated);
+        updateHospitalProfile({
+          ...updated,
+          id: hospitalProfile?.id,
+          lat: latitude,
+          lng: longitude
+        });
+        setGeocodeNotice(`GPS coordinates detected: Lat ${latitude.toFixed(4)}, Lng ${longitude.toFixed(4)}`);
+      } finally {
+        setIsLocating(false);
+        setTimeout(() => setGeocodeNotice(null), 5000);
+      }
+    };
+
     if (!navigator.geolocation) {
-      alert('Geolocation is not supported by your browser.');
+      resolveLocationViaIP().finally(() => {
+        setIsLocating(false);
+        setTimeout(() => setGeocodeNotice(null), 4000);
+      });
       return;
     }
-    setIsLocating(true);
-    setGeocodeNotice('Detecting device GPS coordinates...');
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const latitude = pos.coords.latitude;
-        const longitude = pos.coords.longitude;
-        setGeocodeNotice(`GPS detected: Lat ${latitude.toFixed(4)}, Lng ${longitude.toFixed(4)}. Fetching full address via Geocoding API...`);
 
-        try {
-          const details = await reverseGeocodeAddressDetails(latitude, longitude);
-          setForm(prev => ({
-            ...prev,
-            lat: String(latitude),
-            lng: String(longitude),
-            address: details.address || prev.address,
-            city: details.city || prev.city,
-            state: details.state || prev.state,
-            area: details.area || prev.area,
-            pinCode: details.pinCode || prev.pinCode,
-            country: details.country || prev.country || 'India'
-          }));
-          const summary = [details.area, details.city, details.state, details.pinCode].filter(Boolean).join(', ');
-          setGeocodeNotice(`✓ Address & GPS updated: ${summary || 'Coordinates saved'}`);
-        } catch (err) {
-          setForm(prev => ({
-            ...prev,
-            lat: String(latitude),
-            lng: String(longitude)
-          }));
-          setGeocodeNotice(`GPS coordinates detected: Lat ${latitude.toFixed(4)}, Lng ${longitude.toFixed(4)}`);
-        } finally {
-          setIsLocating(false);
-          setTimeout(() => setGeocodeNotice(null), 5000);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        onLocationResolved(pos.coords.latitude, pos.coords.longitude);
+      },
+      async (_err) => {
+        // Fallback to Network IP geolocation when browser hardware GPS is unavailable or restricted
+        const ipResolved = await resolveLocationViaIP();
+        if (!ipResolved) {
+          setGeocodeNotice('Could not detect GPS location. Please check browser permissions or enter address manually.');
         }
-      },
-      (err) => {
         setIsLocating(false);
-        setGeocodeNotice('Could not get GPS permission: ' + err.message);
-        setTimeout(() => setGeocodeNotice(null), 4000);
+        setTimeout(() => setGeocodeNotice(null), 5000);
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      { enableHighAccuracy: false, timeout: 6000, maximumAge: 300000 }
     );
   };
 
