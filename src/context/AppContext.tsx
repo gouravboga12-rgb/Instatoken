@@ -238,41 +238,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [user, setUser] = useState<UserProfile | null>(() => {
     const saved = localStorage.getItem('insta_user');
     if (saved) {
-      const parsed = JSON.parse(saved);
-      if (parsed) {
-        if (parsed.subscription === undefined) {
-          parsed.subscription = {
-            planName: "3-Day Pass",
-            expiresAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-            price: 10
-          };
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed) {
+          // Completely remove legacy "Guest Patient" account
+          if (parsed.name === "Guest Patient" || parsed.email === "patient@example.com") {
+            localStorage.removeItem('insta_user');
+            return null;
+          }
+          if (parsed.subscription === undefined) {
+            parsed.subscription = {
+              planName: "3-Day Pass",
+              expiresAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+              price: 10
+            };
+          }
+          if (!parsed.savedDoctors) {
+            parsed.savedDoctors = [];
+          }
+          return parsed;
         }
-        if (!parsed.savedDoctors) {
-          parsed.savedDoctors = [];
-        }
-      }
-      return parsed;
+      } catch (e) {}
     }
-    return {
-      name: "Guest Patient",
-      email: "patient@example.com",
-      phone: "+91 9876543210",
-      role: "patient",
-      location: "Koramangala, Bengaluru",
-      lat: 12.9348,
-      lng: 77.6189,
-      savedHospitals: ["hosp-apollo"],
-      savedDoctors: ["doc-arvind"],
-      familyMembers: [
-        { id: "fam-1", name: "Ramesh Sharma", age: 58, gender: "Male", relationship: "Father" },
-        { id: "fam-2", name: "Kanta Sharma", age: 52, gender: "Female", relationship: "Mother" }
-      ],
-      subscription: {
-        planName: "3-Day Pass",
-        expiresAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-        price: 10
-      }
-    };
+    return null;
   });
 
   const [hospitals, setHospitals] = useState<Hospital[]>(() => getHydratedHospitals());
@@ -622,7 +610,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // --- Persistence Effects ---
   useEffect(() => {
-    localStorage.setItem('insta_user', JSON.stringify(user));
+    if (user) {
+      localStorage.setItem('insta_user', JSON.stringify(user));
+    } else {
+      localStorage.removeItem('insta_user');
+    }
   }, [user]);
 
   useEffect(() => {
@@ -697,24 +689,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addNotification("Logged in as Admin", "Welcome to the InstaToken Central Command.", "success");
       return true;
     } else {
+      const cleanInput = emailOrPhone.trim();
+      const existing = customers.find(c => 
+        (c.email && c.email.toLowerCase() === cleanInput.toLowerCase()) ||
+        (c.phone && c.phone === cleanInput)
+      );
+
+      const resolvedName = existing?.name 
+        || (cleanInput.includes('@') 
+            ? cleanInput.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) 
+            : 'Patient');
+
       setUser({
-        name: "Guest Patient",
-        email: emailOrPhone.includes('@') ? emailOrPhone : "patient@example.com",
-        phone: !emailOrPhone.includes('@') ? emailOrPhone : "+91 9876543210",
+        name: resolvedName,
+        email: existing?.email || (cleanInput.includes('@') ? cleanInput : "patient@instatoken.com"),
+        phone: existing?.phone || (!cleanInput.includes('@') ? cleanInput : "+91 9876543210"),
         role: "patient",
-        savedHospitals: ["hosp-apollo"],
-        savedDoctors: ["doc-arvind"],
-        familyMembers: [
-          { id: "fam-1", name: "Ramesh Sharma", age: 58, gender: "Male", relationship: "Father" },
-          { id: "fam-2", name: "Kanta Sharma", age: 52, gender: "Female", relationship: "Mother" }
-        ],
-        subscription: {
+        savedHospitals: existing?.bookings?.map(b => b.hospitalId) || [],
+        savedDoctors: [],
+        familyMembers: (existing as any)?.familyMembers || [],
+        subscription: (existing as any)?.subscription || {
           planName: "3-Day Pass",
           expiresAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
           price: 10
         }
       });
-      addNotification("Logged in Successfully", "Welcome back! Keep track of your booking history.", "success");
+      addNotification("Logged in Successfully", `Welcome back, ${resolvedName}!`, "success");
       return true;
     }
   };
@@ -754,6 +754,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const logout = () => {
     setUser(null);
+    localStorage.removeItem('insta_user');
     addNotification("Logged Out", "You have successfully logged out of your account.", "info");
   };
 

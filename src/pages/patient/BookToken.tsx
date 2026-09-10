@@ -153,10 +153,10 @@ export const BookToken: React.FC = () => {
   
   // Patient details form
   const [name, setName] = useState(user?.name || '');
-  const [age, setAge] = useState<string>('28');
+  const [age, setAge] = useState<string>('');
   const [gender, setGender] = useState<string>('Male');
-  const [phone, setPhone] = useState(user?.phone || '+91 9876543210');
-  const [place, setPlace] = useState('Vijayawada');
+  const [phone, setPhone] = useState(user?.phone || '');
+  const [place, setPlace] = useState('');
   const [isExisting, setIsExisting] = useState(false);
   const [showRmpFields, setShowRmpFields] = useState(false);
   const [rmpName, setRmpName] = useState('');

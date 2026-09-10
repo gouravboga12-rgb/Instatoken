@@ -161,15 +161,25 @@ const TopNavbar: React.FC = () => {
             )}
           </button>
 
-          <button 
-            onClick={() => navigate('/profile')}
-            className="flex items-center gap-2 border border-slate-200 bg-slate-50 rounded-xl px-3 py-1.5 hover:ring-2 hover:ring-blue-100 transition-all cursor-pointer font-bold text-slate-700 text-xs"
-          >
-            <div className="w-6 h-6 bg-slate-200 text-slate-600 rounded-full flex items-center justify-center text-xs font-bold">
-              {user?.name.charAt(0)}
-            </div>
-            <span>{user?.name}</span>
-          </button>
+          {user ? (
+            <button 
+              onClick={() => navigate('/profile')}
+              className="flex items-center gap-2 border border-slate-200 bg-slate-50 rounded-xl px-3 py-1.5 hover:ring-2 hover:ring-blue-100 transition-all cursor-pointer font-bold text-slate-700 text-xs"
+            >
+              <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-bold">
+                {user.name.charAt(0).toUpperCase()}
+              </div>
+              <span>{user.name}</span>
+            </button>
+          ) : (
+            <button 
+              onClick={() => navigate('/login')}
+              className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-3.5 py-1.5 shadow-xs transition-all cursor-pointer font-bold text-xs border-none"
+            >
+              <UserIcon size={14} />
+              <span>Login / Sign Up</span>
+            </button>
+          )}
         </div>
       </div>
     </header>
@@ -361,13 +371,13 @@ const AppContent: React.FC = () => {
           </button>
           
           <button 
-            onClick={() => navigate('/profile')}
+            onClick={() => navigate(user ? '/profile' : '/login')}
             className={`flex flex-col items-center gap-0.5 cursor-pointer transition-colors ${
               isProfileActive ? 'text-blue-600 font-extrabold scale-105' : 'text-slate-400 hover:text-slate-600'
             }`}
           >
             <UserIcon size={20} />
-            <span className="text-[11.5px] font-bold">Profile</span>
+            <span className="text-[11.5px] font-bold">{user ? 'Profile' : 'Login'}</span>
           </button>
         </div>
       )}

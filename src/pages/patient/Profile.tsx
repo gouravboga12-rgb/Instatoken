@@ -63,26 +63,34 @@ export const Profile: React.FC = () => {
   const [detectingGps, setDetectingGps] = useState(false);
 
   // Edit profile form state
-  const [editName, setEditName] = useState(user?.name || 'Anil Kumar');
-  const [editPhone, setEditPhone] = useState(user?.phone || '+91 98856 14326');
-  const [editEmail, setEditEmail] = useState(user?.email || 'anil.kumar@example.com');
-  const [editLocation, setEditLocation] = useState(user?.location || currentLocation || 'Koramangala, Bengaluru');
+  const [editName, setEditName] = useState(user?.name || '');
+  const [editPhone, setEditPhone] = useState(user?.phone || '');
+  const [editEmail, setEditEmail] = useState(user?.email || '');
+  const [editLocation, setEditLocation] = useState(user?.location || currentLocation || '');
 
   useEffect(() => {
     if (user) {
       setEditName(user.name);
       setEditPhone(user.phone);
       setEditEmail(user.email);
-      setEditLocation(user.location || currentLocation || 'Koramangala, Bengaluru');
+      setEditLocation(user.location || currentLocation || '');
     }
   }, [user, currentLocation]);
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6 bg-white max-w-md mx-auto">
-        <div className="text-center">
-          <p className="text-sm font-bold text-slate-500 mb-4">Please login to view profile</p>
-          <Button onClick={() => navigate('/login')}>Login</Button>
+      <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50">
+        <div className="bg-white p-8 rounded-3xl border border-slate-200/80 shadow-md text-center max-w-sm w-full space-y-4">
+          <div className="w-14 h-14 bg-blue-50 text-blue-600 rounded-2xl mx-auto flex items-center justify-center">
+            <User size={28} />
+          </div>
+          <div>
+            <h3 className="text-lg font-black text-slate-900">Patient Account</h3>
+            <p className="text-xs text-slate-500 mt-1">Please sign in or register to access your profile, family members, and medical history.</p>
+          </div>
+          <Button onClick={() => navigate('/login')} className="w-full">
+            Sign In / Register
+          </Button>
         </div>
       </div>
     );

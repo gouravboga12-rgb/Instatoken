@@ -935,31 +935,43 @@ export const Home: React.FC<HomeProps> = ({
               </div>
 
               {/* User Profile Card */}
-              <div className="p-4 bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 text-white flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full border-2 border-white overflow-hidden bg-white/20 shrink-0 shadow-sm">
-                  <img 
-                    src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=300"
-                    alt={user?.name || 'Guest'}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'Guest')}&background=ffffff&color=2563EB&size=200&bold=true`;
-                    }}
-                  />
+              {user ? (
+                <div className="p-4 bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 text-white flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-full border-2 border-white overflow-hidden bg-white/20 shrink-0 shadow-sm flex items-center justify-center font-black text-lg">
+                    <img 
+                      src={`https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=ffffff&color=2563EB&size=200&bold=true`}
+                      alt={user.name}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-extrabold text-sm truncate flex items-center gap-1">
+                      <span>{user.name}</span>
+                      <span className="w-3.5 h-3.5 bg-white text-blue-600 rounded-full text-[9px] font-black inline-flex items-center justify-center shrink-0">✓</span>
+                    </h4>
+                    <p className="text-[10px] text-blue-100 font-medium truncate">{user.phone || user.email}</p>
+                    <button 
+                      onClick={() => { setIsMobileMenuOpen(false); navigate('/profile'); }}
+                      className="mt-1 text-[9.5px] font-black text-amber-300 hover:underline transition-all cursor-pointer block"
+                    >
+                      Manage Profile →
+                    </button>
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <h4 className="font-extrabold text-sm truncate flex items-center gap-1">
-                    <span>{user?.name || 'Guest Patient'}</span>
-                    <span className="w-3.5 h-3.5 bg-white text-blue-600 rounded-full text-[9px] font-black inline-flex items-center justify-center shrink-0">✓</span>
-                  </h4>
-                  <p className="text-[10px] text-blue-100 font-medium truncate">{user?.phone || '+91 98856 14326'}</p>
+              ) : (
+                <div className="p-4 bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 text-white flex items-center justify-between">
+                  <div>
+                    <h4 className="font-extrabold text-sm">Welcome to InstaToken</h4>
+                    <p className="text-[10px] text-blue-100 font-medium mt-0.5">Skip hospital lines & track live queue</p>
+                  </div>
                   <button 
-                    onClick={() => { setIsMobileMenuOpen(false); navigate('/profile'); }}
-                    className="mt-1 text-[9.5px] font-black text-amber-300 hover:underline transition-all cursor-pointer block"
+                    onClick={() => { setIsMobileMenuOpen(false); navigate('/login'); }}
+                    className="px-3.5 py-1.5 bg-white hover:bg-blue-50 text-blue-700 rounded-xl text-xs font-black shadow-xs transition-colors border-none cursor-pointer shrink-0"
                   >
-                    Manage Profile →
+                    Login / Sign Up
                   </button>
                 </div>
-              </div>
+              )}
 
               {/* All Pages Navigation List */}
               <div className="p-3 space-y-1">
