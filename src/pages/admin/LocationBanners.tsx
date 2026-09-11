@@ -2,7 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   MapPin, Plus, Search, CheckCircle2, Edit2, Trash2,
   Layers, Globe, Sparkles, RefreshCw,
-  X, ChevronRight, SlidersHorizontal
+  X, ChevronRight, SlidersHorizontal,
+  UploadCloud, Building2, Link as LinkIcon, ChevronDown
 } from 'lucide-react';
 import {
   INDIAN_STATES,
@@ -11,14 +12,7 @@ import {
 } from '../../utils/geoHierarchy';
 import type { BannerRecord } from '../../utils/geoHierarchy';
 
-const PRESET_BANNER_IMAGES = [
-  { label: 'Cardiology Camp', url: 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=1200&auto=format&fit=crop&q=80' },
-  { label: 'Rural Health Outreach', url: 'https://images.unsplash.com/photo-1629909613654-28e377c37b09?w=1200&auto=format&fit=crop&q=80' },
-  { label: 'Digital Token Drive', url: 'https://images.unsplash.com/photo-1538108149393-fbbd81895907?w=1200&auto=format&fit=crop&q=80' },
-  { label: 'Specialist Clinic', url: 'https://images.unsplash.com/photo-1587351021759-3e566b6af7cc?w=1200&auto=format&fit=crop&q=80' },
-  { label: 'Eye Care Camp', url: 'https://images.unsplash.com/photo-1516549655169-df83a0774514?w=1200&auto=format&fit=crop&q=80' },
-  { label: 'Metro FastTrack OPD', url: 'https://images.unsplash.com/photo-1586773860418-d37222d8fce3?w=1200&auto=format&fit=crop&q=80' }
-];
+const DEFAULT_BANNER_FALLBACK = 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=1200&auto=format&fit=crop&q=80';
 
 export const LocationBanners: React.FC = () => {
   const [banners, setBanners] = useState<BannerRecord[]>([]);
@@ -27,6 +21,14 @@ export const LocationBanners: React.FC = () => {
   const [selectedTab, setSelectedTab] = useState<'all' | 'country' | 'state' | 'district'>('all');
   const [stateFilter, setStateFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+
+  // Registered Hospitals for optional dropdown
+  const [hospitals, setHospitals] = useState<Array<{ id: string; name: string; city?: string; type?: string; image?: string; address?: string }>>([]);
+  const [hospitalSearch, setHospitalSearch] = useState('');
+  const [isHospitalDropdownOpen, setIsHospitalDropdownOpen] = useState(false);
+
+  // Banner image upload state
+  const [imageInputMode, setImageInputMode] = useState<'upload' | 'url'>('upload');
 
   // Modal State
   const [showModal, setShowModal] = useState(false);
@@ -39,6 +41,8 @@ export const LocationBanners: React.FC = () => {
     image: string;
     badge: string;
     ctaText: string;
+    destinationType: 'hospital' | 'custom';
+    hospitalId: string;
     linkUrl: string;
     status: 'active' | 'inactive';
     targetLevel: 'country' | 'state' | 'district' | 'mandal';
@@ -51,9 +55,11 @@ export const LocationBanners: React.FC = () => {
   }>({
     title: '',
     description: '',
-    image: PRESET_BANNER_IMAGES[0].url,
+    image: '',
     badge: 'HEALTH CAMP',
     ctaText: 'Book OPD Token',
+    destinationType: 'custom',
+    hospitalId: '',
     linkUrl: '/search',
     status: 'active',
     targetLevel: 'district',
@@ -88,9 +94,74 @@ export const LocationBanners: React.FC = () => {
     }
   };
 
+  // Fetch Hospitals for searchable dropdown
+  const fetchHospitals = async () => {
+    try {
+      const res = await fetch('/api/hospitals');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.hospitals)) {
+          setHospitals(data.hospitals);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load hospitals for banner dropdown:', err);
+    }
+  };
+
   useEffect(() => {
     fetchBanners();
+    fetchHospitals();
   }, []);
+
+  // Filtered hospitals for searchable dropdown
+  const filteredHospitals = useMemo(() => {
+    if (!hospitalSearch.trim()) return hospitals;
+    const q = hospitalSearch.toLowerCase();
+    return hospitals.filter(h => 
+      h.name?.toLowerCase().includes(q) ||
+      h.city?.toLowerCase().includes(q) ||
+      h.type?.toLowerCase().includes(q) ||
+      h.address?.toLowerCase().includes(q)
+    );
+  }, [hospitals, hospitalSearch]);
+
+  const handleSelectHospital = (h: any) => {
+    setFormData(prev => ({
+      ...prev,
+      destinationType: 'hospital',
+      hospitalId: h.id,
+      linkUrl: `/hospital-details/${h.id}`
+    }));
+    setIsHospitalDropdownOpen(false);
+    setHospitalSearch('');
+  };
+
+  const handleClearHospital = () => {
+    setFormData(prev => ({
+      ...prev,
+      destinationType: 'custom',
+      hospitalId: '',
+      linkUrl: '/search'
+    }));
+  };
+
+  // Handle Image File Upload (converts to base64 Data URL)
+  const handleImageFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 8 * 1024 * 1024) {
+      alert("Please select an image file under 8MB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setFormData(prev => ({ ...prev, image: reader.result as string }));
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Filtered Banners
   const filteredBanners = useMemo(() => {
@@ -132,12 +203,15 @@ export const LocationBanners: React.FC = () => {
   // Open Create Modal
   const handleOpenCreate = () => {
     setEditingBanner(null);
+    setImageInputMode('upload');
     setFormData({
       title: '',
       description: '',
-      image: PRESET_BANNER_IMAGES[0].url,
+      image: '',
       badge: 'HEALTH CAMP',
       ctaText: 'Book OPD Token',
+      destinationType: 'custom',
+      hospitalId: '',
       linkUrl: '/search',
       status: 'active',
       targetLevel: 'district',
@@ -148,19 +222,25 @@ export const LocationBanners: React.FC = () => {
       displayPanels: ['customer'],
       priority: 1
     });
+    setHospitalSearch('');
+    setIsHospitalDropdownOpen(false);
+    fetchHospitals();
     setShowModal(true);
   };
 
   // Open Edit Modal
   const handleOpenEdit = (b: BannerRecord) => {
     setEditingBanner(b);
+    setImageInputMode(b.image && b.image.startsWith('data:') ? 'upload' : 'url');
     setFormData({
       title: b.title || '',
       description: b.description || '',
-      image: b.image || PRESET_BANNER_IMAGES[0].url,
+      image: b.image || '',
       badge: b.badge || 'PROMOTION',
       ctaText: b.ctaText || 'Book OPD Token',
-      linkUrl: b.linkUrl || '/search',
+      destinationType: b.hospitalId ? 'hospital' : (b.destinationType || 'custom'),
+      hospitalId: b.hospitalId || '',
+      linkUrl: b.linkUrl || (b.hospitalId ? `/hospital-details/${b.hospitalId}` : '/search'),
       status: b.status,
       targetLevel: (b.targetLevel === 'village' ? 'mandal' : b.targetLevel) as any,
       country: 'India',
@@ -170,6 +250,9 @@ export const LocationBanners: React.FC = () => {
       displayPanels: b.displayPanels || ['customer'],
       priority: b.priority || 1
     });
+    setHospitalSearch('');
+    setIsHospitalDropdownOpen(false);
+    fetchHospitals();
     setShowModal(true);
   };
 
@@ -182,9 +265,13 @@ export const LocationBanners: React.FC = () => {
       return;
     }
     if (!formData.image.trim()) {
-      alert('Please select or enter a banner image URL.');
+      alert('Please upload a banner image or enter an image URL.');
       return;
     }
+
+    const resolvedLink = formData.hospitalId 
+      ? `/hospital-details/${formData.hospitalId}` 
+      : (formData.linkUrl.trim() || '/search');
 
     const payload = {
       title: formData.title.trim(),
@@ -192,7 +279,9 @@ export const LocationBanners: React.FC = () => {
       image: formData.image.trim(),
       badge: formData.badge.trim(),
       ctaText: formData.ctaText.trim(),
-      linkUrl: formData.linkUrl.trim() || '/search',
+      hospitalId: formData.hospitalId || null,
+      destinationType: formData.hospitalId ? 'hospital' : formData.destinationType,
+      linkUrl: resolvedLink,
       status: formData.status,
       targetLevel: formData.targetLevel,
       country: 'India',
@@ -560,7 +649,7 @@ export const LocationBanners: React.FC = () => {
                     alt={banner.title}
                     className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-300"
                     onError={e => {
-                      (e.target as HTMLImageElement).src = PRESET_BANNER_IMAGES[0].url;
+                      (e.target as HTMLImageElement).src = DEFAULT_BANNER_FALLBACK;
                     }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent" />
@@ -596,10 +685,30 @@ export const LocationBanners: React.FC = () => {
                 </div>
 
                 {/* Card Body */}
-                <div className="p-4 flex-1 flex flex-col justify-between space-y-3">
+                <div className="p-4 flex-1 flex flex-col justify-between space-y-2.5">
                   <p className="text-xs text-slate-500 font-medium line-clamp-2 leading-relaxed">
                     {banner.description || 'Campaign announcement displayed to customers based on their detected location.'}
                   </p>
+
+                  {/* Destination Hospital / URL Info */}
+                  <div>
+                    {banner.hospitalId ? (
+                      (() => {
+                        const h = hospitals.find(hosp => hosp.id === banner.hospitalId);
+                        return (
+                          <div className="flex items-center gap-1.5 text-[11px] font-bold text-indigo-700 bg-indigo-50/90 border border-indigo-150 px-2.5 py-1 rounded-xl truncate">
+                            <Building2 size={13} className="shrink-0 text-indigo-600" />
+                            <span className="truncate">Hospital: {h?.name || banner.hospitalId}</span>
+                          </div>
+                        );
+                      })()
+                    ) : (
+                      <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-xl truncate">
+                        <LinkIcon size={12} className="shrink-0 text-slate-400" />
+                        <span className="truncate">URL: {banner.linkUrl || '/search'}</span>
+                      </div>
+                    )}
+                  </div>
 
                   <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
                     <span className="text-[11px] font-extrabold text-blue-600 flex items-center gap-1 bg-blue-50 px-2.5 py-1 rounded-xl">
@@ -704,45 +813,107 @@ export const LocationBanners: React.FC = () => {
                 </div>
               </div>
 
-              {/* Step 2: Banner Image with Presets */}
+              {/* Step 2: Banner Image Upload (Direct File Upload & Optional URL) */}
               <div className="space-y-3 pt-3 border-t border-slate-100">
-                <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                  <span className="w-4 h-4 rounded-full bg-blue-600 text-white text-[10px] flex items-center justify-center">2</span>
-                  Banner Image
-                </h4>
-
-                <div>
-                  <label className="block text-xs font-extrabold text-slate-700 mb-1">Image URL *</label>
-                  <input
-                    type="url"
-                    required
-                    value={formData.image}
-                    onChange={e => setFormData({ ...formData, image: e.target.value })}
-                    placeholder="https://images.unsplash.com/..."
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium text-slate-800 focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-
-                {/* Quick Presets */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-500 mb-1.5">Or choose a healthcare preset:</label>
-                  <div className="flex flex-wrap gap-2">
-                    {PRESET_BANNER_IMAGES.map(p => (
-                      <button
-                        key={p.label}
-                        type="button"
-                        onClick={() => setFormData({ ...formData, image: p.url })}
-                        className={`text-[11px] font-extrabold px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
-                          formData.image === p.url
-                            ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                            : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
-                        }`}
-                      >
-                        {p.label}
-                      </button>
-                    ))}
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                    <span className="w-4 h-4 rounded-full bg-blue-600 text-white text-[10px] flex items-center justify-center">2</span>
+                    Banner Upload
+                  </h4>
+                  <div className="flex items-center gap-1 text-[11px] font-bold">
+                    <button
+                      type="button"
+                      onClick={() => setImageInputMode('upload')}
+                      className={`px-2.5 py-0.5 rounded-lg transition-colors cursor-pointer ${
+                        imageInputMode === 'upload' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-400 hover:text-slate-600'
+                      }`}
+                    >
+                      Upload File
+                    </button>
+                    <span className="text-slate-300">|</span>
+                    <button
+                      type="button"
+                      onClick={() => setImageInputMode('url')}
+                      className={`px-2.5 py-0.5 rounded-lg transition-colors cursor-pointer ${
+                        imageInputMode === 'url' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-400 hover:text-slate-600'
+                      }`}
+                    >
+                      Paste Image URL
+                    </button>
                   </div>
                 </div>
+
+                {imageInputMode === 'upload' ? (
+                  <div>
+                    <input
+                      id="banner-file-input"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageFileUpload}
+                      className="hidden"
+                    />
+
+                    {!formData.image ? (
+                      <label
+                        htmlFor="banner-file-input"
+                        className="border-2 border-dashed border-slate-300 hover:border-blue-500 bg-slate-50/70 hover:bg-blue-50/30 rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer transition-all group"
+                      >
+                        <div className="w-12 h-12 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center mb-2.5 group-hover:scale-110 transition-transform">
+                          <UploadCloud size={24} />
+                        </div>
+                        <p className="text-xs font-black text-slate-800 group-hover:text-blue-600 transition-colors">
+                          Click to Browse or Drag & Drop Banner Image
+                        </p>
+                        <p className="text-[10px] font-semibold text-slate-400 mt-0.5">
+                          Supports PNG, JPG, JPEG, WEBP (Max 8MB · Recommended 1200 x 600 px)
+                        </p>
+                      </label>
+                    ) : (
+                      <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <img
+                            src={formData.image}
+                            alt="Uploaded Banner"
+                            className="w-16 h-12 rounded-xl object-cover border border-slate-200 shrink-0"
+                          />
+                          <div className="min-w-0">
+                            <span className="inline-flex items-center gap-1 text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                              <CheckCircle2 size={10} /> Banner Image Ready
+                            </span>
+                            <p className="text-xs font-bold text-slate-700 truncate mt-0.5">Image uploaded from device</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <label
+                            htmlFor="banner-file-input"
+                            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold cursor-pointer transition-colors shadow-xs"
+                          >
+                            Change Image
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => setFormData(prev => ({ ...prev, image: '' }))}
+                            className="px-2.5 py-1.5 bg-slate-200 hover:bg-red-50 hover:text-red-600 text-slate-600 rounded-xl text-xs font-bold cursor-pointer transition-colors"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-xs font-extrabold text-slate-700 mb-1">Image Web URL *</label>
+                    <input
+                      type="url"
+                      required={!formData.image}
+                      value={formData.image}
+                      onChange={e => setFormData({ ...formData, image: e.target.value })}
+                      placeholder="https://images.unsplash.com/..."
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-medium text-slate-800 focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                )}
 
                 {/* Live Card Preview */}
                 {formData.image && (
@@ -760,7 +931,7 @@ export const LocationBanners: React.FC = () => {
                           </span>
                         )}
                         <h5 className="text-xs font-black truncate">{formData.title || 'Your Banner Title'}</h5>
-                        <p className="text-[10px] text-slate-200 truncate">{formData.description || 'Your description'}</p>
+                        <p className="text-[10px] text-slate-200 truncate">{formData.description || 'Your description will appear here'}</p>
                       </div>
                     </div>
                   </div>
@@ -904,13 +1075,138 @@ export const LocationBanners: React.FC = () => {
                 </div>
               </div>
 
-              {/* Step 4: Button & Status */}
-              <div className="space-y-3 pt-3 border-t border-slate-100">
+              {/* Step 4: Button Action, Hospital Redirection & URL Options */}
+              <div className="space-y-4 pt-3 border-t border-slate-100">
                 <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
                   <span className="w-4 h-4 rounded-full bg-blue-600 text-white text-[10px] flex items-center justify-center">4</span>
-                  Button Action & Status
+                  Banner Action & Hospital Redirection (Optional)
                 </h4>
 
+                {/* Option 1: Searchable Registered Hospital Dropdown */}
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-extrabold text-slate-800 flex items-center gap-1.5">
+                      <Building2 size={14} className="text-blue-600" />
+                      Link to a Registered Hospital (Optional)
+                    </label>
+                    {formData.hospitalId && (
+                      <button
+                        type="button"
+                        onClick={handleClearHospital}
+                        className="text-[11px] font-bold text-red-600 hover:text-red-700 cursor-pointer"
+                      >
+                        ✕ Remove Hospital Link
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-500 font-medium">
+                    When patients click this banner, automatically redirect them to this hospital's OPD booking page.
+                  </p>
+
+                  {/* Selected Hospital Display or Dropdown Toggle */}
+                  {formData.hospitalId ? (
+                    (() => {
+                      const selHosp = hospitals.find(h => h.id === formData.hospitalId);
+                      return (
+                        <div className="p-3 bg-white border border-blue-200 rounded-xl flex items-center justify-between shadow-xs">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-black text-sm shrink-0">
+                              <Building2 size={20} />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-extrabold text-slate-900 text-xs truncate">{selHosp?.name || 'Partner Hospital'}</span>
+                                <span className="text-[9px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.2 rounded-full shrink-0">
+                                  ✓ Linked
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-slate-500 font-medium truncate">
+                                {selHosp?.city || 'Location'} · {selHosp?.type || 'Multi Speciality'}
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setIsHospitalDropdownOpen(!isHospitalDropdownOpen)}
+                            className="text-xs font-bold text-blue-600 hover:text-blue-700 px-3 py-1.5 rounded-lg hover:bg-blue-50 cursor-pointer shrink-0"
+                          >
+                            Change
+                          </button>
+                        </div>
+                      );
+                    })()
+                  ) : (
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setIsHospitalDropdownOpen(!isHospitalDropdownOpen)}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 flex items-center justify-between hover:border-slate-300 transition-colors cursor-pointer"
+                      >
+                        <span className="flex items-center gap-2">
+                          <Building2 size={14} className="text-slate-400" />
+                          <span>Select a Registered Hospital (Optional)...</span>
+                        </span>
+                        <ChevronDown size={15} className={`text-slate-400 transition-transform ${isHospitalDropdownOpen ? 'rotate-180' : ''}`} />
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Searchable Hospital Dropdown Menu */}
+                  {isHospitalDropdownOpen && (
+                    <div className="mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden animate-fadeIn z-30">
+                      <div className="p-2.5 border-b border-slate-100 bg-slate-50/50">
+                        <div className="relative">
+                          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                          <input
+                            type="text"
+                            autoFocus
+                            value={hospitalSearch}
+                            onChange={e => setHospitalSearch(e.target.value)}
+                            placeholder="Search hospital name, city, or specialty..."
+                            className="w-full pl-8 pr-3 py-2 text-xs font-bold bg-white rounded-xl border border-slate-200 text-slate-900 focus:outline-none focus:border-blue-500"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="max-h-56 overflow-y-auto divide-y divide-slate-100 p-1">
+                        {filteredHospitals.length > 0 ? (
+                          filteredHospitals.map(h => (
+                            <div
+                              key={h.id}
+                              onClick={() => handleSelectHospital(h)}
+                              className={`p-2.5 rounded-xl flex items-center justify-between hover:bg-blue-50 cursor-pointer transition-colors ${
+                                formData.hospitalId === h.id ? 'bg-blue-50/80' : ''
+                              }`}
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center font-black text-xs shrink-0">
+                                  <Building2 size={15} />
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="font-extrabold text-slate-900 text-xs truncate">{h.name}</p>
+                                  <p className="text-[10px] text-slate-500 font-medium truncate">
+                                    {h.city || 'Location'} · {h.type || 'Hospital'}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="text-right shrink-0">
+                                <span className="text-[9px] font-black bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 rounded-full">
+                                  Registered Partner
+                                </span>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="p-4 text-center text-xs font-bold text-slate-400">
+                            No registered hospitals found matching "{hospitalSearch}".
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Option 2: Button Label & Redirect URL Field */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-extrabold text-slate-700 mb-1">Button Label</label>
@@ -924,17 +1220,24 @@ export const LocationBanners: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-extrabold text-slate-700 mb-1">Button Link</label>
+                    <label className="block text-xs font-extrabold text-slate-700 mb-1">
+                      Redirect URL (Page or Link) *
+                    </label>
                     <input
                       type="text"
+                      required
                       value={formData.linkUrl}
                       onChange={e => setFormData({ ...formData, linkUrl: e.target.value })}
-                      placeholder="/search"
+                      placeholder="e.g. /search, /hospital-details/..., or https://..."
                       className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800"
                     />
+                    <span className="text-[10px] text-slate-400 font-medium block mt-0.5">
+                      {formData.hospitalId ? 'Auto-linked to selected hospital OPD page' : 'Enter /search, /bookings, or full URL https://...'}
+                    </span>
                   </div>
                 </div>
 
+                {/* Publish Status */}
                 <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200">
                   <div>
                     <span className="text-xs font-extrabold text-slate-900 block">Publish Status</span>

@@ -120,6 +120,7 @@ export const Home: React.FC<HomeProps> = ({
 
         return {
           id: b.id,
+          hospitalId: b.hospitalId,
           badge: b.badge || `${b.targetLevel.toUpperCase()} SPECIAL`,
           title: b.title,
           location: locLabel,
@@ -127,7 +128,7 @@ export const Home: React.FC<HomeProps> = ({
           image: b.image,
           cta: b.ctaText || 'Book Token',
           targetLevel: b.targetLevel,
-          linkUrl: b.linkUrl || '/search',
+          linkUrl: b.hospitalId ? `/hospital-details/${b.hospitalId}` : (b.linkUrl || '/search'),
           isLocationTargeted: true,
           rating: 4.9,
           reviews: 1240
@@ -154,6 +155,19 @@ export const Home: React.FC<HomeProps> = ({
     }, 5000);
     return () => clearInterval(timer);
   }, [displayBanners.length]);
+
+  const handleBannerClick = (b: any) => {
+    if (b.hospitalId) {
+      onHospitalSelect(b.hospitalId);
+      return;
+    }
+    const target = b.linkUrl || (b.isLocationTargeted ? '/search' : `/hospital/${b.id}`);
+    if (target.startsWith('http://') || target.startsWith('https://')) {
+      window.open(target, '_blank', 'noopener,noreferrer');
+    } else {
+      navigate(target);
+    }
+  };
 
   const isComingSoonCity = currentLocation.includes('Vijayawada');
 
@@ -573,13 +587,7 @@ export const Home: React.FC<HomeProps> = ({
           return (
             <div 
               className="relative rounded-3xl overflow-hidden shadow-xl text-white min-h-[220px] md:min-h-[290px] p-4 md:p-8 flex flex-col justify-between transition-all duration-700 group cursor-pointer border border-slate-800/40"
-              onClick={() => {
-                if (currentBanner.isLocationTargeted && currentBanner.linkUrl) {
-                  navigate(currentBanner.linkUrl);
-                } else {
-                  onHospitalSelect(currentBanner.id);
-                }
-              }}
+              onClick={() => handleBannerClick(currentBanner)}
             >
               {/* Full background photo with smooth scale animation */}
               <img 
@@ -672,11 +680,7 @@ export const Home: React.FC<HomeProps> = ({
                     size="sm" 
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (currentBanner.isLocationTargeted && currentBanner.linkUrl) {
-                        navigate(currentBanner.linkUrl);
-                      } else {
-                        onHospitalSelect(currentBanner.id);
-                      }
+                      handleBannerClick(currentBanner);
                     }}
                     className="bg-white text-blue-600 hover:bg-blue-50 py-2.5 px-5 rounded-xl font-black text-xs sm:text-sm flex items-center gap-2 cursor-pointer border-none shadow-lg shadow-black/30 hover:scale-105 transition-all"
                   >

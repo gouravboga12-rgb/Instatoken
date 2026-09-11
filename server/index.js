@@ -2213,6 +2213,8 @@ app.post('/api/banners', async (req, res) => {
     badge: bannerData.badge || 'LOCAL HEALTH UPDATE',
     linkUrl: bannerData.linkUrl || '/search',
     ctaText: bannerData.ctaText || 'Book Token',
+    hospitalId: bannerData.hospitalId || null,
+    destinationType: bannerData.destinationType || (bannerData.hospitalId ? 'hospital' : 'custom'),
     status: initialStatus,
     active: isBannerActive,
     startDate: bannerData.startDate || null,

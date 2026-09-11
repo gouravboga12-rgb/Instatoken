@@ -25,6 +25,8 @@ export interface BannerRecord {
   badge?: string;
   linkUrl?: string;
   ctaText?: string;
+  hospitalId?: string;
+  destinationType?: 'hospital' | 'custom';
   status: 'active' | 'inactive';
   startDate?: string;
   endDate?: string;
