@@ -201,6 +201,15 @@ const AppContent: React.FC = () => {
   const isAdminRoute = location.pathname.startsWith('/admin') || location.pathname.startsWith('/admin-login');
   const isManagementRoute = isHospitalRoute || isAdminRoute;
 
+  // Panel dashboard routes that manage their own full-height application shell
+  const isPanelRoute = (
+    (location.pathname.startsWith('/hospital/') || location.pathname === '/hospital') &&
+    !location.pathname.startsWith('/hospital-login') &&
+    !location.pathname.startsWith('/hospital-signup') &&
+    !location.pathname.startsWith('/hospital-details') &&
+    !location.pathname.startsWith('/hospitals')
+  ) || isAdminRoute;
+
   // App load Splash Screen state - ONLY for customer/patient entry, under 1s (400ms)
   const [showSplash, setShowSplash] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
@@ -266,7 +275,7 @@ const AppContent: React.FC = () => {
   const isProfileActive = location.pathname === '/profile';
 
   return (
-    <div className={`min-h-screen bg-slate-50 flex flex-col justify-between relative ${isManagementRoute ? 'h-screen overflow-hidden' : ''}`} style={{ overflowX: 'clip' }}>
+    <div className={`min-h-screen bg-slate-50 flex flex-col justify-between relative ${isPanelRoute ? 'h-screen overflow-hidden' : ''}`} style={{ overflowX: 'clip' }}>
       {/* Desktop Navigation Header */}
       {!isManagementRoute && <TopNavbar />}
 

@@ -226,10 +226,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans">
+    <div className="h-screen w-full bg-slate-50 flex flex-col md:flex-row font-sans overflow-hidden">
       
       {/* ── LEFT NAVIGATION SIDEBAR (Desktop) ───────────────────────────── */}
-      <div className="hidden md:flex flex-col w-64 bg-slate-900 border-r border-slate-800 p-5 text-white h-screen sticky top-0 justify-between shrink-0">
+      <div className="hidden md:flex flex-col w-64 bg-slate-900 border-r border-slate-800 p-5 text-white h-full justify-between shrink-0 overflow-y-auto">
         <div className="space-y-6">
           {/* Logo brand block */}
           <div className="flex items-center gap-2.5 px-2 py-1 cursor-pointer" onClick={() => navigate('/')}>
@@ -314,7 +314,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
         </div>
 
         {/* Bottom Operator Footer */}
-        <div className="space-y-2">
+        <div className="space-y-2 pt-4">
           <div className="bg-slate-800/60 rounded-2xl p-3 border border-slate-800 text-[10px] text-slate-400">
             <span className="font-extrabold text-white flex items-center gap-1.5 mb-0.5 text-xs">
               <ShieldCheck size={14} className="text-blue-500" />
@@ -333,44 +333,47 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
         </div>
       </div>
 
-      {/* ── MOBILE HEADER (Mobile Only) ─────────────────────────────────── */}
-      <div className="md:hidden flex flex-col w-full bg-slate-900 text-white">
-        <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button 
-              onClick={() => navigate('/')}
-              className="p-2 rounded-xl hover:bg-slate-800 text-slate-400 cursor-pointer"
-            >
-              <ArrowLeft size={16} />
-            </button>
-            <div>
-              <h2 className="text-base font-black tracking-tight">Super Admin Panel</h2>
-              <p className="text-[9px] text-blue-400 font-bold uppercase tracking-wider">InstaToken Central</p>
+      {/* ── RIGHT COLUMN (Header on mobile + Scrollable Main Content) ───── */}
+      <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden">
+        {/* ── MOBILE HEADER (Mobile Only) ─────────────────────────────────── */}
+        <div className="md:hidden flex flex-col w-full bg-slate-900 text-white shrink-0">
+          <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={() => navigate('/')}
+                className="p-2 rounded-xl hover:bg-slate-800 text-slate-400 cursor-pointer"
+              >
+                <ArrowLeft size={16} />
+              </button>
+              <div>
+                <h2 className="text-base font-black tracking-tight">Super Admin Panel</h2>
+                <p className="text-[9px] text-blue-400 font-bold uppercase tracking-wider">InstaToken Central</p>
+              </div>
             </div>
+            <Badge variant="blue" className="bg-blue-500/20 text-blue-400 border-none py-1">
+              Super Admin
+            </Badge>
           </div>
-          <Badge variant="blue" className="bg-blue-500/20 text-blue-400 border-none py-1">
-            Super Admin
-          </Badge>
+
+          {/* Mobile Nav Tabs */}
+          <div className="flex overflow-x-auto px-2 border-b border-slate-800 text-[10px] font-bold uppercase tracking-wider no-scrollbar">
+            {(['stats', 'hospitals', 'customers', 'banners', 'financials'] as const).map(tab => (
+              <button
+                key={tab}
+                onClick={() => setAdminTab(tab)}
+                className={`px-3 py-3 border-b-2 whitespace-nowrap cursor-pointer ${
+                  adminTab === tab ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400'
+                }`}
+              >
+                {tab === 'stats' ? 'Overview' : tab === 'hospitals' ? 'Hospitals' : tab === 'customers' ? 'Customers' : tab === 'banners' ? 'Banners' : 'Revenue'}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Mobile Nav Tabs */}
-        <div className="flex overflow-x-auto px-2 border-b border-slate-800 text-[10px] font-bold uppercase tracking-wider no-scrollbar">
-          {(['stats', 'hospitals', 'customers', 'banners', 'financials'] as const).map(tab => (
-            <button
-              key={tab}
-              onClick={() => setAdminTab(tab)}
-              className={`px-3 py-3 border-b-2 whitespace-nowrap cursor-pointer ${
-                adminTab === tab ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400'
-              }`}
-            >
-              {tab === 'stats' ? 'Overview' : tab === 'hospitals' ? 'Hospitals' : tab === 'customers' ? 'Customers' : tab === 'banners' ? 'Banners' : 'Revenue'}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* ── MAIN CONTENT AREA ───────────────────────────────────────────── */}
-      <div className="flex-grow px-4 py-6 md:p-8 max-w-[1400px] mx-auto w-full space-y-6">
+        {/* ── MAIN CONTENT SCROLLABLE AREA ────────────────────────────────── */}
+        <main className="flex-1 overflow-y-auto px-4 py-6 md:p-8 w-full">
+          <div className="max-w-[1400px] mx-auto w-full space-y-6 pb-24">
         
         {/* ── TAB 1: SYSTEM OVERVIEW ───────────────────────────────────── */}
         {adminTab === 'stats' && (
@@ -1316,7 +1319,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
           </div>
         )}
 
-      </div>
+        </div>
+      </main>
+    </div>
 
       {/* ── CUSTOMER TOKENS & HISTORY MODAL DIALOG ───────────────────────── */}
       {selectedCustomerModal && (
