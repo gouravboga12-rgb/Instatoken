@@ -87,23 +87,31 @@ export const broadcastGlobalSync = (type: string, data?: any) => {
     }
   }
 
-  // 3. Automatically push tokens/appointments changes to AWS EC2 Backend
+  // 3. Automatically push tokens/appointments changes to AWS EC2 Backend ONLY if valid new records exist
   if (typeof window !== 'undefined') {
-    const savedHToks = localStorage.getItem('insta_hospital_tokens');
-    const savedAppts = localStorage.getItem('insta_appointments');
+    const isTokenEvent = ['TOKEN_BOOKED', 'HOSPITAL_TOKEN_CREATED', 'HOSPITAL_TOKENS_UPDATED'].includes(type);
+    if (isTokenEvent && data) {
+      const isDummyToken = (t: any) =>
+        !t ||
+        ['tok-101', 'tok-102', 'tok-103', 'tok-104', 'tok-105', 'tok-106', 'tok-107', 'tok-108', 'tok-98', 'tok-99', 'tok-100', 'tok-1001'].includes(t.id) ||
+        ['Rahul Kumar', 'Priya Sharma', 'Mohan Reddy', 'Ananya Patel', 'Ramesh Kumar', 'Neha Singh', 'Mohan Das', 'Lakshmi Devi', 'Suresh Reddy', 'Kavitha Rao', 'Arun Verma', 'Guest Patient'].includes(t.patientName);
 
-    const isDummyToken = (t: any) =>
-      !t ||
-      ['tok-101', 'tok-102', 'tok-103', 'tok-104', 'tok-105', 'tok-106', 'tok-107', 'tok-108', 'tok-98', 'tok-99', 'tok-100', 'tok-1001'].includes(t.id) ||
-      ['Rahul Kumar', 'Priya Sharma', 'Mohan Reddy', 'Ananya Patel', 'Ramesh Kumar', 'Neha Singh', 'Mohan Das', 'Lakshmi Devi', 'Suresh Reddy', 'Kavitha Rao', 'Arun Verma', 'Guest Patient'].includes(t.patientName);
+      const toSync: any = {};
+      if (data.tokens && Array.isArray(data.tokens) && data.tokens.length > 0) {
+        const clean = data.tokens.filter((t: any) => !isDummyToken(t));
+        if (clean.length > 0) toSync.tokens = clean;
+      }
+      if (data.token && !isDummyToken(data.token)) {
+        toSync.tokens = [data.token];
+      }
+      if (data.appointment && !isDummyToken(data.appointment)) {
+        toSync.appointments = [data.appointment];
+      }
 
-    const cleanTokens = savedHToks ? (JSON.parse(savedHToks) as any[]).filter(t => !isDummyToken(t)) : [];
-    const cleanAppts = savedAppts ? (JSON.parse(savedAppts) as any[]).filter(t => !isDummyToken(t)) : [];
-
-    pushCloudSync({
-      tokens: cleanTokens,
-      appointments: cleanAppts,
-    }).catch(() => {});
+      if (Object.keys(toSync).length > 0) {
+        pushCloudSync(toSync).catch(() => {});
+      }
+    }
   }
 };
 

@@ -79,8 +79,8 @@ export const HospitalSettings: React.FC = () => {
   const loadedKeyRef = React.useRef<string>('');
   React.useEffect(() => {
     if (hospitalProfile) {
-      const syncKey = `${hospitalProfile.id}_${hospitalProfile.address}_${hospitalProfile.lat}_${hospitalProfile.lng}`;
-      if (syncKey !== loadedKeyRef.current) {
+      const syncKey = `${hospitalProfile.id}`;
+      if (loadedKeyRef.current !== syncKey) {
         loadedKeyRef.current = syncKey;
         setForm({
           name: hospitalProfile.name || '',
@@ -137,20 +137,30 @@ export const HospitalSettings: React.FC = () => {
         const data = await res.json();
         if (data.success && data.url) {
           setForm(prev => ({ ...prev, [field]: data.url }));
+          setUploadingPhoto(false);
           return;
         }
       }
+      // Base64 fallback
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const b64 = ev.target?.result as string;
+        setForm(prev => ({ ...prev, [field]: b64 }));
+        setUploadingPhoto(false);
+      };
+      reader.onerror = () => setUploadingPhoto(false);
+      reader.readAsDataURL(file);
     } catch (e) {
       console.warn('S3 upload failed, using base64 fallback:', e);
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const b64 = ev.target?.result as string;
+        setForm(prev => ({ ...prev, [field]: b64 }));
+        setUploadingPhoto(false);
+      };
+      reader.onerror = () => setUploadingPhoto(false);
+      reader.readAsDataURL(file);
     }
-    // Base64 fallback
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const b64 = ev.target?.result as string;
-      setForm(prev => ({ ...prev, [field]: b64 }));
-    };
-    reader.readAsDataURL(file);
-    setUploadingPhoto(false);
   };
 
   // Upload multiple images & videos for hospital facility gallery
@@ -158,41 +168,44 @@ export const HospitalSettings: React.FC = () => {
     if (!files || files.length === 0) return;
     setUploadingGallery(true);
     const newItems: any[] = [];
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const isVideo = file.type.startsWith('video') || file.name.endsWith('.mp4') || file.name.endsWith('.webm');
-      try {
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('folder', 'hospital-gallery');
-        const res = await fetch('/api/media/upload', { method: 'POST', body: formData });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.success && data.url) {
-            newItems.push({
-              id: `med-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-              type: isVideo ? 'video' : 'image',
-              url: data.url,
-              caption: file.name.replace(/\.[^/.]+$/, '')
-            });
-            continue;
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const isVideo = file.type.startsWith('video') || file.name.endsWith('.mp4') || file.name.endsWith('.webm');
+        try {
+          const formData = new FormData();
+          formData.append('file', file);
+          formData.append('folder', 'hospital-gallery');
+          const res = await fetch('/api/media/upload', { method: 'POST', body: formData });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.success && data.url) {
+              newItems.push({
+                id: `med-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+                type: isVideo ? 'video' : 'image',
+                url: data.url,
+                caption: file.name.replace(/\.[^/.]+$/, '')
+              });
+              continue;
+            }
           }
+        } catch (e) {
+          console.warn('Gallery upload failed for', file.name, e);
         }
-      } catch (e) {
-        console.warn('Gallery upload failed for', file.name, e);
       }
+      if (newItems.length > 0) {
+        setForm(prev => {
+          const updatedGallery = [...(prev.gallery || []), ...newItems];
+          return {
+            ...prev,
+            gallery: updatedGallery,
+            coverImage: prev.coverImage || updatedGallery.find(m => m.type === 'image')?.url || ''
+          };
+        });
+      }
+    } finally {
+      setUploadingGallery(false);
     }
-    if (newItems.length > 0) {
-      setForm(prev => {
-        const updatedGallery = [...(prev.gallery || []), ...newItems];
-        return {
-          ...prev,
-          gallery: updatedGallery,
-          coverImage: prev.coverImage || updatedGallery.find(m => m.type === 'image')?.url || ''
-        };
-      });
-    }
-    setUploadingGallery(false);
   };
 
   const handleAddMediaUrl = () => {
@@ -445,6 +458,7 @@ export const HospitalSettings: React.FC = () => {
                         onChange={e => {
                           const file = e.target.files?.[0];
                           if (file) handlePhotoUpload(file, 'coverImage');
+                          e.target.value = '';
                         }}
                       />
                       <button
@@ -499,6 +513,7 @@ export const HospitalSettings: React.FC = () => {
                         onChange={e => {
                           const files = e.target.files;
                           if (files) handleGalleryFilesUpload(files);
+                          e.target.value = '';
                         }}
                       />
                       <button
@@ -646,6 +661,7 @@ export const HospitalSettings: React.FC = () => {
                         onChange={e => {
                           const file = e.target.files?.[0];
                           if (file) handlePhotoUpload(file, 'logo');
+                          e.target.value = '';
                         }}
                       />
                       <button

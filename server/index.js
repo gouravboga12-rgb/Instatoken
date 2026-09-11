@@ -517,6 +517,80 @@ async function getUnifiedStore() {
           store.locationBanners = INITIAL_LOCATION_BANNERS;
         }
 
+        // Merge live tokens from PostgreSQL tokens table into store.tokens
+        try {
+          const tokRows = await query(`SELECT data FROM tokens ORDER BY created_at DESC LIMIT 300`);
+          if (tokRows.rows.length > 0) {
+            store.tokens = store.tokens || [];
+            tokRows.rows.forEach(r => {
+              if (r.data && !isDummyTokenRecord(r.data)) {
+                const idx = store.tokens.findIndex(t => t.id === r.data.id);
+                if (idx === -1) {
+                  store.tokens.push(r.data);
+                } else {
+                  store.tokens[idx] = { ...store.tokens[idx], ...r.data };
+                }
+              }
+            });
+          }
+        } catch (tokErr) {
+          console.warn('Error merging tokens from RDS:', tokErr.message);
+        }
+
+        // Merge live appointments from PostgreSQL appointments table into store.appointments
+        try {
+          const apptRows = await query(`SELECT data FROM appointments ORDER BY created_at DESC LIMIT 300`);
+          if (apptRows.rows.length > 0) {
+            store.appointments = store.appointments || [];
+            apptRows.rows.forEach(r => {
+              if (r.data && !isDummyApptRecord(r.data)) {
+                const idx = store.appointments.findIndex(a => a.id === r.data.id);
+                if (idx === -1) {
+                  store.appointments.push(r.data);
+                } else {
+                  store.appointments[idx] = { ...store.appointments[idx], ...r.data };
+                }
+              }
+            });
+          }
+        } catch (apptErr) {
+          console.warn('Error merging appointments from RDS:', apptErr.message);
+        }
+
+        // Merge live hospitals and profiles from PostgreSQL
+        try {
+          const hospRows = await query(`SELECT id, data FROM hospitals`);
+          if (hospRows.rows.length > 0) {
+            store.hospitals = store.hospitals || [];
+            hospRows.rows.forEach(r => {
+              if (r.data) {
+                const idx = store.hospitals.findIndex(h => h.id === r.id);
+                if (idx === -1) store.hospitals.push(r.data);
+                else store.hospitals[idx] = { ...store.hospitals[idx], ...r.data };
+              }
+            });
+          }
+        } catch (hospErr) {
+          console.warn('Error merging hospitals from RDS:', hospErr.message);
+        }
+
+        try {
+          const profRows = await query(`SELECT hospital_id, profile_data FROM hospital_profiles`);
+          if (profRows.rows.length > 0) {
+            store.hospitalProfiles = store.hospitalProfiles || {};
+            profRows.rows.forEach(r => {
+              if (r.profile_data) {
+                store.hospitalProfiles[r.hospital_id] = {
+                  ...(store.hospitalProfiles[r.hospital_id] || {}),
+                  ...r.profile_data
+                };
+              }
+            });
+          }
+        } catch (profErr) {
+          console.warn('Error merging hospital profiles from RDS:', profErr.message);
+        }
+
         ensureHospitalProfilesSynced(store);
         return store;
       }
@@ -650,8 +724,9 @@ app.post('/api/sync', async (req, res) => {
     });
   }
 
-  // Protect hospitals list from stale mock data overwrites
-  if (hospitals && Array.isArray(hospitals)) {
+  // Protect hospitals list from stale mock data overwrites and merge safely
+  if (hospitals && Array.isArray(hospitals) && hospitals.length > 0) {
+    store.hospitals = store.hospitals || [];
     hospitals.forEach(incomingHosp => {
       if (!incomingHosp || !incomingHosp.id) return;
       const currentProf = store.hospitalProfiles?.[incomingHosp.id];
@@ -664,16 +739,85 @@ app.post('/api/sync', async (req, res) => {
         if (currentProf.lat) incomingHosp.lat = currentProf.lat;
         if (currentProf.lng) incomingHosp.lng = currentProf.lng;
       }
+      const idx = store.hospitals.findIndex(h => h.id === incomingHosp.id);
+      if (idx !== -1) {
+        store.hospitals[idx] = { ...store.hospitals[idx], ...incomingHosp };
+      } else {
+        store.hospitals.push(incomingHosp);
+      }
     });
-    store.hospitals = hospitals;
   }
 
   if (hospitalDoctors) store.hospitalDoctors = { ...store.hospitalDoctors, ...hospitalDoctors };
   ensureHospitalProfilesSynced(store);
 
   if (hospitalDepartments) store.hospitalDepartments = { ...store.hospitalDepartments, ...hospitalDepartments };
-  if (tokens) store.tokens = tokens.filter(t => !isDummyTokenRecord(t));
-  if (appointments) store.appointments = appointments.filter(a => !isDummyApptRecord(a));
+  
+  if (tokens && Array.isArray(tokens) && tokens.length > 0) {
+    store.tokens = store.tokens || [];
+    const validTokens = tokens.filter(t => !isDummyTokenRecord(t));
+    validTokens.forEach(t => {
+      const idx = store.tokens.findIndex(old => old.id === t.id);
+      if (idx !== -1) {
+        store.tokens[idx] = { ...store.tokens[idx], ...t };
+      } else {
+        store.tokens.unshift(t);
+      }
+
+      if (isDbConnected) {
+        query(
+          `INSERT INTO tokens (id, hospital_id, doctor_id, token_number, patient_name, patient_phone, status, token_type, session, token_date, data, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
+           ON CONFLICT (id) DO UPDATE SET status = $7, data = $11, updated_at = NOW()`,
+          [
+            t.id,
+            t.hospitalId || 'hosp-apollo',
+            t.doctorId || '',
+            String(t.tokenNo || t.tokenNumber || ''),
+            t.patientName || '',
+            t.patientPhone || '',
+            t.status || 'booked',
+            t.type || 'online',
+            t.session || 'morning',
+            t.bookingDate || new Date().toISOString().split('T')[0],
+            JSON.stringify(t)
+          ]
+        ).catch(e => console.warn('Error syncing token to RDS:', e.message));
+      }
+    });
+  }
+
+  if (appointments && Array.isArray(appointments) && appointments.length > 0) {
+    store.appointments = store.appointments || [];
+    const validAppts = appointments.filter(a => !isDummyApptRecord(a));
+    validAppts.forEach(a => {
+      const idx = store.appointments.findIndex(old => old.id === a.id);
+      if (idx !== -1) {
+        store.appointments[idx] = { ...store.appointments[idx], ...a };
+      } else {
+        store.appointments.unshift(a);
+      }
+
+      if (isDbConnected) {
+        query(
+          `INSERT INTO appointments (id, hospital_id, doctor_id, patient_name, patient_phone, appointment_date, appointment_time, status, data, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+           ON CONFLICT (id) DO UPDATE SET status = $8, data = $9, updated_at = NOW()`,
+          [
+            a.id,
+            a.hospitalId || 'hosp-apollo',
+            a.doctorId || '',
+            a.patientName || '',
+            a.phone || '',
+            a.date || new Date().toISOString().split('T')[0],
+            a.time || '',
+            a.status || 'booked',
+            JSON.stringify(a)
+          ]
+        ).catch(e => console.warn('Error syncing appointment to RDS:', e.message));
+      }
+    });
+  }
 
   if (customers && Array.isArray(customers)) {
     store.customers = store.customers || [];
@@ -1342,11 +1486,12 @@ app.get('/api/hospitals/:hospitalId/patients', requireHospitalAuth, async (req, 
 
   allHospitalTokens.forEach(tok => {
     if (!tok.patientPhone && !tok.patientName) return;
-    const phoneKey = tok.patientPhone || tok.patientName;
+    const cleanDigits = (tok.patientPhone || '').replace(/\D/g, '').slice(-10);
+    const phoneKey = cleanDigits || (tok.patientName || '').trim().toLowerCase();
 
     if (!patientMap.has(phoneKey)) {
       patientMap.set(phoneKey, {
-        id: `pat-${hospitalId}-${phoneKey.replace(/\D/g, '') || Math.random().toString(36).substring(2, 7)}`,
+        id: `pat-${hospitalId}-${cleanDigits || Math.random().toString(36).substring(2, 7)}`,
         hospitalId,
         uhid: `APS${Math.abs(phoneKey.split('').reduce((acc, char) => acc + char.charCodeAt(0), 1000)).toString().padStart(6, '0')}`,
         name: tok.patientName || 'Patient',
@@ -1410,7 +1555,9 @@ app.get('/api/hospitals/:hospitalId/patients', requireHospitalAuth, async (req, 
   // Also include manually registered hospital patients
   const manualPatients = store.hospitalPatients?.[hospitalId] || [];
   manualPatients.forEach(mp => {
-    if (!patientMap.has(mp.phone)) {
+    const cleanDigits = (mp.phone || '').replace(/\D/g, '').slice(-10);
+    const phoneKey = cleanDigits || (mp.name || '').trim().toLowerCase();
+    if (!patientMap.has(phoneKey)) {
       const docMap = new Map();
       if (Array.isArray(mp.doctorVisits)) {
         mp.doctorVisits.forEach(v => docMap.set(v.doctorId, v));
@@ -1423,7 +1570,7 @@ app.get('/api/hospitals/:hospitalId/patients', requireHospitalAuth, async (req, 
           lastVisitDate: mp.registeredOn || new Date().toISOString().split('T')[0]
         });
       }
-      patientMap.set(mp.phone, {
+      patientMap.set(phoneKey, {
         ...mp,
         hospitalId,
         doctorVisits: docMap,
@@ -1872,6 +2019,29 @@ app.get('/api/hospitals/:hospitalId/tokens', requireHospitalAuth, async (req, re
   const store = await getUnifiedStore();
 
   let tokens = (store.tokens || []).filter(t => (t.hospitalId || 'hosp-apollo') === hospitalId && !isDummyTokenRecord(t));
+
+  if (isDbConnected) {
+    try {
+      const dbTokens = await query(
+        `SELECT data FROM tokens WHERE hospital_id = $1 ORDER BY created_at DESC`,
+        [hospitalId]
+      );
+      if (dbTokens.rows.length > 0) {
+        dbTokens.rows.forEach(r => {
+          if (r.data && !isDummyTokenRecord(r.data)) {
+            const idx = tokens.findIndex(t => t.id === r.data.id);
+            if (idx === -1) {
+              tokens.push(r.data);
+            } else {
+              tokens[idx] = { ...tokens[idx], ...r.data };
+            }
+          }
+        });
+      }
+    } catch (dbErr) {
+      console.warn('Error fetching tokens from RDS:', dbErr.message);
+    }
+  }
 
   if (doctorId && doctorId !== 'all') tokens = tokens.filter(t => t.doctorId === doctorId);
   if (session && session !== 'all') tokens = tokens.filter(t => t.session === session);

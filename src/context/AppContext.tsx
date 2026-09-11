@@ -105,7 +105,7 @@ interface AppContextType {
     date: string,
     time: string,
     paymentMethod: string
-  ) => Appointment;
+  ) => Promise<Appointment>;
   cancelAppointment: (id: string) => void;
   advanceQueue: (hospitalId: string, doctorId: string) => void;
   addHospital: (hospital: Omit<Hospital, 'id' | 'rating' | 'reviewsCount' | 'distance' | 'doctors'>) => void;
@@ -1036,14 +1036,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // --- Book Token ---
-  const bookToken = (
+  const bookToken = async (
     patientDetails: { name: string; age: number; gender: string; phone: string; email: string; address: string },
     hospitalId: string,
     doctorId: string,
     date: string,
     time: string,
     paymentMethod: string
-  ): Appointment => {
+  ): Promise<Appointment> => {
     const targetHosp = hospitals.find(h => h.id === hospitalId);
     const targetDoc = targetHosp?.doctors.find(d => d.id === doctorId);
 
@@ -1130,23 +1130,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem(`insta_hospital_tokens_${hospitalId}`, JSON.stringify(updatedHospitalTokens));
 
     // Post token to backend hospital endpoint
-    fetch(`/api/hospitals/${hospitalId}/tokens`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-hospital-token': `htok_${hospitalId}_default`
-      },
-      body: JSON.stringify(newHospitalToken)
-    }).catch(() => {});
+    try {
+      await fetch(`/api/hospitals/${hospitalId}/tokens`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-hospital-token': `htok_${hospitalId}_default`
+        },
+        body: JSON.stringify(newHospitalToken)
+      });
+    } catch (e) {}
 
     // Post appointment directly to AWS RDS
-    fetch('/api/appointments', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(newAppt)
-    }).catch(e => console.warn('Failed to post appointment to AWS:', e));
+    try {
+      await fetch('/api/appointments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(newAppt)
+      });
+    } catch (e) {
+      console.warn('Failed to post appointment to AWS:', e);
+    }
 
     // Register patient in hospital patients store (Phase 20)
     try {
@@ -1222,6 +1228,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const updatedAppts = [newAppt, ...appointments];
     setAppointments(updatedAppts);
+    localStorage.setItem('insta_appointments', JSON.stringify(updatedAppts));
 
     broadcastGlobalSync('HOSPITAL_TOKEN_CREATED', { token: newHospitalToken, appointment: newAppt, tokens: updatedHospitalTokens });
     broadcastGlobalSync('TOKEN_BOOKED', { token: newHospitalToken, appointment: newAppt, tokens: updatedHospitalTokens });

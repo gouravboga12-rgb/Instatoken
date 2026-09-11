@@ -52,7 +52,7 @@ export const Payment: React.FC = () => {
     e.preventDefault();
     setProcessing(true);
 
-    setTimeout(() => {
+    setTimeout(async () => {
       try {
         purchaseSubscription(subPlan.name, subPlan.price, subPlan.days);
 
@@ -63,7 +63,7 @@ export const Payment: React.FC = () => {
         });
 
         if (patientDetails) {
-          const appointmentCreated = bookToken(
+          const appointmentCreated = await bookToken(
             patientDetails,
             hospitalId,
             doctorId,

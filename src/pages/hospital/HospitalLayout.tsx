@@ -19,16 +19,16 @@ import { DepartmentManagement } from './DepartmentManagement';
 import {
   LayoutDashboard, Plus, List, Wifi, WifiOff, Calendar, RefreshCw,
   Users, Stethoscope, Building2,
-  Printer, ShieldCheck, MessageSquare, BarChart2, Download, Settings,
+  MessageSquare, BarChart2, Download, Settings,
   ChevronLeft, ChevronRight, Bell, Search, LogOut, Menu, X, Activity,
   CreditCard, DollarSign, Sliders
 } from 'lucide-react';
 
 // ─── RBAC permission map ──────────────────────────────────────────────────────
 const ROLE_SECTIONS: Record<string, string[]> = {
-  owner:        ['dashboard','doctor-screens','token-manage','tokens','add-token','all-tokens','online-tokens','offline-tokens','today-tokens','upcoming-tokens','completed-tokens','cancelled-tokens','revisit-tokens','revenue','doctors','departments','sessions','staff','patients','token-validation','prescription','communication','billing','reports','settings'],
-  admin:        ['dashboard','doctor-screens','token-manage','tokens','add-token','all-tokens','online-tokens','offline-tokens','today-tokens','upcoming-tokens','completed-tokens','cancelled-tokens','revisit-tokens','revenue','doctors','departments','sessions','staff','patients','token-validation','reports'],
-  receptionist: ['dashboard','doctor-screens','token-manage','add-token','all-tokens','today-tokens','staff','patients','token-validation','prescription'],
+  owner:        ['dashboard','doctor-screens','token-manage','tokens','add-token','all-tokens','online-tokens','offline-tokens','today-tokens','upcoming-tokens','completed-tokens','cancelled-tokens','revisit-tokens','revenue','doctors','departments','sessions','staff','patients','communication','billing','reports','settings'],
+  admin:        ['dashboard','doctor-screens','token-manage','tokens','add-token','all-tokens','online-tokens','offline-tokens','today-tokens','upcoming-tokens','completed-tokens','cancelled-tokens','revisit-tokens','revenue','doctors','departments','sessions','staff','patients','reports'],
+  receptionist: ['dashboard','doctor-screens','token-manage','add-token','all-tokens','today-tokens','staff','patients'],
   doctor:       ['dashboard','doctor-screens','today-tokens','patients'],
   accountant:   ['dashboard','revenue','billing','reports'],
   nurse:        ['dashboard','doctor-screens','today-tokens','staff'],
@@ -82,8 +82,6 @@ const buildNav = (doctors: HospitalDoctor[], tokens: TokenRecord[]): { section: 
     ]},
     { section: 'Patient Management', items: [
       { id: 'patients', label: 'Patients', icon: <Users size={15} />, path: '/hospital/patients' },
-      { id: 'token-validation', label: 'Token Validation', icon: <ShieldCheck size={15} />, path: '/hospital/validate' },
-      { id: 'prescription', label: 'Prescription Print', icon: <Printer size={15} />, path: '/hospital/validate?tab=prescription' },
     ]},
     { section: 'Communication', items: [
       { id: 'communication', label: 'Push Notification', icon: <Bell size={15} />, path: '/hospital/communication' },
@@ -330,7 +328,6 @@ export const HospitalLayout: React.FC = () => {
             <Route path="schedule" element={<TokenManage />} />
             <Route path="staff" element={<HospitalStaff />} />
             <Route path="patients" element={<PatientManagement />} />
-            <Route path="validate" element={<TokenValidationPage />} />
 
             <Route path="communication" element={<CommunicationCenter />} />
             <Route path="billing" element={<BillingPayments />} />
@@ -340,93 +337,6 @@ export const HospitalLayout: React.FC = () => {
           </Routes>
         </main>
       </div>
-    </div>
-  );
-};
-
-// Inline placeholder for Token Validation page (full page is in TokenManagement.tsx)
-const TokenValidationPage: React.FC = () => {
-  const { validateToken, updateTokenStatus } = useHospital();
-  const [tokenInput, setTokenInput] = useState('');
-  const [result, setResult] = useState<any>(null);
-  const [error, setError] = useState('');
-
-  const handleValidate = () => {
-    setError('');
-    const token = validateToken(parseInt(tokenInput));
-    if (token) { setResult(token); }
-    else { setResult(null); setError('Token not found. Please check the number and try again.'); }
-  };
-
-  const statusColors: Record<string, string> = {
-    booked: 'bg-blue-100 text-blue-700',
-    'checked-in': 'bg-amber-100 text-amber-700',
-    completed: 'bg-green-100 text-green-700',
-    cancelled: 'bg-red-100 text-red-700',
-    waiting: 'bg-purple-100 text-purple-700',
-    skipped: 'bg-slate-100 text-slate-700',
-  };
-
-  return (
-    <div className="p-6 max-w-2xl mx-auto">
-      <h2 className="text-xl font-black text-slate-800 mb-1">Token Validation</h2>
-      <p className="text-xs text-slate-400 mb-6">Enter token number to validate patient visit</p>
-
-      <div className="bg-white rounded-3xl border border-slate-100 p-6 shadow-sm mb-4">
-        <label className="text-xs font-bold text-slate-600 block mb-2">Enter Token Number</label>
-        <div className="flex gap-3">
-          <input
-            type="number" value={tokenInput} onChange={e => setTokenInput(e.target.value)}
-            placeholder="e.g. 101" onKeyDown={e => e.key === 'Enter' && handleValidate()}
-            className="flex-1 px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-500 transition-all"
-          />
-          <button
-            onClick={handleValidate}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-3 rounded-xl cursor-pointer border-none transition-colors"
-          >
-            Validate
-          </button>
-        </div>
-        {error && <p className="text-xs text-red-500 mt-2 font-semibold">{error}</p>}
-      </div>
-
-      {result && (
-        <div className="bg-white rounded-3xl border border-slate-100 p-6 shadow-sm space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-black text-slate-800">{result.patientName}</h3>
-              <p className="text-sm text-slate-500">{result.patientPhone} · {result.patientGender}, {result.patientAge}Y</p>
-            </div>
-            <div className="text-right">
-              <div className="text-3xl font-black text-blue-600">#{result.tokenNo}</div>
-              <span className={`text-[10px] font-bold px-2 py-1 rounded-full capitalize ${statusColors[result.status] || 'bg-slate-100 text-slate-700'}`}>
-                {result.status.replace('-', ' ')}
-              </span>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3 text-xs">
-            <div className="bg-slate-50 p-3 rounded-xl"><span className="text-slate-400">Doctor</span><p className="font-bold text-slate-800 mt-0.5">{result.doctorName}</p></div>
-            <div className="bg-slate-50 p-3 rounded-xl"><span className="text-slate-400">Department</span><p className="font-bold text-slate-800 mt-0.5">{result.departmentName}</p></div>
-            <div className="bg-slate-50 p-3 rounded-xl"><span className="text-slate-400">Session</span><p className="font-bold text-slate-800 mt-0.5 capitalize">{result.session}</p></div>
-            <div className="bg-slate-50 p-3 rounded-xl"><span className="text-slate-400">Time Slot</span><p className="font-bold text-slate-800 mt-0.5">{result.time}</p></div>
-            {result.isRevisit && <div className="bg-green-50 p-3 rounded-xl col-span-2"><span className="text-green-600 font-black text-xs">✓ Valid for Revisit — Upto {result.revisitValidUpto}</span></div>}
-          </div>
-          <div className="flex gap-2 pt-2">
-            {result.status === 'booked' && (
-              <button onClick={() => { updateTokenStatus(result.id, 'checked-in'); setResult({ ...result, status: 'checked-in' }); }}
-                className="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-bold py-2.5 rounded-xl cursor-pointer border-none text-sm">
-                ✓ Mark Checked In
-              </button>
-            )}
-            {(result.status === 'booked' || result.status === 'checked-in') && (
-              <button onClick={() => { updateTokenStatus(result.id, 'completed'); setResult({ ...result, status: 'completed' }); }}
-                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl cursor-pointer border-none text-sm">
-                ✓ Complete Visit
-              </button>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 };
