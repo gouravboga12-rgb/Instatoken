@@ -67,6 +67,7 @@ export const Profile: React.FC = () => {
   const [editPhone, setEditPhone] = useState(user?.phone || '');
   const [editEmail, setEditEmail] = useState(user?.email || '');
   const [editLocation, setEditLocation] = useState(user?.location || currentLocation || '');
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -187,8 +188,14 @@ export const Profile: React.FC = () => {
             </h3>
             <p className="text-xs sm:text-sm text-blue-100 font-bold flex items-center gap-1">
               <span>📞</span>
-              <span>{user.phone || '+91 98856 14326'}</span>
+              <span>{user.phone || 'No phone number'}</span>
             </p>
+            {user.email && (
+              <p className="text-[11px] text-blue-100/90 font-semibold flex items-center gap-1">
+                <span>✉️</span>
+                <span>{user.email}</span>
+              </p>
+            )}
 
             <button 
               onClick={() => setIsEditProfileOpen(true)}
@@ -437,16 +444,27 @@ export const Profile: React.FC = () => {
         <form 
           onSubmit={async (e) => {
             e.preventDefault();
-            updateUserProfile({
-              name: editName,
-              phone: editPhone,
-              email: editEmail,
-              location: editLocation
-            });
-            if (editLocation !== user.location) {
-              await updateUserLocation(editLocation);
+            if (!editName.trim()) {
+              alert("Please enter your name");
+              return;
             }
-            setIsEditProfileOpen(false);
+            setIsSavingProfile(true);
+            try {
+              await updateUserProfile({
+                name: editName.trim(),
+                phone: editPhone.trim(),
+                email: editEmail.trim(),
+                location: editLocation
+              });
+              if (editLocation && editLocation !== user.location) {
+                await updateUserLocation(editLocation);
+              }
+              setIsEditProfileOpen(false);
+            } catch (err: any) {
+              alert("Error saving profile: " + (err?.message || err));
+            } finally {
+              setIsSavingProfile(false);
+            }
           }} 
           className="space-y-4 text-left"
         >
@@ -514,8 +532,21 @@ export const Profile: React.FC = () => {
             </p>
           </div>
 
-          <Button type="submit" variant="primary" fullWidth className="py-2.5 mt-2 rounded-xl text-xs font-bold shadow-md shadow-blue-500/20">
-            Save Account &amp; Update Hospital Distance
+          <Button 
+            type="submit" 
+            variant="primary" 
+            fullWidth 
+            disabled={isSavingProfile}
+            className="py-2.5 mt-2 rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 flex items-center justify-center gap-1.5 disabled:opacity-60 cursor-pointer"
+          >
+            {isSavingProfile ? (
+              <>
+                <Loader2 size={13} className="animate-spin" />
+                <span>Saving to AWS Cloud...</span>
+              </>
+            ) : (
+              <span>Save Account &amp; Update Hospital Distance</span>
+            )}
           </Button>
         </form>
       </Modal>

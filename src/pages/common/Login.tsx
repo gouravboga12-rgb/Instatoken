@@ -47,11 +47,16 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
         return;
       }
       setLoading(true);
-      setTimeout(() => {
-        login(emailOrPhone, password);
-        setLoading(false);
-        onSuccess();
-      }, 500);
+      (async () => {
+        try {
+          await login(emailOrPhone, password);
+          onSuccess();
+        } catch (err: any) {
+          setError(err?.message || 'Login failed');
+        } finally {
+          setLoading(false);
+        }
+      })();
     } else {
       // Signup flow -> Require OTP verification
       if (!name || !email || !phone || !password || !confirmPassword) {
@@ -66,10 +71,17 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
     }
   };
 
-  const handleOtpSuccess = () => {
+  const handleOtpSuccess = async () => {
     setShowOtpModal(false);
-    signup(name, email, phone);
-    onSuccess();
+    setLoading(true);
+    try {
+      await signup(name, email, phone);
+      onSuccess();
+    } catch (err: any) {
+      setError(err?.message || 'Registration failed');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleGoogleAuth = useGoogleLogin({
@@ -82,12 +94,12 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
         const profile = await res.json();
         setLoading(false);
         if (profile.email) {
-          login(profile.email, 'google');
+          await login(profile.email, 'google', profile.name);
           onSuccess();
         }
       } catch (err) {
         setLoading(false);
-        login('google-user@gmail.com', 'google');
+        await login('google-user@gmail.com', 'google');
         onSuccess();
       }
     },

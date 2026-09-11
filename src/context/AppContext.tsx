@@ -84,11 +84,11 @@ interface AppContextType {
   setUserCoords: (coords: { lat: number; lng: number } | null) => void;
   setSearchRadiusKm: (km: number) => void;
   setCurrentLocation: (loc: string) => void;
-  updateUserProfile: (updates: Partial<UserProfile>) => void;
+  updateUserProfile: (updates: Partial<UserProfile>) => Promise<void> | void;
   updateUserLocation: (locationName: string, coords?: { lat: number; lng: number }) => Promise<void>;
   getOrCreateCustomerAccount: (name: string, phone: string, email?: string) => CustomerAccount;
-  login: (emailOrPhone: string, passwordOrOtp: string) => boolean;
-  signup: (name: string, email: string, phone: string) => boolean;
+  login: (emailOrPhone: string, passwordOrOtp: string, optionalName?: string) => Promise<boolean> | boolean;
+  signup: (name: string, email: string, phone: string) => Promise<boolean> | boolean;
   logout: () => void;
   addFamilyMember: (name: string, age: number, gender: string, relationship: string) => void;
   removeFamilyMember: (id: string) => void;
@@ -587,6 +587,50 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       })
       .catch(err => console.warn('Failed to fetch appointments from server:', err));
+
+    // Fetch live registered customers from AWS RDS PostgreSQL and sync active user profile
+    fetch('/api/customers')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.customers)) {
+          setCustomers(data.customers);
+          localStorage.setItem('insta_customers', JSON.stringify(data.customers));
+
+          const savedUser = localStorage.getItem('insta_user');
+          if (savedUser) {
+            try {
+              const parsed = JSON.parse(savedUser);
+              if (parsed && (parsed.phone || parsed.email)) {
+                const normPhone = (parsed.phone || '').replace(/\D/g, '').slice(-10);
+                const normEmail = (parsed.email || '').trim().toLowerCase();
+                const matched = data.customers.find((c: any) => {
+                  const cNorm = (c.phone || '').replace(/\D/g, '').slice(-10);
+                  if (normPhone && cNorm && cNorm === normPhone) return true;
+                  if (normEmail && c.email && c.email.toLowerCase() === normEmail) return true;
+                  return false;
+                });
+                if (matched) {
+                  setUser(prev => prev ? {
+                    ...prev,
+                    name: matched.name || prev.name,
+                    phone: matched.phone || prev.phone,
+                    email: matched.email || prev.email,
+                    location: matched.location || prev.location
+                  } : null);
+                  localStorage.setItem('insta_user', JSON.stringify({
+                    ...parsed,
+                    name: matched.name || parsed.name,
+                    phone: matched.phone || parsed.phone,
+                    email: matched.email || parsed.email,
+                    location: matched.location || parsed.location
+                  }));
+                }
+              }
+            } catch (e) {}
+          }
+        }
+      })
+      .catch(err => console.warn('Failed to fetch customers from server:', err));
   }, []);
 
   // --- Cross-tab & Real-time Global Sync ---
@@ -763,7 +807,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [appointments]);
 
   // --- Auth Functions ---
-  const login = (emailOrPhone: string, passwordOrOtp: string): boolean => {
+  const login = async (emailOrPhone: string, passwordOrOtp: string, optionalName?: string): Promise<boolean> => {
     if (emailOrPhone.includes('admin') || passwordOrOtp === 'admin') {
       setUser({
         name: "Admin Officer",
@@ -779,17 +823,73 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return true;
     } else {
       const cleanInput = emailOrPhone.trim();
+
+      // 1. First attempt live authentication from AWS RDS PostgreSQL
+      try {
+        const res = await fetch('/api/customers/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ emailOrPhone: cleanInput, name: optionalName })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.customer) {
+            const cust = data.customer;
+            const profile: UserProfile = {
+              name: cust.name,
+              email: cust.email,
+              phone: cust.phone,
+              role: 'patient',
+              savedHospitals: cust.savedHospitals || [],
+              savedDoctors: cust.savedDoctors || [],
+              familyMembers: cust.familyMembers || [],
+              subscription: cust.subscription || {
+                planName: "3-Day Pass",
+                expiresAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+                price: 10
+              },
+              location: cust.location,
+              lat: cust.lat,
+              lng: cust.lng
+            };
+            setUser(profile);
+            localStorage.setItem('insta_user', JSON.stringify(profile));
+
+            setCustomers(prev => {
+              const idx = prev.findIndex(c => c.id === cust.id || (cust.phone && c.phone === cust.phone));
+              let next;
+              if (idx !== -1) {
+                next = [...prev];
+                next[idx] = { ...next[idx], ...cust };
+              } else {
+                next = [cust, ...prev];
+              }
+              localStorage.setItem('insta_customers', JSON.stringify(next));
+              return next;
+            });
+
+            addNotification("Logged in Successfully", `Welcome back, ${cust.name}!`, "success");
+            return true;
+          }
+        }
+      } catch (e) {
+        console.warn('Backend login fallback:', e);
+      }
+
+      // 2. Offline / Local fallback
+      const normPhone = cleanInput.replace(/\D/g, '').slice(-10);
       const existing = customers.find(c => 
         (c.email && c.email.toLowerCase() === cleanInput.toLowerCase()) ||
-        (c.phone && c.phone === cleanInput)
+        (normPhone && (c.phone || '').replace(/\D/g, '').slice(-10) === normPhone)
       );
 
       const resolvedName = existing?.name 
+        || optionalName
         || (cleanInput.includes('@') 
             ? cleanInput.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) 
             : 'Patient');
 
-      setUser({
+      const profile: UserProfile = {
         name: resolvedName,
         email: existing?.email || (cleanInput.includes('@') ? cleanInput : "patient@instatoken.com"),
         phone: existing?.phone || (!cleanInput.includes('@') ? cleanInput : "+91 9876543210"),
@@ -802,40 +902,53 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           expiresAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
           price: 10
         }
-      });
+      };
+      setUser(profile);
+      localStorage.setItem('insta_user', JSON.stringify(profile));
       addNotification("Logged in Successfully", `Welcome back, ${resolvedName}!`, "success");
       return true;
     }
   };
 
-  const signup = (name: string, email: string, phone: string): boolean => {
-    setUser({
-      name,
-      email,
-      phone,
+  const signup = async (name: string, email: string, phone: string): Promise<boolean> => {
+    const profile: UserProfile = {
+      name: name.trim(),
+      email: email.trim(),
+      phone: phone.trim(),
       role: 'patient',
       savedHospitals: [],
       savedDoctors: [],
       familyMembers: [],
-      subscription: null
-    });
+      subscription: {
+        planName: "3-Day Pass",
+        expiresAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+        price: 10
+      }
+    };
+    setUser(profile);
+    localStorage.setItem('insta_user', JSON.stringify(profile));
 
-    setCustomers(prev => {
-      const exists = prev.some(c => c.email === email || c.phone === phone);
-      if (exists) return prev;
-      const newCust: CustomerAccount = {
-        id: `cust-${Date.now()}`,
-        name,
-        email,
-        phone,
-        location: "Koramangala, Bengaluru",
-        joinedDate: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
-        status: 'active',
-        avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
-        bookings: []
-      };
-      return [newCust, ...prev];
-    });
+    // Save directly to AWS RDS PostgreSQL
+    try {
+      const res = await fetch('/api/customers/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: profile.name,
+          email: profile.email,
+          phone: profile.phone,
+          location: currentLocation || "Hyderabad, Telangana"
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.customer) {
+          setCustomers(prev => [data.customer, ...prev.filter(c => c.id !== data.customer.id)]);
+        }
+      }
+    } catch (e) {
+      console.warn('Signup RDS sync error:', e);
+    }
 
     addNotification("Account Created", `Welcome ${name}! Start booking digital OPD tokens now.`, "success");
     return true;
@@ -1359,7 +1472,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
   };
 
-  const updateUserProfile = (updates: Partial<UserProfile>) => {
+  const updateUserProfile = async (updates: Partial<UserProfile>) => {
+    const oldUser = user;
+
     setUser(prev => {
       if (!prev) return null;
       const updated = { ...prev, ...updates };
@@ -1377,8 +1492,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         localStorage.setItem('insta_location', updates.location);
       }
       setCustomers(prev => {
+        const normOldPhone = (oldUser?.phone || '').replace(/\D/g, '').slice(-10);
+        const normOldEmail = (oldUser?.email || '').trim().toLowerCase();
+        let found = false;
         const updated = prev.map(c => {
-          if (user && (c.email === user.email || c.phone === user.phone)) {
+          const cPhoneNorm = (c.phone || '').replace(/\D/g, '').slice(-10);
+          const cEmailNorm = (c.email || '').trim().toLowerCase();
+          if (
+            (normOldPhone && cPhoneNorm === normOldPhone) ||
+            (normOldEmail && cEmailNorm === normOldEmail) ||
+            (oldUser?.name && c.name === oldUser.name)
+          ) {
+            found = true;
             return {
               ...c,
               name: updates.name || c.name,
@@ -1391,12 +1516,77 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }
           return c;
         });
+
+        if (!found && updates.name && (updates.phone || updates.email || oldUser?.phone || oldUser?.email)) {
+          const newCust: CustomerAccount = {
+            id: `cust-${Date.now()}`,
+            name: updates.name,
+            phone: updates.phone || oldUser?.phone || '',
+            email: updates.email || oldUser?.email || '',
+            location: updates.location || oldUser?.location || currentLocation,
+            joinedDate: new Date().toISOString().split('T')[0],
+            status: 'active',
+            bookings: []
+          };
+          updated.unshift(newCust);
+        }
+
         localStorage.setItem('insta_customers', JSON.stringify(updated));
         return updated;
       });
     }
 
-    addNotification("Profile Updated", "Your customer account details and location were saved.", "success");
+    // Persist directly to AWS RDS PostgreSQL
+    try {
+      const payload = {
+        name: updates.name || oldUser?.name,
+        phone: updates.phone || oldUser?.phone,
+        email: updates.email || oldUser?.email,
+        location: updates.location || oldUser?.location || currentLocation,
+        lat: updates.lat ?? oldUser?.lat,
+        lng: updates.lng ?? oldUser?.lng,
+        familyMembers: updates.familyMembers || oldUser?.familyMembers,
+        savedDoctors: updates.savedDoctors || oldUser?.savedDoctors,
+        savedHospitals: updates.savedHospitals || oldUser?.savedHospitals,
+        subscription: updates.subscription || oldUser?.subscription,
+        oldPhone: oldUser?.phone,
+        oldEmail: oldUser?.email
+      };
+
+      const res = await fetch('/api/customers/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.customer) {
+          const cust = data.customer;
+          setUser(prev => prev ? {
+            ...prev,
+            name: cust.name,
+            phone: cust.phone,
+            email: cust.email,
+            location: cust.location,
+            lat: cust.lat,
+            lng: cust.lng
+          } : null);
+          localStorage.setItem('insta_user', JSON.stringify({
+            ...(oldUser || {}),
+            ...updates,
+            name: cust.name,
+            phone: cust.phone,
+            email: cust.email,
+            location: cust.location
+          }));
+        }
+      }
+    } catch (e) {
+      console.warn('Customer profile cloud sync error:', e);
+    }
+
+    addNotification("Profile Updated", "Your customer account details were saved to AWS cloud.", "success");
   };
 
   const updateUserLocation = async (locationName: string, coords?: { lat: number; lng: number }) => {

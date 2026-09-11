@@ -327,6 +327,7 @@ function loadStore() {
       if (!data.hospitalSchedules) data.hospitalSchedules = {};
       if (!data.hospitalStaff) data.hospitalStaff = {};
       if (!data.hospitalCredentials) data.hospitalCredentials = [];
+      if (!data.customers || !Array.isArray(data.customers)) data.customers = [];
       if (!data.locationBanners || !Array.isArray(data.locationBanners) || data.locationBanners.length === 0) {
         data.locationBanners = INITIAL_LOCATION_BANNERS;
       }
@@ -344,6 +345,7 @@ function loadStore() {
     hospitalSchedules: {},
     hospitalStaff: {},
     hospitalCredentials: [],
+    customers: [],
     locationBanners: INITIAL_LOCATION_BANNERS,
     tokens: [],
     appointments: [],
@@ -510,6 +512,7 @@ async function getUnifiedStore() {
         if (!store.hospitalSchedules) store.hospitalSchedules = {};
         if (!store.hospitalStaff) store.hospitalStaff = {};
         if (!store.hospitalCredentials) store.hospitalCredentials = [];
+        if (!store.customers || !Array.isArray(store.customers)) store.customers = [];
         if (!store.locationBanners || !Array.isArray(store.locationBanners) || store.locationBanners.length === 0) {
           store.locationBanners = INITIAL_LOCATION_BANNERS;
         }
@@ -627,7 +630,7 @@ const STALE_MOCK_APOLLO_ADDRESS = "Koramangala 5th Block, near Sony World Signal
 // POST to update global sync data
 app.post('/api/sync', async (req, res) => {
   const store = await getUnifiedStore();
-  const { hospitals, hospitalDoctors, hospitalProfiles, hospitalDepartments, tokens, appointments } = req.body;
+  const { hospitals, hospitalDoctors, hospitalProfiles, hospitalDepartments, tokens, appointments, customers } = req.body;
 
   // Protect hospitalProfiles from stale mock data overwrites
   if (hospitalProfiles && typeof hospitalProfiles === 'object') {
@@ -670,6 +673,24 @@ app.post('/api/sync', async (req, res) => {
   if (hospitalDepartments) store.hospitalDepartments = { ...store.hospitalDepartments, ...hospitalDepartments };
   if (tokens) store.tokens = tokens.filter(t => !isDummyTokenRecord(t));
   if (appointments) store.appointments = appointments.filter(a => !isDummyApptRecord(a));
+
+  if (customers && Array.isArray(customers)) {
+    store.customers = store.customers || [];
+    customers.forEach(incoming => {
+      if (!incoming || (!incoming.id && !incoming.phone && !incoming.email)) return;
+      const incomingNorm = (incoming.phone || '').replace(/\D/g, '').slice(-10);
+      const idx = store.customers.findIndex(c => 
+        (incoming.id && c.id === incoming.id) ||
+        (incomingNorm && (c.phone || '').replace(/\D/g, '').slice(-10) === incomingNorm) ||
+        (incoming.email && c.email && c.email.toLowerCase() === incoming.email.toLowerCase())
+      );
+      if (idx !== -1) {
+        store.customers[idx] = { ...store.customers[idx], ...incoming };
+      } else {
+        store.customers.push(incoming);
+      }
+    });
+  }
 
   await saveUnifiedStore(store);
 
@@ -1454,6 +1475,177 @@ app.post('/api/hospitals/:hospitalId/patients', requireHospitalAuth, async (req,
 
   await saveUnifiedStore(store);
   res.json({ success: true, hospitalId, message: 'Patient record saved successfully' });
+});
+
+// ─── Customer / Patient Account & Profile APIs (AWS RDS Synchronized) ────────
+
+function normalizeCustomerPhone(p) {
+  if (!p) return '';
+  const digits = String(p).replace(/\D/g, '');
+  if (digits.length > 10) return digits.slice(-10);
+  return digits;
+}
+
+// GET /api/customers - List all registered customers for admin & sync
+app.get('/api/customers', async (req, res) => {
+  try {
+    const store = await getUnifiedStore();
+    res.json({ success: true, customers: store.customers || [] });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// GET /api/customers/profile - Fetch customer by phone, email, or id
+app.get('/api/customers/profile', async (req, res) => {
+  try {
+    const { id, phone, email } = req.query;
+    const store = await getUnifiedStore();
+    store.customers = store.customers || [];
+
+    const normPhone = normalizeCustomerPhone(phone);
+    const normEmail = (email || '').trim().toLowerCase();
+
+    const customer = store.customers.find(c => {
+      if (id && c.id === id) return true;
+      if (normPhone && normalizeCustomerPhone(c.phone) === normPhone) return true;
+      if (normEmail && (c.email || '').trim().toLowerCase() === normEmail) return true;
+      return false;
+    });
+
+    if (!customer) {
+      return res.status(404).json({ success: false, message: 'Customer not found' });
+    }
+
+    res.json({ success: true, customer });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/customers/login - Login / resolve customer account from AWS RDS
+app.post('/api/customers/login', async (req, res) => {
+  try {
+    const { emailOrPhone, name } = req.body;
+    if (!emailOrPhone) {
+      return res.status(400).json({ success: false, message: 'Email or phone is required' });
+    }
+
+    const cleanInput = String(emailOrPhone).trim();
+    const isEmail = cleanInput.includes('@');
+    const normPhone = isEmail ? '' : normalizeCustomerPhone(cleanInput);
+    const normEmail = isEmail ? cleanInput.toLowerCase() : '';
+
+    const store = await getUnifiedStore();
+    store.customers = store.customers || [];
+
+    let customer = store.customers.find(c => {
+      if (normPhone && normalizeCustomerPhone(c.phone) === normPhone) return true;
+      if (normEmail && (c.email || '').trim().toLowerCase() === normEmail) return true;
+      return false;
+    });
+
+    if (customer) {
+      console.log(`✅ Customer logged in from AWS RDS: ${customer.name} (${customer.phone || customer.email})`);
+      return res.json({ success: true, customer, isNew: false });
+    }
+
+    // New customer registering
+    const defaultName = name 
+      || (isEmail 
+          ? cleanInput.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) 
+          : 'Patient');
+
+    const newCustomer = {
+      id: `cust-${Date.now()}`,
+      name: defaultName,
+      email: isEmail ? cleanInput : `${normPhone}@patient.instatoken.in`,
+      phone: !isEmail ? (cleanInput.startsWith('+') ? cleanInput : `+91 ${cleanInput}`) : '+91 9876543210',
+      location: 'Hyderabad, Telangana',
+      joinedDate: new Date().toISOString().split('T')[0],
+      status: 'active',
+      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+      familyMembers: [],
+      savedDoctors: [],
+      savedHospitals: [],
+      subscription: {
+        planName: "3-Day Pass",
+        expiresAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+        price: 10
+      },
+      bookings: []
+    };
+
+    store.customers.unshift(newCustomer);
+    await saveUnifiedStore(store);
+    console.log(`✅ Created new customer in AWS RDS: ${newCustomer.name} (${newCustomer.phone})`);
+    res.status(201).json({ success: true, customer: newCustomer, isNew: true });
+  } catch (err) {
+    console.error('Customer login error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/customers/profile - Update / Save customer profile in AWS RDS
+app.post('/api/customers/profile', async (req, res) => {
+  try {
+    const { id, name, phone, email, location, lat, lng, familyMembers, savedDoctors, savedHospitals, subscription, oldPhone, oldEmail } = req.body;
+    const store = await getUnifiedStore();
+    store.customers = store.customers || [];
+
+    const normPhone = normalizeCustomerPhone(phone);
+    const normOldPhone = normalizeCustomerPhone(oldPhone);
+    const normEmail = (email || '').trim().toLowerCase();
+    const normOldEmail = (oldEmail || '').trim().toLowerCase();
+
+    let idx = store.customers.findIndex(c => {
+      if (id && c.id === id) return true;
+      const cPhone = normalizeCustomerPhone(c.phone);
+      if (normOldPhone && cPhone === normOldPhone) return true;
+      if (normPhone && cPhone === normPhone) return true;
+      const cEmail = (c.email || '').trim().toLowerCase();
+      if (normOldEmail && cEmail === normOldEmail) return true;
+      if (normEmail && cEmail === normEmail) return true;
+      return false;
+    });
+
+    const existing = idx !== -1 ? store.customers[idx] : null;
+
+    const updatedCustomer = {
+      id: existing?.id || id || `cust-${Date.now()}`,
+      name: (name || existing?.name || 'Patient').trim(),
+      phone: (phone || existing?.phone || '').trim(),
+      email: (email || existing?.email || '').trim(),
+      location: location !== undefined ? location : (existing?.location || 'Hyderabad, Telangana'),
+      lat: lat !== undefined ? Number(lat) : existing?.lat,
+      lng: lng !== undefined ? Number(lng) : existing?.lng,
+      joinedDate: existing?.joinedDate || new Date().toISOString().split('T')[0],
+      status: existing?.status || 'active',
+      avatar: existing?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+      familyMembers: familyMembers || existing?.familyMembers || [],
+      savedDoctors: savedDoctors || existing?.savedDoctors || [],
+      savedHospitals: savedHospitals || existing?.savedHospitals || [],
+      subscription: subscription !== undefined ? subscription : (existing?.subscription || {
+        planName: "3-Day Pass",
+        expiresAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+        price: 10
+      }),
+      bookings: existing?.bookings || []
+    };
+
+    if (idx !== -1) {
+      store.customers[idx] = updatedCustomer;
+    } else {
+      store.customers.unshift(updatedCustomer);
+    }
+
+    await saveUnifiedStore(store);
+    console.log(`✅ Saved customer profile to AWS RDS: ${updatedCustomer.name} (${updatedCustomer.phone})`);
+    res.json({ success: true, customer: updatedCustomer, message: 'Customer profile saved to AWS RDS' });
+  } catch (err) {
+    console.error('Error saving customer profile in AWS RDS:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
 });
 
 // ─── PHASE 21: Backend Revenue Calculation Engine ────────────────────────────
