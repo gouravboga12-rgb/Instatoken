@@ -126,6 +126,7 @@ export const Home: React.FC<HomeProps> = ({
           location: locLabel,
           description: b.description,
           image: b.image,
+          mediaType: b.mediaType || (/\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(b.image || '') ? 'video' : 'image'),
           cta: b.ctaText || 'Book Token',
           targetLevel: b.targetLevel,
           linkUrl: b.hospitalId ? `/hospital-details/${b.hospitalId}` : (b.linkUrl || '/search'),
@@ -137,6 +138,7 @@ export const Home: React.FC<HomeProps> = ({
     }
     return featuredBanners.map(b => ({
       ...b,
+      mediaType: 'image' as const,
       isLocationTargeted: false,
       targetLevel: 'district' as const,
       description: 'Instant token booking & live OPD queue tracking.',
@@ -589,16 +591,28 @@ export const Home: React.FC<HomeProps> = ({
               className="relative rounded-3xl overflow-hidden shadow-xl text-white min-h-[220px] md:min-h-[290px] p-4 md:p-8 flex flex-col justify-between transition-all duration-700 group cursor-pointer border border-slate-800/40"
               onClick={() => handleBannerClick(currentBanner)}
             >
-              {/* Full background photo with smooth scale animation */}
-              <img 
-                key={currentBanner.id}
-                src={currentBanner.image} 
-                alt={currentBanner.title}
-                className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000 ease-out"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = getHospitalSVGImage(currentBanner.title);
-                }}
-              />
+              {/* Full background photo or video with smooth scale animation */}
+              {currentBanner.mediaType === 'video' || /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(currentBanner.image || '') ? (
+                <video
+                  key={currentBanner.id}
+                  src={currentBanner.image}
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  className="absolute inset-0 w-full h-full object-cover"
+                />
+              ) : (
+                <img 
+                  key={currentBanner.id}
+                  src={currentBanner.image} 
+                  alt={currentBanner.title}
+                  className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000 ease-out"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = getHospitalSVGImage(currentBanner.title);
+                  }}
+                />
+              )}
 
               {/* Dark Gradient Overlay for optimal legibility */}
               <div className="absolute inset-0 bg-gradient-to-r from-slate-950/95 via-slate-950/80 to-slate-950/30 md:to-transparent z-10" />
@@ -638,6 +652,11 @@ export const Home: React.FC<HomeProps> = ({
                   <span className="bg-blue-600/90 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg border border-blue-400/30 shadow-md">
                     {currentBanner.badge}
                   </span>
+                  {(currentBanner.mediaType === 'video' || /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(currentBanner.image || '')) && (
+                    <span className="bg-purple-600/90 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg border border-purple-400/30 shadow-md flex items-center gap-1">
+                      🎬 VIDEO
+                    </span>
+                  )}
                   {currentBanner.isLocationTargeted && (
                     <span className="bg-emerald-600/90 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg border border-emerald-400/30 shadow-md flex items-center gap-1">
                       <MapPin size={10} />

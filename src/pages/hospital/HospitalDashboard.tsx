@@ -201,9 +201,18 @@ export const HospitalDashboard: React.FC = () => {
         <div className="relative overflow-hidden bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white rounded-3xl p-5 shadow-lg border border-blue-800/40 animate-in fade-in slide-in-from-top-2 duration-300">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
             <div className="flex items-start sm:items-center gap-3.5">
-              {regionalBanners[currentBannerIndex]?.imageUrl ? (
+              {regionalBanners[currentBannerIndex]?.mediaType === 'video' || /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(regionalBanners[currentBannerIndex]?.imageUrl || regionalBanners[currentBannerIndex]?.image || '') ? (
+                <video 
+                  src={regionalBanners[currentBannerIndex].imageUrl || regionalBanners[currentBannerIndex].image} 
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  className="w-14 h-14 rounded-2xl object-cover border border-white/20 shrink-0 shadow-md"
+                />
+              ) : regionalBanners[currentBannerIndex]?.imageUrl || regionalBanners[currentBannerIndex]?.image ? (
                 <img 
-                  src={regionalBanners[currentBannerIndex].imageUrl} 
+                  src={regionalBanners[currentBannerIndex].imageUrl || regionalBanners[currentBannerIndex].image} 
                   alt={regionalBanners[currentBannerIndex].title} 
                   className="w-14 h-14 rounded-2xl object-cover border border-white/20 shrink-0 shadow-md"
                 />

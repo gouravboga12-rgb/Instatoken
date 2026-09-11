@@ -20,7 +20,13 @@ app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 // Multer in-memory storage for direct S3 file uploads
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 15 * 1024 * 1024 }, // 15MB max file size
+  limits: { fileSize: 200 * 1024 * 1024 }, // 200MB max (covers videos)
+});
+
+// Separate video upload instance with higher limit
+const uploadVideo = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 200 * 1024 * 1024 }, // 200MB
 });
 
 // ─── File-Based Fallback Data Store ───────────────────────────────────────────
@@ -2466,15 +2472,17 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
     }
     const ext = path.extname(req.file.originalname) || '.jpg';
     const cleanExt = ext.toLowerCase();
-    const key = `banners/banner-${Date.now()}-${Math.random().toString(36).substring(2, 7)}${cleanExt}`;
+    const isVideo = req.file.mimetype && req.file.mimetype.startsWith('video/');
+    const folder = isVideo ? 'banner-videos' : 'banners';
+    const key = `${folder}/banner-${Date.now()}-${Math.random().toString(36).substring(2, 7)}${cleanExt}`;
     try {
       const publicUrl = await uploadFile(key, req.file.buffer, req.file.mimetype || 'image/jpeg');
       console.log('✅ Uploaded banner media to S3:', publicUrl);
-      return res.json({ success: true, url: publicUrl, source: 's3' });
+      return res.json({ success: true, url: publicUrl, source: 's3', mediaType: isVideo ? 'video' : 'image' });
     } catch (s3Err) {
       console.warn('⚠️ S3 upload failed, returning base64 fallback:', s3Err.message);
       const b64 = `data:${req.file.mimetype || 'image/jpeg'};base64,${req.file.buffer.toString('base64')}`;
-      return res.json({ success: true, url: b64, source: 'base64' });
+      return res.json({ success: true, url: b64, source: 'base64', mediaType: isVideo ? 'video' : 'image' });
     }
   } catch (err) {
     console.error('Upload endpoint error:', err);
@@ -2482,25 +2490,65 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
   }
 });
 
+const uploadsDir = path.join(__dirname, 'uploads');
+fs.mkdirSync(path.join(uploadsDir, 'banner-videos'), { recursive: true });
+fs.mkdirSync(path.join(uploadsDir, 'banners'), { recursive: true });
+app.use('/uploads', express.static(uploadsDir));
+
+// ─── Dedicated Video Upload Endpoint ──────────────────────────────────────────
+app.post('/api/upload/video', uploadVideo.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file uploaded' });
+    }
+    const ext = path.extname(req.file.originalname) || '.mp4';
+    const filename = `video-${Date.now()}-${Math.random().toString(36).substring(2, 7)}${ext.toLowerCase()}`;
+    const key = `banner-videos/${filename}`;
+    try {
+      const publicUrl = await uploadFile(key, req.file.buffer, req.file.mimetype || 'video/mp4');
+      console.log('✅ Uploaded banner video to S3:', publicUrl);
+      return res.json({ success: true, url: publicUrl, source: 's3', mediaType: 'video' });
+    } catch (s3Err) {
+      console.warn('⚠️ S3 video upload failed, saving to local uploads directory:', s3Err.message);
+      const localPath = path.join(uploadsDir, 'banner-videos', filename);
+      fs.writeFileSync(localPath, req.file.buffer);
+      const localUrl = `/uploads/banner-videos/${filename}`;
+      return res.json({ success: true, url: localUrl, source: 'local', mediaType: 'video' });
+    }
+  } catch (err) {
+    console.error('Video upload endpoint error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 async function resolveBannerImage(imageSource) {
   if (!imageSource) return '';
   const trimmed = imageSource.trim();
-  if (trimmed.startsWith('data:image/')) {
+  if (trimmed.startsWith('data:image/') || trimmed.startsWith('data:video/')) {
+    const isVideo = trimmed.startsWith('data:video/');
     try {
       const matches = trimmed.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
       if (matches && matches.length === 3) {
         const mime = matches[1];
         const buffer = Buffer.from(matches[2], 'base64');
-        const ext = mime.split('/')[1]?.split(';')[0] || 'jpg';
-        const key = `banners/banner-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${ext}`;
-        const s3Url = await uploadFile(key, buffer, mime);
-        if (s3Url) {
-          console.log('✅ Converted base64 banner to S3 URL:', s3Url);
-          return s3Url;
+        const ext = mime.split('/')[1]?.split(';')[0] || (isVideo ? 'mp4' : 'jpg');
+        const folder = isVideo ? 'banner-videos' : 'banners';
+        const filename = `${isVideo ? 'video' : 'banner'}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${ext}`;
+        const key = `${folder}/${filename}`;
+        try {
+          const s3Url = await uploadFile(key, buffer, mime);
+          if (s3Url) {
+            console.log('✅ Converted base64 banner to S3 URL:', s3Url);
+            return s3Url;
+          }
+        } catch (s3Err) {
+          const localPath = path.join(uploadsDir, folder, filename);
+          fs.writeFileSync(localPath, buffer);
+          return `/uploads/${folder}/${filename}`;
         }
       }
     } catch (e) {
-      console.warn('⚠️ S3 upload for base64 failed, keeping as base64:', e.message);
+      console.warn('⚠️ S3/local upload for base64 failed, keeping as is:', e.message);
     }
   }
   return trimmed;
@@ -2704,12 +2752,15 @@ app.post('/api/banners', async (req, res) => {
     const initialStatus = bannerData.status || (bannerData.active === false ? 'inactive' : 'active');
     const isBannerActive = initialStatus === 'active';
 
+    const isVideo = bannerData.mediaType === 'video' || /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(finalImage || '');
+
     const newBanner = {
       id: bannerData.id || `ban-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`,
       title: bannerData.title.trim(),
       description: bannerData.description || '',
       image: finalImage,
       imageUrl: finalImage,
+      mediaType: isVideo ? 'video' : (bannerData.mediaType || 'image'),
       badge: bannerData.badge || 'LOCAL HEALTH UPDATE',
       linkUrl: bannerData.linkUrl || '/search',
       ctaText: bannerData.ctaText || 'Book Token',
@@ -2758,6 +2809,7 @@ app.put('/api/banners/:id', async (req, res) => {
     const rawImage = updateData.image || updateData.imageUrl || existing.imageUrl || existing.image;
     const finalImage = await resolveBannerImage(rawImage);
     const nextStatus = updateData.status || (updateData.active !== undefined ? (updateData.active ? 'active' : 'inactive') : existing.status);
+    const isVideo = updateData.mediaType === 'video' || /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(finalImage || '');
 
     store.locationBanners[idx] = {
       ...existing,
@@ -2765,6 +2817,7 @@ app.put('/api/banners/:id', async (req, res) => {
       id,
       image: finalImage,
       imageUrl: finalImage,
+      mediaType: isVideo ? 'video' : (updateData.mediaType || existing.mediaType || 'image'),
       status: nextStatus,
       active: nextStatus === 'active',
       updatedAt: new Date().toISOString()

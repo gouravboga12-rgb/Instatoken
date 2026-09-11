@@ -28,8 +28,8 @@ export const LocationBanners: React.FC = () => {
   const [hospitalSearch, setHospitalSearch] = useState('');
   const [isHospitalDropdownOpen, setIsHospitalDropdownOpen] = useState(false);
 
-  // Banner image upload & submission states
-  const [imageInputMode, setImageInputMode] = useState<'upload' | 'url'>('upload');
+  // Banner image/video upload & submission states
+  const [imageInputMode, setImageInputMode] = useState<'upload' | 'video' | 'url'>('upload');
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -42,6 +42,7 @@ export const LocationBanners: React.FC = () => {
     title: string;
     description: string;
     image: string;
+    mediaType: 'image' | 'video';
     badge: string;
     ctaText: string;
     destinationType: 'hospital' | 'custom';
@@ -59,6 +60,7 @@ export const LocationBanners: React.FC = () => {
     title: '',
     description: '',
     image: '',
+    mediaType: 'image',
     badge: 'HEALTH CAMP',
     ctaText: 'Book OPD Token',
     destinationType: 'custom',
@@ -191,6 +193,39 @@ export const LocationBanners: React.FC = () => {
     });
   };
 
+  // Handle Video File Upload to S3
+  const handleVideoFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 200 * 1024 * 1024) {
+      alert('Please select a video file under 200MB.');
+      return;
+    }
+    setIsUploadingImage(true);
+    try {
+      const uploadData = new FormData();
+      uploadData.append('file', file);
+      const res = await fetch('/api/upload/video', { method: 'POST', body: uploadData });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.url) {
+          setFormData(prev => ({ ...prev, image: data.url, mediaType: 'video' }));
+          return;
+        }
+      }
+      // Fallback: local object URL preview (won't persist across refresh but works for preview)
+      const objectUrl = URL.createObjectURL(file);
+      setFormData(prev => ({ ...prev, image: objectUrl, mediaType: 'video' }));
+    } catch (err) {
+      console.warn('Video upload error, using object URL:', err);
+      const objectUrl = URL.createObjectURL(file);
+      setFormData(prev => ({ ...prev, image: objectUrl, mediaType: 'video' }));
+    } finally {
+      setIsUploadingImage(false);
+      e.target.value = '';
+    }
+  };
+
   // Handle Image File Upload (compresses instantly and uploads to S3 / server)
   const handleImageFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -217,7 +252,7 @@ export const LocationBanners: React.FC = () => {
       if (res.ok) {
         const data = await res.json();
         if (data.success && data.url) {
-          setFormData(prev => ({ ...prev, image: data.url }));
+          setFormData(prev => ({ ...prev, image: data.url, mediaType: 'image' }));
         }
       }
     } catch (err) {
@@ -272,6 +307,7 @@ export const LocationBanners: React.FC = () => {
       title: '',
       description: '',
       image: '',
+      mediaType: 'image',
       badge: 'HEALTH CAMP',
       ctaText: 'Book OPD Token',
       destinationType: 'custom',
@@ -295,11 +331,13 @@ export const LocationBanners: React.FC = () => {
   // Open Edit Modal
   const handleOpenEdit = (b: BannerRecord) => {
     setEditingBanner(b);
-    setImageInputMode(b.image && b.image.startsWith('data:') ? 'upload' : 'url');
+    const isVid = b.mediaType === 'video' || /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(b.image || '');
+    setImageInputMode(isVid ? 'video' : (b.image && b.image.startsWith('data:') ? 'upload' : 'url'));
     setFormData({
       title: b.title || '',
       description: b.description || '',
       image: b.image || '',
+      mediaType: isVid ? 'video' : (b.mediaType || 'image'),
       badge: b.badge || 'PROMOTION',
       ctaText: b.ctaText || 'Book OPD Token',
       destinationType: b.hospitalId ? 'hospital' : (b.destinationType || 'custom'),
@@ -329,7 +367,7 @@ export const LocationBanners: React.FC = () => {
       return;
     }
     if (!formData.image.trim()) {
-      alert('Please upload a banner image or enter an image URL.');
+      alert('Please upload a banner image/video or enter a media URL.');
       return;
     }
 
@@ -337,10 +375,13 @@ export const LocationBanners: React.FC = () => {
       ? `/hospital-details/${formData.hospitalId}` 
       : (formData.linkUrl.trim() || '/search');
 
+    const isVid = formData.mediaType === 'video' || /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(formData.image.trim());
+
     const payload = {
       title: formData.title.trim(),
       description: formData.description.trim(),
       image: formData.image.trim(),
+      mediaType: isVid ? 'video' : 'image',
       badge: formData.badge.trim(),
       ctaText: formData.ctaText.trim(),
       hospitalId: formData.hospitalId || null,
@@ -719,17 +760,35 @@ export const LocationBanners: React.FC = () => {
                 key={banner.id}
                 className="bg-white rounded-3xl border border-slate-200/90 shadow-xs hover:shadow-md transition-all overflow-hidden flex flex-col group"
               >
-                {/* Banner Image Preview with Location Overlay */}
-                <div className="relative h-44 w-full bg-slate-100 overflow-hidden">
-                  <img
-                    src={banner.image}
-                    alt={banner.title}
-                    className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-300"
-                    onError={e => {
-                      (e.target as HTMLImageElement).src = DEFAULT_BANNER_FALLBACK;
-                    }}
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent" />
+                {/* Banner Image or Video Preview with Location Overlay */}
+                <div className="relative h-44 w-full bg-slate-900 overflow-hidden">
+                  {banner.mediaType === 'video' || /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(banner.image || '') ? (
+                    <video
+                      src={banner.image}
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-300"
+                    />
+                  ) : (
+                    <img
+                      src={banner.image}
+                      alt={banner.title}
+                      className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-300"
+                      onError={e => {
+                        (e.target as HTMLImageElement).src = DEFAULT_BANNER_FALLBACK;
+                      }}
+                    />
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent pointer-events-none" />
+
+                  {/* Video indicator tag */}
+                  {(banner.mediaType === 'video' || /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(banner.image || '')) && (
+                    <div className="absolute bottom-3 right-3 z-10 bg-purple-600/90 text-white text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm backdrop-blur-xs">
+                      🎬 VIDEO
+                    </div>
+                  )}
 
                   {/* Top Badges */}
                   <div className="absolute top-3 left-3 right-3 flex items-center justify-between gap-2">
@@ -890,134 +949,162 @@ export const LocationBanners: React.FC = () => {
                 </div>
               </div>
 
-              {/* Step 2: Banner Image Upload (Direct File Upload & Optional URL) */}
+              {/* Step 2: Banner Upload (Image or Video) */}
               <div className="space-y-3 pt-3 border-t border-slate-100">
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
                     <span className="w-4 h-4 rounded-full bg-blue-600 text-white text-[10px] flex items-center justify-center">2</span>
                     Banner Upload
                   </h4>
-                  <div className="flex items-center gap-1 text-[11px] font-bold">
+                  <div className="flex items-center gap-1 text-[11px] font-bold bg-slate-100 rounded-xl p-0.5">
                     <button
                       type="button"
-                      onClick={() => setImageInputMode('upload')}
-                      className={`px-2.5 py-0.5 rounded-lg transition-colors cursor-pointer ${
-                        imageInputMode === 'upload' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-400 hover:text-slate-600'
+                      onClick={() => { setImageInputMode('upload'); setFormData(prev => ({ ...prev, mediaType: 'image' })); }}
+                      className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${
+                        imageInputMode === 'upload' ? 'bg-white text-blue-600 shadow-sm font-extrabold' : 'text-slate-400 hover:text-slate-600'
                       }`}
                     >
-                      Upload File
+                      📷 Image
                     </button>
-                    <span className="text-slate-300">|</span>
+                    <button
+                      type="button"
+                      onClick={() => { setImageInputMode('video'); setFormData(prev => ({ ...prev, mediaType: 'video' })); }}
+                      className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${
+                        imageInputMode === 'video' ? 'bg-white text-purple-600 shadow-sm font-extrabold' : 'text-slate-400 hover:text-slate-600'
+                      }`}
+                    >
+                      🎬 Video
+                    </button>
                     <button
                       type="button"
                       onClick={() => setImageInputMode('url')}
-                      className={`px-2.5 py-0.5 rounded-lg transition-colors cursor-pointer ${
-                        imageInputMode === 'url' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-400 hover:text-slate-600'
+                      className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${
+                        imageInputMode === 'url' ? 'bg-white text-blue-600 shadow-sm font-extrabold' : 'text-slate-400 hover:text-slate-600'
                       }`}
                     >
-                      Paste Image URL
+                      🔗 URL
                     </button>
                   </div>
                 </div>
 
-                {imageInputMode === 'upload' ? (
+                {/* IMAGE UPLOAD TAB */}
+                {imageInputMode === 'upload' && (
                   <div>
-                    <input
-                      id="banner-file-input"
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageFileUpload}
-                      className="hidden"
-                    />
-
+                    <input id="banner-file-input" type="file" accept="image/*" onChange={handleImageFileUpload} className="hidden" />
                     {isUploadingImage ? (
                       <div className="border-2 border-dashed border-blue-300 bg-blue-50/60 rounded-2xl p-6 flex flex-col items-center justify-center text-center">
                         <Loader2 size={26} className="text-blue-600 animate-spin mb-2" />
                         <p className="text-xs font-black text-blue-900">Optimizing & Uploading Banner Image...</p>
                         <p className="text-[10px] font-semibold text-blue-600 mt-0.5">Compressing image for instant delivery</p>
                       </div>
-                    ) : !formData.image ? (
-                      <label
-                        htmlFor="banner-file-input"
-                        className="border-2 border-dashed border-slate-300 hover:border-blue-500 bg-slate-50/70 hover:bg-blue-50/30 rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer transition-all group"
-                      >
+                    ) : !formData.image || formData.mediaType === 'video' ? (
+                      <label htmlFor="banner-file-input" className="border-2 border-dashed border-slate-300 hover:border-blue-500 bg-slate-50/70 hover:bg-blue-50/30 rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer transition-all group">
                         <div className="w-12 h-12 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center mb-2.5 group-hover:scale-110 transition-transform">
                           <UploadCloud size={24} />
                         </div>
-                        <p className="text-xs font-black text-slate-800 group-hover:text-blue-600 transition-colors">
-                          Click to Browse or Drag & Drop Banner Image
-                        </p>
-                        <p className="text-[10px] font-semibold text-slate-400 mt-0.5">
-                          Supports PNG, JPG, JPEG, WEBP (Max 15MB · Auto-optimized)
-                        </p>
+                        <p className="text-xs font-black text-slate-800 group-hover:text-blue-600 transition-colors">Click to Browse or Drag & Drop Banner Image</p>
+                        <p className="text-[10px] font-semibold text-slate-400 mt-0.5">Supports PNG, JPG, JPEG, WEBP (Max 15MB · Auto-optimized)</p>
                       </label>
                     ) : (
                       <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between gap-3">
                         <div className="flex items-center gap-3 min-w-0">
-                          <img
-                            src={formData.image}
-                            alt="Uploaded Banner"
-                            className="w-16 h-12 rounded-xl object-cover border border-slate-200 shrink-0"
-                          />
+                          <img src={formData.image} alt="Uploaded Banner" className="w-16 h-12 rounded-xl object-cover border border-slate-200 shrink-0" />
                           <div className="min-w-0">
                             <span className="inline-flex items-center gap-1 text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
-                              <CheckCircle2 size={10} /> Banner Image Ready
+                              <CheckCircle2 size={10} /> Image Ready
                             </span>
-                            <p className="text-xs font-bold text-slate-700 truncate mt-0.5">
-                              {formData.image.startsWith('http') ? 'Stored on Cloud CDN' : 'Optimized & compressed'}
-                            </p>
+                            <p className="text-xs font-bold text-slate-700 truncate mt-0.5">{formData.image.startsWith('http') ? 'Stored on Cloud CDN' : 'Optimized & compressed'}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
-                          <label
-                            htmlFor="banner-file-input"
-                            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold cursor-pointer transition-colors shadow-xs"
-                          >
-                            Change Image
-                          </label>
-                          <button
-                            type="button"
-                            onClick={() => setFormData(prev => ({ ...prev, image: '' }))}
-                            className="px-2.5 py-1.5 bg-slate-200 hover:bg-red-50 hover:text-red-600 text-slate-600 rounded-xl text-xs font-bold cursor-pointer transition-colors"
-                          >
-                            Remove
-                          </button>
+                          <label htmlFor="banner-file-input" className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold cursor-pointer transition-colors shadow-xs">Change Image</label>
+                          <button type="button" onClick={() => setFormData(prev => ({ ...prev, image: '', mediaType: 'image' }))} className="px-2.5 py-1.5 bg-slate-200 hover:bg-red-50 hover:text-red-600 text-slate-600 rounded-xl text-xs font-bold cursor-pointer transition-colors">Remove</button>
                         </div>
                       </div>
                     )}
                   </div>
-                ) : (
+                )}
+
+                {/* VIDEO UPLOAD TAB */}
+                {imageInputMode === 'video' && (
                   <div>
-                    <label className="block text-xs font-extrabold text-slate-700 mb-1">Image Web URL *</label>
+                    <input id="banner-video-input" type="file" accept="video/mp4,video/webm,video/ogg,video/*" onChange={handleVideoFileUpload} className="hidden" />
+                    {isUploadingImage ? (
+                      <div className="border-2 border-dashed border-purple-300 bg-purple-50/60 rounded-2xl p-6 flex flex-col items-center justify-center text-center">
+                        <Loader2 size={26} className="text-purple-600 animate-spin mb-2" />
+                        <p className="text-xs font-black text-purple-900">Uploading Banner Video to Cloud...</p>
+                        <p className="text-[10px] font-semibold text-purple-600 mt-0.5">Large files may take a moment — please wait</p>
+                      </div>
+                    ) : !formData.image || formData.mediaType === 'image' ? (
+                      <label htmlFor="banner-video-input" className="border-2 border-dashed border-slate-300 hover:border-purple-500 bg-slate-50/70 hover:bg-purple-50/30 rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer transition-all group">
+                        <div className="w-12 h-12 rounded-2xl bg-purple-100 text-purple-600 flex items-center justify-center mb-2.5 group-hover:scale-110 transition-transform text-2xl">
+                          🎬
+                        </div>
+                        <p className="text-xs font-black text-slate-800 group-hover:text-purple-600 transition-colors">Click to Browse or Drag & Drop Banner Video</p>
+                        <p className="text-[10px] font-semibold text-slate-400 mt-0.5">Supports MP4, WEBM, OGG (Max 200MB · Auto-loop on banner)</p>
+                      </label>
+                    ) : (
+                      <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-16 h-12 rounded-xl bg-purple-100 flex items-center justify-center text-2xl shrink-0 border border-purple-200">🎬</div>
+                          <div className="min-w-0">
+                            <span className="inline-flex items-center gap-1 text-[10px] font-black text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-100">
+                              <CheckCircle2 size={10} /> Video Ready
+                            </span>
+                            <p className="text-xs font-bold text-slate-700 truncate mt-0.5">{formData.image.startsWith('http') ? 'Stored on Cloud CDN' : 'Local preview (will upload on save)'}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <label htmlFor="banner-video-input" className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold cursor-pointer transition-colors shadow-xs">Change Video</label>
+                          <button type="button" onClick={() => setFormData(prev => ({ ...prev, image: '', mediaType: 'image' }))} className="px-2.5 py-1.5 bg-slate-200 hover:bg-red-50 hover:text-red-600 text-slate-600 rounded-xl text-xs font-bold cursor-pointer transition-colors">Remove</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* URL TAB */}
+                {imageInputMode === 'url' && (
+                  <div>
+                    <label className="block text-xs font-extrabold text-slate-700 mb-1">Image or Video URL *</label>
                     <input
                       type="url"
                       required={!formData.image}
                       value={formData.image}
                       onChange={e => setFormData({ ...formData, image: e.target.value })}
-                      placeholder="https://images.unsplash.com/..."
+                      placeholder="https://..."
                       className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-medium text-slate-800 focus:outline-none focus:border-blue-500"
                     />
+                    <p className="text-[10px] text-slate-400 font-medium mt-1">Paste a direct image URL (JPG/PNG/WEBP) or video URL (MP4/WEBM)</p>
                   </div>
                 )}
 
-                {/* Live Card Preview */}
+                {/* Live Preview */}
                 {formData.image && (
                   <div className="mt-2 p-3 bg-slate-50 rounded-2xl border border-slate-200">
-                    <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block mb-1.5">
-                      Live Customer Preview:
-                    </span>
+                    <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block mb-1.5">Live Customer Preview:</span>
                     <div className="relative h-28 w-full rounded-xl overflow-hidden shadow-xs">
-                      <img src={formData.image} alt="Preview" className="w-full h-full object-cover" />
+                      {formData.mediaType === 'video' ? (
+                        <video
+                          src={formData.image}
+                          autoPlay
+                          loop
+                          muted
+                          playsInline
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <img src={formData.image} alt="Preview" className="w-full h-full object-cover" />
+                      )}
                       <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent" />
                       <div className="absolute bottom-2 left-3 right-3 text-white">
-                        {formData.badge && (
-                          <span className="text-[8px] font-black bg-blue-600 text-white px-1.5 py-0.2 rounded uppercase">
-                            {formData.badge}
-                          </span>
-                        )}
+                        {formData.badge && <span className="text-[8px] font-black bg-blue-600 text-white px-1.5 py-0.2 rounded uppercase">{formData.badge}</span>}
                         <h5 className="text-xs font-black truncate">{formData.title || 'Your Banner Title'}</h5>
                         <p className="text-[10px] text-slate-200 truncate">{formData.description || 'Your description will appear here'}</p>
                       </div>
+                      {formData.mediaType === 'video' && (
+                        <div className="absolute top-2 right-2 bg-purple-600/80 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">🎬 VIDEO</div>
+                      )}
                     </div>
                   </div>
                 )}

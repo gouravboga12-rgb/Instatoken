@@ -22,6 +22,7 @@ export interface BannerRecord {
   title: string;
   description: string;
   image: string;
+  mediaType?: 'image' | 'video'; // NEW: distinguishes image vs video banners
   badge?: string;
   linkUrl?: string;
   ctaText?: string;
