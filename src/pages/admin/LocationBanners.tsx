@@ -79,6 +79,12 @@ export const LocationBanners: React.FC = () => {
   const [simState, setSimState] = useState('Telangana');
   const [simDistrict, setSimDistrict] = useState('Hyderabad');
 
+  // Searchable combobox state for state & district pickers
+  const [stateSearchQ, setStateSearchQ] = useState('');
+  const [districtSearchQ, setDistrictSearchQ] = useState('');
+  const [stateDropOpen, setStateDropOpen] = useState(false);
+  const [districtDropOpen, setDistrictDropOpen] = useState(false);
+
   // Fetch Banners
   const fetchBanners = async () => {
     setLoading(true);
@@ -1073,53 +1079,153 @@ export const LocationBanners: React.FC = () => {
                 {formData.targetLevel === 'state' && (
                   <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-2 animate-fadeIn">
                     <label className="block text-xs font-extrabold text-slate-700">Select State *</label>
-                    <select
-                      value={formData.state}
-                      onChange={e => setFormData({ ...formData, state: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-extrabold text-slate-800"
-                    >
-                      {INDIAN_STATES.map(s => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
-                    </select>
+                    {/* Searchable State Combobox */}
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => { setStateDropOpen(o => !o); setStateSearchQ(''); }}
+                        className="w-full flex items-center justify-between px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-extrabold text-slate-800 hover:border-blue-400 transition-colors"
+                      >
+                        <span>{formData.state || 'Select state…'}</span>
+                        <ChevronDown size={14} className={`text-slate-400 transition-transform ${stateDropOpen ? 'rotate-180' : ''}`} />
+                      </button>
+                      {stateDropOpen && (
+                        <div className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden">
+                          <div className="p-2 border-b border-slate-100">
+                            <div className="flex items-center gap-1.5 px-2 py-1.5 bg-slate-50 rounded-xl border border-slate-200">
+                              <Search size={12} className="text-slate-400 shrink-0" />
+                              <input
+                                autoFocus
+                                type="text"
+                                value={stateSearchQ}
+                                onChange={e => setStateSearchQ(e.target.value)}
+                                placeholder="Search state…"
+                                className="flex-1 bg-transparent text-xs font-semibold text-slate-700 outline-none placeholder-slate-400"
+                              />
+                              {stateSearchQ && <button type="button" onClick={() => setStateSearchQ('')}><X size={11} className="text-slate-400" /></button>}
+                            </div>
+                          </div>
+                          <ul className="max-h-52 overflow-y-auto py-1">
+                            {INDIAN_STATES.filter(s => s.toLowerCase().includes(stateSearchQ.toLowerCase())).map(s => (
+                              <li
+                                key={s}
+                                onClick={() => { setFormData({ ...formData, state: s }); setStateDropOpen(false); setStateSearchQ(''); }}
+                                className={`px-3.5 py-2 text-xs font-semibold cursor-pointer transition-colors ${
+                                  formData.state === s ? 'bg-blue-50 text-blue-700 font-extrabold' : 'text-slate-700 hover:bg-slate-50'
+                                }`}
+                              >{s}</li>
+                            ))}
+                            {INDIAN_STATES.filter(s => s.toLowerCase().includes(stateSearchQ.toLowerCase())).length === 0 && (
+                              <li className="px-3.5 py-3 text-xs text-slate-400 text-center">No states found</li>
+                            )}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 
                 {(formData.targetLevel === 'district' || formData.targetLevel === 'mandal') && (
                   <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-3 animate-fadeIn">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {/* Searchable State Combobox */}
                       <div>
                         <label className="block text-xs font-extrabold text-slate-700 mb-1">State *</label>
-                        <select
-                          value={formData.state}
-                          onChange={e => {
-                            const newState = e.target.value;
-                            const dists = getDistricts('India', newState);
-                            setFormData({
-                              ...formData,
-                              state: newState,
-                              district: dists[0] || ''
-                            });
-                          }}
-                          className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-extrabold text-slate-800"
-                        >
-                          {INDIAN_STATES.map(s => (
-                            <option key={s} value={s}>{s}</option>
-                          ))}
-                        </select>
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => { setStateDropOpen(o => !o); setDistrictDropOpen(false); setStateSearchQ(''); }}
+                            className="w-full flex items-center justify-between px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-extrabold text-slate-800 hover:border-blue-400 transition-colors"
+                          >
+                            <span>{formData.state || 'Select state…'}</span>
+                            <ChevronDown size={14} className={`text-slate-400 transition-transform ${stateDropOpen ? 'rotate-180' : ''}`} />
+                          </button>
+                          {stateDropOpen && (
+                            <div className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden">
+                              <div className="p-2 border-b border-slate-100">
+                                <div className="flex items-center gap-1.5 px-2 py-1.5 bg-slate-50 rounded-xl border border-slate-200">
+                                  <Search size={12} className="text-slate-400 shrink-0" />
+                                  <input
+                                    autoFocus
+                                    type="text"
+                                    value={stateSearchQ}
+                                    onChange={e => setStateSearchQ(e.target.value)}
+                                    placeholder="Search state…"
+                                    className="flex-1 bg-transparent text-xs font-semibold text-slate-700 outline-none placeholder-slate-400"
+                                  />
+                                  {stateSearchQ && <button type="button" onClick={() => setStateSearchQ('')}><X size={11} className="text-slate-400" /></button>}
+                                </div>
+                              </div>
+                              <ul className="max-h-52 overflow-y-auto py-1">
+                                {INDIAN_STATES.filter(s => s.toLowerCase().includes(stateSearchQ.toLowerCase())).map(s => (
+                                  <li
+                                    key={s}
+                                    onClick={() => {
+                                      const dists = getDistricts('India', s);
+                                      setFormData({ ...formData, state: s, district: dists[0] || '' });
+                                      setStateDropOpen(false); setStateSearchQ(''); setDistrictSearchQ('');
+                                    }}
+                                    className={`px-3.5 py-2 text-xs font-semibold cursor-pointer transition-colors ${
+                                      formData.state === s ? 'bg-blue-50 text-blue-700 font-extrabold' : 'text-slate-700 hover:bg-slate-50'
+                                    }`}
+                                  >{s}</li>
+                                ))}
+                                {INDIAN_STATES.filter(s => s.toLowerCase().includes(stateSearchQ.toLowerCase())).length === 0 && (
+                                  <li className="px-3.5 py-3 text-xs text-slate-400 text-center">No states found</li>
+                                )}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
                       </div>
 
+                      {/* Searchable City/District Combobox */}
                       <div>
                         <label className="block text-xs font-extrabold text-slate-700 mb-1">City / District *</label>
-                        <select
-                          value={formData.district}
-                          onChange={e => setFormData({ ...formData, district: e.target.value })}
-                          className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-extrabold text-slate-800"
-                        >
-                          {getDistricts('India', formData.state).map(d => (
-                            <option key={d} value={d}>{d}</option>
-                          ))}
-                        </select>
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => { setDistrictDropOpen(o => !o); setStateDropOpen(false); setDistrictSearchQ(''); }}
+                            className="w-full flex items-center justify-between px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-extrabold text-slate-800 hover:border-blue-400 transition-colors"
+                          >
+                            <span>{formData.district || 'Select city…'}</span>
+                            <ChevronDown size={14} className={`text-slate-400 transition-transform ${districtDropOpen ? 'rotate-180' : ''}`} />
+                          </button>
+                          {districtDropOpen && (
+                            <div className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden">
+                              <div className="p-2 border-b border-slate-100">
+                                <div className="flex items-center gap-1.5 px-2 py-1.5 bg-slate-50 rounded-xl border border-slate-200">
+                                  <Search size={12} className="text-slate-400 shrink-0" />
+                                  <input
+                                    autoFocus
+                                    type="text"
+                                    value={districtSearchQ}
+                                    onChange={e => setDistrictSearchQ(e.target.value)}
+                                    placeholder="Search city / district…"
+                                    className="flex-1 bg-transparent text-xs font-semibold text-slate-700 outline-none placeholder-slate-400"
+                                  />
+                                  {districtSearchQ && <button type="button" onClick={() => setDistrictSearchQ('')}><X size={11} className="text-slate-400" /></button>}
+                                </div>
+                              </div>
+                              <ul className="max-h-52 overflow-y-auto py-1">
+                                {getDistricts('India', formData.state)
+                                  .filter(d => d.toLowerCase().includes(districtSearchQ.toLowerCase()))
+                                  .map(d => (
+                                    <li
+                                      key={d}
+                                      onClick={() => { setFormData({ ...formData, district: d }); setDistrictDropOpen(false); setDistrictSearchQ(''); }}
+                                      className={`px-3.5 py-2 text-xs font-semibold cursor-pointer transition-colors ${
+                                        formData.district === d ? 'bg-blue-50 text-blue-700 font-extrabold' : 'text-slate-700 hover:bg-slate-50'
+                                      }`}
+                                    >{d}</li>
+                                  ))}
+                                {getDistricts('India', formData.state).filter(d => d.toLowerCase().includes(districtSearchQ.toLowerCase())).length === 0 && (
+                                  <li className="px-3.5 py-3 text-xs text-slate-400 text-center">No cities found</li>
+                                )}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
 
