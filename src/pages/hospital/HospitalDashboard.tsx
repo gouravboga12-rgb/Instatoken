@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useHospital } from '../../context/HospitalContext';
+import { subscribeGlobalSync } from '../../utils/syncBus';
 import {
   Users, Ticket, Clock, TrendingUp, TrendingDown,
   UserPlus, Plus, ArrowRight, Stethoscope, Bell,
@@ -48,19 +49,25 @@ export const HospitalDashboard: React.FC = () => {
         const state = hospitalProfile?.state || 'Telangana';
         const district = hospitalProfile?.city || 'Hyderabad';
         const mandal = hospitalProfile?.area || '';
-        const params = new URLSearchParams({ country, state, district, mandal });
+        const params = new URLSearchParams({ panel: 'hospital', country, state, district, mandal });
         const res = await fetch(`/api/banners/active?${params.toString()}`);
         if (res.ok) {
           const data = await res.json();
-          if (Array.isArray(data) && data.length > 0) {
-            setRegionalBanners(data);
-          }
+          const list = Array.isArray(data) ? data : (Array.isArray(data.banners) ? data.banners : []);
+          setRegionalBanners(list);
         }
       } catch (err) {
         console.error('Failed to load regional banners for hospital', err);
       }
     };
     fetchRegionalBanners();
+
+    const unsubscribe = subscribeGlobalSync((event) => {
+      if (event.type === 'BANNERS_UPDATED' || event.type === 'BANNER_DELETED') {
+        fetchRegionalBanners();
+      }
+    });
+    return () => unsubscribe();
   }, [hospitalProfile]);
 
   // Format greeting

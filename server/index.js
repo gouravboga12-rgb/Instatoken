@@ -2574,8 +2574,8 @@ function matchBannerLocation(banner, userLoc) {
     return false;
   }
 
-  // 1. Country level
-  if (banner.targetLevel === 'country') {
+  // 1. Country level or Global (All India / Worldwide)
+  if (!banner.targetLevel || banner.targetLevel === 'country' || banner.targetLevel === 'all') {
     return true;
   }
 
@@ -2707,8 +2707,8 @@ app.get('/api/banners/active', async (req, res) => {
     if (banner.status !== 'active') return false;
 
     // 2. Panel audience check
-    if (banner.displayPanels && Array.isArray(banner.displayPanels)) {
-      if (!banner.displayPanels.includes(panel)) return false;
+    if (banner.displayPanels && Array.isArray(banner.displayPanels) && banner.displayPanels.length > 0) {
+      if (!banner.displayPanels.includes(panel) && !banner.displayPanels.includes('all')) return false;
     }
 
     // 3. Date validity check
@@ -2776,12 +2776,13 @@ app.post('/api/banners', async (req, res) => {
       district: bannerData.district || null,
       mandal: bannerData.mandal || null,
       village: bannerData.village || null,
-      displayPanels: bannerData.displayPanels || ['customer'],
+      displayPanels: bannerData.displayPanels && bannerData.displayPanels.length > 0 ? bannerData.displayPanels : ['customer', 'hospital'],
       priority: Number(bannerData.priority) || 1,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
 
+    store.lastUpdated = Date.now();
     store.locationBanners.unshift(newBanner);
     await saveUnifiedStore(store);
 
@@ -2818,11 +2819,13 @@ app.put('/api/banners/:id', async (req, res) => {
       image: finalImage,
       imageUrl: finalImage,
       mediaType: isVideo ? 'video' : (updateData.mediaType || existing.mediaType || 'image'),
+      displayPanels: updateData.displayPanels || existing.displayPanels || ['customer', 'hospital'],
       status: nextStatus,
       active: nextStatus === 'active',
       updatedAt: new Date().toISOString()
     };
 
+    store.lastUpdated = Date.now();
     await saveUnifiedStore(store);
     res.json({ success: true, message: 'Banner updated successfully', banner: store.locationBanners[idx], ...store.locationBanners[idx] });
   } catch (err) {
@@ -2848,6 +2851,7 @@ app.patch('/api/banners/:id/status', async (req, res) => {
   store.locationBanners[idx].active = (nextStatus === 'active');
   store.locationBanners[idx].updatedAt = new Date().toISOString();
 
+  store.lastUpdated = Date.now();
   await saveUnifiedStore(store);
   res.json({ success: true, message: `Banner status set to ${nextStatus}`, banner: store.locationBanners[idx], active: store.locationBanners[idx].active, status: nextStatus });
 });
@@ -2858,6 +2862,7 @@ app.delete('/api/banners/:id', async (req, res) => {
   const store = await getUnifiedStore();
 
   store.locationBanners = (store.locationBanners || []).filter(b => b.id !== id);
+  store.lastUpdated = Date.now();
   await saveUnifiedStore(store);
 
   res.json({ success: true, message: 'Banner deleted successfully', deletedId: id });

@@ -3,7 +3,7 @@ import {
   MapPin, Plus, Search, CheckCircle2, Edit2, Trash2,
   Layers, Globe, Sparkles, RefreshCw,
   X, ChevronRight, SlidersHorizontal,
-  UploadCloud, Building2, Link as LinkIcon, ChevronDown, Loader2
+  UploadCloud, Building2, Link as LinkIcon, ChevronDown, Loader2, AlertCircle
 } from 'lucide-react';
 import {
   INDIAN_STATES,
@@ -67,14 +67,17 @@ export const LocationBanners: React.FC = () => {
     hospitalId: '',
     linkUrl: '/search',
     status: 'active',
-    targetLevel: 'district',
+    targetLevel: 'country',
     country: 'India',
     state: 'Telangana',
     district: 'Hyderabad',
     mandal: '',
-    displayPanels: ['customer'],
+    displayPanels: ['customer', 'hospital'],
     priority: 1
   });
+
+  const [formError, setFormError] = useState<string | null>(null);
+  const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
 
   // Optional tester/simulator collapsed by default
   const [showTester, setShowTester] = useState(false);
@@ -303,6 +306,9 @@ export const LocationBanners: React.FC = () => {
   const handleOpenCreate = () => {
     setEditingBanner(null);
     setImageInputMode('upload');
+    setFormError(null);
+    setIsUploadingImage(false);
+    setIsSubmitting(false);
     setFormData({
       title: '',
       description: '',
@@ -314,12 +320,12 @@ export const LocationBanners: React.FC = () => {
       hospitalId: '',
       linkUrl: '/search',
       status: 'active',
-      targetLevel: 'district',
+      targetLevel: 'country',
       country: 'India',
       state: 'Telangana',
       district: 'Hyderabad',
       mandal: '',
-      displayPanels: ['customer'],
+      displayPanels: ['customer', 'hospital'],
       priority: 1
     });
     setHospitalSearch('');
@@ -331,6 +337,9 @@ export const LocationBanners: React.FC = () => {
   // Open Edit Modal
   const handleOpenEdit = (b: BannerRecord) => {
     setEditingBanner(b);
+    setFormError(null);
+    setIsUploadingImage(false);
+    setIsSubmitting(false);
     const isVid = b.mediaType === 'video' || /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(b.image || '');
     setImageInputMode(isVid ? 'video' : (b.image && b.image.startsWith('data:') ? 'upload' : 'url'));
     setFormData({
@@ -344,12 +353,12 @@ export const LocationBanners: React.FC = () => {
       hospitalId: b.hospitalId || '',
       linkUrl: b.linkUrl || (b.hospitalId ? `/hospital-details/${b.hospitalId}` : '/search'),
       status: b.status,
-      targetLevel: (b.targetLevel === 'village' ? 'mandal' : b.targetLevel) as any,
+      targetLevel: (b.targetLevel === 'village' ? 'mandal' : (b.targetLevel || 'country')) as any,
       country: 'India',
       state: b.state || 'Telangana',
       district: b.district || 'Hyderabad',
       mandal: b.mandal || '',
-      displayPanels: b.displayPanels || ['customer'],
+      displayPanels: b.displayPanels || ['customer', 'hospital'],
       priority: b.priority || 1
     });
     setHospitalSearch('');
@@ -359,15 +368,28 @@ export const LocationBanners: React.FC = () => {
   };
 
   // Save Banner (Create or Edit)
-  const handleSubmitForm = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmitForm = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setFormError(null);
 
-    if (!formData.title.trim()) {
-      alert('Please enter a banner title.');
+    const titleTrimmed = (formData.title || '').trim();
+    if (!titleTrimmed) {
+      setFormError('Please enter a Banner Title in Section 1.');
+      const titleEl = document.getElementById('banner-title-input');
+      if (titleEl) {
+        titleEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        titleEl.focus();
+      }
       return;
     }
-    if (!formData.image.trim()) {
-      alert('Please upload a banner image/video or enter a media URL.');
+
+    const imageTrimmed = (formData.image || '').trim();
+    if (!imageTrimmed) {
+      setFormError('Please upload a banner image/video or enter a URL in Section 2.');
+      const mediaEl = document.getElementById('banner-media-section');
+      if (mediaEl) {
+        mediaEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
       return;
     }
 
@@ -375,26 +397,26 @@ export const LocationBanners: React.FC = () => {
       ? `/hospital-details/${formData.hospitalId}` 
       : (formData.linkUrl.trim() || '/search');
 
-    const isVid = formData.mediaType === 'video' || /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(formData.image.trim());
+    const isVid = formData.mediaType === 'video' || /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(imageTrimmed);
 
     const payload = {
-      title: formData.title.trim(),
+      title: titleTrimmed,
       description: formData.description.trim(),
-      image: formData.image.trim(),
+      image: imageTrimmed,
       mediaType: isVid ? 'video' : 'image',
-      badge: formData.badge.trim(),
-      ctaText: formData.ctaText.trim(),
+      badge: formData.badge.trim() || 'LOCAL HEALTH UPDATE',
+      ctaText: formData.ctaText.trim() || 'Book OPD Token',
       hospitalId: formData.hospitalId || null,
       destinationType: formData.hospitalId ? 'hospital' : formData.destinationType,
       linkUrl: resolvedLink,
       status: formData.status,
-      targetLevel: formData.targetLevel,
+      targetLevel: formData.targetLevel || 'country',
       country: 'India',
       state: formData.targetLevel !== 'country' ? formData.state : null,
       district: (formData.targetLevel === 'district' || formData.targetLevel === 'mandal') ? formData.district : null,
       mandal: formData.targetLevel === 'mandal' ? (formData.mandal.trim() || null) : null,
       village: null,
-      displayPanels: ['customer'],
+      displayPanels: formData.displayPanels || ['customer', 'hospital'],
       priority: 1
     };
 
@@ -411,6 +433,8 @@ export const LocationBanners: React.FC = () => {
 
       if (res.ok) {
         setShowModal(false);
+        setSaveSuccessMsg(editingBanner ? 'Banner updated successfully!' : 'Banner published globally across entire website!');
+        setTimeout(() => setSaveSuccessMsg(null), 6000);
         await fetchBanners();
         broadcastGlobalSync('BANNERS_UPDATED', { action: editingBanner ? 'update' : 'create' });
       } else {
@@ -422,11 +446,11 @@ export const LocationBanners: React.FC = () => {
           const txt = await res.text().catch(() => '');
           if (txt) errMessage = `Server error (${res.status}): ${txt.slice(0, 100)}`;
         }
-        alert(errMessage);
+        setFormError(errMessage);
       }
     } catch (err: any) {
       console.error('Error saving banner:', err);
-      alert(`Error saving banner: ${err?.message || 'Network error'}`);
+      setFormError(`Network error: ${err?.message || 'Failed to reach server'}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -466,6 +490,17 @@ export const LocationBanners: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-fadeIn pb-12">
+      {/* Success Notification */}
+      {saveSuccessMsg && (
+        <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-black rounded-2xl flex items-center justify-between shadow-xs animate-fadeIn">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 size={18} className="text-emerald-600" />
+            <span>{saveSuccessMsg}</span>
+          </div>
+          <button onClick={() => setSaveSuccessMsg(null)} className="text-emerald-500 hover:text-emerald-700 font-bold text-sm cursor-pointer">✕</button>
+        </div>
+      )}
+
       {/* ─── Header Section ─────────────────────────────────────────────────── */}
       <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -904,7 +939,7 @@ export const LocationBanners: React.FC = () => {
             </div>
 
             {/* Modal Form */}
-            <form onSubmit={handleSubmitForm} className="p-6 space-y-5 max-h-[80vh] overflow-y-auto">
+            <form onSubmit={handleSubmitForm} noValidate className="p-6 space-y-5 max-h-[80vh] overflow-y-auto">
               {/* Step 1: Banner Information */}
               <div className="space-y-3">
                 <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
@@ -915,6 +950,7 @@ export const LocationBanners: React.FC = () => {
                 <div>
                   <label className="block text-xs font-extrabold text-slate-700 mb-1">Banner Title *</label>
                   <input
+                    id="banner-title-input"
                     type="text"
                     required
                     value={formData.title}
@@ -950,7 +986,7 @@ export const LocationBanners: React.FC = () => {
               </div>
 
               {/* Step 2: Banner Upload (Image or Video) */}
-              <div className="space-y-3 pt-3 border-t border-slate-100">
+              <div id="banner-media-section" className="space-y-3 pt-3 border-t border-slate-100">
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
                     <span className="w-4 h-4 rounded-full bg-blue-600 text-white text-[10px] flex items-center justify-center">2</span>
@@ -1128,9 +1164,9 @@ export const LocationBanners: React.FC = () => {
                         : 'border-slate-200 hover:border-slate-300 bg-white'
                     }`}
                   >
-                    <div className="text-lg mb-1">🇮🇳</div>
-                    <h5 className="text-xs font-black text-slate-900">All India</h5>
-                    <p className="text-[10px] text-slate-500 font-medium mt-0.5">Every user in India</p>
+                    <div className="text-lg mb-1">🌍</div>
+                    <h5 className="text-xs font-black text-slate-900">All India (Global)</h5>
+                    <p className="text-[10px] text-slate-500 font-medium mt-0.5">Visible across entire website</p>
                   </button>
 
                   <button
@@ -1338,7 +1374,7 @@ export const LocationBanners: React.FC = () => {
                     Audience: Visible to users in{' '}
                     <strong className="underline">
                       {formData.targetLevel === 'country'
-                        ? 'India (Nationwide)'
+                        ? '🌍 All India (Global — visible to every user across entire website)'
                         : formData.targetLevel === 'state'
                         ? `India → ${formData.state}`
                         : `India → ${formData.state} → ${formData.district}${formData.mandal ? ' (' + formData.mandal + ')' : ''}`}
@@ -1527,6 +1563,14 @@ export const LocationBanners: React.FC = () => {
                 </div>
               </div>
 
+              {/* Form Error Banner */}
+              {formError && (
+                <div className="p-4 bg-red-50 border border-red-200 rounded-2xl flex items-center gap-3 text-xs font-bold text-red-700 animate-fadeIn shadow-xs">
+                  <AlertCircle size={20} className="text-red-600 shrink-0" />
+                  <span className="leading-snug">{formError}</span>
+                </div>
+              )}
+
               {/* Modal Actions */}
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
                 <button
@@ -1539,6 +1583,7 @@ export const LocationBanners: React.FC = () => {
 
                 <button
                   type="submit"
+                  onClick={() => handleSubmitForm()}
                   disabled={isSubmitting || isUploadingImage}
                   className="px-6 py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black shadow-md shadow-blue-500/20 cursor-pointer transition-all hover:scale-102 flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
