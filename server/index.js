@@ -2008,6 +2008,54 @@ app.post('/api/hospitals/:hospitalId/staff', requireHospitalAuth, async (req, re
   res.json({ success: true, hospitalId, staff });
 });
 
+// ─── Direct Media Upload Endpoint (S3 with Base64 fallback) ───────────────────
+app.post('/api/upload', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file uploaded' });
+    }
+    const ext = path.extname(req.file.originalname) || '.jpg';
+    const cleanExt = ext.toLowerCase();
+    const key = `banners/banner-${Date.now()}-${Math.random().toString(36).substring(2, 7)}${cleanExt}`;
+    try {
+      const publicUrl = await uploadFile(key, req.file.buffer, req.file.mimetype || 'image/jpeg');
+      console.log('✅ Uploaded banner media to S3:', publicUrl);
+      return res.json({ success: true, url: publicUrl, source: 's3' });
+    } catch (s3Err) {
+      console.warn('⚠️ S3 upload failed, returning base64 fallback:', s3Err.message);
+      const b64 = `data:${req.file.mimetype || 'image/jpeg'};base64,${req.file.buffer.toString('base64')}`;
+      return res.json({ success: true, url: b64, source: 'base64' });
+    }
+  } catch (err) {
+    console.error('Upload endpoint error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+async function resolveBannerImage(imageSource) {
+  if (!imageSource) return '';
+  const trimmed = imageSource.trim();
+  if (trimmed.startsWith('data:image/')) {
+    try {
+      const matches = trimmed.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+      if (matches && matches.length === 3) {
+        const mime = matches[1];
+        const buffer = Buffer.from(matches[2], 'base64');
+        const ext = mime.split('/')[1]?.split(';')[0] || 'jpg';
+        const key = `banners/banner-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${ext}`;
+        const s3Url = await uploadFile(key, buffer, mime);
+        if (s3Url) {
+          console.log('✅ Converted base64 banner to S3 URL:', s3Url);
+          return s3Url;
+        }
+      }
+    } catch (e) {
+      console.warn('⚠️ S3 upload for base64 failed, keeping as base64:', e.message);
+    }
+  }
+  return trimmed;
+}
+
 // ─── Location-Based Banners API (Admin, Customer, Hospital) ─────────────────
 
 function normalizeGeo(str) {
@@ -2192,80 +2240,92 @@ app.get('/api/banners/active', async (req, res) => {
 
 // POST /api/banners - Create a new banner
 app.post('/api/banners', async (req, res) => {
-  const bannerData = req.body;
-  const imageSource = bannerData.image || bannerData.imageUrl || bannerData.bannerImage;
-  if (!bannerData.title || !imageSource) {
-    return res.status(400).json({ success: false, message: 'Title and image are required' });
+  try {
+    const bannerData = req.body;
+    const rawImage = bannerData.image || bannerData.imageUrl || bannerData.bannerImage;
+    if (!bannerData.title || !rawImage) {
+      return res.status(400).json({ success: false, message: 'Title and image are required' });
+    }
+
+    const finalImage = await resolveBannerImage(rawImage);
+    const store = await getUnifiedStore();
+    store.locationBanners = store.locationBanners || [];
+
+    const initialStatus = bannerData.status || (bannerData.active === false ? 'inactive' : 'active');
+    const isBannerActive = initialStatus === 'active';
+
+    const newBanner = {
+      id: bannerData.id || `ban-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`,
+      title: bannerData.title.trim(),
+      description: bannerData.description || '',
+      image: finalImage,
+      imageUrl: finalImage,
+      badge: bannerData.badge || 'LOCAL HEALTH UPDATE',
+      linkUrl: bannerData.linkUrl || '/search',
+      ctaText: bannerData.ctaText || 'Book Token',
+      hospitalId: bannerData.hospitalId || null,
+      destinationType: bannerData.destinationType || (bannerData.hospitalId ? 'hospital' : 'custom'),
+      status: initialStatus,
+      active: isBannerActive,
+      startDate: bannerData.startDate || null,
+      endDate: bannerData.endDate || null,
+      targetLevel: bannerData.targetLevel || 'country',
+      country: bannerData.country || 'India',
+      state: bannerData.state || null,
+      district: bannerData.district || null,
+      mandal: bannerData.mandal || null,
+      village: bannerData.village || null,
+      displayPanels: bannerData.displayPanels || ['customer'],
+      priority: Number(bannerData.priority) || 1,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    store.locationBanners.unshift(newBanner);
+    await saveUnifiedStore(store);
+
+    res.status(201).json({ success: true, message: 'Banner created successfully', banner: newBanner, id: newBanner.id });
+  } catch (err) {
+    console.error('Error creating banner:', err);
+    res.status(500).json({ success: false, message: err.message || 'Server error creating banner' });
   }
-
-  const store = await getUnifiedStore();
-  store.locationBanners = store.locationBanners || [];
-
-  const initialStatus = bannerData.status || (bannerData.active === false ? 'inactive' : 'active');
-  const isBannerActive = initialStatus === 'active';
-
-  const newBanner = {
-    id: bannerData.id || `ban-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`,
-    title: bannerData.title.trim(),
-    description: bannerData.description || '',
-    image: imageSource.trim(),
-    imageUrl: imageSource.trim(),
-    badge: bannerData.badge || 'LOCAL HEALTH UPDATE',
-    linkUrl: bannerData.linkUrl || '/search',
-    ctaText: bannerData.ctaText || 'Book Token',
-    hospitalId: bannerData.hospitalId || null,
-    destinationType: bannerData.destinationType || (bannerData.hospitalId ? 'hospital' : 'custom'),
-    status: initialStatus,
-    active: isBannerActive,
-    startDate: bannerData.startDate || null,
-    endDate: bannerData.endDate || null,
-    targetLevel: bannerData.targetLevel || 'country',
-    country: bannerData.country || 'India',
-    state: bannerData.state || null,
-    district: bannerData.district || null,
-    mandal: bannerData.mandal || null,
-    village: bannerData.village || null,
-    displayPanels: bannerData.displayPanels || ['customer'],
-    priority: Number(bannerData.priority) || 1,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  };
-
-  store.locationBanners.unshift(newBanner);
-  await saveUnifiedStore(store);
-
-  res.status(201).json({ success: true, message: 'Banner created successfully', banner: newBanner, id: newBanner.id });
 });
 
 // PUT /api/banners/:id - Update banner
 app.put('/api/banners/:id', async (req, res) => {
-  const { id } = req.params;
-  const updateData = req.body;
-  const store = await getUnifiedStore();
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+    const store = await getUnifiedStore();
 
-  store.locationBanners = store.locationBanners || [];
-  const idx = store.locationBanners.findIndex(b => b.id === id);
-  if (idx === -1) {
-    return res.status(404).json({ success: false, message: 'Banner not found' });
+    store.locationBanners = store.locationBanners || [];
+    const idx = store.locationBanners.findIndex(b => b.id === id);
+    if (idx === -1) {
+      return res.status(404).json({ success: false, message: 'Banner not found' });
+    }
+
+    const existing = store.locationBanners[idx];
+    const rawImage = updateData.image || updateData.imageUrl || existing.imageUrl || existing.image;
+    const finalImage = await resolveBannerImage(rawImage);
+    const nextStatus = updateData.status || (updateData.active !== undefined ? (updateData.active ? 'active' : 'inactive') : existing.status);
+
+    store.locationBanners[idx] = {
+      ...existing,
+      ...updateData,
+      id,
+      image: finalImage,
+      imageUrl: finalImage,
+      status: nextStatus,
+      active: nextStatus === 'active',
+      updatedAt: new Date().toISOString()
+    };
+
+    await saveUnifiedStore(store);
+    res.json({ success: true, message: 'Banner updated successfully', banner: store.locationBanners[idx], ...store.locationBanners[idx] });
+  } catch (err) {
+    console.error('Error updating banner:', err);
+    res.status(500).json({ success: false, message: err.message || 'Server error updating banner' });
   }
-
-  const existing = store.locationBanners[idx];
-  const imageSource = updateData.image || updateData.imageUrl || existing.imageUrl || existing.image;
-  const nextStatus = updateData.status || (updateData.active !== undefined ? (updateData.active ? 'active' : 'inactive') : existing.status);
-
-  store.locationBanners[idx] = {
-    ...existing,
-    ...updateData,
-    id,
-    image: imageSource,
-    imageUrl: imageSource,
-    status: nextStatus,
-    active: nextStatus === 'active',
-    updatedAt: new Date().toISOString()
-  };
-
-  await saveUnifiedStore(store);
-  res.json({ success: true, message: 'Banner updated successfully', banner: store.locationBanners[idx], ...store.locationBanners[idx] });
 });
 
 // PATCH /api/banners/:id/status - Toggle active/inactive

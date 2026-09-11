@@ -3,7 +3,7 @@ import {
   MapPin, Plus, Search, CheckCircle2, Edit2, Trash2,
   Layers, Globe, Sparkles, RefreshCw,
   X, ChevronRight, SlidersHorizontal,
-  UploadCloud, Building2, Link as LinkIcon, ChevronDown
+  UploadCloud, Building2, Link as LinkIcon, ChevronDown, Loader2
 } from 'lucide-react';
 import {
   INDIAN_STATES,
@@ -27,8 +27,10 @@ export const LocationBanners: React.FC = () => {
   const [hospitalSearch, setHospitalSearch] = useState('');
   const [isHospitalDropdownOpen, setIsHospitalDropdownOpen] = useState(false);
 
-  // Banner image upload state
+  // Banner image upload & submission states
   const [imageInputMode, setImageInputMode] = useState<'upload' | 'url'>('upload');
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Modal State
   const [showModal, setShowModal] = useState(false);
@@ -146,21 +148,76 @@ export const LocationBanners: React.FC = () => {
     }));
   };
 
-  // Handle Image File Upload (converts to base64 Data URL)
-  const handleImageFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Helper to resize/compress image file to max 1200x600 JPEG (~80KB)
+  const compressImageFile = (file: File): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let { width, height } = img;
+          const maxDim = 1200;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            const compressed = canvas.toDataURL('image/jpeg', 0.85);
+            resolve(compressed);
+          } else {
+            resolve(e.target?.result as string);
+          }
+        };
+        img.src = e.target?.result as string;
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  // Handle Image File Upload (compresses instantly and uploads to S3 / server)
+  const handleImageFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 8 * 1024 * 1024) {
-      alert("Please select an image file under 8MB.");
+    if (file.size > 15 * 1024 * 1024) {
+      alert("Please select an image file under 15MB.");
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        setFormData(prev => ({ ...prev, image: reader.result as string }));
+
+    setIsUploadingImage(true);
+    try {
+      // 1. Instant client-side compression for responsive preview and reliable fallback
+      const compressedDataUrl = await compressImageFile(file);
+      setFormData(prev => ({ ...prev, image: compressedDataUrl }));
+
+      // 2. Upload to S3/server
+      const uploadData = new FormData();
+      uploadData.append('file', file);
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: uploadData,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.url) {
+          setFormData(prev => ({ ...prev, image: data.url }));
+        }
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.warn("Upload endpoint fallback to compressed data URL:", err);
+    } finally {
+      setIsUploadingImage(false);
+    }
   };
 
   // Filtered Banners
@@ -293,6 +350,7 @@ export const LocationBanners: React.FC = () => {
       priority: 1
     };
 
+    setIsSubmitting(true);
     try {
       const url = editingBanner ? `/api/banners/${editingBanner.id}` : '/api/banners';
       const method = editingBanner ? 'PUT' : 'POST';
@@ -305,14 +363,23 @@ export const LocationBanners: React.FC = () => {
 
       if (res.ok) {
         setShowModal(false);
-        fetchBanners();
+        await fetchBanners();
       } else {
-        const data = await res.json();
-        alert(data.message || 'Failed to save banner');
+        let errMessage = `Error ${res.status}: Failed to save banner`;
+        try {
+          const data = await res.json();
+          if (data && data.message) errMessage = data.message;
+        } catch {
+          const txt = await res.text().catch(() => '');
+          if (txt) errMessage = `Server error (${res.status}): ${txt.slice(0, 100)}`;
+        }
+        alert(errMessage);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error saving banner:', err);
-      alert('Error saving banner');
+      alert(`Error saving banner: ${err?.message || 'Network error'}`);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -853,7 +920,13 @@ export const LocationBanners: React.FC = () => {
                       className="hidden"
                     />
 
-                    {!formData.image ? (
+                    {isUploadingImage ? (
+                      <div className="border-2 border-dashed border-blue-300 bg-blue-50/60 rounded-2xl p-6 flex flex-col items-center justify-center text-center">
+                        <Loader2 size={26} className="text-blue-600 animate-spin mb-2" />
+                        <p className="text-xs font-black text-blue-900">Optimizing & Uploading Banner Image...</p>
+                        <p className="text-[10px] font-semibold text-blue-600 mt-0.5">Compressing image for instant delivery</p>
+                      </div>
+                    ) : !formData.image ? (
                       <label
                         htmlFor="banner-file-input"
                         className="border-2 border-dashed border-slate-300 hover:border-blue-500 bg-slate-50/70 hover:bg-blue-50/30 rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer transition-all group"
@@ -865,7 +938,7 @@ export const LocationBanners: React.FC = () => {
                           Click to Browse or Drag & Drop Banner Image
                         </p>
                         <p className="text-[10px] font-semibold text-slate-400 mt-0.5">
-                          Supports PNG, JPG, JPEG, WEBP (Max 8MB · Recommended 1200 x 600 px)
+                          Supports PNG, JPG, JPEG, WEBP (Max 15MB · Auto-optimized)
                         </p>
                       </label>
                     ) : (
@@ -880,7 +953,9 @@ export const LocationBanners: React.FC = () => {
                             <span className="inline-flex items-center gap-1 text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
                               <CheckCircle2 size={10} /> Banner Image Ready
                             </span>
-                            <p className="text-xs font-bold text-slate-700 truncate mt-0.5">Image uploaded from device</p>
+                            <p className="text-xs font-bold text-slate-700 truncate mt-0.5">
+                              {formData.image.startsWith('http') ? 'Stored on Cloud CDN' : 'Optimized & compressed'}
+                            </p>
                           </div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
@@ -1267,10 +1342,20 @@ export const LocationBanners: React.FC = () => {
 
                 <button
                   type="submit"
-                  className="px-6 py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black shadow-md shadow-blue-500/20 cursor-pointer transition-all hover:scale-102 flex items-center gap-1.5"
+                  disabled={isSubmitting || isUploadingImage}
+                  className="px-6 py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black shadow-md shadow-blue-500/20 cursor-pointer transition-all hover:scale-102 flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Sparkles size={14} />
-                  <span>{editingBanner ? 'Save Changes' : 'Publish Banner Now'}</span>
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      <span>Saving Banner...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={14} />
+                      <span>{editingBanner ? 'Save Changes' : 'Publish Banner Now'}</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>
