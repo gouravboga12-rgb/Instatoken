@@ -11,7 +11,7 @@ import {
   DollarSign, Building2, CheckCircle2, Search, Plus,
   Users, UserCheck, UserX,
   AlertTriangle, Download, X, Calendar, Upload, User,
-  MapPin
+  MapPin, Trash2, Loader2
 } from 'lucide-react';
 import { LocationBanners } from './LocationBanners';
 
@@ -24,9 +24,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
   const location = useLocation();
   const { 
     hospitals, appointments, customers, addHospital, addDoctor, 
-    toggleDisableHospital, toggleCustomerStatus, notifications, addNotification,
+    toggleDisableHospital, deleteHospital, toggleCustomerStatus, notifications, addNotification,
     platformFeePercent, setPlatformFeePercent 
   } = useApp();
+
+  const [hospitalToDelete, setHospitalToDelete] = useState<any | null>(null);
+  const [isDeletingHosp, setIsDeletingHosp] = useState(false);
 
   const [adminTab, setAdminTab] = useState<
     'stats' | 'hospitals' | 'customers' | 'financials' | 'add-hospital' | 'add-doctor' | 'banners'
@@ -636,16 +639,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                               )}
                             </td>
                             <td className="px-4 py-3 text-right">
-                              <button
-                                onClick={() => toggleDisableHospital(hosp.id)}
-                                className={`text-xs font-extrabold px-3 py-1.5 rounded-xl transition-all cursor-pointer border-none shadow-2xs ${
-                                  isDisabled 
-                                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white' 
-                                    : 'bg-red-50 text-red-600 hover:bg-red-100 border border-red-200'
-                                }`}
-                              >
-                                {isDisabled ? 'Enable Hospital' : 'Disable Account'}
-                              </button>
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  onClick={() => toggleDisableHospital(hosp.id)}
+                                  className={`text-xs font-extrabold px-3 py-1.5 rounded-xl transition-all cursor-pointer border-none shadow-2xs ${
+                                    isDisabled 
+                                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white' 
+                                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
+                                  }`}
+                                >
+                                  {isDisabled ? 'Enable' : 'Disable'}
+                                </button>
+                                <button
+                                  onClick={() => setHospitalToDelete(hosp)}
+                                  className="text-xs font-extrabold px-2.5 py-1.5 rounded-xl bg-red-50 text-red-600 hover:bg-red-600 hover:text-white border border-red-200 transition-all cursor-pointer shadow-2xs flex items-center gap-1"
+                                  title="Permanently Delete Hospital"
+                                >
+                                  <Trash2 size={12} />
+                                  <span>Delete</span>
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         );
@@ -688,7 +701,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                 <span className="text-[10px] text-slate-400 font-black uppercase tracking-wider block">Total Customer Visits</span>
                 <span className="text-3xl font-black text-purple-600 font-heading block mt-1">
                   {customers.reduce((sum, c) => {
-                    const uniqueHosps = new Set(c.bookings.map(b => b.hospitalId));
+                    const uniqueHosps = new Set((c.bookings || []).map(b => b.hospitalId));
                     return sum + uniqueHosps.size;
                   }, 0)}
                 </span>
@@ -794,7 +807,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                             </td>
                             <td className="px-4 py-3 font-extrabold text-blue-600">
                               <span className="bg-blue-50 text-blue-700 px-2.5 py-1 rounded-xl text-xs">
-                                {cust.bookings.length} Tokens
+                                {(cust.bookings || []).length} Tokens
                               </span>
                             </td>
                             <td className="px-4 py-3">
@@ -1416,9 +1429,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                 </h4>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {Array.from(new Set(selectedCustomerModal.bookings.map(b => b.hospitalId))).map((hId) => {
+                  {Array.from(new Set((selectedCustomerModal.bookings || []).map(b => b.hospitalId))).map((hId) => {
                     const hosp = hospitals.find(h => h.id === hId);
-                    const countVisits = selectedCustomerModal.bookings.filter(b => b.hospitalId === hId).length;
+                    const countVisits = (selectedCustomerModal.bookings || []).filter(b => b.hospitalId === hId).length;
                     return (
                       <div key={hId} className="p-3 bg-purple-50/50 border border-purple-100 rounded-2xl flex items-center gap-3">
                         <img 
@@ -1445,6 +1458,67 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                 className="px-5 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 cursor-pointer border-none"
               >
                 Close Customer Details
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sticky Modal: Permanently Delete Hospital Confirmation */}
+      {hospitalToDelete && (
+        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 text-center space-y-4 border border-slate-200">
+            <div className="w-14 h-14 rounded-2xl bg-red-50 text-red-600 mx-auto flex items-center justify-center border border-red-100">
+              <AlertTriangle size={28} />
+            </div>
+            <div>
+              <h3 className="text-lg font-black text-slate-900">Permanently Delete Hospital?</h3>
+              <p className="text-xs text-slate-500 font-medium mt-1">
+                Are you sure you want to permanently delete <strong>{hospitalToDelete.name}</strong>?
+              </p>
+            </div>
+            <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-100 text-left text-xs space-y-1">
+              <p className="font-bold text-slate-800">Hospital: <span className="font-medium text-slate-600">{hospitalToDelete.name}</span></p>
+              <p className="font-bold text-slate-800">Address: <span className="font-medium text-slate-600">{hospitalToDelete.address}</span></p>
+              <p className="font-bold text-slate-800">Doctors: <span className="font-medium text-slate-600">{(hospitalToDelete.doctors || []).length} Doctors assigned</span></p>
+              <p className="text-[10px] text-red-600 font-bold mt-2">
+                ⚠️ This will permanently remove this hospital, its doctors, OPD sessions, and departments from AWS RDS. This action cannot be undone.
+              </p>
+            </div>
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                onClick={() => !isDeletingHosp && setHospitalToDelete(null)}
+                disabled={isDeletingHosp}
+                className="flex-1 py-2.5 px-4 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-50 transition-all cursor-pointer disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  setIsDeletingHosp(true);
+                  try {
+                    await deleteHospital(hospitalToDelete.id);
+                    setHospitalToDelete(null);
+                  } catch (err) {
+                    alert("Error deleting hospital: " + err);
+                  } finally {
+                    setIsDeletingHosp(false);
+                  }
+                }}
+                disabled={isDeletingHosp}
+                className="flex-1 py-2.5 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black text-xs shadow-md shadow-red-500/20 transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
+              >
+                {isDeletingHosp ? (
+                  <>
+                    <Loader2 size={13} className="animate-spin" />
+                    <span>Deleting from RDS...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={13} />
+                    <span>Delete Permanently</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

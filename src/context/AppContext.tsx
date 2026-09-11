@@ -95,7 +95,9 @@ interface AppContextType {
   toggleSaveHospital: (hospitalId: string) => void;
   toggleSaveDoctor: (doctorId: string) => void;
   toggleDisableHospital: (hospitalId: string) => void;
+  deleteHospital: (hospitalId: string) => Promise<boolean>;
   toggleCustomerStatus: (customerId: string) => void;
+  deleteCustomer: (customerId: string) => Promise<boolean>;
   bookToken: (
     patientDetails: { name: string; age: number; gender: string; phone: string; email: string; address: string },
     hospitalId: string,
@@ -719,6 +721,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             localStorage.setItem('insta_hospitals', JSON.stringify(updated));
             return updated;
           });
+        }
+
+      } else if (event.type === 'BANNER_DELETED') {
+        const deletedId = event.data?.id;
+        if (deletedId) {
+          setActiveBanners(prev => prev.filter(b => b.id !== deletedId));
+        }
+        fetchActiveBanners(userGeoHierarchy || undefined);
+
+      } else if (event.type === 'BANNERS_UPDATED') {
+        fetchActiveBanners(userGeoHierarchy || undefined);
+
+      } else if (event.type === 'HOSPITAL_DELETED') {
+        const deletedHospId = event.data?.id || event.data?.hospitalId;
+        if (deletedHospId) {
+          setHospitals(prev => prev.filter(h => h.id !== deletedHospId));
         }
 
       } else if (event.type === 'CLOUD_SYNC_UPDATED') {
@@ -1400,19 +1418,69 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }));
   };
 
-  const toggleCustomerStatus = (customerId: string) => {
-    setCustomers(prev => prev.map(c => {
-      if (c.id === customerId) {
-        const nextStatus = c.status === 'suspended' ? 'active' : 'suspended';
-        addNotification(
-          nextStatus === 'suspended' ? "Customer Suspended" : "Customer Activated",
-          `Customer ${c.name} account is now ${nextStatus.toUpperCase()}.`,
-          nextStatus === 'suspended' ? "warning" : "success"
-        );
-        return { ...c, status: nextStatus };
+  const deleteHospital = async (hospitalId: string): Promise<boolean> => {
+    try {
+      const res = await fetch(`/api/hospitals/${hospitalId}`, { method: 'DELETE' });
+      if (res.ok) {
+        setHospitals(prev => {
+          const filtered = prev.filter(h => h.id !== hospitalId);
+          localStorage.setItem('insta_hospitals', JSON.stringify(filtered));
+          return filtered;
+        });
+        localStorage.removeItem(`insta_hospital_profile_${hospitalId}`);
+        localStorage.removeItem(`insta_hospital_doctors_${hospitalId}`);
+        localStorage.removeItem(`insta_hospital_departments_${hospitalId}`);
+        broadcastGlobalSync('HOSPITAL_DELETED', { hospitalId });
+        addNotification("Hospital Deleted", "Hospital and its records permanently removed from AWS RDS.", "warning");
+        return true;
       }
-      return c;
-    }));
+    } catch (e) {
+      console.error('Error deleting hospital:', e);
+    }
+    return false;
+  };
+
+  const toggleCustomerStatus = (customerId: string) => {
+    setCustomers(prev => {
+      const updated = prev.map(c => {
+        if (c.id === customerId) {
+          const nextStatus: 'active' | 'suspended' = c.status === 'suspended' ? 'active' : 'suspended';
+          fetch(`/api/customers/${customerId}/status`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: nextStatus })
+          }).catch(console.warn);
+
+          addNotification(
+            nextStatus === 'suspended' ? "Customer Suspended" : "Customer Activated",
+            `Customer ${c.name} account is now ${nextStatus.toUpperCase()}.`,
+            nextStatus === 'suspended' ? "warning" : "success"
+          );
+          return { ...c, status: nextStatus };
+        }
+        return c;
+      });
+      localStorage.setItem('insta_customers', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const deleteCustomer = async (customerId: string): Promise<boolean> => {
+    try {
+      const res = await fetch(`/api/customers/${customerId}`, { method: 'DELETE' });
+      if (res.ok) {
+        setCustomers(prev => {
+          const filtered = prev.filter(c => c.id !== customerId);
+          localStorage.setItem('insta_customers', JSON.stringify(filtered));
+          return filtered;
+        });
+        addNotification("Customer Removed", "Customer account removed from AWS RDS.", "info");
+        return true;
+      }
+    } catch (e) {
+      console.error('Error deleting customer:', e);
+    }
+    return false;
   };
 
   // --- Notification Helpers ---
@@ -1741,7 +1809,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       toggleSaveHospital,
       toggleSaveDoctor,
       toggleDisableHospital,
+      deleteHospital,
       toggleCustomerStatus,
+      deleteCustomer,
       bookToken,
       cancelAppointment,
       advanceQueue,

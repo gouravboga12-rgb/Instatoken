@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { getHospitalSVGImage } from '../../utils/mockData';
 import { calculateDistanceKm } from '../../utils/googleMaps';
@@ -6,7 +6,8 @@ import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { 
   ArrowLeft, Star, MapPin, Clock, Heart, Share2, 
-  Phone, CheckCircle, Stethoscope, Navigation, AlertTriangle
+  Phone, CheckCircle, Stethoscope, Navigation, AlertTriangle,
+  ChevronLeft, ChevronRight, Video
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 
@@ -21,6 +22,26 @@ export const HospitalDetails: React.FC<HospitalDetailsProps> = ({ onDoctorSelect
   
   const hospital = hospitals.find(h => h.id === id);
   const [selectedDeptId, setSelectedDeptId] = useState<string>('All');
+  const [activeMediaIndex, setActiveMediaIndex] = useState(0);
+  const [isHovered, setIsHovered] = useState(false);
+
+  const mediaList = useMemo(() => {
+    const rawGallery = (hospital as any)?.gallery;
+    if (Array.isArray(rawGallery) && rawGallery.length > 0) {
+      return rawGallery;
+    }
+    return [
+      { id: 'cover', type: 'image', url: hospital?.image || '', caption: hospital?.name || 'Hospital' }
+    ];
+  }, [hospital]);
+
+  useEffect(() => {
+    if (mediaList.length <= 1 || isHovered) return;
+    const interval = setInterval(() => {
+      setActiveMediaIndex(prev => (prev + 1) % mediaList.length);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [mediaList.length, isHovered]);
 
   if (!hospital) {
     return (
@@ -97,14 +118,76 @@ export const HospitalDetails: React.FC<HospitalDetailsProps> = ({ onDoctorSelect
       {/* Real Hospital Photo Banner & Gallery (Always top) */}
       <div className="px-0 md:px-5 md:mt-4 mb-4">
         <div className="bg-white border-b border-slate-150 md:border md:rounded-3xl overflow-hidden shadow-2xs rounded-b-3xl">
-          <div className="h-72 sm:h-80 md:h-96 w-full relative bg-slate-100">
-            <img 
-              src={hospital.image} 
-              alt={hospital.name} 
-              className="w-full h-full object-cover"
-              onError={(e) => { (e.target as HTMLImageElement).src = getHospitalSVGImage(hospital.name); }}
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/75 via-transparent to-transparent" />
+          <div 
+            className="h-72 sm:h-80 md:h-96 w-full relative bg-slate-900 group"
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+          >
+            {/* Active Media (Image or Video) */}
+            {mediaList[activeMediaIndex]?.type === 'video' ? (
+              <video 
+                key={mediaList[activeMediaIndex].url}
+                src={mediaList[activeMediaIndex].url} 
+                autoPlay 
+                muted 
+                loop 
+                playsInline 
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <img 
+                key={mediaList[activeMediaIndex]?.url || hospital.image}
+                src={mediaList[activeMediaIndex]?.url || hospital.image} 
+                alt={mediaList[activeMediaIndex]?.caption || hospital.name} 
+                className="w-full h-full object-cover transition-opacity duration-500"
+                onError={(e) => { (e.target as HTMLImageElement).src = getHospitalSVGImage(hospital.name); }}
+              />
+            )}
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/20 to-transparent pointer-events-none" />
+
+            {/* Media Type Badge */}
+            {mediaList[activeMediaIndex]?.type === 'video' && (
+              <span className="absolute top-4 left-1/2 -translate-x-1/2 px-3 py-1 bg-amber-500/90 text-slate-950 font-black text-xs rounded-full flex items-center gap-1.5 shadow-lg backdrop-blur-xs">
+                <Video size={12} />
+                <span>Video Tour ({activeMediaIndex + 1}/{mediaList.length})</span>
+              </span>
+            )}
+
+            {/* Navigation Arrows (if multiple media) */}
+            {mediaList.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setActiveMediaIndex(prev => (prev - 1 + mediaList.length) % mediaList.length)}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-slate-900/60 hover:bg-slate-900/90 text-white flex items-center justify-center backdrop-blur-md transition-all cursor-pointer border border-white/20 shadow-lg active:scale-95"
+                  aria-label="Previous Media"
+                >
+                  <ChevronLeft size={20} className="stroke-[2.5]" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveMediaIndex(prev => (prev + 1) % mediaList.length)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-slate-900/60 hover:bg-slate-900/90 text-white flex items-center justify-center backdrop-blur-md transition-all cursor-pointer border border-white/20 shadow-lg active:scale-95"
+                  aria-label="Next Media"
+                >
+                  <ChevronRight size={20} className="stroke-[2.5]" />
+                </button>
+
+                {/* Dot Indicators */}
+                <div className="absolute top-4 right-4 hidden md:flex items-center gap-1.5 bg-black/40 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/15">
+                  {mediaList.map((_, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setActiveMediaIndex(idx)}
+                      className={`h-1.5 rounded-full transition-all cursor-pointer ${
+                        idx === activeMediaIndex ? 'w-5 bg-blue-500' : 'w-1.5 bg-white/50 hover:bg-white'
+                      }`}
+                      aria-label={`Slide ${idx + 1}`}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
             
             {/* Mobile-only overlay navigation buttons */}
             <div className="absolute top-4 left-4 right-4 flex items-center justify-between md:hidden">

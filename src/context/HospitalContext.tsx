@@ -68,7 +68,7 @@ export interface TokenRecord {
   session: 'morning' | 'afternoon' | 'evening';
   time: string;
   bookingDate: string;
-  status: 'booked' | 'checked-in' | 'completed' | 'cancelled' | 'waiting' | 'skipped' | 'not-visited';
+  status: 'booked' | 'checked-in' | 'completed' | 'cancelled' | 'waiting' | 'skipped' | 'not-visited' | 'calling' | 'late-coming' | 'arrived' | 'in-consultation';
   queuePosition: number;
   estimatedWait: number; // minutes
   consultationFee: number;

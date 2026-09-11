@@ -6,16 +6,22 @@ import type { TokenRecord, PatientRecord } from '../../context/HospitalContext';
 import {
   Plus, Search, XCircle, CheckCircle, Wifi, WifiOff,
   Printer, X, Calendar, AlertCircle, UserPlus, User, Phone, Mail,
-  MapPin, Droplets, FileText, Check, ArrowRight
+  MapPin, Droplets, FileText, Check, ArrowRight, Volume2, Eye, Clock,
+  RotateCcw, CheckCircle2, Stethoscope
 } from 'lucide-react';
 
 const statusColors: Record<string, string> = {
   booked: 'bg-blue-50 text-blue-700 border border-blue-200',
-  'checked-in': 'bg-amber-50 text-amber-700 border border-amber-200',
+  'checked-in': 'bg-indigo-50 text-indigo-700 border border-indigo-200',
+  arrived: 'bg-indigo-50 text-indigo-700 border border-indigo-200 font-bold',
+  'in-consultation': 'bg-indigo-50 text-indigo-700 border border-indigo-200 font-bold',
   waiting: 'bg-purple-50 text-purple-700 border border-purple-200',
-  completed: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+  calling: 'bg-amber-100 text-amber-900 border border-amber-400 font-black animate-pulse',
+  'late-coming': 'bg-orange-50 text-orange-700 border border-orange-300 font-bold',
+  completed: 'bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold',
   cancelled: 'bg-red-50 text-red-700 border border-red-200',
   skipped: 'bg-slate-100 text-slate-600 border border-slate-200',
+  'not-visited': 'bg-rose-50 text-rose-700 border border-rose-200',
 };
 
 // ─── Create Customer / Patient Account Modal ─────────────────────────────────
@@ -869,6 +875,266 @@ const WalkInGenerator: React.FC<{
   );
 };
 
+// ─── Web Audio Dual-Chime Sound Generator ──────────────────────────────────
+const playCallingChime = () => {
+  try {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+    const now = ctx.currentTime;
+
+    // Chime Note 1: E5 (659.25 Hz)
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(659.25, now);
+    gain1.gain.setValueAtTime(0.22, now);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.start(now);
+    osc1.stop(now + 0.55);
+
+    // Chime Note 2: A5 (880 Hz) - pleasant chime interval
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(880, now + 0.26);
+    gain2.gain.setValueAtTime(0.28, now + 0.26);
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.85);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.start(now + 0.26);
+    osc2.stop(now + 0.85);
+  } catch (err) {
+    console.warn('Could not play calling chime:', err);
+  }
+};
+
+// ─── Call Confirmation Modal Component ─────────────────────────────────────
+const CallConfirmationModal: React.FC<{
+  token: TokenRecord;
+  onConfirm: () => void;
+  onClose: () => void;
+}> = ({ token, onConfirm, onClose }) => {
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 animate-fadeIn">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-10 h-10 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center animate-bounce">
+              <Volume2 size={20} />
+            </div>
+            <div>
+              <h3 className="text-base font-black text-slate-800">Call Patient Token</h3>
+              <p className="text-[11px] text-slate-400 font-semibold">Sound chime & broadcast to digital screens</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 font-bold border-none cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="bg-gradient-to-br from-amber-500/10 via-amber-50/50 to-orange-50/20 border border-amber-200 rounded-2xl p-5 text-center space-y-2">
+          <span className="text-[10px] font-black uppercase tracking-widest text-amber-700 block">Calling Token Number</span>
+          <div className="text-5xl font-black text-amber-900 tracking-tight">#{token.tokenNo}</div>
+          <div className="pt-2 border-t border-amber-200/60">
+            <p className="font-extrabold text-base text-slate-800">{token.patientName}</p>
+            <p className="text-xs text-slate-500 font-semibold">{token.patientPhone} · {token.doctorName}</p>
+            <p className="text-[11px] text-amber-700 font-bold mt-1 uppercase tracking-wide">
+              {token.session} OPD · {token.departmentName}
+            </p>
+          </div>
+        </div>
+
+        <p className="text-xs text-slate-500 text-center font-medium leading-relaxed">
+          Confirming will play an audio chime, notify display boards, and update token status to <strong className="text-amber-800 font-bold">Calling</strong>.
+        </p>
+
+        <div className="grid grid-cols-2 gap-3 pt-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs cursor-pointer border-none transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="py-3 bg-amber-500 hover:bg-amber-600 text-white font-black rounded-xl text-xs cursor-pointer border-none shadow-md shadow-amber-500/25 flex items-center justify-center gap-1.5 transition-all"
+          >
+            <Volume2 size={16} /> Confirm & Call
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── Patient File Modal Component ──────────────────────────────────────────
+const PatientFileModal: React.FC<{
+  token: TokenRecord;
+  allTokens: TokenRecord[];
+  onClose: () => void;
+}> = ({ token, allTokens, onClose }) => {
+  const patientPastTokens = allTokens.filter(t =>
+    t.id !== token.id &&
+    ((t.patientPhone && t.patientPhone === token.patientPhone) ||
+     (t.patientName && t.patientName.toLowerCase() === token.patientName.toLowerCase()))
+  );
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 animate-fadeIn">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl p-6 space-y-5 max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3.5">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-black text-base">
+              <User size={20} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-black text-slate-800">{token.patientName}</h3>
+                <span className="text-[10px] font-extrabold px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full">
+                  Token #{token.tokenNo}
+                </span>
+                <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${statusColors[token.status] || 'bg-slate-100 text-slate-700'}`}>
+                  {token.status.toUpperCase()}
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 font-semibold mt-0.5">
+                Hospital OPD Patient File & Consultation Dossier
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 cursor-pointer border-none font-bold"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Patient Profile Card */}
+        <div className="bg-slate-50/70 border border-slate-100 rounded-2xl p-4 grid grid-cols-2 sm:grid-cols-4 gap-3.5 text-xs">
+          <div>
+            <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wider">Age & Gender</span>
+            <span className="font-extrabold text-slate-800">{token.patientAge} Years · {token.patientGender}</span>
+          </div>
+          <div>
+            <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wider">Phone</span>
+            <span className="font-extrabold text-slate-800 flex items-center gap-1">
+              <Phone size={11} className="text-blue-500" /> {token.patientPhone}
+            </span>
+          </div>
+          <div>
+            <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wider">Registration Type</span>
+            <span className="font-extrabold text-slate-800 capitalize flex items-center gap-1">
+              {token.type === 'online' ? <Wifi size={11} className="text-blue-500" /> : <WifiOff size={11} className="text-slate-500" />}
+              {token.type} OPD
+            </span>
+          </div>
+          <div>
+            <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wider">Visit Status</span>
+            <span className="font-extrabold text-slate-800">
+              {token.isRevisit ? 'Follow-up / Revisit' : 'New Patient Visit'}
+            </span>
+          </div>
+        </div>
+
+        {/* Current Consultation Details */}
+        <div className="border border-slate-100 rounded-2xl p-4 space-y-3">
+          <h4 className="text-xs font-black text-slate-800 flex items-center gap-1.5 uppercase tracking-wider">
+            <Stethoscope size={14} className="text-blue-600" /> Current OPD Consultation Details
+          </h4>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+            <div className="bg-blue-50/50 p-2.5 rounded-xl border border-blue-100/50">
+              <span className="text-[10px] text-slate-400 font-bold block">Consulting Doctor</span>
+              <span className="font-black text-slate-800">{token.doctorName}</span>
+              <span className="text-[10px] text-blue-600 font-semibold block mt-0.5">{token.departmentName}</span>
+            </div>
+            <div className="bg-blue-50/50 p-2.5 rounded-xl border border-blue-100/50">
+              <span className="text-[10px] text-slate-400 font-bold block">OPD Session & Slot</span>
+              <span className="font-black text-slate-800 capitalize">{token.session} OPD</span>
+              <span className="text-[10px] text-slate-500 font-semibold block mt-0.5">{token.time} ({token.bookingDate})</span>
+            </div>
+            <div className="bg-emerald-50/50 p-2.5 rounded-xl border border-emerald-100/50">
+              <span className="text-[10px] text-slate-400 font-bold block">Consultation Fee</span>
+              <span className="font-black text-emerald-700 text-base">₹{token.consultationFee}</span>
+              <span className={`text-[9px] font-extrabold block mt-0.5 ${token.paymentStatus === 'paid' ? 'text-emerald-600' : 'text-amber-600'}`}>
+                {token.paymentStatus.toUpperCase()} via {token.paymentMethod || 'Hospital Desk'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Doctor Reference & Complaint Notes */}
+        <div className="border border-slate-100 rounded-2xl p-4 space-y-2">
+          <h4 className="text-xs font-black text-slate-800 flex items-center gap-1.5 uppercase tracking-wider">
+            <FileText size={14} className="text-slate-600" /> Chief Complaints & Doctor Reference Notes
+          </h4>
+          <div className="bg-slate-50 p-3 rounded-xl text-xs text-slate-700 font-medium leading-relaxed">
+            {token.notes ? (
+              <p>{token.notes}</p>
+            ) : (
+              <p className="text-slate-400 italic">No specific complaint notes recorded. Standard consultation queue token.</p>
+            )}
+          </div>
+        </div>
+
+        {/* Past Tokens / OPD Visit History */}
+        <div className="border border-slate-100 rounded-2xl p-4 space-y-2.5">
+          <h4 className="text-xs font-black text-slate-800 flex items-center gap-1.5 uppercase tracking-wider">
+            <Clock size={14} className="text-purple-600" /> Past OPD Consultation History ({patientPastTokens.length})
+          </h4>
+          {patientPastTokens.length === 0 ? (
+            <p className="text-xs text-slate-400 italic py-2">First recorded visit at this hospital.</p>
+          ) : (
+            <div className="divide-y divide-slate-100 max-h-40 overflow-y-auto">
+              {patientPastTokens.map(pt => (
+                <div key={pt.id} className="py-2 flex items-center justify-between text-xs">
+                  <div>
+                    <span className="font-bold text-slate-800">Token #{pt.tokenNo} · {pt.doctorName}</span>
+                    <span className="text-[10px] text-slate-400 block font-medium">{pt.departmentName} · {pt.bookingDate}</span>
+                  </div>
+                  <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${statusColors[pt.status] || 'bg-slate-100 text-slate-600'}`}>
+                    {pt.status.toUpperCase()}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Revenue Status Note */}
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 flex items-start gap-2.5 text-xs text-amber-900">
+          <AlertCircle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+          <div>
+            <span className="font-bold block">Hospital Financial Ledger Policy:</span>
+            <span className="text-[11px] text-amber-800">
+              Revenue from this consultation is strictly posted to the hospital earnings report only when marked as <strong className="font-black text-emerald-800">Completed</strong>. Calling, skipped, or late-coming tokens remain pending and will not count towards realized revenue.
+            </span>
+          </div>
+        </div>
+
+        <div className="flex justify-end pt-1">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl cursor-pointer border-none"
+          >
+            Close File
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── Token Management Table Component ─────────────────────────────────────
 const TokenTable: React.FC<{
   tokens: TokenRecord[];
@@ -887,6 +1153,10 @@ const TokenTable: React.FC<{
   const [deptFilter, setDeptFilter] = useState('all');
   const [docFilter, setDocFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState(() => new Date().toISOString().split('T')[0]);
+
+  // Modal states
+  const [callConfirmToken, setCallConfirmToken] = useState<TokenRecord | null>(null);
+  const [selectedPatientToken, setSelectedPatientToken] = useState<TokenRecord | null>(null);
 
   const filteredDocList = deptFilter === 'all'
     ? doctors
@@ -909,9 +1179,14 @@ const TokenTable: React.FC<{
 
   const totalCount = filtered.length;
   const completedCount = filtered.filter(t => t.status === 'completed').length;
-  const inCabinCount = filtered.filter(t => t.status === 'checked-in' || (t.status as string) === 'in-cabin').length;
-  const cancelledCount = filtered.filter(t => t.status === 'cancelled' || t.status === 'skipped').length;
-  const totalRevenue = filtered.reduce((acc, t) => acc + (t.status !== 'cancelled' ? (t.consultationFee || 0) : 0), 0);
+  const callingCount = filtered.filter(t => t.status === 'calling').length;
+  const inCabinCount = filtered.filter(t => ['checked-in', 'arrived', 'in-consultation'].includes(t.status)).length;
+  const lateComingCount = filtered.filter(t => t.status === 'late-coming').length;
+
+  // STRICT REVENUE INTEGRITY: Revenue is strictly earned ONLY upon completion!
+  const totalEarnedRevenue = filtered
+    .filter(t => t.status === 'completed')
+    .reduce((acc, t) => acc + (t.consultationFee || 0), 0);
 
   return (
     <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden space-y-0">
@@ -939,28 +1214,54 @@ const TokenTable: React.FC<{
         </div>
 
         {/* Analytics Mini Strip */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 pt-2 border-t border-slate-100/80">
+        <div className="grid grid-cols-2 sm:grid-cols-6 gap-2.5 pt-2 border-t border-slate-100/80">
           <div className="bg-slate-50 p-2.5 rounded-xl text-center">
-            <p className="text-[10px] font-bold text-slate-400">Total Booked</p>
+            <p className="text-[10px] font-bold text-slate-400">Total Tokens</p>
             <p className="text-sm font-black text-slate-800">{totalCount}</p>
           </div>
+          <div className="bg-amber-50 p-2.5 rounded-xl text-center">
+            <p className="text-[10px] font-bold text-amber-600">Calling Now</p>
+            <p className="text-sm font-black text-amber-700">{callingCount}</p>
+          </div>
+          <div className="bg-indigo-50 p-2.5 rounded-xl text-center">
+            <p className="text-[10px] font-bold text-indigo-600">In-Cabin</p>
+            <p className="text-sm font-black text-indigo-700">{inCabinCount}</p>
+          </div>
+          <div className="bg-orange-50 p-2.5 rounded-xl text-center">
+            <p className="text-[10px] font-bold text-orange-600">Late / On Hold</p>
+            <p className="text-sm font-black text-orange-700">{lateComingCount}</p>
+          </div>
           <div className="bg-emerald-50 p-2.5 rounded-xl text-center">
-            <p className="text-[10px] font-bold text-emerald-600">Completed</p>
+            <p className="text-[10px] font-bold text-emerald-600">Completed Visits</p>
             <p className="text-sm font-black text-emerald-700">{completedCount}</p>
           </div>
-          <div className="bg-amber-50 p-2.5 rounded-xl text-center">
-            <p className="text-[10px] font-bold text-amber-600">In-Cabin / Waiting</p>
-            <p className="text-sm font-black text-amber-700">{inCabinCount}</p>
-          </div>
-          <div className="bg-red-50 p-2.5 rounded-xl text-center">
-            <p className="text-[10px] font-bold text-red-500">Cancelled / Skipped</p>
-            <p className="text-sm font-black text-red-600">{cancelledCount}</p>
-          </div>
           <div className="bg-purple-50 p-2.5 rounded-xl text-center col-span-2 sm:col-span-1">
-            <p className="text-[10px] font-bold text-purple-600">Token Fees</p>
-            <p className="text-sm font-black text-purple-700">₹{totalRevenue.toLocaleString('en-IN')}</p>
+            <p className="text-[10px] font-bold text-purple-600">Realized Revenue</p>
+            <p className="text-sm font-black text-purple-700">₹{totalEarnedRevenue.toLocaleString('en-IN')}</p>
+            <span className="text-[8px] text-purple-500 font-bold block">Completed Only</span>
           </div>
         </div>
+
+        {/* Late-Coming / On-Hold Banner Notice */}
+        {lateComingCount > 0 && (
+          <div className="bg-orange-50/80 border border-orange-200 rounded-2xl p-3 flex items-center justify-between gap-3 text-xs text-orange-900 animate-fadeIn">
+            <div className="flex items-center gap-2">
+              <span className="text-base">⏳</span>
+              <div>
+                <span className="font-extrabold">{lateComingCount} Patient(s) Marked as Late-Coming / On Hold</span>
+                <p className="text-[11px] text-orange-700 font-medium">
+                  These tokens were skipped to keep queue moving. Once the patient arrives, click <strong className="font-bold">Call Now</strong> to admit them.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setStatusFilter('late-coming')}
+              className="px-3 py-1 bg-orange-600 hover:bg-orange-700 text-white font-bold text-[11px] rounded-xl border-none cursor-pointer shrink-0"
+            >
+              View On-Hold Queue
+            </button>
+          </div>
+        )}
 
         {/* Filter Controls */}
         <div className="flex flex-wrap items-center gap-2 pt-1">
@@ -1015,9 +1316,11 @@ const TokenTable: React.FC<{
           >
             <option value="all">All Statuses</option>
             <option value="booked">Booked / Waiting</option>
-            <option value="checked-in">In-Cabin</option>
-            <option value="completed">Completed</option>
-            <option value="skipped">Skipped</option>
+            <option value="calling">Calling Now</option>
+            <option value="checked-in">In-Cabin / Arrived</option>
+            <option value="late-coming">Late-Coming (On-Hold)</option>
+            <option value="completed">Completed (Visited)</option>
+            <option value="not-visited">Not Visited / No-Show</option>
             <option value="cancelled">Cancelled</option>
           </select>
 
@@ -1049,13 +1352,13 @@ const TokenTable: React.FC<{
             <tr className="border-b border-slate-100 bg-slate-50/50 text-[10px] font-black text-slate-400 uppercase tracking-wider">
               <th className="py-3 px-4">Token #</th>
               <th className="py-3 px-4">Type</th>
-              <th className="py-3 px-4">Patient</th>
+              <th className="py-3 px-4">Patient File</th>
               <th className="py-3 px-4">Doctor & Dept</th>
               <th className="py-3 px-4">Session & Time</th>
               <th className="py-3 px-4">Queue</th>
               <th className="py-3 px-4">Fee</th>
               <th className="py-3 px-4">Status</th>
-              <th className="py-3 px-4 text-right">Actions</th>
+              <th className="py-3 px-4 text-right">Queue Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -1083,8 +1386,22 @@ const TokenTable: React.FC<{
                     )}
                   </td>
                   <td className="py-3 px-4">
-                    <p className="font-bold text-slate-800">{t.patientName}</p>
-                    <p className="text-[10px] text-slate-400 font-medium">{t.patientPhone} · {t.patientAge}y, {t.patientGender}</p>
+                    <div className="flex items-center gap-2">
+                      <div>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedPatientToken(t)}
+                          className="font-black text-slate-800 hover:text-blue-600 cursor-pointer border-none bg-transparent text-left p-0 transition-colors flex items-center gap-1"
+                          title="Click to view complete patient details & medical history"
+                        >
+                          <span>{t.patientName}</span>
+                          <Eye size={12} className="text-blue-500 opacity-60" />
+                        </button>
+                        <p className="text-[10px] text-slate-400 font-medium">
+                          {t.patientPhone} · {t.patientAge}y, {t.patientGender}
+                        </p>
+                      </div>
+                    </div>
                   </td>
                   <td className="py-3 px-4">
                     <p className="font-bold text-slate-800">{t.doctorName}</p>
@@ -1106,34 +1423,147 @@ const TokenTable: React.FC<{
                   </td>
                   <td className="py-3 px-4">
                     <span className={`text-[10px] font-extrabold px-2.5 py-1 rounded-full ${statusColors[t.status] || 'bg-slate-100 text-slate-600'}`}>
-                      {t.status}
+                      {t.status === 'calling' ? '🔊 CALLING' : t.status === 'late-coming' ? '⏳ LATE-COMING' : t.status}
                     </span>
                   </td>
                   <td className="py-3 px-4 text-right">
-                    <div className="flex items-center justify-end gap-1">
+                    <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                      {/* View Patient Details Button */}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedPatientToken(t)}
+                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg cursor-pointer border border-blue-200 transition-colors"
+                        title="View Patient Details & OPD Dossier"
+                      >
+                        <Eye size={13} />
+                      </button>
+
+                      {/* Stage 1: Booked / Waiting -> Call Token or Mark Late */}
                       {['booked', 'waiting'].includes(t.status) && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setCallConfirmToken(t)}
+                            className="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[10px] font-black cursor-pointer border-none shadow-xs flex items-center gap-1"
+                            title="Call Token & Sound Chime"
+                          >
+                            <Volume2 size={11} /> Call
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => updateTokenStatus(t.id, 'late-coming')}
+                            className="px-2 py-1.5 bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 rounded-lg text-[10px] font-bold cursor-pointer transition-colors"
+                            title="Patient is late: hold this token so subsequent token can proceed"
+                          >
+                            Late-Coming
+                          </button>
+                        </>
+                      )}
+
+                      {/* Stage 2: Calling -> Mark Arrived or Skip/Late */}
+                      {t.status === 'calling' && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => updateTokenStatus(t.id, 'in-consultation')}
+                            className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10px] font-black cursor-pointer border-none shadow-xs flex items-center gap-1"
+                            title="Patient has entered cabin / arrived"
+                          >
+                            <CheckCircle2 size={11} /> Arrived
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              playCallingChime();
+                            }}
+                            className="p-1.5 text-amber-600 hover:bg-amber-50 border border-amber-300 rounded-lg cursor-pointer"
+                            title="Re-play calling sound chime"
+                          >
+                            <Volume2 size={13} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => updateTokenStatus(t.id, 'late-coming')}
+                            className="px-2 py-1.5 bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 rounded-lg text-[10px] font-bold cursor-pointer"
+                            title="Did not respond: move to late-coming on-hold queue"
+                          >
+                            Skip / Late
+                          </button>
+                        </>
+                      )}
+
+                      {/* Stage 3: Arrived / In Consultation -> Complete Consultation (triggers revenue) or No-Show */}
+                      {['checked-in', 'arrived', 'in-consultation'].includes(t.status) && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => updateTokenStatus(t.id, 'completed')}
+                            className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-black cursor-pointer border-none shadow-xs flex items-center gap-1"
+                            title="Complete Consultation - Updates Revenue Ledger"
+                          >
+                            <CheckCircle size={11} /> Complete
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => updateTokenStatus(t.id, 'not-visited')}
+                            className="px-2 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-[10px] font-bold cursor-pointer"
+                            title="Patient left without consultation: not counted in revenue"
+                          >
+                            No-Show
+                          </button>
+                        </>
+                      )}
+
+                      {/* Stage 4: Late-Coming -> Re-call now or Mark Not Visited */}
+                      {t.status === 'late-coming' && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setCallConfirmToken(t)}
+                            className="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[10px] font-black cursor-pointer border-none shadow-xs flex items-center gap-1"
+                            title="Patient has now reported to desk: call them into cabin"
+                          >
+                            <Volume2 size={11} /> Call Now
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => updateTokenStatus(t.id, 'not-visited')}
+                            className="px-2 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-[10px] font-bold cursor-pointer"
+                            title="Did not visit today: exclude from revenue"
+                          >
+                            Not Visited
+                          </button>
+                        </>
+                      )}
+
+                      {/* Stage 5: Completed -> Revenue Realized Badge */}
+                      {t.status === 'completed' && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-black text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-200">
+                          <CheckCircle size={11} /> Visited (Earned)
+                        </span>
+                      )}
+
+                      {/* Stage 6: Not-Visited or Skipped -> Allow Reopen if patient shows up late */}
+                      {['not-visited', 'skipped'].includes(t.status) && (
                         <button
-                          onClick={() => updateTokenStatus(t.id, 'checked-in')}
-                          className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[10px] font-bold cursor-pointer border-none"
+                          type="button"
+                          onClick={() => setCallConfirmToken(t)}
+                          className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[10px] font-bold cursor-pointer border-none flex items-center gap-1"
+                          title="Patient arrived very late: reopen token"
                         >
-                          Check In
+                          <RotateCcw size={10} /> Re-Open
                         </button>
                       )}
-                      {t.status === 'checked-in' && (
-                        <button
-                          onClick={() => updateTokenStatus(t.id, 'completed')}
-                          className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-bold cursor-pointer border-none"
-                        >
-                          Complete
-                        </button>
-                      )}
+
+                      {/* Cancel token for active records */}
                       {t.status !== 'completed' && t.status !== 'cancelled' && (
                         <button
+                          type="button"
                           onClick={() => cancelToken(t.id)}
-                          className="p-1 text-slate-400 hover:text-red-600 rounded-lg cursor-pointer transition-colors"
+                          className="p-1 text-slate-300 hover:text-red-600 rounded-lg cursor-pointer transition-colors"
                           title="Cancel token"
                         >
-                          <XCircle size={14} />
+                          <XCircle size={13} />
                         </button>
                       )}
                     </div>
@@ -1144,6 +1574,28 @@ const TokenTable: React.FC<{
           </tbody>
         </table>
       </div>
+
+      {/* Calling Confirmation Sound Modal */}
+      {callConfirmToken && (
+        <CallConfirmationModal
+          token={callConfirmToken}
+          onConfirm={() => {
+            playCallingChime();
+            updateTokenStatus(callConfirmToken.id, 'calling');
+            setCallConfirmToken(null);
+          }}
+          onClose={() => setCallConfirmToken(null)}
+        />
+      )}
+
+      {/* Patient Dossier / File Modal */}
+      {selectedPatientToken && (
+        <PatientFileModal
+          token={selectedPatientToken}
+          allTokens={toks}
+          onClose={() => setSelectedPatientToken(null)}
+        />
+      )}
     </div>
   );
 };

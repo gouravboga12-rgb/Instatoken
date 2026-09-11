@@ -513,7 +513,7 @@ async function getUnifiedStore() {
         if (!store.hospitalStaff) store.hospitalStaff = {};
         if (!store.hospitalCredentials) store.hospitalCredentials = [];
         if (!store.customers || !Array.isArray(store.customers)) store.customers = [];
-        if (!store.locationBanners || !Array.isArray(store.locationBanners) || store.locationBanners.length === 0) {
+        if (!store.locationBanners || !Array.isArray(store.locationBanners)) {
           store.locationBanners = INITIAL_LOCATION_BANNERS;
         }
 
@@ -602,6 +602,7 @@ function syncProfileToHospitalsList(store, hospitalId, profile) {
     about: profile.about,
     facilities: profile.facilities,
     image: profile.coverImage || profile.logo,
+    gallery: profile.gallery || [],
     lat: profile.lat !== undefined ? Number(profile.lat) : undefined,
     lng: profile.lng !== undefined ? Number(profile.lng) : undefined
   };
@@ -907,6 +908,45 @@ app.get('/api/auth/hospital-me', requireHospitalAuth, (req, res) => {
 app.get('/api/hospitals', async (req, res) => {
   const store = await getUnifiedStore();
   res.json({ success: true, hospitals: store.hospitals, store });
+});
+
+// DELETE /api/hospitals/:id - Permanently Delete Hospital from AWS RDS (Super Admin)
+app.delete('/api/hospitals/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const store = await getUnifiedStore();
+
+    // 1. Remove from store.hospitals
+    store.hospitals = (store.hospitals || []).filter(h => h.id !== id);
+
+    // 2. Remove associated profiles, doctors, depts, schedules
+    if (store.hospitalProfiles) delete store.hospitalProfiles[id];
+    if (store.hospitalDoctors) delete store.hospitalDoctors[id];
+    if (store.hospitalDepartments) delete store.hospitalDepartments[id];
+    if (store.hospitalSchedules) delete store.hospitalSchedules[id];
+    if (store.hospitalStaff) delete store.hospitalStaff[id];
+    if (store.hospitalPatients) delete store.hospitalPatients[id];
+
+    // 3. Purge from relational PostgreSQL tables if connected
+    if (isDbConnected) {
+      try {
+        await query(`DELETE FROM hospital_doctors WHERE hospital_id = $1`, [id]);
+        await query(`DELETE FROM hospital_departments WHERE hospital_id = $1`, [id]);
+        await query(`DELETE FROM hospital_schedules WHERE hospital_id = $1`, [id]);
+        await query(`DELETE FROM hospital_profiles WHERE hospital_id = $1`, [id]);
+        await query(`DELETE FROM hospitals WHERE id = $1`, [id]);
+      } catch (dbErr) {
+        console.warn('Warning deleting relational hospital data:', dbErr.message);
+      }
+    }
+
+    await saveUnifiedStore(store);
+    console.log(`✅ Permanently deleted hospital ${id} from AWS RDS`);
+    res.json({ success: true, message: `Hospital ${id} permanently deleted`, deletedId: id });
+  } catch (err) {
+    console.error('Error deleting hospital:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
 });
 
 // ─── Hospital Doctors (Phase 21 & 22) ────────────────────────────────────────
@@ -1490,7 +1530,16 @@ function normalizeCustomerPhone(p) {
 app.get('/api/customers', async (req, res) => {
   try {
     const store = await getUnifiedStore();
-    res.json({ success: true, customers: store.customers || [] });
+    const safeCustomers = (store.customers || [])
+      .filter(c => c && (c.name !== 'Patient' || c.phone || c.email))
+      .map(c => ({
+        ...c,
+        bookings: Array.isArray(c.bookings) ? c.bookings : [],
+        familyMembers: Array.isArray(c.familyMembers) ? c.familyMembers : [],
+        savedDoctors: Array.isArray(c.savedDoctors) ? c.savedDoctors : [],
+        savedHospitals: Array.isArray(c.savedHospitals) ? c.savedHospitals : []
+      }));
+    res.json({ success: true, customers: safeCustomers });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -1648,6 +1697,38 @@ app.post('/api/customers/profile', async (req, res) => {
   }
 });
 
+// PATCH /api/customers/:id/status - Toggle Customer Status (Admin)
+app.patch('/api/customers/:id/status', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    const store = await getUnifiedStore();
+    store.customers = store.customers || [];
+    const idx = store.customers.findIndex(c => c.id === id);
+    if (idx === -1) {
+      return res.status(404).json({ success: false, message: 'Customer not found' });
+    }
+    store.customers[idx].status = status || (store.customers[idx].status === 'active' ? 'suspended' : 'active');
+    await saveUnifiedStore(store);
+    res.json({ success: true, customer: store.customers[idx] });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// DELETE /api/customers/:id - Delete Customer Account (Admin)
+app.delete('/api/customers/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const store = await getUnifiedStore();
+    store.customers = (store.customers || []).filter(c => c.id !== id);
+    await saveUnifiedStore(store);
+    res.json({ success: true, message: 'Customer deleted', deletedId: id });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // ─── PHASE 21: Backend Revenue Calculation Engine ────────────────────────────
 // Calculates doctor-wise and overall hospital revenue on the backend
 // Eliminates frontend calculation dependencies
@@ -1720,8 +1801,8 @@ app.get('/api/hospitals/:hospitalId/revenue', requireHospitalAuth, async (req, r
   const doctorRevenueStats = doctors.map(doc => {
     const docTokens = hospitalTokens.filter(t => t.doctorId === doc.id);
     const completedTokens = docTokens.filter(t => t.status === 'completed');
-    const notVisitedTokens = docTokens.filter(t => ['not-visited', 'skipped'].includes(t.status));
-    const waitingTokens = docTokens.filter(t => ['booked', 'waiting', 'checked-in', 'in-cabin'].includes(t.status));
+    const notVisitedTokens = docTokens.filter(t => ['not-visited', 'skipped', 'no-show', 'cancelled'].includes(t.status));
+    const waitingTokens = docTokens.filter(t => ['booked', 'waiting', 'checked-in', 'in-cabin', 'calling', 'arrived', 'in-consultation', 'late-coming'].includes(t.status));
     const cancelledTokens = docTokens.filter(t => t.status === 'cancelled');
 
     const fee = doc.consultationFee || 500;
@@ -1851,7 +1932,7 @@ app.patch('/api/hospitals/:hospitalId/tokens/:tokenId/status', requireHospitalAu
 
   let targetToken = null;
   store.tokens = (store.tokens || []).map(t => {
-    if (t.id === tokenId && (t.hospitalId || 'hosp-apollo') === hospitalId) {
+    if (t.id === tokenId) {
       targetToken = {
         ...t,
         status,
@@ -1862,12 +1943,19 @@ app.patch('/api/hospitals/:hospitalId/tokens/:tokenId/status', requireHospitalAu
     return t;
   });
 
-  if (isDbConnected && targetToken) {
+  if (isDbConnected) {
     try {
-      await query(
-        `UPDATE tokens SET status = $1, data = $2, updated_at = NOW() WHERE id = $3`,
-        [status, JSON.stringify(targetToken), tokenId]
-      );
+      if (targetToken) {
+        await query(
+          `UPDATE tokens SET status = $1, data = $2, updated_at = NOW() WHERE id = $3`,
+          [status, JSON.stringify(targetToken), tokenId]
+        );
+      } else {
+        await query(
+          `UPDATE tokens SET status = $1, updated_at = NOW() WHERE id = $2`,
+          [status, tokenId]
+        );
+      }
       await query(
         `UPDATE appointments SET status = $1, updated_at = NOW() WHERE id = $2`,
         [status, tokenId]

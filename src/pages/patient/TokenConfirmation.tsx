@@ -5,8 +5,9 @@ import { Button } from '../../components/ui/Button';
 import { QRCodeSVG } from 'qrcode.react';
 import { 
   Calendar, Download, Share2, CheckCircle2, 
-  Phone, Compass, Building2, User, Sun, CreditCard,
-  AlertCircle, ArrowLeft, Loader2, ExternalLink
+  Phone, Compass, Building2, User, CreditCard,
+  AlertCircle, ArrowLeft, Loader2, ExternalLink,
+  Clock, QrCode, ChevronDown, ChevronUp, MapPin
 } from 'lucide-react';
 
 const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -43,11 +44,12 @@ export const formatLocalDate = (dateStr: string) => {
 
 export const TokenConfirmation: React.FC = () => {
   const { appointmentId } = useParams<{ appointmentId: string }>();
-  const { appointments, addNotification } = useApp();
+  const { appointments, hospitals, addNotification } = useApp();
   const navigate = useNavigate();
 
   const [fetchedAppointment, setFetchedAppointment] = useState<any>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [showQr, setShowQr] = useState(false);
 
   // Look in React state first, then fallback to fetched appointment
   const inMemoryAppointment = appointments.find(a => a.id === appointmentId) || (appointmentId ? null : appointments[0]);
@@ -209,123 +211,108 @@ export const TokenConfirmation: React.FC = () => {
         
         {/* Left Column (Pass Card & Action Buttons) */}
         <div className="md:col-span-6 space-y-4 mb-5 md:mb-0">
-          {/* Main Printable Digital Token Card matching Image 4 */}
+          {/* Main Printable Digital Token Card */}
           <div className="bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden">
           
-          {/* Blue Top Ticket Header Banner */}
-          <div className="bg-blue-600 px-5 py-3.5 flex justify-between items-center text-white">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 bg-white text-blue-600 rounded-lg flex items-center justify-center font-black text-sm shadow-sm">
+          {/* Blue Top Ticket Header Banner with Real Hospital Address */}
+          <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-800 px-5 py-4 flex justify-between items-center text-white">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-white/20 backdrop-blur-xs text-white rounded-xl flex items-center justify-center font-black text-base shadow-sm border border-white/20">
                 +
               </div>
-              <div>
-                <span className="text-[8px] font-black uppercase tracking-widest text-blue-100 block">INSTATOKEN OFFICIAL</span>
-                <h4 className="text-xs font-black truncate max-w-[220px]">{appointment.hospitalName}</h4>
-                <p className="text-[9px] text-blue-100 font-medium">Kurnool Road, Adoni, Andhra Pradesh</p>
+              <div className="min-w-0">
+                <span className="text-[8px] font-black uppercase tracking-widest text-blue-200 block">INSTATOKEN VERIFIED OPD PASS</span>
+                <h4 className="text-sm font-black truncate max-w-[240px] text-white">{appointment.hospitalName}</h4>
+                <p className="text-[9.5px] text-blue-100 font-medium truncate max-w-[240px] flex items-center gap-1 mt-0.5">
+                  <MapPin size={10} className="text-blue-300 shrink-0" />
+                  <span>{hospitals.find(h => h.id === appointment.hospitalId)?.address || appointment.address || 'Hospital OPD Facility'}</span>
+                </p>
               </div>
             </div>
 
             {/* Paid Pill Badge */}
-            <span className="bg-emerald-600 text-white text-[10px] font-black uppercase px-2.5 py-1 rounded-full flex items-center gap-1 shadow-sm">
-              PAID <CheckCircle2 size={10} className="stroke-[3]" />
+            <span className="bg-emerald-500 text-white text-[10px] font-black uppercase px-3 py-1 rounded-full flex items-center gap-1 shadow-sm shrink-0">
+              {appointment.paymentMethod === 'online' ? 'PAID ONLINE' : 'PAY AT HOSPITAL'} <CheckCircle2 size={10} className="stroke-[3]" />
             </span>
           </div>
 
           {/* Ticket Body Content */}
-          <div className="p-5">
-            <div className="grid grid-cols-2 gap-4 items-center border-b border-slate-100 pb-5">
+          <div className="p-5 space-y-4">
+            
+            {/* 1. Large High-Visibility Token Number & Consultation Time */}
+            <div className="bg-gradient-to-br from-blue-50 via-slate-50 to-indigo-50/50 border border-blue-100 rounded-3xl p-5 text-center shadow-2xs relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-full blur-xl pointer-events-none" />
+              <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">
+                YOUR CONFIRMED OPD TOKEN NUMBER
+              </span>
               
-              {/* Left Column: Token #8 & QR Code */}
-              <div className="flex flex-col items-center text-center pr-3 border-r border-slate-100">
-                <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest">YOUR OPD TOKEN</span>
-                <span className="text-6xl font-black text-blue-600 tracking-tight my-1 font-heading">
-                  {appointment.tokenNumber || 8}
-                </span>
-
-                {/* QR Code Container */}
-                <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-2xl my-2 shadow-inner">
-                  <QRCodeSVG 
-                    value={qrPayload}
-                    size={105}
-                    level="M"
-                  />
-                </div>
-                <span className="text-[9px] font-bold text-slate-400">Token ID: ITK-0262</span>
+              <div className="text-6xl sm:text-7xl font-black text-blue-700 tracking-tight my-1 font-heading">
+                #{appointment.tokenNumber || 1}
               </div>
 
-              {/* Right Column: Doctor, Patient, Session, Date */}
-              <div className="space-y-3 pl-1">
-                
-                {/* Doctor */}
-                <div>
-                  <span className="text-[9px] font-black text-blue-600 uppercase tracking-wide">DOCTOR</span>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <div className="w-7 h-7 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center font-bold text-xs shrink-0">
-                      <User size={14} />
-                    </div>
-                    <div>
-                      <h5 className="text-xs font-black text-slate-900 leading-tight">{appointment.doctorName}</h5>
-                      <p className="text-[9.5px] text-slate-400 font-semibold">{appointment.departmentName}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Patient */}
-                <div>
-                  <span className="text-[9px] font-black text-blue-600 uppercase tracking-wide">PATIENT</span>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <div className="w-7 h-7 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center font-bold text-xs shrink-0">
-                      <User size={14} />
-                    </div>
-                    <div>
-                      <h5 className="text-xs font-black text-slate-900 leading-tight">{appointment.patientName}</h5>
-                      <p className="text-[9.5px] text-slate-400 font-semibold">{appointment.gender} • {appointment.age} yrs</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Session Card (Green Tint) */}
-                <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-2 flex items-center gap-2">
-                  <Sun size={18} className="text-amber-500 shrink-0" />
-                  <div>
-                    <span className="text-[8px] font-extrabold text-emerald-800 uppercase block">SESSION</span>
-                    <span className="text-[10px] font-black text-emerald-700 block">{appointment.time || 'Morning Session'}</span>
-                  </div>
-                </div>
-
-                {/* Date Card (Blue Tint) */}
-                <div className="bg-blue-50 border border-blue-100 rounded-xl p-2 flex items-center gap-2">
-                  <Calendar size={18} className="text-blue-600 shrink-0" />
-                  <div>
-                    <span className="text-[8px] font-extrabold text-blue-800 uppercase block">DATE</span>
-                    <span className="text-[10px] font-black text-blue-700 block">{formattedDate}</span>
-                    <span className="text-[8px] text-slate-500 font-bold">{dayOfWeek}</span>
-                  </div>
-                </div>
-
+              <div className="inline-flex items-center gap-2 bg-white px-3.5 py-1.5 rounded-full border border-blue-200/80 shadow-2xs text-xs font-bold text-slate-800 mt-1">
+                <Clock size={13} className="text-blue-600 shrink-0" />
+                <span>OPD Slot: <strong>{appointment.time || '10:00 AM'}</strong></span>
+                <span className="text-slate-300">•</span>
+                <span className="text-slate-500">{formattedDate} ({dayOfWeek})</span>
               </div>
-
             </div>
 
-            {/* Doctor Consultation Fee Card (Matching Image 4) */}
-            <div className="mt-4 bg-gradient-to-r from-amber-50/70 to-yellow-50/70 border border-blue-400 rounded-2xl p-4 flex items-center justify-between">
+            {/* 2. Doctor & Patient Details Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Doctor Details */}
+              <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-1">
+                <span className="text-[9px] font-black text-blue-700 uppercase tracking-wider block">CONSULTING DOCTOR</span>
+                <div className="flex items-center gap-2.5 pt-0.5">
+                  <div className="w-8 h-8 bg-blue-100 text-blue-700 rounded-xl flex items-center justify-center font-bold text-xs shrink-0">
+                    <User size={15} />
+                  </div>
+                  <div className="min-w-0">
+                    <h5 className="text-xs font-black text-slate-900 truncate">{appointment.doctorName}</h5>
+                    <p className="text-[10px] text-blue-600 font-bold truncate">{appointment.departmentName || 'General OPD'}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Patient Details */}
+              <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-1">
+                <span className="text-[9px] font-black text-blue-700 uppercase tracking-wider block">REGISTERED PATIENT</span>
+                <div className="flex items-center gap-2.5 pt-0.5">
+                  <div className="w-8 h-8 bg-purple-100 text-purple-700 rounded-xl flex items-center justify-center font-bold text-xs shrink-0">
+                    <User size={15} />
+                  </div>
+                  <div className="min-w-0">
+                    <h5 className="text-xs font-black text-slate-900 truncate">{appointment.patientName}</h5>
+                    <p className="text-[10px] text-slate-500 font-semibold truncate">
+                      {appointment.gender || 'Patient'} • {appointment.age || 28} yrs
+                      {appointment.phone ? ` • 📞 ${appointment.phone}` : ''}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 3. Doctor Consultation Fee Card */}
+            <div className="bg-gradient-to-r from-amber-50/70 to-yellow-50/70 border border-amber-200 rounded-2xl p-4 flex items-center justify-between">
               <div className="space-y-0.5">
-                <span className="text-[9px] font-black text-blue-800 uppercase tracking-wider flex items-center gap-1">
-                  <CreditCard size={12} className="text-blue-600" /> DOCTOR CONSULTATION FEE
+                <span className="text-[9px] font-black text-amber-800 uppercase tracking-wider flex items-center gap-1">
+                  <CreditCard size={12} className="text-amber-600" /> DOCTOR CONSULTATION FEE
                 </span>
-                <span className="text-3xl font-black text-blue-600 block font-heading">₹{appointment.fee || 800}</span>
+                <span className="text-3xl font-black text-slate-900 block font-heading">₹{appointment.fee || 500}</span>
               </div>
 
               <div className="text-right">
                 <span className="bg-emerald-600 text-white text-[10px] font-black px-3 py-1 rounded-md inline-block uppercase shadow-sm">
-                  PAY AT HOSPITAL
+                  {appointment.paymentMethod === 'online' ? 'PAID ONLINE' : 'PAY AT HOSPITAL'}
                 </span>
-                <h5 className="text-[10px] font-black text-slate-900 mt-1">PAY AT HOSPITAL</h5>
+                <h5 className="text-[10px] font-black text-slate-700 mt-1">
+                  {appointment.paymentMethod === 'online' ? 'Transaction Verified' : 'Pay at OPD Counter'}
+                </h5>
               </div>
             </div>
 
-            {/* Consultation Validity Dates Banner */}
-            <div className="mt-3 bg-emerald-50 border border-emerald-200/80 rounded-2xl p-3 flex items-center justify-between">
+            {/* 4. Consultation Validity Dates Banner */}
+            <div className="bg-emerald-50 border border-emerald-200/80 rounded-2xl p-3 flex items-center justify-between">
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className="w-8 h-8 bg-emerald-100 text-emerald-700 rounded-xl flex items-center justify-center shrink-0 font-bold">
                   <Calendar size={16} />
@@ -339,6 +326,36 @@ export const TokenConfirmation: React.FC = () => {
               <span className="bg-emerald-600 text-white text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider shadow-2xs shrink-0 ml-2">
                 7 DAYS VALID
               </span>
+            </div>
+
+            {/* 5. Collapsible Front-Desk Check-In QR Code */}
+            <div className="border border-slate-200 rounded-2xl p-3 bg-white">
+              <button
+                type="button"
+                onClick={() => setShowQr(!showQr)}
+                className="w-full flex items-center justify-between text-xs font-black text-slate-700 hover:text-blue-600 cursor-pointer transition-colors"
+              >
+                <span className="flex items-center gap-1.5">
+                  <QrCode size={14} className="text-blue-600" />
+                  <span>{showQr ? 'Hide Hospital Scanner QR Code' : 'Show Hospital Scanner QR Code (Optional)'}</span>
+                </span>
+                {showQr ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              </button>
+
+              {showQr && (
+                <div className="mt-3 pt-3 border-t border-slate-100 flex flex-col items-center text-center animate-in fade-in duration-200">
+                  <div className="p-3 bg-white border border-slate-200 rounded-2xl shadow-xs">
+                    <QRCodeSVG 
+                      value={qrPayload}
+                      size={130}
+                      level="M"
+                    />
+                  </div>
+                  <span className="text-[10px] font-bold text-slate-400 mt-2">
+                    Show at hospital front desk for instant OPD barcode scanning
+                  </span>
+                </div>
+              )}
             </div>
 
           </div>

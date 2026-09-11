@@ -11,6 +11,7 @@ import {
   matchLocationHierarchy
 } from '../../utils/geoHierarchy';
 import type { BannerRecord } from '../../utils/geoHierarchy';
+import { broadcastGlobalSync } from '../../utils/syncBus';
 
 const DEFAULT_BANNER_FALLBACK = 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=1200&auto=format&fit=crop&q=80';
 
@@ -364,6 +365,7 @@ export const LocationBanners: React.FC = () => {
       if (res.ok) {
         setShowModal(false);
         await fetchBanners();
+        broadcastGlobalSync('BANNERS_UPDATED', { action: editingBanner ? 'update' : 'create' });
       } else {
         let errMessage = `Error ${res.status}: Failed to save banner`;
         try {
@@ -394,6 +396,7 @@ export const LocationBanners: React.FC = () => {
       });
       if (res.ok) {
         setBanners(prev => prev.map(b => b.id === banner.id ? { ...b, status: newStatus } : b));
+        broadcastGlobalSync('BANNERS_UPDATED', { id: banner.id, status: newStatus });
       }
     } catch (e) {
       console.error('Error toggling banner status:', e);
@@ -407,6 +410,7 @@ export const LocationBanners: React.FC = () => {
       const res = await fetch(`/api/banners/${id}`, { method: 'DELETE' });
       if (res.ok) {
         setBanners(prev => prev.filter(b => b.id !== id));
+        broadcastGlobalSync('BANNER_DELETED', { id });
       }
     } catch (e) {
       console.error('Error deleting banner:', e);

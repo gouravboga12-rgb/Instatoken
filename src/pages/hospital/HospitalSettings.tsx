@@ -4,7 +4,7 @@ import { geocodeLocation, reverseGeocodeAddressDetails } from '../../utils/googl
 import {
   Building2, Save, Check, MapPin, Layers, Compass,
   ExternalLink, Sparkles, Loader2, Upload, ImageIcon, Phone,
-  AlertCircle
+  AlertCircle, Video, Trash2, Plus, Film, Star
 } from 'lucide-react';
 
 const COMMON_FACILITIES = [
@@ -32,11 +32,17 @@ export const HospitalSettings: React.FC = () => {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingGallery, setUploadingGallery] = useState(false);
+  const [customMediaUrl, setCustomMediaUrl] = useState('');
+  const [customMediaType, setCustomMediaType] = useState<'image' | 'video'>('image');
+  const [customMediaCaption, setCustomMediaCaption] = useState('');
 
   const [form, setForm] = useState({
     name: hospitalProfile?.name || 'Apollo Spectra Hospital',
     logo: hospitalProfile?.logo || '',
     coverImage: hospitalProfile?.coverImage || '',
+    gallery: (hospitalProfile?.gallery as any[]) || [],
     registrationNumber: hospitalProfile?.registrationNumber || 'HOSP-BLR-2024-889',
     accreditation: hospitalProfile?.accreditation || 'NABH & JCI Accredited',
     gstNumber: hospitalProfile?.gstNumber || '29AABCA1234F1Z8',
@@ -80,6 +86,7 @@ export const HospitalSettings: React.FC = () => {
           name: hospitalProfile.name || '',
           logo: hospitalProfile.logo || '',
           coverImage: hospitalProfile.coverImage || '',
+          gallery: hospitalProfile.gallery || [],
           registrationNumber: hospitalProfile.registrationNumber || '',
           accreditation: hospitalProfile.accreditation || '',
           gstNumber: hospitalProfile.gstNumber || '',
@@ -144,6 +151,76 @@ export const HospitalSettings: React.FC = () => {
     };
     reader.readAsDataURL(file);
     setUploadingPhoto(false);
+  };
+
+  // Upload multiple images & videos for hospital facility gallery
+  const handleGalleryFilesUpload = async (files: FileList | File[]) => {
+    if (!files || files.length === 0) return;
+    setUploadingGallery(true);
+    const newItems: any[] = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const isVideo = file.type.startsWith('video') || file.name.endsWith('.mp4') || file.name.endsWith('.webm');
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('folder', 'hospital-gallery');
+        const res = await fetch('/api/media/upload', { method: 'POST', body: formData });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.url) {
+            newItems.push({
+              id: `med-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+              type: isVideo ? 'video' : 'image',
+              url: data.url,
+              caption: file.name.replace(/\.[^/.]+$/, '')
+            });
+            continue;
+          }
+        }
+      } catch (e) {
+        console.warn('Gallery upload failed for', file.name, e);
+      }
+    }
+    if (newItems.length > 0) {
+      setForm(prev => {
+        const updatedGallery = [...(prev.gallery || []), ...newItems];
+        return {
+          ...prev,
+          gallery: updatedGallery,
+          coverImage: prev.coverImage || updatedGallery.find(m => m.type === 'image')?.url || ''
+        };
+      });
+    }
+    setUploadingGallery(false);
+  };
+
+  const handleAddMediaUrl = () => {
+    if (!customMediaUrl.trim()) return;
+    const newItem = {
+      id: `med-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      type: customMediaType,
+      url: customMediaUrl.trim(),
+      caption: customMediaCaption.trim() || (customMediaType === 'video' ? 'Facility Video Tour' : 'Campus Photo')
+    };
+    setForm(prev => ({
+      ...prev,
+      gallery: [...(prev.gallery || []), newItem],
+      coverImage: prev.coverImage || (newItem.type === 'image' ? newItem.url : prev.coverImage)
+    }));
+    setCustomMediaUrl('');
+    setCustomMediaCaption('');
+  };
+
+  const handleRemoveMedia = (id: string) => {
+    setForm(prev => ({
+      ...prev,
+      gallery: (prev.gallery || []).filter(m => m.id !== id)
+    }));
+  };
+
+  const handleSetAsCover = (url: string) => {
+    setForm(prev => ({ ...prev, coverImage: url }));
   };
 
   const handleAutoGeocode = async () => {
@@ -392,6 +469,161 @@ export const HospitalSettings: React.FC = () => {
                       </div>
                     </div>
                   </div>
+                </div>
+
+                {/* ── MULTI-MEDIA GALLERY (IMAGES & VIDEOS) ── */}
+                <div className="bg-slate-50/80 p-5 rounded-3xl border border-slate-200/80 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Film size={16} className="text-blue-600" />
+                        <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                          Hospital Multi-Media Gallery (Photos &amp; Videos)
+                        </h4>
+                        <span className="bg-blue-100 text-blue-800 text-[10px] font-extrabold px-2 py-0.5 rounded-full">
+                          {(form.gallery || []).length} media items
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 font-semibold mt-0.5">
+                        Upload facility photos and video tours. These appear as an interactive carousel on your hospital page.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="file"
+                        ref={galleryInputRef}
+                        multiple
+                        accept="image/*,video/*"
+                        className="hidden"
+                        onChange={e => {
+                          const files = e.target.files;
+                          if (files) handleGalleryFilesUpload(files);
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => galleryInputRef.current?.click()}
+                        disabled={uploadingGallery}
+                        className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold rounded-xl cursor-pointer border-none shadow-xs disabled:opacity-50 transition-colors"
+                      >
+                        {uploadingGallery ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+                        <span>{uploadingGallery ? 'Uploading to S3...' : 'Upload Media Files'}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Add Media via Direct URL */}
+                  <div className="bg-white p-3.5 rounded-2xl border border-slate-200 flex flex-wrap items-center gap-2 text-xs">
+                    <select
+                      value={customMediaType}
+                      onChange={e => setCustomMediaType(e.target.value as any)}
+                      className="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-bold outline-none"
+                    >
+                      <option value="image">🖼️ Photo Image</option>
+                      <option value="video">🎬 Video Clip</option>
+                    </select>
+                    <input
+                      type="text"
+                      placeholder="Paste Image / Video MP4 URL..."
+                      value={customMediaUrl}
+                      onChange={e => setCustomMediaUrl(e.target.value)}
+                      className="flex-1 min-w-[200px] bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs outline-none focus:border-blue-500"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Caption (e.g. ICU Wing, Reception)"
+                      value={customMediaCaption}
+                      onChange={e => setCustomMediaCaption(e.target.value)}
+                      className="w-48 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs outline-none focus:border-blue-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddMediaUrl}
+                      className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-extrabold text-xs cursor-pointer border-none flex items-center gap-1"
+                    >
+                      <Plus size={12} /> Add to Gallery
+                    </button>
+                  </div>
+
+                  {/* Gallery Items Grid */}
+                  {(form.gallery || []).length > 0 ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 pt-1">
+                      {(form.gallery || []).map((item: any, idx: number) => {
+                        const isCover = form.coverImage === item.url;
+                        return (
+                          <div
+                            key={item.id || idx}
+                            className={`group relative rounded-2xl overflow-hidden border bg-white shadow-2xs transition-all ${
+                              isCover ? 'ring-2 ring-blue-600 border-blue-600' : 'border-slate-200 hover:border-slate-300'
+                            }`}
+                          >
+                            <div className="h-28 w-full relative bg-slate-900 flex items-center justify-center overflow-hidden">
+                              {item.type === 'video' ? (
+                                <video
+                                  src={item.url}
+                                  className="w-full h-full object-cover opacity-90"
+                                  muted
+                                />
+                              ) : (
+                                <img
+                                  src={item.url}
+                                  alt={item.caption || 'Facility'}
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=400';
+                                  }}
+                                />
+                              )}
+
+                              {/* Media Type Badge */}
+                              <span className="absolute top-2 left-2 px-2 py-0.5 bg-slate-900/80 backdrop-blur-xs text-white text-[9px] font-black rounded-lg flex items-center gap-1">
+                                {item.type === 'video' ? <Video size={9} className="text-amber-400" /> : <ImageIcon size={9} className="text-blue-400" />}
+                                <span>{item.type === 'video' ? 'Video' : 'Photo'}</span>
+                              </span>
+
+                              {isCover && (
+                                <span className="absolute bottom-2 left-2 px-2 py-0.5 bg-blue-600 text-white text-[9px] font-black rounded-lg flex items-center gap-1 shadow-sm">
+                                  <Star size={9} className="fill-white" /> Cover
+                                </span>
+                              )}
+
+                              {/* Delete button */}
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveMedia(item.id)}
+                                className="absolute top-2 right-2 w-6 h-6 rounded-lg bg-red-600/90 text-white flex items-center justify-center hover:bg-red-700 cursor-pointer border-none shadow-xs transition-colors"
+                                title="Remove item"
+                              >
+                                <Trash2 size={11} />
+                              </button>
+                            </div>
+
+                            <div className="p-2 space-y-1">
+                              <p className="text-[11px] font-bold text-slate-800 truncate" title={item.caption}>
+                                {item.caption || 'Facility Media'}
+                              </p>
+                              {!isCover && item.type === 'image' && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleSetAsCover(item.url)}
+                                  className="w-full py-1 text-[10px] font-bold text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer border-none"
+                                >
+                                  Make Cover Photo
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="py-6 text-center text-slate-400 space-y-1">
+                      <Film size={28} className="mx-auto text-slate-300" />
+                      <p className="text-xs font-bold text-slate-600">No gallery media added yet</p>
+                      <p className="text-[10px] text-slate-400">Upload facility photos or video tours above.</p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Hospital Logo Upload */}
