@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { Button } from '../../components/ui/Button';
@@ -6,7 +6,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { 
   Calendar, Download, Share2, CheckCircle2, 
   Phone, Compass, Building2, User, Sun, CreditCard,
-  AlertCircle, ArrowLeft
+  AlertCircle, ArrowLeft, Loader2, ExternalLink
 } from 'lucide-react';
 
 const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -46,15 +46,102 @@ export const TokenConfirmation: React.FC = () => {
   const { appointments, addNotification } = useApp();
   const navigate = useNavigate();
 
-  const appointment = appointments.find(a => a.id === appointmentId) || appointments[0];
+  const [fetchedAppointment, setFetchedAppointment] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  // Look in React state first, then fallback to fetched appointment
+  const inMemoryAppointment = appointments.find(a => a.id === appointmentId) || (appointmentId ? null : appointments[0]);
+  const appointment = inMemoryAppointment || fetchedAppointment;
+
+  useEffect(() => {
+    if (inMemoryAppointment) {
+      setIsLoading(false);
+      return;
+    }
+
+    if (!appointmentId) {
+      setIsLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+    setIsLoading(true);
+
+    fetch(`/api/appointments/${appointmentId}`)
+      .then(res => res.json())
+      .then(data => {
+        if (!isMounted) return;
+        if (data.success && data.appointment) {
+          setFetchedAppointment(data.appointment);
+          setIsLoading(false);
+        } else {
+          // Fallback check tokens endpoint
+          fetch(`/api/tokens/${appointmentId}`)
+            .then(r => r.json())
+            .then(tData => {
+              if (!isMounted) return;
+              if (tData.success && tData.token) {
+                const tok = tData.token;
+                setFetchedAppointment({
+                  id: tok.id,
+                  tokenNumber: tok.tokenNo || tok.tokenNumber || 1,
+                  patientName: tok.patientName || 'Patient',
+                  age: tok.patientAge || 28,
+                  gender: tok.patientGender || 'Male',
+                  phone: tok.patientPhone || '',
+                  email: tok.patientEmail || '',
+                  address: tok.address || '',
+                  hospitalId: tok.hospitalId,
+                  hospitalName: tok.hospitalName || 'Hospital',
+                  doctorId: tok.doctorId,
+                  doctorName: tok.doctorName || 'Doctor',
+                  departmentName: tok.departmentName || 'General Medicine',
+                  date: tok.bookingDate || new Date().toISOString().split('T')[0],
+                  time: tok.time || '10:00 AM',
+                  fee: tok.consultationFee || 500,
+                  status: tok.status || 'booked',
+                  paymentId: tok.paymentId || `PAY-${tok.id}`,
+                  paymentMethod: tok.paymentMethod || 'Online',
+                  estimatedWaitTime: tok.estimatedWait || 15
+                });
+              }
+              setIsLoading(false);
+            })
+            .catch(() => {
+              if (isMounted) setIsLoading(false);
+            });
+        }
+      })
+      .catch(() => {
+        if (isMounted) setIsLoading(false);
+      });
+
+    return () => { isMounted = false; };
+  }, [appointmentId, inMemoryAppointment]);
+
   const { formattedDate, dayOfWeek, validUntilDate } = formatLocalDate(appointment?.date || '');
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-slate-50 max-w-md mx-auto text-center">
+        <Loader2 size={36} className="animate-spin text-blue-600 mb-3" />
+        <h3 className="text-sm font-black text-slate-800">Retrieving Your OPD Token...</h3>
+        <p className="text-xs text-slate-400 mt-1">Connecting to AWS cloud database</p>
+      </div>
+    );
+  }
 
   if (!appointment) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50 max-w-md mx-auto">
-        <div className="text-center">
-          <p className="text-sm font-bold text-slate-500 mb-4">Token record not found</p>
-          <Button onClick={() => navigate('/')}>Go Home</Button>
+        <div className="text-center bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+          <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-3 font-black text-lg">!</div>
+          <h3 className="text-base font-black text-slate-800">Token Record Not Found</h3>
+          <p className="text-xs font-semibold text-slate-400 mb-5 mt-1">We could not locate this token ID in the cloud registry.</p>
+          <div className="flex flex-col gap-2">
+            <Button onClick={() => navigate('/bookings')}>View My Bookings</Button>
+            <Button variant="secondary" onClick={() => navigate('/')}>Go Home</Button>
+          </div>
         </div>
       </div>
     );
@@ -289,16 +376,36 @@ export const TokenConfirmation: React.FC = () => {
           </button>
 
           <button 
-            onClick={() => navigate(`/hospital/${appointment.hospitalId}`)}
+            onClick={() => navigate(`/hospital-details/${appointment.hospitalId}`)}
             className="bg-white border border-slate-200 rounded-2xl p-2.5 sm:p-3 flex items-center gap-2 sm:gap-2.5 shadow-2xs hover:border-blue-300 transition-all cursor-pointer min-w-0"
           >
             <div className="w-8 h-8 sm:w-9 sm:h-9 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center shrink-0">
               <Building2 size={16} />
             </div>
             <div className="text-left min-w-0">
-              <h5 className="text-[10.5px] sm:text-xs font-extrabold text-slate-900 leading-tight truncate">View Hospital</h5>
-              <p className="text-[8.5px] sm:text-[9px] text-slate-400 font-medium truncate">Details</p>
+              <h5 className="text-[10.5px] sm:text-xs font-extrabold text-slate-900 leading-tight truncate">Hospital Info</h5>
+              <p className="text-[8.5px] sm:text-[9px] text-slate-400 font-medium truncate">Doctor details</p>
             </div>
+          </button>
+        </div>
+
+        {/* Hospital Panel Direct Redirection / Tracking Banner */}
+        <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl p-3 flex items-center justify-between shadow-2xs">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 bg-emerald-600 text-white rounded-xl flex items-center justify-center font-bold text-xs shrink-0">
+              🏥
+            </div>
+            <div className="min-w-0">
+              <h5 className="text-xs font-black text-slate-900 truncate">Hospital Live Queue Panel</h5>
+              <p className="text-[9.5px] text-emerald-700 font-medium truncate">View your token moving live in OPD doctor cabin queue</p>
+            </div>
+          </div>
+          <button
+            onClick={() => navigate('/hospital/tokens/all')}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black px-3 py-1.5 rounded-xl uppercase tracking-wider shadow-sm shrink-0 flex items-center gap-1 cursor-pointer"
+          >
+            <span>Track In Hospital</span>
+            <ExternalLink size={12} />
           </button>
         </div>
 

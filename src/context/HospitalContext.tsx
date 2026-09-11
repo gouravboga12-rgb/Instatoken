@@ -674,42 +674,110 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return { totals: null, doctorStats: [] };
   };
 
-  // Auto-fetch patients for current hospital on mount or whenever active hospital / token changes
+  // Auto-fetch patients, tokens, doctors, departments, schedules for current hospital directly from AWS RDS
   useEffect(() => {
-    if (targetHospId && authToken) {
-      fetchPatients();
-    }
+    if (!targetHospId) return;
+
+    fetchPatients();
+
+    // 1. Fetch live tokens
+    fetch(`/api/hospitals/${targetHospId}/tokens`, {
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+        'x-hospital-token': authToken
+      }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.tokens)) {
+          setTokens(data.tokens.filter((t: any) => !isDummyToken(t)));
+          localStorage.setItem(`insta_hospital_tokens_${targetHospId}`, JSON.stringify(data.tokens));
+        }
+      })
+      .catch(err => console.warn('Could not fetch tokens from AWS RDS:', err));
+
+    // 2. Fetch live doctors
+    fetch(`/api/hospitals/${targetHospId}/doctors`, {
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+        'x-hospital-token': authToken
+      }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.doctors) && data.doctors.length > 0) {
+          setDoctors(data.doctors);
+          localStorage.setItem(`insta_hospital_doctors_${targetHospId}`, JSON.stringify(data.doctors));
+          localStorage.setItem('insta_hospital_doctors', JSON.stringify(data.doctors));
+        }
+      })
+      .catch(err => console.warn('Could not fetch doctors from AWS RDS:', err));
+
+    // 3. Fetch live departments
+    fetch(`/api/hospitals/${targetHospId}/departments`, {
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+        'x-hospital-token': authToken
+      }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.departments) && data.departments.length > 0) {
+          setDepartments(data.departments);
+          localStorage.setItem(`insta_hospital_departments_${targetHospId}`, JSON.stringify(data.departments));
+          localStorage.setItem('insta_hospital_departments', JSON.stringify(data.departments));
+        }
+      })
+      .catch(err => console.warn('Could not fetch departments from AWS RDS:', err));
+
+    // 4. Fetch live schedules
+    fetch(`/api/hospitals/${targetHospId}/schedules`, {
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+        'x-hospital-token': authToken
+      }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.schedule) {
+          setScheduleConfig(data.schedule);
+          localStorage.setItem('insta_hospital_schedule', JSON.stringify(data.schedule));
+        }
+      })
+      .catch(err => console.warn('Could not fetch schedules from AWS RDS:', err));
   }, [targetHospId, authToken]);
 
   // ─── Cross-tab & Real-time Global Sync ─────────────────────────────────────
   useEffect(() => {
     const unsubscribe = subscribeGlobalSync((event) => {
-      if (event.type === 'TOKEN_BOOKED' && event.data?.appointment) {
-        const appt = event.data.appointment;
+      if ((event.type === 'TOKEN_BOOKED' || event.type === 'HOSPITAL_TOKEN_CREATED') && (event.data?.appointment || event.data?.token)) {
+        const payload = event.data.token || event.data.appointment;
+        const appt = event.data.appointment || event.data.token;
         setTokens(prev => {
-          if (prev.some(t => t.id === appt.id) || isDummyToken(appt)) return prev;
+          if (prev.some(t => t.id === payload.id) || isDummyToken(payload)) return prev;
           const newTok: TokenRecord = {
-            id: appt.id,
-            tokenNo: appt.tokenNumber,
-            type: 'online',
-            patientName: appt.patientName,
-            patientPhone: appt.phone,
-            patientAge: appt.age,
-            patientGender: appt.gender,
-            doctorId: appt.doctorId,
-            doctorName: appt.doctorName,
-            departmentId: 'dept-general',
-            departmentName: appt.departmentName,
-            session: 'morning',
-            time: appt.time,
-            bookingDate: appt.date,
-            status: 'booked',
-            queuePosition: Math.max(1, prev.filter(t => t.doctorId === appt.doctorId && ['booked','waiting','checked-in'].includes(t.status)).length + 1),
-            estimatedWait: appt.estimatedWaitTime || 15,
-            consultationFee: appt.fee,
-            paymentStatus: 'paid',
-            paymentMethod: appt.paymentMethod || 'Online',
-            isRevisit: false
+            id: payload.id,
+            tokenNo: payload.tokenNo || payload.tokenNumber || 1,
+            type: payload.type || 'online',
+            patientName: payload.patientName,
+            patientPhone: payload.patientPhone || payload.phone || '',
+            patientAge: payload.patientAge || payload.age || 28,
+            patientGender: payload.patientGender || payload.gender || 'Male',
+            doctorId: payload.doctorId,
+            doctorName: payload.doctorName,
+            departmentId: payload.departmentId || 'dept-general',
+            departmentName: payload.departmentName || 'General Medicine',
+            session: payload.session || 'morning',
+            time: payload.time || '10:00 AM',
+            bookingDate: payload.bookingDate || payload.date || new Date().toISOString().split('T')[0],
+            status: payload.status || 'booked',
+            queuePosition: Math.max(1, prev.filter(t => t.doctorId === payload.doctorId && ['booked','waiting','checked-in'].includes(t.status)).length + 1),
+            estimatedWait: payload.estimatedWait || payload.estimatedWaitTime || 15,
+            consultationFee: payload.consultationFee || payload.fee || 500,
+            paymentStatus: payload.paymentStatus || 'paid',
+            paymentMethod: payload.paymentMethod || 'Online',
+            isRevisit: false,
+            hospitalId: payload.hospitalId || targetHospId
           };
           const updated = [newTok, ...prev];
           localStorage.setItem('insta_hospital_tokens', JSON.stringify(updated));
@@ -1119,6 +1187,12 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       syncDoctorsGlobally(updated);
       return updated;
     });
+    fetch(`/api/hospitals/${targetHospId}/doctors/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${authToken}`
+      }
+    }).catch(e => console.warn('Failed to delete doctor on AWS RDS:', e));
   };
   const toggleDoctorActive = (id: string) => {
     setDoctors(prev => {
@@ -1149,6 +1223,12 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       syncDepartmentsGlobally(updated);
       return updated;
     });
+    fetch(`/api/hospitals/${targetHospId}/departments/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${authToken}`
+      }
+    }).catch(e => console.warn('Failed to delete department on AWS RDS:', e));
   };
   const toggleDepartmentActive = (id: string) => {
     setDepartments(prev => {
@@ -1439,6 +1519,14 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setScheduleConfig(prev => {
       const updated = { ...prev, ...config };
       localStorage.setItem('insta_hospital_schedule', JSON.stringify(updated));
+      fetch(`/api/hospitals/${targetHospId}/schedules`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({ schedule: updated })
+      }).catch(e => console.warn('Failed to save schedule to AWS RDS:', e));
       broadcastGlobalSync('HOSPITAL_SCHEDULE_UPDATED', updated);
       return updated;
     });
@@ -1450,6 +1538,14 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         sessions: prev.sessions.map(s => s.id === id ? { ...s, ...updates } : s)
       };
       localStorage.setItem('insta_hospital_schedule', JSON.stringify(updated));
+      fetch(`/api/hospitals/${targetHospId}/schedules`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({ schedule: updated })
+      }).catch(e => console.warn('Failed to save session to AWS RDS:', e));
       broadcastGlobalSync('HOSPITAL_SCHEDULE_UPDATED', updated);
       return updated;
     });

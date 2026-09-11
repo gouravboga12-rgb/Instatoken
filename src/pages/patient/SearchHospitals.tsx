@@ -34,8 +34,21 @@ export const SearchHospitals: React.FC<SearchHospitalsProps> = ({
     if (filter !== null) setActiveFilter(filter);
   }, [searchParams]);
 
-  // Available specialties for filter
-  const specialties = ['All', 'Multi Speciality', 'Children Hospital', 'Eye Hospital', 'Dental Clinic', 'Orthopedic', 'Cardiology', 'Neurology', 'ENT', 'Gynecology'];
+  // Available specialties for filter dynamically derived from hospitals and departments
+  const specialties = React.useMemo(() => {
+    const set = new Set<string>();
+    hospitals.forEach(h => {
+      if (h.category) set.add(h.category);
+      if (Array.isArray(h.departments)) {
+        h.departments.forEach(d => {
+          if (d && d.name) set.add(d.name);
+        });
+      }
+    });
+    const defaultList = ['Multi Speciality', 'Cardiology', 'Neurology', 'Orthopedics', 'Pediatrics', 'General Medicine'];
+    defaultList.forEach(item => set.add(item));
+    return ['All', ...Array.from(set)];
+  }, [hospitals]);
 
   // Filter & sort logic
   const getFilteredHospitals = () => {

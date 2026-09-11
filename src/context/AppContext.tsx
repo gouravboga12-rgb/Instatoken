@@ -576,6 +576,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       })
       .catch(err => console.warn('Failed to fetch hospitals from server:', err));
+
+    // Fetch live customer appointments from AWS RDS
+    fetch('/api/appointments')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.appointments) && data.appointments.length > 0) {
+          setAppointments(data.appointments);
+          localStorage.setItem('insta_appointments', JSON.stringify(data.appointments));
+        }
+      })
+      .catch(err => console.warn('Failed to fetch appointments from server:', err));
   }, []);
 
   // --- Cross-tab & Real-time Global Sync ---
@@ -997,6 +1008,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       body: JSON.stringify(newHospitalToken)
     }).catch(() => {});
 
+    // Post appointment directly to AWS RDS
+    fetch('/api/appointments', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(newAppt)
+    }).catch(e => console.warn('Failed to post appointment to AWS:', e));
+
     // Register patient in hospital patients store (Phase 20)
     try {
       const savedPats = localStorage.getItem('insta_hospital_patients');
@@ -1073,6 +1093,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setAppointments(updatedAppts);
 
     broadcastGlobalSync('HOSPITAL_TOKEN_CREATED', { token: newHospitalToken, appointment: newAppt, tokens: updatedHospitalTokens });
+    broadcastGlobalSync('TOKEN_BOOKED', { token: newHospitalToken, appointment: newAppt, tokens: updatedHospitalTokens });
     broadcastGlobalSync('HOSPITAL_TOKENS_UPDATED', updatedHospitalTokens);
 
     // Attach to customer account in admin customers store

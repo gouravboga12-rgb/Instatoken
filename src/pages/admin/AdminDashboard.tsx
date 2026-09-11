@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { Card } from '../../components/ui/Card';
@@ -77,20 +77,42 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
 
   // --- Financials State ---
   const [revenueDateFilter, setRevenueDateFilter] = useState<'all' | 'month' | 'today'>('all');
+  const [liveAppointments, setLiveAppointments] = useState<any[]>([]);
+  const [liveRevenueData, setLiveRevenueData] = useState<{ summary?: any; transactions?: any[] } | null>(null);
+
+  useEffect(() => {
+    fetch(`/api/admin/revenue?dateFilter=${revenueDateFilter}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setLiveRevenueData(data);
+        }
+      })
+      .catch(err => console.warn('Could not fetch live revenue from AWS:', err));
+
+    fetch('/api/appointments')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.appointments)) {
+          setLiveAppointments(data.appointments);
+        }
+      })
+      .catch(err => console.warn('Could not fetch appointments from AWS:', err));
+  }, [revenueDateFilter]);
 
   // Calculate gross customer revenue across mock customers & live appointments
   const safeCustomers = customers || [];
-  const safeAppointments = appointments || [];
+  const safeAppointments = (liveAppointments.length > 0 ? liveAppointments : appointments) || [];
   const safeHospitals = hospitals || [];
   const allCustomerBookings = safeCustomers.flatMap(c => c?.bookings || []);
   const customerRevenueSum = allCustomerBookings.reduce((sum, b) => sum + (b?.fee || 0), 0);
   const apptRevenueSum = safeAppointments.reduce((sum, a) => sum + (a?.fee || 500), 0);
-  const totalRevenueGenerated = customerRevenueSum + apptRevenueSum;
+  const totalRevenueGenerated = liveRevenueData?.summary?.totalGrossRevenue ?? (customerRevenueSum + apptRevenueSum);
   const activeHospitalsCount = safeHospitals.filter(h => h?.status !== 'disabled').length;
   const disabledHospitalsCount = safeHospitals.filter(h => h?.status === 'disabled').length;
 
   // Customer aggregates
-  const totalCustomerTokens = allCustomerBookings.length + safeAppointments.length;
+  const totalCustomerTokens = liveRevenueData?.summary?.totalTransactions ?? (allCustomerBookings.length + safeAppointments.length);
   const avgRevenuePerCustomer = safeCustomers.length > 0 ? Math.round(totalRevenueGenerated / safeCustomers.length) : 0;
 
   const handleCreateHospital = (e: React.FormEvent) => {
@@ -263,11 +285,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
 
             <button
               onClick={() => setAdminTab('financials')}
-              className={`w-full text-left px-3.5 py-2 text-xs font-bold rounded-xl flex items-center gap-2.5 transition-all cursor-pointer border-none ${
+              className={`w-full text-left px-3.5 py-2 text-xs font-bold rounded-xl flex items-center justify-between transition-all cursor-pointer border-none ${
                 adminTab === 'financials' ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
               }`}
             >
-              <DollarSign size={15} /> Financials & Revenue
+              <div className="flex items-center gap-2.5">
+                <DollarSign size={15} /> Revenue & Payments
+              </div>
+              <span className="bg-emerald-500/20 text-[9px] font-extrabold px-2 py-0.5 rounded-full text-emerald-300">
+                Live
+              </span>
             </button>
 
             <button

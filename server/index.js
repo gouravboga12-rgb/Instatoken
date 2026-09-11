@@ -514,33 +514,6 @@ async function getUnifiedStore() {
           store.locationBanners = INITIAL_LOCATION_BANNERS;
         }
 
-        // Seamlessly preserve any data saved during initial connection warmup
-        const local = loadStore();
-        if (local.locationBanners && Array.isArray(local.locationBanners)) {
-          local.locationBanners.forEach(lb => {
-            if (!store.locationBanners.some(sb => sb.id === lb.id)) {
-              store.locationBanners.push(lb);
-            }
-          });
-        }
-        if (local.hospitalPatients) {
-          Object.keys(local.hospitalPatients).forEach(hId => {
-            store.hospitalPatients[hId] = store.hospitalPatients[hId] || [];
-            (local.hospitalPatients[hId] || []).forEach(lp => {
-              if (!store.hospitalPatients[hId].some(rp => rp.phone === lp.phone)) {
-                store.hospitalPatients[hId].push(lp);
-              }
-            });
-          });
-        }
-        if (local.tokens && Array.isArray(local.tokens)) {
-          local.tokens.forEach(lt => {
-            if (!store.tokens.some(rt => rt.id === lt.id)) {
-              store.tokens.push(lt);
-            }
-          });
-        }
-
         ensureHospitalProfilesSynced(store);
         return store;
       }
@@ -558,20 +531,19 @@ async function getUnifiedStore() {
 
 async function saveUnifiedStore(store) {
   ensureHospitalProfilesSynced(store);
-  saveStore(store);
   if (isDbConnected) {
     try {
-      console.log('Saving unified store to RDS... Apollo addr:', store.hospitals?.find(h => h.id === 'hosp-apollo')?.address);
       const res = await query(
         `INSERT INTO sync_store (key, data, last_updated) 
          VALUES ('global_store', $1, NOW()) 
          ON CONFLICT (key) DO UPDATE SET data = $1, last_updated = NOW() RETURNING key`,
         [JSON.stringify(store)]
       );
-      console.log('Saved to RDS successfully:', res.rowCount);
     } catch (e) {
       console.error('Error syncing to RDS:', e.message);
     }
+  } else {
+    saveStore(store);
   }
 }
 
@@ -919,8 +891,43 @@ app.get('/api/hospitals', async (req, res) => {
 // ─── Hospital Doctors (Phase 21 & 22) ────────────────────────────────────────
 app.get('/api/hospitals/:id/doctors', requireHospitalAuth, async (req, res) => {
   const { id } = req.params;
-  const store = await getUnifiedStore();
-  const doctors = store.hospitalDoctors?.[id] || [];
+  let doctors = [];
+  
+  if (isDbConnected) {
+    try {
+      const dbRes = await query(`SELECT * FROM hospital_doctors WHERE hospital_id = $1 ORDER BY created_at ASC`, [id]);
+      if (dbRes.rows && dbRes.rows.length > 0) {
+        doctors = dbRes.rows.map(r => {
+          let extra = {};
+          try { extra = typeof r.data === 'string' ? JSON.parse(r.data) : (r.data || {}); } catch(e){}
+          return {
+            id: r.id,
+            hospitalId: r.hospital_id,
+            name: r.name,
+            specialization: r.specialization,
+            departmentId: r.department_id,
+            departmentName: r.department_name,
+            photo: r.photo_url,
+            qualification: r.qualification,
+            experience: Number(r.experience) || 0,
+            consultationFee: Number(r.consultation_fee) || 500,
+            rating: Number(r.rating) || 5.0,
+            totalPatients: Number(r.total_patients) || 0,
+            active: r.active !== false,
+            ...extra
+          };
+        });
+      }
+    } catch (e) {
+      console.warn('Error fetching doctors from RDS:', e.message);
+    }
+  }
+
+  if (doctors.length === 0) {
+    const store = await getUnifiedStore();
+    doctors = store.hospitalDoctors?.[id] || (id === 'hosp-apollo' ? INITIAL_DOCTORS : []);
+  }
+
   res.json({ success: true, hospitalId: id, doctors });
 });
 
@@ -939,8 +946,73 @@ app.post('/api/hospitals/:id/doctors', requireHospitalAuth, async (req, res) => 
     }
   }
 
+  if (isDbConnected && Array.isArray(doctors)) {
+    try {
+      await query(`DELETE FROM hospital_doctors WHERE hospital_id = $1`, [id]);
+      for (const doc of doctors) {
+        await query(
+          `INSERT INTO hospital_doctors (id, hospital_id, name, specialization, department_id, department_name, photo_url, qualification, experience, consultation_fee, rating, total_patients, active, data, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW())
+           ON CONFLICT (id) DO UPDATE SET name = $3, specialization = $4, photo_url = $7, consultation_fee = $10, active = $13, data = $14, updated_at = NOW()`,
+          [
+            doc.id,
+            id,
+            doc.name,
+            doc.specialization || doc.specialty || '',
+            doc.departmentId || '',
+            doc.departmentName || '',
+            doc.photo || doc.image || '',
+            doc.qualification || '',
+            Number(doc.experience) || 0,
+            Number(doc.consultationFee) || 0,
+            Number(doc.rating) || 5.0,
+            Number(doc.totalPatients) || 0,
+            doc.active !== false,
+            JSON.stringify(doc)
+          ]
+        );
+      }
+      const hosp = store.hospitals?.find(h => h.id === id);
+      if (hosp) {
+        await query(`UPDATE hospitals SET data = $2, updated_at = NOW() WHERE id = $1`, [id, JSON.stringify(hosp)]);
+      }
+    } catch (dbErr) {
+      console.error('Error persisting doctors to AWS RDS:', dbErr.message);
+    }
+  }
+
   await saveUnifiedStore(store);
   res.json({ success: true, hospitalId: id, doctors, hospitals: store.hospitals });
+});
+
+app.delete('/api/hospitals/:id/doctors/:docId', requireHospitalAuth, async (req, res) => {
+  const { id, docId } = req.params;
+  const store = await getUnifiedStore();
+
+  store.hospitalDoctors = store.hospitalDoctors || {};
+  store.hospitalDoctors[id] = (store.hospitalDoctors[id] || []).filter(d => d.id !== docId);
+
+  if (store.hospitals && Array.isArray(store.hospitals)) {
+    const hosp = store.hospitals.find(h => h.id === id);
+    if (hosp) {
+      hosp.doctors = mapHospitalDoctorsToPublic(store.hospitalDoctors[id]);
+    }
+  }
+
+  if (isDbConnected) {
+    try {
+      await query(`DELETE FROM hospital_doctors WHERE id = $1 AND hospital_id = $2`, [docId, id]);
+      const hosp = store.hospitals?.find(h => h.id === id);
+      if (hosp) {
+        await query(`UPDATE hospitals SET data = $2, updated_at = NOW() WHERE id = $1`, [id, JSON.stringify(hosp)]);
+      }
+    } catch (dbErr) {
+      console.error('Error deleting doctor from AWS RDS:', dbErr.message);
+    }
+  }
+
+  await saveUnifiedStore(store);
+  res.json({ success: true, hospitalId: id, deletedDoctorId: docId, doctors: store.hospitalDoctors[id], hospitals: store.hospitals });
 });
 
 // ─── Hospital Profile (Phase 21 & 22) ────────────────────────────────────────
@@ -970,6 +1042,23 @@ app.post('/api/hospitals/:id/profile', requireHospitalAuth, async (req, res) => 
   store.hospitalProfiles[id] = profile;
   syncProfileToHospitalsList(store, id, profile);
 
+  if (isDbConnected && profile) {
+    try {
+      await query(
+        `INSERT INTO hospital_profiles (hospital_id, profile_data, updated_at)
+         VALUES ($1, $2, NOW())
+         ON CONFLICT (hospital_id) DO UPDATE SET profile_data = $2, updated_at = NOW()`,
+        [id, JSON.stringify(profile)]
+      );
+      const hosp = store.hospitals?.find(h => h.id === id);
+      if (hosp) {
+        await query(`UPDATE hospitals SET data = $2, updated_at = NOW() WHERE id = $1`, [id, JSON.stringify(hosp)]);
+      }
+    } catch (dbErr) {
+      console.error('Error persisting hospital profile to AWS RDS:', dbErr.message);
+    }
+  }
+
   await saveUnifiedStore(store);
   res.json({ success: true, hospitalId: id, profile, hospitals: store.hospitals });
 });
@@ -977,8 +1066,37 @@ app.post('/api/hospitals/:id/profile', requireHospitalAuth, async (req, res) => 
 // ─── Hospital Departments (Phase 21 & 22) ────────────────────────────────────
 app.get('/api/hospitals/:id/departments', requireHospitalAuth, async (req, res) => {
   const { id } = req.params;
-  const store = await getUnifiedStore();
-  const departments = store.hospitalDepartments?.[id] || [];
+  let departments = [];
+
+  if (isDbConnected) {
+    try {
+      const dbRes = await query(`SELECT * FROM hospital_departments WHERE hospital_id = $1 ORDER BY created_at ASC`, [id]);
+      if (dbRes.rows && dbRes.rows.length > 0) {
+        departments = dbRes.rows.map(r => {
+          let extra = {};
+          try { extra = typeof r.data === 'string' ? JSON.parse(r.data) : (r.data || {}); } catch(e){}
+          return {
+            id: r.id,
+            hospitalId: r.hospital_id,
+            name: r.name,
+            icon: r.icon,
+            headDoctor: r.head_doctor,
+            totalDoctors: Number(r.total_doctors) || 0,
+            active: r.active !== false,
+            ...extra
+          };
+        });
+      }
+    } catch (e) {
+      console.warn('Error fetching departments from RDS:', e.message);
+    }
+  }
+
+  if (departments.length === 0) {
+    const store = await getUnifiedStore();
+    departments = store.hospitalDepartments?.[id] || (id === 'hosp-apollo' ? INITIAL_DEPARTMENTS : []);
+  }
+
   res.json({ success: true, hospitalId: id, departments });
 });
 
@@ -994,11 +1112,134 @@ app.post('/api/hospitals/:id/departments', requireHospitalAuth, async (req, res)
     const hosp = store.hospitals.find(h => h.id === id);
     if (hosp) {
       hosp.departments = mapHospitalDeptsToPublic(departments);
+      hosp.categories = Array.from(new Set(departments.filter(d => d.active !== false).map(d => d.name)));
+    }
+  }
+
+  if (isDbConnected && Array.isArray(departments)) {
+    try {
+      await query(`DELETE FROM hospital_departments WHERE hospital_id = $1`, [id]);
+      for (const dept of departments) {
+        await query(
+          `INSERT INTO hospital_departments (id, hospital_id, name, icon, head_doctor, total_doctors, active, data, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+           ON CONFLICT (id) DO UPDATE SET name = $3, icon = $4, active = $7, data = $8`,
+          [
+            dept.id,
+            id,
+            dept.name,
+            dept.icon || '🩺',
+            dept.headDoctor || '',
+            Number(dept.totalDoctors) || 0,
+            dept.active !== false,
+            JSON.stringify(dept)
+          ]
+        );
+      }
+      const hosp = store.hospitals?.find(h => h.id === id);
+      if (hosp) {
+        await query(`UPDATE hospitals SET data = $2, updated_at = NOW() WHERE id = $1`, [id, JSON.stringify(hosp)]);
+      }
+    } catch (dbErr) {
+      console.error('Error persisting departments to AWS RDS:', dbErr.message);
     }
   }
 
   await saveUnifiedStore(store);
   res.json({ success: true, hospitalId: id, departments, hospitals: store.hospitals });
+});
+
+app.delete('/api/hospitals/:id/departments/:deptId', requireHospitalAuth, async (req, res) => {
+  const { id, deptId } = req.params;
+  const store = await getUnifiedStore();
+
+  store.hospitalDepartments = store.hospitalDepartments || {};
+  store.hospitalDepartments[id] = (store.hospitalDepartments[id] || []).filter(d => d.id !== deptId);
+
+  if (store.hospitals && Array.isArray(store.hospitals)) {
+    const hosp = store.hospitals.find(h => h.id === id);
+    if (hosp) {
+      hosp.departments = mapHospitalDeptsToPublic(store.hospitalDepartments[id]);
+      hosp.categories = Array.from(new Set(store.hospitalDepartments[id].filter(d => d.active !== false).map(d => d.name)));
+    }
+  }
+
+  if (isDbConnected) {
+    try {
+      await query(`DELETE FROM hospital_departments WHERE id = $1 AND hospital_id = $2`, [deptId, id]);
+      const hosp = store.hospitals?.find(h => h.id === id);
+      if (hosp) {
+        await query(`UPDATE hospitals SET data = $2, updated_at = NOW() WHERE id = $1`, [id, JSON.stringify(hosp)]);
+      }
+    } catch (dbErr) {
+      console.error('Error deleting department from AWS RDS:', dbErr.message);
+    }
+  }
+
+  await saveUnifiedStore(store);
+  res.json({ success: true, hospitalId: id, deletedDepartmentId: deptId, departments: store.hospitalDepartments[id], hospitals: store.hospitals });
+});
+
+// ─── Hospital Schedules (Sessions & OPD Management) ──────────────────────────
+app.get('/api/hospitals/:id/schedules', requireHospitalAuth, async (req, res) => {
+  const { id } = req.params;
+  let schedule = null;
+
+  if (isDbConnected) {
+    try {
+      const dbRes = await query(`SELECT schedule_data FROM hospital_schedules WHERE hospital_id = $1`, [id]);
+      if (dbRes.rows && dbRes.rows.length > 0) {
+        schedule = typeof dbRes.rows[0].schedule_data === 'string'
+          ? JSON.parse(dbRes.rows[0].schedule_data)
+          : dbRes.rows[0].schedule_data;
+      }
+    } catch (e) {
+      console.warn('Error fetching schedule from RDS:', e.message);
+    }
+  }
+
+  if (!schedule) {
+    const store = await getUnifiedStore();
+    schedule = store.hospitalSchedules?.[id] || {
+      sessions: [
+        { id: 'sess-morning', name: 'Morning', startTime: '09:00 AM', endTime: '01:00 PM', maxTokens: 50, consultationDuration: 15, breakTime: 5, active: true },
+        { id: 'sess-evening', name: 'Evening', startTime: '05:00 PM', endTime: '09:00 PM', maxTokens: 40, consultationDuration: 15, breakTime: 5, active: true },
+      ],
+      bookingOpensDaysBefore: 3,
+      advanceBookingLimit: 7,
+      bufferTime: 15,
+      dailyTokenLimit: 150,
+      walkInPercentage: 30,
+      onlinePercentage: 70,
+    };
+  }
+
+  res.json({ success: true, hospitalId: id, schedule });
+});
+
+app.post('/api/hospitals/:id/schedules', requireHospitalAuth, async (req, res) => {
+  const { id } = req.params;
+  const { schedule } = req.body;
+  const store = await getUnifiedStore();
+
+  store.hospitalSchedules = store.hospitalSchedules || {};
+  store.hospitalSchedules[id] = schedule;
+
+  if (isDbConnected && schedule) {
+    try {
+      await query(
+        `INSERT INTO hospital_schedules (hospital_id, schedule_data, updated_at)
+         VALUES ($1, $2, NOW())
+         ON CONFLICT (hospital_id) DO UPDATE SET schedule_data = $2, updated_at = NOW()`,
+        [id, JSON.stringify(schedule)]
+      );
+    } catch (e) {
+      console.error('Error saving schedule to RDS:', e.message);
+    }
+  }
+
+  await saveUnifiedStore(store);
+  res.json({ success: true, hospitalId: id, schedule });
 });
 
 // ─── PHASE 20: Patients Management Endpoint ──────────────────────────────────
@@ -1381,8 +1622,33 @@ app.post('/api/hospitals/:hospitalId/tokens', requireHospitalAuth, async (req, r
   };
 
   store.tokens.unshift(newToken);
-  await saveUnifiedStore(store);
 
+  if (isDbConnected) {
+    try {
+      await query(
+        `INSERT INTO tokens (id, hospital_id, doctor_id, token_number, patient_name, patient_phone, status, token_type, session, token_date, data, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
+         ON CONFLICT (id) DO UPDATE SET status = $7, data = $11, updated_at = NOW()`,
+        [
+          newToken.id,
+          hospitalId,
+          newToken.doctorId || '',
+          String(newToken.tokenNo || newToken.tokenNumber || ''),
+          newToken.patientName || '',
+          newToken.patientPhone || '',
+          newToken.status || 'booked',
+          newToken.type || 'online',
+          newToken.session || 'Morning',
+          newToken.bookingDate || new Date().toISOString().split('T')[0],
+          JSON.stringify(newToken)
+        ]
+      );
+    } catch (dbErr) {
+      console.error('Error inserting token into AWS RDS PostgreSQL:', dbErr.message);
+    }
+  }
+
+  await saveUnifiedStore(store);
   res.status(201).json({ success: true, hospitalId, token: newToken });
 });
 
@@ -1391,19 +1657,302 @@ app.patch('/api/hospitals/:hospitalId/tokens/:tokenId/status', requireHospitalAu
   const { status } = req.body;
   const store = await getUnifiedStore();
 
+  let targetToken = null;
   store.tokens = (store.tokens || []).map(t => {
     if (t.id === tokenId && (t.hospitalId || 'hosp-apollo') === hospitalId) {
-      return {
+      targetToken = {
         ...t,
         status,
         paymentStatus: status === 'cancelled' ? 'refunded' : status === 'completed' ? 'paid' : t.paymentStatus
       };
+      return targetToken;
     }
     return t;
   });
 
+  if (isDbConnected && targetToken) {
+    try {
+      await query(
+        `UPDATE tokens SET status = $1, data = $2, updated_at = NOW() WHERE id = $3`,
+        [status, JSON.stringify(targetToken), tokenId]
+      );
+      await query(
+        `UPDATE appointments SET status = $1, updated_at = NOW() WHERE id = $2`,
+        [status, tokenId]
+      );
+    } catch (dbErr) {
+      console.error('Error updating token status in AWS RDS:', dbErr.message);
+    }
+  }
+
   await saveUnifiedStore(store);
-  res.json({ success: true, hospitalId, tokenId, status });
+  res.json({ success: true, hospitalId, tokenId, status, token: targetToken });
+});
+
+// ─── Direct Token Lookup ─────────────────────────────────────────────────────
+app.get('/api/tokens/:id', async (req, res) => {
+  const { id } = req.params;
+  if (isDbConnected) {
+    try {
+      const dbRes = await query(`SELECT data FROM tokens WHERE id = $1`, [id]);
+      if (dbRes.rows.length > 0 && dbRes.rows[0].data) {
+        return res.json({ success: true, token: dbRes.rows[0].data });
+      }
+    } catch (e) {
+      console.warn('Error querying token from RDS:', e.message);
+    }
+  }
+  const store = await getUnifiedStore();
+  const found = (store.tokens || []).find(t => t.id === id);
+  if (found) return res.json({ success: true, token: found });
+  res.status(404).json({ success: false, message: 'Token not found' });
+});
+
+// ─── Appointments API (Customer Token Bookings) ─────────────────────────────
+app.post('/api/appointments', async (req, res) => {
+  const appt = req.body;
+  if (!appt || !appt.id) {
+    return res.status(400).json({ success: false, message: 'Invalid appointment payload' });
+  }
+
+  const store = await getUnifiedStore();
+  store.appointments = store.appointments || [];
+  store.appointments = [appt, ...store.appointments.filter(a => a.id !== appt.id)];
+
+  const tokenRecord = {
+    id: appt.id,
+    tokenNo: appt.tokenNumber,
+    tokenNumber: appt.tokenNumber,
+    type: 'online',
+    patientName: appt.patientName,
+    patientPhone: appt.phone,
+    patientAge: appt.age,
+    patientGender: appt.gender,
+    doctorId: appt.doctorId,
+    doctorName: appt.doctorName,
+    departmentName: appt.departmentName,
+    session: (appt.time && parseInt(appt.time.split(':')[0], 10) >= 12 && parseInt(appt.time.split(':')[0], 10) < 17) ? 'afternoon' : (appt.time && parseInt(appt.time.split(':')[0], 10) >= 17) ? 'evening' : 'morning',
+    time: appt.time,
+    bookingDate: appt.date || new Date().toISOString().split('T')[0],
+    status: appt.status || 'booked',
+    estimatedWait: appt.estimatedWaitTime || 15,
+    consultationFee: appt.fee || 500,
+    platformFee: appt.platformFee || 25,
+    totalFee: appt.totalFee || 525,
+    paymentStatus: 'paid',
+    paymentMethod: appt.paymentMethod || 'Online',
+    paymentId: appt.paymentId,
+    hospitalId: appt.hospitalId,
+    hospitalName: appt.hospitalName,
+    createdAt: appt.createdAt || new Date().toISOString()
+  };
+
+  store.tokens = store.tokens || [];
+  store.tokens = [tokenRecord, ...store.tokens.filter(t => t.id !== tokenRecord.id)];
+
+  if (isDbConnected) {
+    try {
+      await query(
+        `INSERT INTO appointments (id, hospital_id, doctor_id, patient_name, patient_phone, appointment_date, appointment_time, status, data, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+         ON CONFLICT (id) DO UPDATE SET status = $8, data = $9, updated_at = NOW()`,
+        [
+          appt.id,
+          appt.hospitalId,
+          appt.doctorId,
+          appt.patientName,
+          appt.phone,
+          appt.date || new Date().toISOString().split('T')[0],
+          appt.time || '',
+          appt.status || 'booked',
+          JSON.stringify(appt)
+        ]
+      );
+
+      await query(
+        `INSERT INTO tokens (id, hospital_id, doctor_id, token_number, patient_name, patient_phone, status, token_type, session, token_date, data, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
+         ON CONFLICT (id) DO UPDATE SET status = $7, data = $11, updated_at = NOW()`,
+        [
+          tokenRecord.id,
+          tokenRecord.hospitalId,
+          tokenRecord.doctorId,
+          String(tokenRecord.tokenNo || tokenRecord.tokenNumber),
+          tokenRecord.patientName,
+          tokenRecord.patientPhone,
+          tokenRecord.status,
+          tokenRecord.type,
+          tokenRecord.session,
+          tokenRecord.bookingDate,
+          JSON.stringify(tokenRecord)
+        ]
+      );
+    } catch (err) {
+      console.error('Error inserting appointment/token into PostgreSQL:', err.message);
+    }
+  }
+
+  await saveUnifiedStore(store);
+  res.status(201).json({ success: true, appointment: appt, token: tokenRecord });
+});
+
+// GET appointment by ID
+app.get('/api/appointments/:id', async (req, res) => {
+  const { id } = req.params;
+  if (isDbConnected) {
+    try {
+      const dbRes = await query(`SELECT data FROM appointments WHERE id = $1`, [id]);
+      if (dbRes.rows.length > 0 && dbRes.rows[0].data) {
+        return res.json({ success: true, appointment: dbRes.rows[0].data });
+      }
+
+      const tokRes = await query(`SELECT data FROM tokens WHERE id = $1`, [id]);
+      if (tokRes.rows.length > 0 && tokRes.rows[0].data) {
+        const tok = tokRes.rows[0].data;
+        const apptFromTok = {
+          id: tok.id,
+          tokenNumber: tok.tokenNo || tok.tokenNumber || 1,
+          patientName: tok.patientName || 'Patient',
+          age: tok.patientAge || 28,
+          gender: tok.patientGender || 'Male',
+          phone: tok.patientPhone || '',
+          email: tok.patientEmail || '',
+          address: tok.address || '',
+          hospitalId: tok.hospitalId,
+          hospitalName: tok.hospitalName || 'Hospital',
+          doctorId: tok.doctorId,
+          doctorName: tok.doctorName || 'Doctor',
+          departmentName: tok.departmentName || 'General Medicine',
+          date: tok.bookingDate || new Date().toISOString().split('T')[0],
+          time: tok.time || '10:00 AM',
+          fee: tok.consultationFee || 500,
+          platformFee: tok.platformFee || 25,
+          totalFee: (tok.consultationFee || 500) + (tok.platformFee || 25),
+          status: tok.status || 'booked',
+          paymentId: tok.paymentId || `PAY-${tok.id}`,
+          paymentMethod: tok.paymentMethod || 'Online',
+          estimatedWaitTime: tok.estimatedWait || 15,
+          createdAt: tok.createdAt || new Date().toISOString()
+        };
+        return res.json({ success: true, appointment: apptFromTok });
+      }
+    } catch (err) {
+      console.warn('Error fetching appointment from RDS:', err.message);
+    }
+  }
+
+  const store = await getUnifiedStore();
+  const appt = (store.appointments || []).find(a => a.id === id);
+  if (appt) {
+    return res.json({ success: true, appointment: appt });
+  }
+  const tok = (store.tokens || []).find(t => t.id === id);
+  if (tok) {
+    return res.json({ success: true, appointment: tok });
+  }
+
+  res.status(404).json({ success: false, message: 'Appointment not found' });
+});
+
+// GET all appointments
+app.get('/api/appointments', async (req, res) => {
+  if (isDbConnected) {
+    try {
+      const dbRes = await query(`SELECT data FROM appointments ORDER BY created_at DESC`);
+      if (dbRes.rows.length > 0) {
+        const appts = dbRes.rows.map(r => r.data).filter(Boolean);
+        return res.json({ success: true, appointments: appts });
+      }
+    } catch (err) {
+      console.warn('Error querying appointments:', err.message);
+    }
+  }
+
+  const store = await getUnifiedStore();
+  res.json({ success: true, appointments: store.appointments || [] });
+});
+
+// GET Super Admin Revenue Tracking
+app.get('/api/admin/revenue', async (req, res) => {
+  const { dateFilter, hospitalId } = req.query;
+  let allAppts = [];
+  let allTokens = [];
+
+  if (isDbConnected) {
+    try {
+      const aRes = await query(`SELECT data FROM appointments ORDER BY created_at DESC`);
+      allAppts = aRes.rows.map(r => r.data).filter(Boolean);
+
+      const tRes = await query(`SELECT data FROM tokens ORDER BY created_at DESC`);
+      allTokens = tRes.rows.map(r => r.data).filter(Boolean);
+    } catch (e) {
+      console.warn('Error loading revenue from RDS:', e.message);
+    }
+  }
+
+  if (allAppts.length === 0) {
+    const store = await getUnifiedStore();
+    allAppts = store.appointments || [];
+    allTokens = store.tokens || [];
+  }
+
+  const combinedMap = new Map();
+  allAppts.forEach(a => {
+    if (a && a.id) combinedMap.set(a.id, a);
+  });
+  allTokens.forEach(t => {
+    if (t && t.id && !combinedMap.has(t.id)) {
+      combinedMap.set(t.id, {
+        id: t.id,
+        tokenNumber: t.tokenNo || t.tokenNumber,
+        patientName: t.patientName,
+        phone: t.patientPhone,
+        hospitalId: t.hospitalId,
+        hospitalName: t.hospitalName || 'Hospital',
+        doctorId: t.doctorId,
+        doctorName: t.doctorName,
+        departmentName: t.departmentName,
+        date: t.bookingDate,
+        time: t.time,
+        fee: t.consultationFee || 500,
+        platformFee: t.platformFee || 25,
+        totalFee: (t.consultationFee || 500) + (t.platformFee || 25),
+        status: t.status,
+        paymentId: t.paymentId || `PAY-${t.id}`,
+        paymentMethod: t.paymentMethod || 'Online',
+        createdAt: t.createdAt
+      });
+    }
+  });
+
+  let transactions = Array.from(combinedMap.values());
+  if (hospitalId && hospitalId !== 'all') {
+    transactions = transactions.filter(t => t.hospitalId === hospitalId);
+  }
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  if (dateFilter === 'today') {
+    transactions = transactions.filter(t => (t.date === todayStr || (t.createdAt && t.createdAt.startsWith(todayStr))));
+  } else if (dateFilter === 'month') {
+    const curMonth = todayStr.slice(0, 7);
+    transactions = transactions.filter(t => (t.date?.startsWith(curMonth) || (t.createdAt && t.createdAt.startsWith(curMonth))));
+  }
+
+  const totalGrossRevenue = transactions.reduce((sum, t) => sum + (Number(t.totalFee) || (Number(t.fee) || 0) + (Number(t.platformFee) || 25)), 0);
+  const totalPlatformFees = transactions.reduce((sum, t) => sum + (Number(t.platformFee) || Math.max(10, Math.round((Number(t.fee) || 500) * 0.05))), 0);
+  const totalDoctorFees = transactions.reduce((sum, t) => sum + (Number(t.fee) || 0), 0);
+
+  res.json({
+    success: true,
+    summary: {
+      totalTransactions: transactions.length,
+      totalGrossRevenue,
+      totalPlatformFees,
+      totalDoctorFees,
+      platformFeePercent: 5
+    },
+    transactions
+  });
 });
 
 // ─── Hospital Schedules (Phase 21 & 22) ──────────────────────────────────────
@@ -1421,6 +1970,19 @@ app.post('/api/hospitals/:hospitalId/schedules', requireHospitalAuth, async (req
 
   store.hospitalSchedules = store.hospitalSchedules || {};
   store.hospitalSchedules[hospitalId] = schedule;
+
+  if (isDbConnected && schedule) {
+    try {
+      await query(
+        `INSERT INTO hospital_schedules (hospital_id, schedule_data, updated_at)
+         VALUES ($1, $2, NOW())
+         ON CONFLICT (hospital_id) DO UPDATE SET schedule_data = $2, updated_at = NOW()`,
+        [hospitalId, JSON.stringify(schedule)]
+      );
+    } catch (e) {
+      console.error('Error persisting hospital schedules to RDS:', e.message);
+    }
+  }
 
   await saveUnifiedStore(store);
   res.json({ success: true, hospitalId, schedule });

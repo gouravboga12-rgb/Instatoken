@@ -36,8 +36,16 @@ export const HospitalDetails: React.FC<HospitalDetailsProps> = ({ onDoctorSelect
   const isSaved = user?.savedHospitals.includes(hospital.id) || false;
 
   const filteredDoctors = selectedDeptId === 'All' 
-    ? hospital.doctors 
-    : hospital.doctors.filter(d => d.departmentId === selectedDeptId);
+    ? (hospital.doctors || [])
+    : (hospital.doctors || []).filter(d => {
+        if (d.departmentId === selectedDeptId) return true;
+        const matchingDept = (hospital.departments || []).find(dp => dp.id === selectedDeptId);
+        if (matchingDept && matchingDept.name) {
+          return d.specialty?.toLowerCase() === matchingDept.name.toLowerCase() ||
+                 (d as any).department?.toLowerCase() === matchingDept.name.toLowerCase();
+        }
+        return false;
+      });
 
   const handleShare = () => {
     if (navigator.share) {
@@ -195,7 +203,7 @@ export const HospitalDetails: React.FC<HospitalDetailsProps> = ({ onDoctorSelect
               >
                 All Specialties
               </button>
-              {hospital.departments.map(dept => (
+              {(hospital.departments || []).map(dept => (
                 <button
                   key={dept.id}
                   onClick={() => setSelectedDeptId(dept.id)}
