@@ -38,41 +38,37 @@ export const HospitalSettings: React.FC = () => {
   const [customMediaType, setCustomMediaType] = useState<'image' | 'video'>('image');
   const [customMediaCaption, setCustomMediaCaption] = useState('');
 
+  const isApollo = (hospitalProfile?.id || 'hosp-apollo') === 'hosp-apollo';
+
   const [form, setForm] = useState({
-    name: hospitalProfile?.name || 'Apollo Spectra Hospital',
+    name: hospitalProfile?.name || (isApollo ? 'Apollo Spectra Hospital' : ''),
     logo: hospitalProfile?.logo || '',
     coverImage: hospitalProfile?.coverImage || '',
     gallery: (hospitalProfile?.gallery as any[]) || [],
-    registrationNumber: hospitalProfile?.registrationNumber || 'HOSP-BLR-2024-889',
-    accreditation: hospitalProfile?.accreditation || 'NABH & JCI Accredited',
-    gstNumber: hospitalProfile?.gstNumber || '29AABCA1234F1Z8',
-    licenseNumber: hospitalProfile?.licenseNumber || 'KPME/2022/9901',
+    registrationNumber: hospitalProfile?.registrationNumber || (isApollo ? 'HOSP-BLR-2024-889' : ''),
+    accreditation: hospitalProfile?.accreditation || (isApollo ? 'NABH & JCI Accredited' : ''),
+    gstNumber: hospitalProfile?.gstNumber || (isApollo ? '29AABCA1234F1Z8' : ''),
+    licenseNumber: hospitalProfile?.licenseNumber || (isApollo ? 'KPME/2022/9901' : ''),
     type: hospitalProfile?.type || 'Multi Speciality Hospital',
     ownershipType: hospitalProfile?.ownershipType || 'Private Corporate',
-    phone: hospitalProfile?.phone || '+91 80 4668 8888',
-    whatsapp: hospitalProfile?.whatsapp || '+91 98450 12345',
-    email: hospitalProfile?.email || 'admin@apollospectra.com',
-    website: hospitalProfile?.website || 'https://www.apollospectra.com',
-    emergencyNumber: hospitalProfile?.emergencyNumber || '1066 / +91 80 4668 8899',
+    phone: hospitalProfile?.phone || (isApollo ? '+91 80 4668 8888' : ''),
+    whatsapp: hospitalProfile?.whatsapp || '',
+    email: hospitalProfile?.email || (isApollo ? 'admin@apollospectra.com' : ''),
+    website: hospitalProfile?.website || '',
+    emergencyNumber: hospitalProfile?.emergencyNumber || '',
     country: hospitalProfile?.country || 'India',
-    state: hospitalProfile?.state || 'Telangana',
-    city: hospitalProfile?.city || 'Hyderabad',
-    area: hospitalProfile?.area || 'Kothapet Pratap Nagar',
-    address: hospitalProfile?.address || '15-57/2, RAMkrishna Raju Residency, Pratap Nagar, Kothapet, Hyderabad, Telangana 500060, India',
-    pinCode: hospitalProfile?.pinCode || '500060',
+    state: hospitalProfile?.state || '',
+    city: hospitalProfile?.city || '',
+    area: hospitalProfile?.area || '',
+    address: hospitalProfile?.address || '',
+    pinCode: hospitalProfile?.pinCode || '',
     lat: String(hospitalProfile?.lat ?? 17.37336200634615),
     lng: String(hospitalProfile?.lng ?? 78.53855589118986),
-    about: hospitalProfile?.about || 'Apollo Spectra Hospital is a state-of-the-art multi-speciality hospital offering world-class healthcare, advanced surgical care, and OPD consultations.',
-    mission: hospitalProfile?.mission || 'To provide high quality patient-centric clinical excellence with zero waiting time.',
-    vision: hospitalProfile?.vision || 'To be the most trusted healthcare institution in the region.',
+    about: hospitalProfile?.about || '',
+    mission: hospitalProfile?.mission || '',
+    vision: hospitalProfile?.vision || '',
     brandColor: hospitalProfile?.brandColor || '#2563EB',
-    facilities: hospitalProfile?.facilities || [
-      '24x7 Emergency & Trauma',
-      'Intensive Care Unit (ICU)',
-      '24x7 In-House Pharmacy',
-      'Advanced Diagnostics & Lab',
-      'Ambulance Service'
-    ]
+    facilities: hospitalProfile?.facilities || []
   });
 
   // Synchronize form with loaded hospital profile

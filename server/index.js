@@ -148,6 +148,8 @@ const INITIAL_HOSPITALS = [
     id: "hosp-apollo",
     name: "Apollo Spectra Hospital",
     category: "Multi Speciality",
+    email: "info@apollospectra.com",
+    phone: "+91 80 4668 8888",
     rating: 4.8,
     reviewsCount: 1240,
     distance: 1.8,
@@ -159,54 +161,6 @@ const INITIAL_HOSPITALS = [
     contact: "+91 80 4668 8888",
     lat: 17.37336200634615,
     lng: 78.53855589118986
-  },
-  {
-    id: "hosp-rainbow",
-    name: "Rainbow Children's Hospital",
-    category: "Children Hospital",
-    rating: 4.7,
-    reviewsCount: 932,
-    distance: 3.2,
-    baseWaitingTime: 15,
-    address: "HSR Layout Sector 2, Bengaluru",
-    image: "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=800&auto=format&fit=crop&q=80",
-    about: "Leading pediatric and maternal healthcare hospital with dedicated neonatal ICU and pediatric emergency services.",
-    facilities: ["Pediatric ICU", "24/7 Emergency", "Pharmacy", "NICU", "Vaccination Center"],
-    contact: "+91 80 4241 1234",
-    lat: 12.9116,
-    lng: 77.6474
-  },
-  {
-    id: "hosp-fortis",
-    name: "Fortis Hospital",
-    category: "Cardiology",
-    rating: 4.6,
-    reviewsCount: 884,
-    distance: 5.4,
-    baseWaitingTime: 45,
-    address: "Bannerghatta Road, Bengaluru",
-    image: "https://images.unsplash.com/photo-1629909613654-28e377c37b09?w=800&auto=format&fit=crop&q=80",
-    about: "Comprehensive tertiary care hospital renowned for cardiology, cardiac surgery, and oncology excellence.",
-    facilities: ["Cath Lab", "ICU", "Blood Bank", "24/7 Trauma", "MRI & CT Scan"],
-    contact: "+91 80 6621 4444",
-    lat: 12.8942,
-    lng: 77.5986
-  },
-  {
-    id: "hosp-nethra",
-    name: "Narayana Nethralaya",
-    category: "Eye Hospital",
-    rating: 4.9,
-    reviewsCount: 1650,
-    distance: 4.1,
-    baseWaitingTime: 35,
-    address: "Indiranagar 100ft Road, Bengaluru",
-    image: "https://images.unsplash.com/photo-1516549655169-df83a0774514?w=800&auto=format&fit=crop&q=80",
-    about: "Premier super-specialty eye care hospital providing state-of-the-art diagnostic and surgical facilities.",
-    facilities: ["Lasik Laser", "Retina Clinic", "Cornea Bank", "Pharmacy", "Optical Shop"],
-    contact: "+91 80 6612 1618",
-    lat: 12.9784,
-    lng: 77.6408
   }
 ];
 
@@ -563,17 +517,35 @@ async function getUnifiedStore() {
           console.warn('Error merging appointments from RDS:', apptErr.message);
         }
 
+        const DUMMY_HOSPITAL_IDS = ['hosp-rainbow', 'hosp-nethra', 'hosp-fortis', 'hosp-continental', 'hosp-ramesh', 'hosp-care-vizag'];
+        store.hospitals = (store.hospitals || []).filter(h => !DUMMY_HOSPITAL_IDS.includes(h.id));
+        if (store.hospitals.length === 0) {
+          store.hospitals = INITIAL_HOSPITALS;
+        }
+
         // Merge live hospitals and profiles from PostgreSQL
         try {
-          const hospRows = await query(`SELECT id, data FROM hospitals`);
+          const hospRows = await query(`SELECT id, name, email, phone, city, state, data FROM hospitals`);
+          const activeDbHospitalIds = new Set(hospRows.rows.map(r => r.id));
+          activeDbHospitalIds.add('hosp-apollo');
+          store.hospitals = (store.hospitals || []).filter(h => activeDbHospitalIds.has(h.id) && !DUMMY_HOSPITAL_IDS.includes(h.id));
+
           if (hospRows.rows.length > 0) {
-            store.hospitals = store.hospitals || [];
             hospRows.rows.forEach(r => {
-              if (r.data) {
-                const idx = store.hospitals.findIndex(h => h.id === r.id);
-                if (idx === -1) store.hospitals.push(r.data);
-                else store.hospitals[idx] = { ...store.hospitals[idx], ...r.data };
-              }
+              if (DUMMY_HOSPITAL_IDS.includes(r.id)) return;
+              const idx = store.hospitals.findIndex(h => h.id === r.id);
+              const merged = {
+                ...(r.data || {}),
+                id: r.id,
+                name: r.name || r.data?.name,
+                email: r.email || r.data?.email || (r.id === 'hosp-apollo' ? 'info@apollospectra.com' : ''),
+                phone: r.phone || r.data?.phone || r.data?.contact || (r.id === 'hosp-apollo' ? '+91 80 4668 8888' : ''),
+                contact: r.phone || r.data?.contact || r.data?.phone || (r.id === 'hosp-apollo' ? '+91 80 4668 8888' : ''),
+                city: r.city || r.data?.city || '',
+                state: r.state || r.data?.state || ''
+              };
+              if (idx === -1) store.hospitals.push(merged);
+              else store.hospitals[idx] = { ...store.hospitals[idx], ...merged };
             });
           }
         } catch (hospErr) {
@@ -605,9 +577,7 @@ async function getUnifiedStore() {
     }
   }
   const fileStore = loadStore();
-  if (!fileStore.hospitalProfiles || fileStore.hospitalProfiles['hosp-apollo']?.address === STALE_MOCK_APOLLO_ADDRESS) {
-    fileStore.hospitalProfiles = { ...fileStore.hospitalProfiles, 'hosp-apollo': INITIAL_PROFILE };
-  }
+  fileStore.hospitals = INITIAL_HOSPITALS;
   ensureHospitalProfilesSynced(fileStore);
   return fileStore;
 }
@@ -616,7 +586,7 @@ async function saveUnifiedStore(store) {
   ensureHospitalProfilesSynced(store);
   if (isDbConnected) {
     try {
-      const res = await query(
+      await query(
         `INSERT INTO sync_store (key, data, last_updated) 
          VALUES ('global_store', $1, NOW()) 
          ON CONFLICT (key) DO UPDATE SET data = $1, last_updated = NOW() RETURNING key`,
@@ -625,8 +595,6 @@ async function saveUnifiedStore(store) {
     } catch (e) {
       console.error('Error syncing to RDS:', e.message);
     }
-  } else {
-    saveStore(store);
   }
 }
 
@@ -1014,20 +982,78 @@ app.post('/api/auth/hospital-signup', async (req, res) => {
   store.hospitalCredentials.push(newCred);
 
   const newProfile = {
-    ...INITIAL_PROFILE,
     id: newHospitalId,
     name,
-    email,
+    email: email.trim().toLowerCase(),
     phone: phone || '',
+    whatsapp: '',
     city: city || 'Bengaluru',
+    state: '',
+    area: '',
     address: address || '',
     type: category || 'Multi Speciality',
-    registrationNumber: registrationNumber || `REG-${Date.now()}`
+    ownershipType: 'Private',
+    registrationNumber: registrationNumber || `REG-${Date.now()}`,
+    accreditation: '',
+    gstNumber: '',
+    licenseNumber: '',
+    website: '',
+    emergencyNumber: phone || '',
+    country: 'India',
+    pinCode: '',
+    lat: 17.3850,
+    lng: 78.4867,
+    about: '',
+    mission: '',
+    vision: '',
+    brandColor: '#2563EB',
+    logo: '',
+    coverImage: '',
+    gallery: [],
+    facilities: [],
+    emergencyServices: [],
+    timings: [
+      { day: 'Mon', open: '09:00', close: '18:00' },
+      { day: 'Tue', open: '09:00', close: '18:00' },
+      { day: 'Wed', open: '09:00', close: '18:00' },
+      { day: 'Thu', open: '09:00', close: '18:00' },
+      { day: 'Fri', open: '09:00', close: '18:00' },
+      { day: 'Sat', open: '09:00', close: '14:00' },
+      { day: 'Sun', open: '10:00', close: '13:00' },
+    ]
   };
 
   store.hospitalProfiles = store.hospitalProfiles || {};
   store.hospitalProfiles[newHospitalId] = newProfile;
+  store.hospitalDoctors = store.hospitalDoctors || {};
+  store.hospitalDoctors[newHospitalId] = [];
+  store.hospitalDepartments = store.hospitalDepartments || {};
+  store.hospitalDepartments[newHospitalId] = [];
+  store.hospitalPatients = store.hospitalPatients || {};
+  store.hospitalPatients[newHospitalId] = [];
+  store.hospitalStaff = store.hospitalStaff || {};
+  store.hospitalStaff[newHospitalId] = [];
+
   syncProfileToHospitalsList(store, newHospitalId, newProfile);
+
+  if (isDbConnected) {
+    try {
+      await query(
+        `INSERT INTO hospitals (id, name, email, phone, city, state, data) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         ON CONFLICT (id) DO UPDATE SET name = $2, email = $3, phone = $4, city = $5, state = $6, data = $7`,
+        [newHospitalId, name, email.trim().toLowerCase(), phone || '', city || '', '', JSON.stringify(newProfile)]
+      );
+      await query(
+        `INSERT INTO hospital_profiles (hospital_id, profile_data) 
+         VALUES ($1, $2)
+         ON CONFLICT (hospital_id) DO UPDATE SET profile_data = $2`,
+        [newHospitalId, JSON.stringify(newProfile)]
+      );
+    } catch (dbErr) {
+      console.warn('Error saving new hospital to RDS tables:', dbErr.message);
+    }
+  }
 
   await saveUnifiedStore(store);
 
@@ -2566,8 +2592,10 @@ app.get('/api/admin/revenue', async (req, res) => {
     transactions = transactions.filter(t => (t.date?.startsWith(curMonth) || (t.createdAt && t.createdAt.startsWith(curMonth))));
   }
 
+  const store = await getUnifiedStore();
+  const currentFeePercent = store.settings?.platformFeePercent !== undefined ? Number(store.settings.platformFeePercent) : 5;
   const totalGrossRevenue = transactions.reduce((sum, t) => sum + (Number(t.totalFee) || (Number(t.fee) || 0) + (Number(t.platformFee) || 25)), 0);
-  const totalPlatformFees = transactions.reduce((sum, t) => sum + (Number(t.platformFee) || Math.max(10, Math.round((Number(t.fee) || 500) * 0.05))), 0);
+  const totalPlatformFees = transactions.reduce((sum, t) => sum + (Number(t.platformFee) || Math.max(10, Math.round((Number(t.fee) || 500) * (currentFeePercent / 100)))), 0);
   const totalDoctorFees = transactions.reduce((sum, t) => sum + (Number(t.fee) || 0), 0);
 
   res.json({
@@ -2577,10 +2605,29 @@ app.get('/api/admin/revenue', async (req, res) => {
       totalGrossRevenue,
       totalPlatformFees,
       totalDoctorFees,
-      platformFeePercent: 5
+      platformFeePercent: currentFeePercent
     },
     transactions
   });
+});
+
+// GET /api/admin/settings
+app.get('/api/admin/settings', async (req, res) => {
+  const store = await getUnifiedStore();
+  const settings = store.settings || { platformFeePercent: 5 };
+  res.json({ success: true, settings });
+});
+
+// POST /api/admin/settings
+app.post('/api/admin/settings', async (req, res) => {
+  const { platformFeePercent } = req.body;
+  const store = await getUnifiedStore();
+  store.settings = store.settings || {};
+  if (platformFeePercent !== undefined) {
+    store.settings.platformFeePercent = Number(platformFeePercent);
+  }
+  await saveUnifiedStore(store);
+  res.json({ success: true, settings: store.settings });
 });
 
 // ─── Hospital Schedules (Phase 21 & 22) ──────────────────────────────────────

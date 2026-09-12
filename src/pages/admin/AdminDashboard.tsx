@@ -11,7 +11,7 @@ import {
   DollarSign, Building2, CheckCircle2, Search, Plus,
   Users, UserCheck, UserX,
   AlertTriangle, Download, X, Calendar, Upload, User,
-  MapPin, Trash2, Loader2, LogOut
+  MapPin, Trash2, Loader2, LogOut, Mail, Phone, PhoneCall
 } from 'lucide-react';
 import { LocationBanners } from './LocationBanners';
 
@@ -576,24 +576,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
             {/* Hospital Roster Table */}
             <div className="bg-white rounded-2xl border border-slate-100 shadow-xs overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[900px] text-left border-collapse">
+                <table className="w-full min-w-[1050px] text-left border-collapse">
                   <thead className="bg-slate-50 border-b border-slate-100 text-[10px] font-black text-slate-500 uppercase tracking-wider">
                     <tr>
-                      <th className="px-4 py-3">Hospital Details</th>
-                      <th className="px-4 py-3">Category</th>
-                      <th className="px-4 py-3">Contact & Location</th>
-                      <th className="px-4 py-3">Doctors</th>
-                      <th className="px-4 py-3">Commission %</th>
-                      <th className="px-4 py-3">Account Status</th>
-                      <th className="px-4 py-3 text-right">Disable / Enable Action</th>
+                      <th className="px-4 py-3.5">Hospital</th>
+                      <th className="px-4 py-3.5">Contact Details</th>
+                      <th className="px-4 py-3.5">Hospital Address</th>
+                      <th className="px-4 py-3.5">Call Option</th>
+                      <th className="px-4 py-3.5">Doctors & Fee</th>
+                      <th className="px-4 py-3.5">Status</th>
+                      <th className="px-4 py-3.5 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="text-xs">
+                  <tbody className="text-xs divide-y divide-slate-100">
                     {hospitals
                       .filter(h => {
                         const matchesSearch = h.name.toLowerCase().includes(hospitalSearch.toLowerCase()) || 
-                          h.address.toLowerCase().includes(hospitalSearch.toLowerCase()) ||
-                          h.contact.includes(hospitalSearch);
+                          (h.address && h.address.toLowerCase().includes(hospitalSearch.toLowerCase())) ||
+                          (h.contact && h.contact.includes(hospitalSearch)) ||
+                          (h.email && h.email.toLowerCase().includes(hospitalSearch.toLowerCase()));
                         const isCurrentlyDisabled = h.status === 'disabled';
                         if (hospitalStatusFilter === 'active') return matchesSearch && !isCurrentlyDisabled;
                         if (hospitalStatusFilter === 'disabled') return matchesSearch && isCurrentlyDisabled;
@@ -601,36 +602,81 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                       })
                       .map((hosp) => {
                         const isDisabled = hosp.status === 'disabled';
+                        const hospEmail = hosp.email || (hosp as any).data?.email || (hosp.id === 'hosp-apollo' ? 'info@apollospectra.com' : 'contact@hospital.com');
+                        const hospPhone = hosp.phone || hosp.contact || (hosp as any).data?.phone || '+91 80 4668 8888';
+
                         return (
-                          <tr key={hosp.id} className={`border-b border-slate-50 transition-colors ${isDisabled ? 'bg-amber-50/40 hover:bg-amber-50/70' : 'hover:bg-slate-50/60'}`}>
-                            <td className="px-4 py-3">
+                          <tr key={hosp.id} className={`transition-colors ${isDisabled ? 'bg-amber-50/40 hover:bg-amber-50/70' : 'hover:bg-slate-50/60'}`}>
+                            {/* Hospital Image & Name */}
+                            <td className="px-4 py-3.5">
                               <div className="flex items-center gap-3">
-                                <img src={hosp.image} alt={hosp.name} className="w-10 h-10 rounded-xl object-cover shrink-0 border border-slate-100" />
+                                <img 
+                                  src={hosp.image || "https://images.unsplash.com/photo-1587351021759-3e566b6af7cc?w=800&auto=format&fit=crop&q=80"} 
+                                  alt={hosp.name} 
+                                  className="w-12 h-12 rounded-xl object-cover shrink-0 border border-slate-200 shadow-2xs" 
+                                />
                                 <div>
-                                  <p className="font-extrabold text-slate-800 leading-none">{hosp.name}</p>
-                                  <p className="text-[10px] text-slate-400 font-semibold mt-0.5 truncate max-w-[220px]">{hosp.address}</p>
+                                  <p className="font-extrabold text-slate-800 text-sm leading-tight">{hosp.name}</p>
+                                  <span className="font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded text-[10px] inline-block mt-1">
+                                    {hosp.category}
+                                  </span>
                                 </div>
                               </div>
                             </td>
-                            <td className="px-4 py-3">
-                              <span className="font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md text-[10px]">
-                                {hosp.category}
-                              </span>
+
+                            {/* Email & Phone */}
+                            <td className="px-4 py-3.5">
+                              <div className="space-y-1">
+                                <a 
+                                  href={`mailto:${hospEmail}`} 
+                                  className="flex items-center gap-1.5 text-slate-700 hover:text-blue-600 font-bold text-xs transition-colors"
+                                  title={`Email ${hosp.name}`}
+                                >
+                                  <Mail size={12} className="text-blue-500 shrink-0" />
+                                  <span className="truncate max-w-[180px]">{hospEmail}</span>
+                                </a>
+                                <div className="flex items-center gap-1.5 text-slate-700 font-bold text-xs">
+                                  <Phone size={12} className="text-emerald-500 shrink-0" />
+                                  <span>{hospPhone}</span>
+                                </div>
+                              </div>
                             </td>
-                            <td className="px-4 py-3">
-                              <p className="font-bold text-slate-700">{hosp.contact}</p>
-                              <p className="text-[10px] text-slate-400">Timings: {hosp.timings}</p>
+
+                            {/* Full Address */}
+                            <td className="px-4 py-3.5">
+                              <div className="flex items-start gap-1.5 text-[11px] text-slate-600 max-w-[240px] leading-snug">
+                                <MapPin size={13} className="text-rose-500 shrink-0 mt-0.5" />
+                                <span>{hosp.address || 'Address not specified'}</span>
+                              </div>
                             </td>
-                            <td className="px-4 py-3 font-extrabold text-blue-600">
-                              {hosp.doctors.length} Doctors
+
+                            {/* Call Button Option */}
+                            <td className="px-4 py-3.5">
+                              <a 
+                                href={`tel:${hospPhone.replace(/\s+/g, '')}`} 
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow-xs transition-all no-underline"
+                                title={`Direct Phone Call to ${hosp.name}`}
+                              >
+                                <PhoneCall size={12} />
+                                <span>Call Hospital</span>
+                              </a>
                             </td>
-                            <td className="px-4 py-3 font-extrabold text-emerald-600">
-                              10% Platform Fee
+
+                            {/* Doctors & Commission */}
+                            <td className="px-4 py-3.5">
+                              <p className="font-black text-blue-600 text-xs">
+                                {(hosp.doctors || []).length} Doctors
+                              </p>
+                              <p className="font-bold text-emerald-600 text-[10px]">
+                                {platformFeePercent}% Platform Fee
+                              </p>
                             </td>
-                            <td className="px-4 py-3">
+
+                            {/* Status */}
+                            <td className="px-4 py-3.5">
                               {isDisabled ? (
                                 <span className="bg-amber-100 text-amber-800 text-[10px] font-extrabold px-2.5 py-1 rounded-full flex items-center gap-1 w-fit">
-                                  <AlertTriangle size={11} className="text-amber-600" /> Account Disabled
+                                  <AlertTriangle size={11} className="text-amber-600" /> Disabled
                                 </span>
                               ) : (
                                 <span className="bg-emerald-100 text-emerald-700 text-[10px] font-extrabold px-2.5 py-1 rounded-full flex items-center gap-1 w-fit">
@@ -638,7 +684,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                                 </span>
                               )}
                             </td>
-                            <td className="px-4 py-3 text-right">
+
+                            {/* Actions */}
+                            <td className="px-4 py-3.5 text-right">
                               <div className="flex items-center justify-end gap-2">
                                 <button
                                   onClick={() => toggleDisableHospital(hosp.id)}

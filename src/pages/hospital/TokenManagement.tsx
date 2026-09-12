@@ -7,8 +7,9 @@ import {
   Plus, Search, XCircle, CheckCircle, Wifi, WifiOff,
   Printer, X, Calendar, AlertCircle, UserPlus, User, Phone, Mail,
   MapPin, Droplets, FileText, Check, ArrowRight, Volume2, Eye, Clock,
-  RotateCcw, CheckCircle2, Stethoscope
+  RotateCcw, CheckCircle2, Stethoscope, MessageSquare
 } from 'lucide-react';
+import { broadcastGlobalSync } from '../../utils/syncBus';
 
 const statusColors: Record<string, string> = {
   booked: 'bg-blue-50 text-blue-700 border border-blue-200',
@@ -1032,17 +1033,52 @@ const PatientFileModal: React.FC<{
             </span>
           </div>
           <div>
+            <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wider">Patient Status</span>
+            <span className={`font-extrabold text-[11px] px-2 py-0.5 rounded-full inline-flex items-center gap-1 mt-0.5 ${token.isExisting ? 'bg-purple-100 text-purple-800' : 'bg-emerald-100 text-emerald-800'}`}>
+              {token.isExisting ? 'Existing Patient' : 'New Patient'}
+            </span>
+          </div>
+          <div>
             <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wider">Registration Type</span>
             <span className="font-extrabold text-slate-800 capitalize flex items-center gap-1">
               {token.type === 'online' ? <Wifi size={11} className="text-blue-500" /> : <WifiOff size={11} className="text-slate-500" />}
               {token.type} OPD
             </span>
           </div>
+        </div>
+
+        {/* RMP Reference & Quick Patient Contact */}
+        <div className="bg-blue-50/60 border border-blue-100 rounded-2xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
           <div>
-            <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wider">Visit Status</span>
-            <span className="font-extrabold text-slate-800">
-              {token.isRevisit ? 'Follow-up / Revisit' : 'New Patient Visit'}
-            </span>
+            <span className="text-[10px] font-black uppercase tracking-wider text-blue-900 block">RMP Reference / Source</span>
+            {token.rmpReference && token.rmpReference.name ? (
+              <p className="font-extrabold text-slate-800 mt-0.5 flex items-center gap-1.5">
+                <span className="text-blue-700">Dr./RMP: {token.rmpReference.name}</span>
+                {token.rmpReference.phone && <span className="text-slate-500 font-medium">({token.rmpReference.phone})</span>}
+              </p>
+            ) : (
+              <p className="text-slate-500 font-medium italic mt-0.5">Direct Registration (No RMP Reference)</p>
+            )}
+          </div>
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            {token.patientPhone && (
+              <>
+                <a
+                  href={`tel:${token.patientPhone}`}
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-[11px] flex items-center gap-1.5 transition-colors no-underline cursor-pointer"
+                >
+                  <Phone size={12} /> Call Phone
+                </a>
+                <a
+                  href={`https://wa.me/${token.patientPhone.replace(/\D/g, '').length === 10 ? '91' + token.patientPhone.replace(/\D/g, '') : token.patientPhone.replace(/\D/g, '')}?text=${encodeURIComponent(`Hello ${token.patientName}, your token #${token.tokenNo} for Dr. ${token.doctorName} is being called at the hospital. Please proceed to the consultation room.`)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-[11px] flex items-center gap-1.5 transition-colors no-underline cursor-pointer"
+                >
+                  <MessageSquare size={12} /> WhatsApp
+                </a>
+              </>
+            )}
           </div>
         </div>
 
@@ -1147,7 +1183,7 @@ const TokenTable: React.FC<{
   subtitle,
   onAddClick
 }) => {
-  const { updateTokenStatus, cancelToken, departments, doctors } = useHospital();
+  const { updateTokenStatus, cancelToken, departments, doctors, hospitalProfile } = useHospital();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [deptFilter, setDeptFilter] = useState('all');
@@ -1388,18 +1424,38 @@ const TokenTable: React.FC<{
                   <td className="py-3 px-4">
                     <div className="flex items-center gap-2">
                       <div>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedPatientToken(t)}
-                          className="font-black text-slate-800 hover:text-blue-600 cursor-pointer border-none bg-transparent text-left p-0 transition-colors flex items-center gap-1"
-                          title="Click to view complete patient details & medical history"
-                        >
-                          <span>{t.patientName}</span>
-                          <Eye size={12} className="text-blue-500 opacity-60" />
-                        </button>
-                        <p className="text-[10px] text-slate-400 font-medium">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedPatientToken(t)}
+                            className="font-black text-slate-800 hover:text-blue-600 cursor-pointer border-none bg-transparent text-left p-0 transition-colors flex items-center gap-1"
+                            title="Click to view complete patient details & medical history"
+                          >
+                            <span>{t.patientName}</span>
+                            <Eye size={12} className="text-blue-500 opacity-60" />
+                          </button>
+                          {t.isExisting ? (
+                            <span className="text-[9px] font-extrabold text-purple-700 bg-purple-50 px-1.5 py-0.2 rounded border border-purple-200">
+                              Existing
+                            </span>
+                          ) : (
+                            <span className="text-[9px] font-extrabold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                              New
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-slate-400 font-medium mt-0.5">
                           {t.patientPhone} · {t.patientAge}y, {t.patientGender}
                         </p>
+                        {t.rmpReference && t.rmpReference.name && (
+                          <div className="mt-0.5">
+                            <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded border border-indigo-200 inline-flex items-center gap-1">
+                              <span>RMP:</span>
+                              <strong>{t.rmpReference.name}</strong>
+                              {t.rmpReference.phone && <span className="text-[8.5px] text-indigo-500">({t.rmpReference.phone})</span>}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </td>
@@ -1428,15 +1484,29 @@ const TokenTable: React.FC<{
                   </td>
                   <td className="py-3 px-4 text-right">
                     <div className="flex items-center justify-end gap-1.5 flex-wrap">
-                      {/* View Patient Details Button */}
-                      <button
-                        type="button"
-                        onClick={() => setSelectedPatientToken(t)}
-                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg cursor-pointer border border-blue-200 transition-colors"
-                        title="View Patient Details & OPD Dossier"
-                      >
-                        <Eye size={13} />
-                      </button>
+                      {/* Direct Phone Call Button */}
+                      {t.patientPhone && (
+                        <a
+                          href={`tel:${t.patientPhone}`}
+                          className="p-1.5 text-blue-600 hover:bg-blue-50 border border-blue-200 rounded-lg cursor-pointer transition-colors inline-flex items-center justify-center"
+                          title={`Call ${t.patientName} (${t.patientPhone})`}
+                        >
+                          <Phone size={12} />
+                        </a>
+                      )}
+
+                      {/* Direct WhatsApp Alert Button */}
+                      {t.patientPhone && (
+                        <a
+                          href={`https://wa.me/${t.patientPhone.replace(/\D/g, '').length === 10 ? '91' + t.patientPhone.replace(/\D/g, '') : t.patientPhone.replace(/\D/g, '')}?text=${encodeURIComponent(`Hello ${t.patientName}, your token #${t.tokenNo} for Dr. ${t.doctorName} at ${hospitalProfile?.name || 'the hospital'} is now being called. Please proceed to the consultation room.`)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="p-1.5 text-emerald-600 hover:bg-emerald-50 border border-emerald-200 rounded-lg cursor-pointer transition-colors inline-flex items-center justify-center"
+                          title={`Send WhatsApp message to ${t.patientName}`}
+                        >
+                          <MessageSquare size={12} />
+                        </a>
+                      )}
 
                       {/* Stage 1: Booked / Waiting -> Call Token or Mark Late */}
                       {['booked', 'waiting'].includes(t.status) && (
@@ -1582,6 +1652,13 @@ const TokenTable: React.FC<{
           onConfirm={() => {
             playCallingChime();
             updateTokenStatus(callConfirmToken.id, 'calling');
+            broadcastGlobalSync('HOSPITAL_TOKEN_CALLED', {
+              tokenNo: callConfirmToken.tokenNo,
+              patientName: callConfirmToken.patientName,
+              doctorName: callConfirmToken.doctorName,
+              hospitalName: hospitalProfile?.name,
+              hospitalId: callConfirmToken.hospitalId
+            });
             setCallConfirmToken(null);
           }}
           onClose={() => setCallConfirmToken(null)}

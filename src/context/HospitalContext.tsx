@@ -78,6 +78,8 @@ export interface TokenRecord {
   revisitValidUpto?: string;
   notes?: string;
   hospitalId?: string;
+  isExisting?: boolean;
+  rmpReference?: { name: string; phone: string } | null;
 }
 
 export interface DoctorVisitSummary {
@@ -526,6 +528,41 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         const prof = JSON.parse(saved);
         if (prof.id === curHospId) return prof;
       } catch (e) {}
+    }
+    if (curHospId !== 'hosp-apollo') {
+      return {
+        id: curHospId,
+        name: '',
+        logo: '',
+        coverImage: '',
+        gallery: [],
+        type: 'General Hospital',
+        ownershipType: 'Private',
+        registrationNumber: '',
+        accreditation: '',
+        gstNumber: '',
+        licenseNumber: '',
+        phone: '',
+        whatsapp: '',
+        email: '',
+        website: '',
+        emergencyNumber: '',
+        address: '',
+        area: '',
+        city: '',
+        state: '',
+        pinCode: '',
+        country: 'India',
+        lat: 17.3850,
+        lng: 78.4867,
+        about: '',
+        mission: '',
+        vision: '',
+        brandColor: '#2563EB',
+        facilities: [],
+        emergencyServices: [],
+        timings: []
+      };
     }
     return INITIAL_PROFILE;
   });

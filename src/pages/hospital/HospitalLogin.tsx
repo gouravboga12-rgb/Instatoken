@@ -28,15 +28,18 @@ export const HospitalLogin: React.FC = () => {
     }
   };
 
-  const fillDemo = (hosp: string) => {
-    const creds: Record<string, { email: string; password: string }> = {
-      apollo: { email: 'admin@apollo.com', password: 'password' },
-      rainbow: { email: 'admin@rainbow.com', password: 'password' },
-      fortis: { email: 'admin@fortis.com', password: 'password' },
-      nethra: { email: 'admin@nethra.com', password: 'password' },
-    };
-    const c = creds[hosp] || creds.apollo;
-    if (c) { setEmail(c.email); setPassword(c.password); setError(''); }
+  const loginApolloDemo = async () => {
+    setEmail('admin@apollo.com');
+    setPassword('password');
+    setError('');
+    setLoading(true);
+    const result = await hospitalLogin('admin@apollo.com', 'password');
+    setLoading(false);
+    if (result.success) {
+      navigate('/hospital/dashboard');
+    } else {
+      setError(result.message);
+    }
   };
 
   return (
@@ -129,42 +132,21 @@ export const HospitalLogin: React.FC = () => {
             <p className="text-slate-500 text-sm mt-2">Sign in to your hospital management account</p>
           </div>
 
-          {/* Demo Quick Fill for Partner Hospitals (Phase 22 Multi-Tenant Testing) */}
+          {/* Demo Quick Fill for Apollo Spectra Hospital */}
           <div className="bg-blue-50/80 border border-blue-100 rounded-2xl p-3.5 mb-6">
             <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-2 flex items-center justify-between">
-              <span>Quick Partner Hospital Login</span>
-              <span className="text-[9px] font-bold text-blue-500 bg-blue-100/70 px-1.5 py-0.5 rounded">Phase 22 Security Test</span>
+              <span>Quick Demo Login</span>
+              <span className="text-[9px] font-bold text-blue-500 bg-blue-100/70 px-1.5 py-0.5 rounded">Apollo Spectra</span>
             </p>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => fillDemo('apollo')}
-                className="bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-extrabold py-2 px-2.5 rounded-xl transition-colors cursor-pointer border-none text-left truncate"
-              >
-                🏥 Apollo Spectra
-              </button>
-              <button
-                type="button"
-                onClick={() => fillDemo('rainbow')}
-                className="bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-extrabold py-2 px-2.5 rounded-xl transition-colors cursor-pointer border-none text-left truncate"
-              >
-                🌈 Rainbow Children
-              </button>
-              <button
-                type="button"
-                onClick={() => fillDemo('fortis')}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-extrabold py-2 px-2.5 rounded-xl transition-colors cursor-pointer border-none text-left truncate"
-              >
-                🩺 Fortis Hospital
-              </button>
-              <button
-                type="button"
-                onClick={() => fillDemo('nethra')}
-                className="bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-extrabold py-2 px-2.5 rounded-xl transition-colors cursor-pointer border-none text-left truncate"
-              >
-                👁️ Narayana Nethra
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={loginApolloDemo}
+              disabled={loading}
+              className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black py-2.5 px-4 rounded-xl transition-all shadow-sm hover:shadow active:scale-[0.99] cursor-pointer border-none"
+            >
+              <span>🏥</span>
+              <span>Apollo Spectra Hospital (Demo Autofill & Login)</span>
+            </button>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">

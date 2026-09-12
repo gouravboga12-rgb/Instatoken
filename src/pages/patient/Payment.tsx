@@ -49,10 +49,7 @@ export const Payment: React.FC = () => {
       : Math.max(10, Math.round((fee || 500) * 0.05)));
   const subPlan = state.subscriptionPlan || { name: "OPD Token Booking Fee", price: tokenFee, days: 3 };
   const basePrice = tokenFee;
-  const convenienceFee = 2;
-  const cgst = parseFloat((basePrice * 0.09).toFixed(2));
-  const sgst = parseFloat((basePrice * 0.09).toFixed(2));
-  const totalAmount = parseFloat((basePrice + convenienceFee + cgst + sgst).toFixed(2));
+  const totalAmount = parseFloat(basePrice.toFixed(2));
 
   const handlePaymentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -119,23 +116,19 @@ export const Payment: React.FC = () => {
             <div className="space-y-2 pb-3 border-b border-slate-100 text-xs">
               <div className="flex justify-between text-slate-700 font-extrabold">
                 <span>{patientDetails ? (subPlan.name || 'OPD Token Booking Fee') : `Platform Booking Pass: ${subPlan.name}`}</span>
-                <span>₹{basePrice.toFixed(2)}</span>
+                <span className="text-blue-600 font-black">₹{basePrice.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between text-slate-500 font-medium">
-                <span>Convenience Charge</span>
-                <span>₹{convenienceFee.toFixed(2)}</span>
+              <div className="flex justify-between text-slate-400 text-[11px] font-medium">
+                <span>Platform Convenience Fee</span>
+                <span className="text-emerald-600 font-bold">Waived (₹0.00)</span>
               </div>
-              <div className="flex justify-between text-slate-500 font-medium">
-                <span>CGST (9%)</span>
-                <span>₹{cgst.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-slate-500 font-medium">
-                <span>SGST (9%)</span>
-                <span>₹{sgst.toFixed(2)}</span>
+              <div className="flex justify-between text-slate-400 text-[11px] font-medium">
+                <span>Taxes & Processing</span>
+                <span className="text-emerald-600 font-bold">Included</span>
               </div>
               
               {patientDetails && fee > 0 && (
-                <div className="flex justify-between items-center text-slate-500 font-bold border-t border-dashed border-slate-200 pt-2.5 text-[10px] bg-amber-50/60 p-2.5 rounded-xl mt-1">
+                <div className="flex justify-between items-center text-slate-500 font-bold border-t border-dashed border-slate-200 pt-2.5 text-[10px] bg-amber-50/70 p-2.5 rounded-xl mt-1">
                   <div>
                     <span className="text-slate-800 font-black block">Doctor Consultation Fee</span>
                     <span className="text-[9px] text-amber-700 font-semibold">Pay directly at hospital cabin / desk</span>
@@ -147,8 +140,8 @@ export const Payment: React.FC = () => {
 
             <div className="flex justify-between items-center pt-3 font-heading font-black text-sm text-slate-850">
               <div>
-                <span>Total Payable Amount (Online)</span>
-                <p className="text-[9.5px] text-slate-400 font-normal">Token booking fee & taxes only</p>
+                <span>Total Payable Online</span>
+                <p className="text-[9.5px] text-slate-400 font-normal">Official InstaToken booking fee only</p>
               </div>
               <span className="text-blue-600 text-base">₹{totalAmount.toFixed(2)}</span>
             </div>

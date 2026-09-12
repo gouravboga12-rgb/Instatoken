@@ -57,6 +57,8 @@ export interface Appointment {
   paymentId: string;
   paymentMethod: string;
   estimatedWaitTime: number; // in minutes
+  isExisting?: boolean;
+  rmpReference?: { name: string; phone: string } | null;
   createdAt: string;
 }
 
@@ -99,7 +101,16 @@ interface AppContextType {
   toggleCustomerStatus: (customerId: string) => void;
   deleteCustomer: (customerId: string) => Promise<boolean>;
   bookToken: (
-    patientDetails: { name: string; age: number; gender: string; phone: string; email: string; address: string },
+    patientDetails: {
+      name: string;
+      age: number;
+      gender: string;
+      phone: string;
+      email: string;
+      address: string;
+      isExisting?: boolean;
+      rmpReference?: { name: string; phone: string } | null;
+    },
     hospitalId: string,
     doctorId: string,
     date: string,
@@ -324,10 +335,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? Number(saved) : 5; // Default 5% platform fee
   });
 
-  const setPlatformFeePercent = (percent: number) => {
+  const setPlatformFeePercent = async (percent: number) => {
     const val = Math.max(1, Math.min(50, percent));
     setPlatformFeePercentState(val);
-    localStorage.setItem('insta_platform_fee_percent', val.toString());
+    try {
+      await fetch('/api/admin/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ platformFeePercent: val })
+      });
+    } catch (e) {}
+    broadcastGlobalSync('PLATFORM_FEE_UPDATED', { platformFeePercent: val });
   };
 
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(() => {
@@ -579,6 +597,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       })
       .catch(err => console.warn('Failed to fetch hospitals from server:', err));
 
+    // Fetch live Admin Settings from AWS RDS
+    fetch('/api/admin/settings')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.settings?.platformFeePercent) {
+          setPlatformFeePercentState(Number(data.settings.platformFeePercent));
+        }
+      })
+      .catch(err => console.warn('Failed to fetch admin settings from server:', err));
+
     // Fetch live customer appointments from AWS RDS
     fetch('/api/appointments')
       .then(res => res.json())
@@ -738,6 +766,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (deletedHospId) {
           setHospitals(prev => prev.filter(h => h.id !== deletedHospId));
         }
+
+      } else if (event.type === 'PLATFORM_FEE_UPDATED') {
+        if (event.data?.platformFeePercent) {
+          setPlatformFeePercentState(Number(event.data.platformFeePercent));
+        }
+
+      } else if (event.type === 'HOSPITAL_TOKEN_CALLED') {
+        const { tokenNo, patientName, doctorName, hospitalName } = event.data || {};
+        addNotification(
+          `Token #${tokenNo} Called!`,
+          `Please proceed to consultation room. Dr. ${doctorName || 'Doctor'} at ${hospitalName || 'Hospital'} is calling ${patientName || 'you'}.`,
+          'info'
+        );
 
       } else if (event.type === 'CLOUD_SYNC_UPDATED') {
         // Backend poller found newer data — re-hydrate from updated localStorage
@@ -1110,7 +1151,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // --- Book Token ---
   const bookToken = async (
-    patientDetails: { name: string; age: number; gender: string; phone: string; email: string; address: string },
+    patientDetails: {
+      name: string;
+      age: number;
+      gender: string;
+      phone: string;
+      email: string;
+      address: string;
+      isExisting?: boolean;
+      rmpReference?: { name: string; phone: string } | null;
+    },
     hospitalId: string,
     doctorId: string,
     date: string,
@@ -1162,6 +1212,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       paymentId: `PAYID-${Math.floor(1000000 + Math.random() * 9000000)}`,
       paymentMethod,
       estimatedWaitTime: computedWaitTime,
+      isExisting: Boolean(patientDetails.isExisting),
+      rmpReference: patientDetails.rmpReference || null,
       createdAt: new Date().toISOString()
     };
 
@@ -1188,7 +1240,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       consultationFee: newAppt.fee,
       paymentStatus: 'pending' as const, // Consultation fee collected at hospital desk/cabin
       paymentMethod: 'Pay at Hospital',
-      isRevisit: false,
+      isRevisit: Boolean(patientDetails.isExisting),
+      isExisting: Boolean(patientDetails.isExisting),
+      rmpReference: patientDetails.rmpReference || null,
       hospitalId
     };
 

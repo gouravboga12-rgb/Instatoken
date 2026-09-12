@@ -50,63 +50,41 @@ export const Home: React.FC<HomeProps> = ({
     "Koramangala, Bengaluru"
   ];
 
-  // Dynamically resolve hospital details from hospitals context for live synchronization
-  const apolloHosp = hospitals.find(h => h.id === 'hosp-apollo');
-  const rainbowHosp = hospitals.find(h => h.id === 'hosp-rainbow');
-  const fortisHosp = hospitals.find(h => h.id === 'hosp-fortis');
-  const nethraHosp = hospitals.find(h => h.id === 'hosp-nethra');
+  // Featured hospital banners for home carousel dynamically mapped from active live hospitals
+  const featuredBanners = useMemo(() => {
+    const bannersList = hospitals.length > 0 ? hospitals : [
+      {
+        id: 'hosp-apollo',
+        name: 'Apollo Spectra Hospital',
+        address: 'Koramangala 5th Block, Bengaluru',
+        baseWaitingTime: 20,
+        rating: 4.8,
+        reviewsCount: 1240,
+        image: 'https://images.unsplash.com/photo-1587351021759-3e566b6af7cc?w=800&auto=format&fit=crop&q=80'
+      } as any
+    ];
 
-  // Featured hospital banners for home carousel
-  const featuredBanners = [
-    {
-      id: "hosp-apollo",
-      badge: "FEATURED HOSPITAL",
-      title: apolloHosp?.name || "Apollo Spectra Hospital",
-      location: apolloHosp?.address || "Koramangala 5th Block, Bengaluru",
-      wait: `${apolloHosp?.baseWaitingTime || 20} Min Avg Wait`,
-      rating: apolloHosp?.rating || 4.8,
-      reviews: apolloHosp?.reviewsCount || 1240,
-      image: apolloHosp?.image || "https://images.unsplash.com/photo-1587351021759-3e566b6af7cc?w=800&auto=format&fit=crop&q=80",
+    const gradients = [
+      "from-blue-700 via-blue-600 to-indigo-700",
+      "from-teal-700 via-emerald-600 to-teal-800",
+      "from-indigo-800 via-blue-700 to-slate-900",
+      "from-cyan-700 via-sky-600 to-blue-800",
+      "from-purple-800 via-indigo-700 to-blue-900"
+    ];
+
+    return bannersList.slice(0, 5).map((h, idx) => ({
+      id: h.id,
+      badge: idx === 0 ? "FEATURED HOSPITAL" : "PARTNER HOSPITAL",
+      title: h.name,
+      location: h.address || `${h.city || 'Bengaluru'}, ${h.state || 'India'}`,
+      wait: `${h.baseWaitingTime || 20} Min Avg Wait`,
+      rating: h.rating || 4.8,
+      reviews: h.reviewsCount || 120,
+      image: h.image || "https://images.unsplash.com/photo-1587351021759-3e566b6af7cc?w=800&auto=format&fit=crop&q=80",
       cta: "Book OPD Token",
-      color: "from-blue-700 via-blue-600 to-indigo-700"
-    },
-    {
-      id: "hosp-rainbow",
-      badge: "PEDIATRIC CARE",
-      title: rainbowHosp?.name || "Rainbow Children's Hospital",
-      location: rainbowHosp?.address || "HSR Layout Sector 2, Bengaluru",
-      wait: `${rainbowHosp?.baseWaitingTime || 15} Min Avg Wait`,
-      rating: rainbowHosp?.rating || 4.7,
-      reviews: rainbowHosp?.reviewsCount || 932,
-      image: rainbowHosp?.image || "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=800&auto=format&fit=crop&q=80",
-      cta: "Book Pediatric OPD",
-      color: "from-blue-700 via-sky-600 to-teal-700"
-    },
-    {
-      id: "hosp-fortis",
-      badge: "TOP CARDIOLOGY",
-      title: fortisHosp?.name || "Fortis Hospital",
-      location: fortisHosp?.address || "Bannerghatta Road, Bengaluru",
-      wait: `${fortisHosp?.baseWaitingTime || 45} Min Avg Wait`,
-      rating: fortisHosp?.rating || 4.6,
-      reviews: fortisHosp?.reviewsCount || 884,
-      image: fortisHosp?.image || "https://images.unsplash.com/photo-1629909613654-28e377c37b09?w=800&auto=format&fit=crop&q=80",
-      cta: "Book Specialist Token",
-      color: "from-indigo-800 via-blue-700 to-slate-900"
-    },
-    {
-      id: "hosp-nethra",
-      badge: "EYE CARE CENTRE",
-      title: nethraHosp?.name || "Narayana Nethralaya",
-      location: nethraHosp?.address || "Indiranagar 100ft Road, Bengaluru",
-      wait: `${nethraHosp?.baseWaitingTime || 35} Min Avg Wait`,
-      rating: nethraHosp?.rating || 4.9,
-      reviews: nethraHosp?.reviewsCount || 1650,
-      image: nethraHosp?.image || "https://images.unsplash.com/photo-1516549655169-df83a0774514?w=800&auto=format&fit=crop&q=80",
-      cta: "Book Eye Checkup",
-      color: "from-blue-800 via-cyan-600 to-blue-900"
-    }
-  ];
+      color: gradients[idx % gradients.length]
+    }));
+  }, [hospitals]);
 
   // Dynamic Location-Based Banners with fallback
   const displayBanners = useMemo(() => {
