@@ -58,7 +58,39 @@ export const OTPModal: React.FC<OTPModalProps> = ({
 
   if (!isOpen) return null;
 
+  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pastedData = e.clipboardData.getData('text');
+    const cleanDigits = pastedData.replace(/\D/g, '').slice(0, 6).split('');
+    if (cleanDigits.length === 0) return;
+
+    const newDigits = ['', '', '', '', '', ''];
+    cleanDigits.forEach((digit, idx) => {
+      newDigits[idx] = digit;
+    });
+    setDigits(newDigits);
+
+    // Focus on the last filled digit or the next empty one
+    const targetIdx = Math.min(cleanDigits.length, 5);
+    const targetInput = document.getElementById(`otp-digit-${targetIdx}`);
+    targetInput?.focus();
+  };
+
   const handleDigitChange = (index: number, val: string) => {
+    // If multiple characters are entered (e.g. autofill or paste event bypass)
+    const onlyDigits = val.replace(/\D/g, '');
+    if (onlyDigits.length > 1) {
+      const cleanDigits = onlyDigits.slice(0, 6).split('');
+      const newDigits = [...digits];
+      cleanDigits.forEach((d, i) => {
+        if (index + i < 6) newDigits[index + i] = d;
+      });
+      setDigits(newDigits);
+      const nextIdx = Math.min(index + cleanDigits.length, 5);
+      document.getElementById(`otp-digit-${nextIdx}`)?.focus();
+      return;
+    }
+
     if (!/^\d*$/.test(val)) return;
     const newDigits = [...digits];
     newDigits[index] = val.slice(-1);
@@ -154,10 +186,13 @@ export const OTPModal: React.FC<OTPModalProps> = ({
                   key={idx}
                   id={`otp-digit-${idx}`}
                   type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
                   maxLength={1}
                   value={digit}
                   onChange={e => handleDigitChange(idx, e.target.value)}
                   onKeyDown={e => handleKeyDown(idx, e)}
+                  onPaste={handlePaste}
                   className="w-11 h-13 text-center text-xl font-black text-slate-800 bg-slate-50 border-2 border-slate-200 rounded-2xl focus:outline-none focus:border-blue-600 focus:bg-white focus:ring-4 focus:ring-blue-100 transition-all font-mono"
                 />
               ))}
