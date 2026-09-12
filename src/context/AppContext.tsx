@@ -1134,7 +1134,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Calculate dynamic platform fee (default 5% of doctor fee, min ₹10)
     const platformFee = Math.max(10, Math.round(targetDoc.consultationFee * (platformFeePercent / 100)));
-    const totalFee = targetDoc.consultationFee + platformFee;
+    const totalFee = platformFee; // Only token fee collected online; consultation fee is paid at hospital
 
     // Ensure customer account exists & is updated
     getOrCreateCustomerAccount(patientDetails.name, patientDetails.phone, patientDetails.email);
@@ -1186,8 +1186,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       queuePosition: patientsAhead + 1,
       estimatedWait: computedWaitTime,
       consultationFee: newAppt.fee,
-      paymentStatus: 'paid' as const,
-      paymentMethod: newAppt.paymentMethod || 'Online',
+      paymentStatus: 'pending' as const, // Consultation fee collected at hospital desk/cabin
+      paymentMethod: 'Pay at Hospital',
       isRevisit: false,
       hospitalId
     };

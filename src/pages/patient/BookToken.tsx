@@ -241,7 +241,10 @@ export const BookToken: React.FC = () => {
     const activeSessionObj = sessionOptions.find(s => s.id === selectedSession);
     const slotTime = activeSessionObj ? `${activeSessionObj.title} (${activeSessionObj.timing})` : '10:00 AM - 12:00 PM';
 
-    // Navigate to Razorpay/UPI Payment Gateway
+    const docFee = doctor.consultationFee || 500;
+    const platFee = Math.max(10, Math.round(docFee * ((platformFeePercent || 5) / 100)));
+
+    // Navigate to Razorpay/UPI Payment Gateway - only collecting token fee online
     navigate('/payment', {
       state: {
         patientDetails,
@@ -249,8 +252,9 @@ export const BookToken: React.FC = () => {
         doctorId: doctor.id,
         date: selectedDate,
         time: slotTime,
-        fee: doctor.consultationFee,
-        subscriptionPlan: { name: "OPD Booking Fee", price: 10, days: 3 }
+        fee: docFee,
+        tokenFee: platFee,
+        subscriptionPlan: { name: "OPD Token Booking Fee", price: platFee, days: 3 }
       }
     });
   };
@@ -616,16 +620,21 @@ export const BookToken: React.FC = () => {
           {(() => {
             const docFee = doctor.consultationFee || 500;
             const platFee = Math.max(10, Math.round(docFee * ((platformFeePercent || 5) / 100)));
-            const totalPayable = docFee + platFee;
+            const totalPayable = platFee;
 
             return (
-              <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl space-y-2 text-xs font-bold text-slate-800">
+              <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl space-y-2.5 text-xs font-bold text-slate-800">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5 text-slate-600">
                     <Stethoscope size={14} className="text-blue-600" />
                     <span>Doctor Consultation Fee</span>
                   </div>
-                  <span className="font-extrabold text-slate-900">₹{docFee}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-extrabold text-slate-900">₹{docFee}</span>
+                    <span className="text-[10px] font-extrabold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
+                      Pay at Hospital
+                    </span>
+                  </div>
                 </div>
 
                 <div className="flex items-center justify-between">
@@ -633,11 +642,19 @@ export const BookToken: React.FC = () => {
                     <Zap size={14} className="text-blue-600" />
                     <span>Platform Booking Fee ({platformFeePercent || 5}%)</span>
                   </div>
-                  <span className="font-extrabold text-blue-700">₹{platFee}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-extrabold text-blue-700">₹{platFee}</span>
+                    <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
+                      Pay Online Now
+                    </span>
+                  </div>
                 </div>
 
                 <div className="pt-2 border-t border-blue-200/60 flex items-center justify-between text-sm">
-                  <span className="font-black text-slate-900">Total Payable</span>
+                  <div>
+                    <span className="font-black text-slate-900 block">Total Payable Now</span>
+                    <span className="text-[10px] text-slate-500 font-medium">Token fee only • Consultation fee of ₹{docFee} payable at hospital</span>
+                  </div>
                   <span className="font-black text-blue-700 text-base">₹{totalPayable}</span>
                 </div>
               </div>
@@ -656,8 +673,8 @@ export const BookToken: React.FC = () => {
 
             {/* Center Text */}
             <div className="text-center px-2">
-              <h4 className="text-base font-black tracking-tight leading-tight">Book Token</h4>
-              <p className="text-[10px] text-blue-100 font-medium">Get your token in just a few seconds</p>
+              <h4 className="text-base font-black tracking-tight leading-tight">Book Token • Pay ₹{Math.max(10, Math.round((doctor.consultationFee || 500) * ((platformFeePercent || 5) / 100)))}</h4>
+              <p className="text-[10px] text-blue-100 font-medium">OPD spot confirmed • Doctor fee payable at hospital</p>
             </div>
 
             {/* Right Arrow Circle */}

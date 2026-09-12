@@ -18,6 +18,7 @@ export const Payment: React.FC = () => {
     date: string;
     time: string;
     fee: number;
+    tokenFee?: number;
     subscriptionPlan?: { name: string; price: number; days: number };
     redirectUrl?: string;
   };
@@ -41,8 +42,13 @@ export const Payment: React.FC = () => {
   }
 
   const { fee, patientDetails, hospitalId, doctorId, date, time, redirectUrl } = state;
-  const subPlan = state.subscriptionPlan || { name: "3-Day Pass", price: 10, days: 3 };
-  const basePrice = subPlan.price;
+  const tokenFee = state.tokenFee !== undefined
+    ? state.tokenFee
+    : (state.subscriptionPlan?.price !== undefined
+      ? state.subscriptionPlan.price
+      : Math.max(10, Math.round((fee || 500) * 0.05)));
+  const subPlan = state.subscriptionPlan || { name: "OPD Token Booking Fee", price: tokenFee, days: 3 };
+  const basePrice = tokenFee;
   const convenienceFee = 2;
   const cgst = parseFloat((basePrice * 0.09).toFixed(2));
   const sgst = parseFloat((basePrice * 0.09).toFixed(2));
@@ -112,7 +118,7 @@ export const Payment: React.FC = () => {
             
             <div className="space-y-2 pb-3 border-b border-slate-100 text-xs">
               <div className="flex justify-between text-slate-700 font-extrabold">
-                <span>Platform Booking Pass: {subPlan.name}</span>
+                <span>{patientDetails ? (subPlan.name || 'OPD Token Booking Fee') : `Platform Booking Pass: ${subPlan.name}`}</span>
                 <span>₹{basePrice.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-slate-500 font-medium">
@@ -129,15 +135,21 @@ export const Payment: React.FC = () => {
               </div>
               
               {patientDetails && fee > 0 && (
-                <div className="flex justify-between text-slate-400 font-bold border-t border-dashed border-slate-100 pt-2 text-[10px]">
-                  <span>OPD Consultation Fee (Doctor Cabin)</span>
-                  <span className="text-slate-500">₹{fee.toFixed(2)} (Pay at Hospital)</span>
+                <div className="flex justify-between items-center text-slate-500 font-bold border-t border-dashed border-slate-200 pt-2.5 text-[10px] bg-amber-50/60 p-2.5 rounded-xl mt-1">
+                  <div>
+                    <span className="text-slate-800 font-black block">Doctor Consultation Fee</span>
+                    <span className="text-[9px] text-amber-700 font-semibold">Pay directly at hospital cabin / desk</span>
+                  </div>
+                  <span className="text-amber-800 font-black text-xs">₹{fee.toFixed(2)} (Pay at Hospital)</span>
                 </div>
               )}
             </div>
 
             <div className="flex justify-between items-center pt-3 font-heading font-black text-sm text-slate-850">
-              <span>Total Payable Amount (Online)</span>
+              <div>
+                <span>Total Payable Amount (Online)</span>
+                <p className="text-[9.5px] text-slate-400 font-normal">Token booking fee & taxes only</p>
+              </div>
               <span className="text-blue-600 text-base">₹{totalAmount.toFixed(2)}</span>
             </div>
           </Card>
@@ -312,7 +324,7 @@ export const Payment: React.FC = () => {
             fullWidth 
             className="py-3 text-sm font-bold flex items-center justify-center gap-2"
           >
-            <span>Pay & Book Token</span>
+            <span>Pay ₹{totalAmount.toFixed(2)} & Book Token</span>
             <Sparkles size={16} />
           </Button>
 

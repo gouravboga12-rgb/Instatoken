@@ -7,7 +7,7 @@ import {
   Calendar, Download, Share2, CheckCircle2, 
   Phone, Compass, Building2, User, CreditCard,
   AlertCircle, ArrowLeft, Loader2, ExternalLink,
-  Clock, QrCode, ChevronDown, ChevronUp, MapPin
+  Clock, QrCode, ChevronDown, ChevronUp, MapPin, ShieldCheck
 } from 'lucide-react';
 
 const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -230,9 +230,9 @@ export const TokenConfirmation: React.FC = () => {
               </div>
             </div>
 
-            {/* Paid Pill Badge */}
+            {/* Confirmed Pill Badge */}
             <span className="bg-emerald-500 text-white text-[10px] font-black uppercase px-3 py-1 rounded-full flex items-center gap-1 shadow-sm shrink-0">
-              {appointment.paymentMethod === 'online' ? 'PAID ONLINE' : 'PAY AT HOSPITAL'} <CheckCircle2 size={10} className="stroke-[3]" />
+              TOKEN CONFIRMED <CheckCircle2 size={10} className="stroke-[3]" />
             </span>
           </div>
 
@@ -299,15 +299,31 @@ export const TokenConfirmation: React.FC = () => {
                   <CreditCard size={12} className="text-amber-600" /> DOCTOR CONSULTATION FEE
                 </span>
                 <span className="text-3xl font-black text-slate-900 block font-heading">₹{appointment.fee || 500}</span>
+                <p className="text-[10px] text-amber-900/70 font-semibold">To be collected at doctor's cabin / OPD desk</p>
               </div>
 
               <div className="text-right">
-                <span className="bg-emerald-600 text-white text-[10px] font-black px-3 py-1 rounded-md inline-block uppercase shadow-sm">
-                  {appointment.paymentMethod === 'online' ? 'PAID ONLINE' : 'PAY AT HOSPITAL'}
+                <span className="bg-amber-600 text-white text-[10px] font-black px-3 py-1 rounded-md inline-block uppercase shadow-sm">
+                  PAY AT HOSPITAL
                 </span>
                 <h5 className="text-[10px] font-black text-slate-700 mt-1">
-                  {appointment.paymentMethod === 'online' ? 'Transaction Verified' : 'Pay at OPD Counter'}
+                  Pay at Doctor Cabin / OPD Desk
                 </h5>
+              </div>
+            </div>
+
+            {/* Token Booking Fee Paid Online */}
+            <div className="bg-blue-50/80 border border-blue-200/80 rounded-2xl p-3.5 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ShieldCheck size={16} className="text-blue-600 shrink-0" />
+                <div>
+                  <span className="text-xs font-black text-slate-800 block">Token Booking Fee</span>
+                  <span className="text-[10px] text-slate-500 font-semibold">Ref: {appointment.paymentId}</span>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-sm font-black text-blue-700 block">₹{appointment.platformFee || 25}</span>
+                <span className="text-[9.5px] font-black text-emerald-700 uppercase">Paid Online ({appointment.paymentMethod || 'Online'})</span>
               </div>
             </div>
 
