@@ -24,7 +24,6 @@ export const OTPModal: React.FC<OTPModalProps> = ({
   const [digits, setDigits] = useState<string[]>(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [sentCode, setSentCode] = useState<string>('');
   const [timer, setTimer] = useState(60);
   const [canResend, setCanResend] = useState(false);
 
@@ -49,7 +48,10 @@ export const OTPModal: React.FC<OTPModalProps> = ({
     setError('');
     const res = await sendOTPEmail(email, type, recipientName);
     setLoading(false);
-    setSentCode(res.code);
+    if (!res.success) {
+      setError(res.message || 'Failed to send OTP. Please try again.');
+      return;
+    }
     setTimer(60);
     setCanResend(false);
   };
@@ -99,13 +101,7 @@ export const OTPModal: React.FC<OTPModalProps> = ({
     }, 500);
   };
 
-  const fillDemoCode = () => {
-    if (sentCode) {
-      setDigits(sentCode.split(''));
-    } else {
-      setDigits(['1', '2', '3', '4', '5', '6']);
-    }
-  };
+
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md animate-in fade-in duration-200">
@@ -146,19 +142,6 @@ export const OTPModal: React.FC<OTPModalProps> = ({
 
         {/* Form Body */}
         <form onSubmit={handleVerify} className="p-6 space-y-5">
-          {/* OTP Code Display Pill for Testing */}
-          {sentCode && (
-            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 flex items-center justify-between text-xs">
-              <span className="text-slate-500 font-bold text-[11px]">Your OTP Code: <strong className="text-blue-600 font-mono tracking-wider">{sentCode}</strong></span>
-              <button
-                type="button"
-                onClick={fillDemoCode}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-[10px] px-2.5 py-1 rounded-lg border-none cursor-pointer"
-              >
-                Auto Fill
-              </button>
-            </div>
-          )}
 
           {/* 6 Digit Inputs */}
           <div>

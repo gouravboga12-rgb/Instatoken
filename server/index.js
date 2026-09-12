@@ -2916,14 +2916,14 @@ app.get('/api/geocode', async (req, res) => {
   res.json({ success: false });
 });
 
-// Nodemailer SMTP Transporter setup for token.in1999@gmail.com
+// Nodemailer SMTP Transporter setup for InstaToken.in (token.in1999@gmail.com)
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || 'smtp.gmail.com',
   port: parseInt(process.env.SMTP_PORT || '587'),
   secure: false,
   auth: {
     user: process.env.SMTP_USER || 'token.in1999@gmail.com',
-    pass: process.env.SMTP_PASSWORD || 'rnppcyctnhowcynk',
+    pass: process.env.SMTP_PASSWORD || 'ekvjhwpigsbvsohe',
   },
 });
 
@@ -2936,13 +2936,16 @@ transporter.verify((error, success) => {
   }
 });
 
-// API Endpoint to Send Real OTP Emails
+// API Endpoint to Send Real OTP Emails (OTP generated server-side)
 app.post('/api/send-otp', async (req, res) => {
-  const { email, code, type, recipientName } = req.body;
+  const { email, type, recipientName } = req.body;
 
-  if (!email || !code) {
-    return res.status(400).json({ success: false, message: 'Email and OTP code are required.' });
+  if (!email) {
+    return res.status(400).json({ success: false, message: 'Email is required.' });
   }
+
+  // Generate OTP server-side — never trust client-supplied codes
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
 
   let title = 'Verification Code';
   let subtitle = 'Complete your authentication';
@@ -2983,7 +2986,7 @@ app.post('/api/send-otp', async (req, res) => {
     <body>
       <div class="container">
         <div class="header">
-          <div class="brand">Insta Token 🩺</div>
+          <div class="brand">InstaToken.in 🩺</div>
           <div class="badge">Healthcare OTP Authentication</div>
         </div>
         <div class="content">
@@ -2995,12 +2998,12 @@ app.post('/api/send-otp', async (req, res) => {
           <p style="font-size: 13px; color: #475569; font-weight: 600;">This code is valid for <strong>5 minutes</strong>. Do not share this OTP with anyone.</p>
 
           <div class="info">
-            🔒 Sent securely via <strong>Insta Token Mailer</strong> (token.in1999@gmail.com).<br>
+            🔒 Sent securely via <strong>InstaToken.in Mailer</strong> (token.in1999@gmail.com).<br>
             If you did not request this code, please ignore this email.
           </div>
         </div>
         <div class="footer">
-          © 2026 Insta Token HMS · Automated OTP System · All Rights Reserved
+          &copy; 2026 InstaToken.in &middot; Automated OTP System &middot; All Rights Reserved
         </div>
       </div>
     </body>
@@ -3009,14 +3012,14 @@ app.post('/api/send-otp', async (req, res) => {
 
   try {
     const info = await transporter.sendMail({
-      from: process.env.SMTP_FROM || '"Insta Token" <token.in1999@gmail.com>',
+      from: process.env.SMTP_FROM || '"InstaToken.in" <token.in1999@gmail.com>',
       to: email,
-      subject: `[Insta Token] ${code} is your OTP Verification Code`,
+      subject: `[InstaToken.in] ${code} is your OTP Verification Code`,
       html: htmlContent,
     });
 
-    console.log(`✉️ Email sent successfully to ${email} (MessageId: ${info.messageId})`);
-    return res.json({ success: true, message: `OTP code sent to ${email}`, messageId: info.messageId });
+    console.log(`✉️ OTP email sent to ${email} | Type: ${type} | MessageId: ${info.messageId}`);
+    return res.json({ success: true, code, message: `OTP code sent to ${email}`, messageId: info.messageId });
   } catch (err) {
     console.error('❌ Error sending mail:', err);
     return res.status(500).json({ success: false, message: 'Failed to send OTP email.', error: err.message });

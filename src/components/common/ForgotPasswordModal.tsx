@@ -16,7 +16,6 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
   const [step, setStep] = useState<1 | 2>(1);
   const [email, setEmail] = useState('');
   const [otpCode, setOtpCode] = useState('');
-  const [sentOtp, setSentOtp] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
@@ -42,7 +41,6 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
     setLoading(false);
 
     if (res.success) {
-      setSentOtp(res.code);
       setStep(2);
     } else {
       setError(res.message);
@@ -170,11 +168,6 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
             </form>
           ) : (
             <form onSubmit={handleResetPassword} className="space-y-3.5">
-              {sentOtp && (
-                <div className="bg-blue-50 border border-blue-100 rounded-xl p-2.5 text-center text-xs text-blue-700 font-semibold">
-                  OTP Code sent: <strong className="font-mono text-blue-900">{sentOtp}</strong>
-                </div>
-              )}
 
               <div>
                 <label className="text-xs font-bold text-slate-700 block mb-1">Enter 6-Digit OTP Code</label>
