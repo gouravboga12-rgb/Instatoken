@@ -11,7 +11,7 @@ import {
   DollarSign, Building2, CheckCircle2, Search, Plus,
   Users, UserCheck, UserX,
   AlertTriangle, Download, X, Calendar, Upload, User,
-  MapPin, Trash2, Loader2
+  MapPin, Trash2, Loader2, LogOut
 } from 'lucide-react';
 import { LocationBanners } from './LocationBanners';
 
@@ -25,7 +25,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
   const { 
     hospitals, appointments, customers, addHospital, addDoctor, 
     toggleDisableHospital, deleteHospital, toggleCustomerStatus, notifications, addNotification,
-    platformFeePercent, setPlatformFeePercent 
+    platformFeePercent, setPlatformFeePercent, logout
   } = useApp();
 
   const [hospitalToDelete, setHospitalToDelete] = useState<any | null>(null);
@@ -323,15 +323,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
               <ShieldCheck size={14} className="text-blue-500" />
               Super Admin Level 1
             </span>
-            Root infrastructure & commission controls.
+            anilajay1999@gmail.com
           </div>
           
           <Button 
             variant="outline" 
-            onClick={() => navigate('/hospital/dashboard')}
-            className="w-full py-2 bg-slate-800 border-slate-700 hover:bg-slate-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
+            onClick={() => { logout(); navigate('/'); }}
+            className="w-full py-2 bg-red-900/40 border-red-800/60 hover:bg-red-800/60 text-red-300 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
           >
-            Hospital Panel →
+            <LogOut size={13} /> Logout
           </Button>
         </div>
       </div>

@@ -826,10 +826,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // --- Auth Functions ---
   const login = async (emailOrPhone: string, passwordOrOtp: string, optionalName?: string): Promise<boolean> => {
-    if (emailOrPhone.includes('admin') && (passwordOrOtp === 'admin' || passwordOrOtp === 'admin123')) {
+    // Super Admin login — fully independent, strict credential check
+    const ADMIN_EMAIL = 'anilajay1999@gmail.com';
+    const ADMIN_PASSWORD = 'anilajay@1999';
+    if (emailOrPhone.trim() === ADMIN_EMAIL && passwordOrOtp === ADMIN_PASSWORD) {
       setUser({
-        name: "Admin Officer",
-        email: "admin@instatoken.com",
+        name: "Super Admin",
+        email: ADMIN_EMAIL,
         phone: "+91 9999999999",
         role: "admin",
         savedHospitals: [],
@@ -837,7 +840,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         familyMembers: [],
         subscription: null
       });
-      addNotification("Logged in as Admin", "Welcome to the InstaToken Central Command.", "success");
+      addNotification("Logged in as Super Admin", "Welcome to the InstaToken Super Admin Portal.", "success");
       return true;
     }
 
