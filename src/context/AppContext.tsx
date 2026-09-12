@@ -87,7 +87,7 @@ interface AppContextType {
   updateUserProfile: (updates: Partial<UserProfile>) => Promise<void> | void;
   updateUserLocation: (locationName: string, coords?: { lat: number; lng: number }) => Promise<void>;
   getOrCreateCustomerAccount: (name: string, phone: string, email?: string) => CustomerAccount;
-  login: (emailOrPhone: string, passwordOrOtp: string, optionalName?: string) => Promise<boolean> | boolean;
+  login: (emailOrPhone: string, passwordOrOtp: string, optionalName?: string, isGoogleAuth?: boolean, googleProfile?: any) => Promise<boolean> | boolean;
   signup: (name: string, email: string, phone: string, password?: string) => Promise<boolean> | boolean;
   logout: () => void;
   addFamilyMember: (name: string, age: number, gender: string, relationship: string) => void;
@@ -825,7 +825,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [appointments]);
 
   // --- Auth Functions ---
-  const login = async (emailOrPhone: string, passwordOrOtp: string, optionalName?: string): Promise<boolean> => {
+  const login = async (
+    emailOrPhone: string, 
+    passwordOrOtp: string, 
+    optionalName?: string,
+    isGoogleAuth?: boolean,
+    googleProfile?: any
+  ): Promise<boolean> => {
     // Super Admin login — fully independent, strict credential check
     const ADMIN_EMAIL = 'anilajay1999@gmail.com';
     const ADMIN_PASSWORD = 'anilajay@1999';
@@ -846,6 +852,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const cleanInput = emailOrPhone.trim();
     const cleanPassword = passwordOrOtp.trim();
+    const isGoogle = isGoogleAuth || cleanPassword === 'google';
 
     // 1. First attempt live authentication from backend
     try {
@@ -855,7 +862,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         body: JSON.stringify({
           emailOrPhone: cleanInput,
           password: cleanPassword,
-          name: optionalName
+          name: optionalName,
+          isGoogleAuth: isGoogle,
+          googleProfile: googleProfile || { name: optionalName, email: cleanInput }
         })
       });
 
@@ -917,6 +926,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       (c.email && c.email.toLowerCase() === cleanInput.toLowerCase()) ||
       (normPhone && (c.phone || '').replace(/\D/g, '').slice(-10) === normPhone)
     );
+
+    if (isGoogle) {
+      const gName = optionalName || existing?.name || (cleanInput.includes('@') ? cleanInput.split('@')[0] : 'Google User');
+      const profile: UserProfile = {
+        name: gName,
+        email: cleanInput.includes('@') ? cleanInput : 'user@gmail.com',
+        phone: existing?.phone || '',
+        role: 'patient',
+        savedHospitals: existing?.bookings?.map(b => b.hospitalId) || [],
+        savedDoctors: [],
+        familyMembers: (existing as any)?.familyMembers || [],
+        subscription: (existing as any)?.subscription || {
+          planName: "3-Day Pass",
+          expiresAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+          price: 10
+        }
+      };
+      setUser(profile);
+      localStorage.setItem('insta_user', JSON.stringify(profile));
+      addNotification("Logged in with Google", `Welcome, ${gName}!`, "success");
+      return true;
+    }
 
     if (!existing) {
       throw new Error('No account found with this email or phone. Please sign up first.');

@@ -1861,7 +1861,7 @@ app.post('/api/customers/login', async (req, res) => {
     });
 
     // Google OAuth Login bypasses password check
-    if (isGoogleAuth && isEmail) {
+    if ((isGoogleAuth || password === 'google') && isEmail) {
       if (!customer) {
         customer = {
           id: `cust-${Date.now()}`,

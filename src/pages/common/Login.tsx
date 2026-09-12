@@ -87,23 +87,26 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
   const handleGoogleAuth = useGoogleLogin({
     onSuccess: async (tokenResponse) => {
       setLoading(true);
+      setError('');
       try {
         const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
           headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
         });
         const profile = await res.json();
         setLoading(false);
-        if (profile.email) {
-          await login(profile.email, 'google', profile.name);
+        if (profile?.email) {
+          await login(profile.email, 'google', profile.name || profile.given_name, true, profile);
           onSuccess();
+        } else {
+          setError('Could not retrieve email from Google profile.');
         }
-      } catch (err) {
+      } catch (err: any) {
         setLoading(false);
-        await login('google-user@gmail.com', 'google');
-        onSuccess();
+        setError(err?.message || 'Google Sign-In failed.');
       }
     },
-    onError: () => {
+    onError: (errorResponse) => {
+      console.warn('Google Sign-In error / popup closed:', errorResponse);
       setError('Google Sign-In was cancelled or failed.');
     },
   });
