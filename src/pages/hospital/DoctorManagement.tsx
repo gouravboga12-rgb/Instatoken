@@ -284,80 +284,115 @@ const to12Hour = (timeStr?: string): string => {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredDoctors.map(doc => {
-              const photo = doc.photo || (doc as any).image;
-              const opdDaysText = Array.isArray(doc.opdDays) && doc.opdDays.length > 0
-                ? doc.opdDays.join(', ')
-                : Array.isArray((doc as any).availability?.days) && (doc as any).availability.days.length > 0
-                  ? (doc as any).availability.days.join(', ')
-                  : 'Mon, Tue, Wed, Thu, Fri';
+          {filteredDoctors.length === 0 ? (
+            <div className="bg-white rounded-3xl p-12 text-center border border-slate-100 shadow-sm max-w-lg mx-auto space-y-4 my-8">
+              <div className="w-14 h-14 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto text-2xl">
+                🩺
+              </div>
+              <div>
+                <h3 className="text-base font-black text-slate-800">No Doctors Enrolled Yet</h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  Start configuring your hospital's roster by adding your first doctor.
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setEditingDoc(null);
+                  setDocForm({
+                    name: '', photo: '', qualification: '', specialization: '', departmentId: availableDepartments[0]?.id || departments[0]?.id || '',
+                    experience: '5', consultationFee: '500', languages: 'English, Hindi', gender: 'Male', biography: '',
+                    opdDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'], opdStartTime: '09:00', opdEndTime: '13:00',
+                    consultationDuration: '15', maxTokensPerDay: '50', onlineConsult: true, offlineConsult: true, active: true
+                  });
+                  setShowDocModal(true);
+                }}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2.5 rounded-xl cursor-pointer border-none inline-flex items-center gap-1.5 text-xs shadow-md shadow-blue-500/10"
+              >
+                <Plus size={14} /> Add First Doctor
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredDoctors.map(doc => {
+                const photo = doc.photo || (doc as any).image;
+                const opdDaysText = Array.isArray(doc.opdDays) && doc.opdDays.length > 0
+                  ? doc.opdDays.join(', ')
+                  : Array.isArray((doc as any).availability?.days) && (doc as any).availability.days.length > 0
+                    ? (doc as any).availability.days.join(', ')
+                    : 'Mon, Tue, Wed, Thu, Fri';
 
-              return (
-                <div key={doc.id} className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden p-5 flex flex-col justify-between hover:shadow-md transition-shadow">
-                  <div>
-                    <div className="flex items-start gap-4">
-                      <div className="w-16 h-16 rounded-2xl bg-blue-50 border border-slate-100 flex items-center justify-center text-blue-600 text-xl font-black shrink-0 overflow-hidden">
-                        {photo ? (
-                          <img src={photo} alt={doc.name || 'Doctor'} className="w-full h-full object-cover" />
-                        ) : (
-                          (doc.name || 'Dr').split(' ').pop()?.charAt(0) || 'D'
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-extrabold text-slate-800 text-sm truncate">{doc.name || 'Doctor'}</h4>
-                          <button
-                            onClick={() => toggleDoctorActive(doc.id)}
-                            className="shrink-0 text-slate-400 hover:text-slate-600 cursor-pointer"
-                            title={doc.active ? 'Deactivate Doctor' : 'Activate Doctor'}
-                          >
-                            {doc.active ? <Eye size={14} className="text-emerald-500" /> : <EyeOff size={14} className="text-slate-400" />}
-                          </button>
+                return (
+                  <div key={doc.id} className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden p-5 flex flex-col justify-between hover:shadow-md transition-shadow">
+                    <div>
+                      <div className="flex items-start gap-4">
+                        <div className="w-16 h-16 rounded-2xl bg-blue-50 border border-slate-100 flex items-center justify-center text-blue-600 text-xl font-black shrink-0 overflow-hidden">
+                          {photo ? (
+                            <img src={photo} alt={doc.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <User size={24} />
+                          )}
                         </div>
-                        <p className="text-[10px] text-blue-600 font-extrabold uppercase mt-0.5 tracking-wider">
-                          {doc.specialization || (doc as any).specialty || 'Specialist'}
-                        </p>
-                        <p className="text-[10px] text-slate-500 mt-1 font-semibold">{doc.qualification || 'MBBS'}</p>
-                        <p className="text-[9px] text-slate-400 mt-0.5">{doc.experience || 5} Years Experience</p>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                              doc.active !== false ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
+                            }`}>
+                              {doc.active !== false ? 'Active' : 'Inactive'}
+                            </span>
+                            <button
+                              onClick={() => toggleDoctorActive(doc.id)}
+                              className="text-slate-400 hover:text-slate-600 p-1 rounded-lg border-none bg-transparent cursor-pointer"
+                              title={doc.active !== false ? 'Deactivate Doctor' : 'Activate Doctor'}
+                            >
+                              {doc.active !== false ? <Eye size={15} /> : <EyeOff size={15} />}
+                            </button>
+                          </div>
+                          <h4 className="text-sm font-black text-slate-800 mt-1 truncate">{doc.name}</h4>
+                          <p className="text-[11px] font-bold text-blue-600 truncate">{doc.specialization || (doc as any).specialty || 'General Physician'}</p>
+                          <p className="text-[10px] text-slate-400 truncate">{doc.qualification}</p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 mt-4 text-xs bg-slate-50 p-3 rounded-2xl">
+                        <div>
+                          <span className="text-[9px] text-slate-450 block font-bold uppercase tracking-wider">Fee</span>
+                          <span className="font-extrabold text-slate-800">₹{doc.consultationFee}</span>
+                        </div>
+                        <div>
+                          <span className="text-[9px] text-slate-450 block font-bold uppercase tracking-wider">Wait Time</span>
+                          <span className="font-extrabold text-slate-800">~{doc.consultationDuration || 15}m</span>
+                        </div>
+                        <div>
+                          <span className="text-[9px] text-slate-450 block font-bold uppercase tracking-wider">OPD Timings</span>
+                          <span className="text-slate-800 truncate block">{doc.opdStartTime || '09:00 AM'} - {doc.opdEndTime || '05:00 PM'}</span>
+                        </div>
+                        <div className="col-span-2">
+                          <span className="text-[9px] text-slate-450 block font-bold uppercase tracking-wider">OPD Days</span>
+                          <span className="text-slate-800 text-[10px]">{opdDaysText}</span>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3 mt-5 bg-slate-50 rounded-2xl p-3 text-[11px] font-semibold text-slate-600">
-                      <div>
-                        <span className="text-[9px] text-slate-450 block font-bold uppercase tracking-wider">Fee / Consult</span>
-                        <span className="text-slate-800 font-extrabold">₹{doc.consultationFee || 500}</span>
-                      </div>
-                      <div>
-                        <span className="text-[9px] text-slate-450 block font-bold uppercase tracking-wider">OPD Timings</span>
-                        <span className="text-slate-800 truncate block">{doc.opdStartTime || '09:00 AM'} - {doc.opdEndTime || '05:00 PM'}</span>
-                      </div>
-                      <div className="col-span-2">
-                        <span className="text-[9px] text-slate-450 block font-bold uppercase tracking-wider">OPD Days</span>
-                        <span className="text-slate-800 text-[10px]">{opdDaysText}</span>
-                      </div>
+                    <div className="flex gap-2 mt-5 pt-3 border-t border-slate-50">
+                      <button
+                        onClick={() => openEditDoc(doc)}
+                        className="flex-1 border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-bold py-2 rounded-xl cursor-pointer transition-colors flex items-center justify-center gap-1.5"
+                      >
+                        <Edit3 size={12} /> Edit Details
+                      </button>
+                      <button
+                        onClick={() => deleteDoctor(doc.id)}
+                        className="p-2 border border-slate-200 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-xl cursor-pointer transition-colors"
+                        title="Delete Doctor"
+                      >
+                        <Trash2 size={13} />
+                      </button>
                     </div>
                   </div>
-
-                  <div className="flex gap-2 mt-5 pt-3 border-t border-slate-50">
-                    <button
-                      onClick={() => openEditDoc(doc)}
-                      className="flex-1 border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-bold py-2 rounded-xl cursor-pointer transition-colors flex items-center justify-center gap-1.5"
-                    >
-                      <Edit3 size={12} /> Edit Details
-                    </button>
-                    <button
-                      onClick={() => deleteDoctor(doc.id)}
-                      className="p-2 border border-slate-200 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-xl cursor-pointer transition-colors"
-                      title="Delete Doctor"
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 

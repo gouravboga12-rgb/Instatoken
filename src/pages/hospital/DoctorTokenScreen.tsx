@@ -107,16 +107,18 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
   if (!doctor) {
     return (
       <div className="p-8 text-center max-w-md mx-auto bg-white rounded-3xl border border-slate-100 shadow-sm mt-12 space-y-4">
-        <div className="w-12 h-12 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto font-black text-xl">
-          ⚠️
+        <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto font-black text-xl">
+          🩺
         </div>
-        <h3 className="text-base font-black text-slate-800">Doctor Screen Not Found</h3>
-        <p className="text-xs text-slate-400 font-semibold">The requested doctor is either inactive, removed, or has no active cabin screen.</p>
+        <h3 className="text-base font-black text-slate-800">No Doctors Enrolled Yet</h3>
+        <p className="text-xs text-slate-400 font-semibold">
+          Add doctors to {hospitalProfile?.name || 'your hospital'} to start managing doctor cabin screens and live token queues.
+        </p>
         <button
           onClick={() => navigate('/hospital/doctors')}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-extrabold cursor-pointer border-none"
+          className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black cursor-pointer border-none shadow-sm shadow-blue-500/20"
         >
-          Back to Doctors Management
+          + Add Doctors to Hospital
         </button>
       </div>
     );

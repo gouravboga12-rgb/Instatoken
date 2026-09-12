@@ -851,12 +851,7 @@ app.post('/api/sync', async (req, res) => {
 // ─── Hospital Auth & Access Control (Phase 22) ───────────────────────────────
 
 const DEFAULT_HOSPITAL_CREDENTIALS = [
-  { hospitalId: 'hosp-apollo', email: 'admin@apollo.com', password: 'password', role: 'owner', name: 'Dr. Rajesh Kumar', hospitalName: 'Apollo Spectra Hospital' },
-  { hospitalId: 'hosp-apollo', email: 'apollo@hospital.com', password: 'password123', role: 'owner', name: 'Dr. Rajesh Kumar', hospitalName: 'Apollo Spectra Hospital' },
-  { hospitalId: 'hosp-rainbow', email: 'admin@rainbow.com', password: 'password', role: 'owner', name: 'Dr. Ramesh Babu', hospitalName: "Rainbow Children's Hospital" },
-  { hospitalId: 'hosp-fortis', email: 'admin@fortis.com', password: 'password', role: 'owner', name: 'Dr. Sanjay Sharma', hospitalName: 'Fortis Hospital' },
-  { hospitalId: 'hosp-fortis', email: 'fortis@hospital.com', password: 'password123', role: 'owner', name: 'Dr. Sanjay Sharma', hospitalName: 'Fortis Hospital' },
-  { hospitalId: 'hosp-nethra', email: 'admin@nethra.com', password: 'password', role: 'owner', name: 'Dr. Bhujang Shetty', hospitalName: 'Narayana Nethralaya' },
+  { hospitalId: 'hosp-apollo', email: 'admin@apollo.com', password: 'password', role: 'owner', name: 'Dr. Rajesh Kumar', hospitalName: 'Apollo Spectra Hospital' }
 ];
 
 const ACTIVE_SESSIONS = new Map();

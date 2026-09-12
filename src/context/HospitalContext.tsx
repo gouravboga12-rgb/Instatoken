@@ -285,20 +285,14 @@ interface HospitalContextType {
   fetchHospitalRevenue: (filter?: string, startDate?: string, endDate?: string, doctorId?: string) => Promise<{ totals: any; doctorStats: any[] }>;
 }
 
-// ─── Mock credentials ─────────────────────────────────────────────────────────
+// ─── Mock credentials (Single Official Reference Demo Hospital) ───────────────
 
 const MOCK_CREDENTIALS = [
-  { email: 'admin@apollo.com', password: 'password', userId: 'huser-apollo' },
-  { email: 'admin@rainbow.com', password: 'password', userId: 'huser-rainbow' },
-  { email: 'admin@fortis.com', password: 'password', userId: 'huser-fortis' },
-  { email: 'admin@nethra.com', password: 'password', userId: 'huser-nethra' },
+  { email: 'admin@apollo.com', password: 'password', userId: 'huser-apollo' }
 ];
 
 const MOCK_USERS: HospitalUser[] = [
-  { id: 'huser-apollo', name: 'Dr. Rajesh Kumar', email: 'admin@apollo.com', role: 'owner', hospitalId: 'hosp-apollo', hospitalName: 'Apollo Spectra Hospital', avatar: '', isOnline: true },
-  { id: 'huser-rainbow', name: 'Dr. Ramesh Babu', email: 'admin@rainbow.com', role: 'owner', hospitalId: 'hosp-rainbow', hospitalName: "Rainbow Children's Hospital", avatar: '', isOnline: true },
-  { id: 'huser-fortis', name: 'Dr. Sanjay Sharma', email: 'admin@fortis.com', role: 'owner', hospitalId: 'hosp-fortis', hospitalName: 'Fortis Hospital', avatar: '', isOnline: true },
-  { id: 'huser-nethra', name: 'Dr. Bhujang Shetty', email: 'admin@nethra.com', role: 'owner', hospitalId: 'hosp-nethra', hospitalName: 'Narayana Nethralaya', avatar: '', isOnline: true },
+  { id: 'huser-apollo', name: 'Dr. Rajesh Kumar', email: 'admin@apollo.com', role: 'owner', hospitalId: 'hosp-apollo', hospitalName: 'Apollo Spectra Hospital', avatar: '', isOnline: true }
 ];
 
 
@@ -516,15 +510,31 @@ export const useHospital = () => {
 export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { hospitals, updateHospital, updateHospitalDoctors, updateHospitalDepartments, getOrCreateCustomerAccount } = useApp();
 
-  const [hospitalUser, setHospitalUser] = useState<HospitalUser | null>(MOCK_USERS[0]);
-
-  const [hospitalProfile, setHospitalProfile] = useState<HospitalProfile>(() => {
-    const saved = localStorage.getItem('insta_hospital_profile');
-    return saved ? JSON.parse(saved) : INITIAL_PROFILE;
+  const [hospitalUser, setHospitalUser] = useState<HospitalUser | null>(() => {
+    const saved = localStorage.getItem('insta_hospital_user');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return MOCK_USERS[0];
   });
 
+  const [hospitalProfile, setHospitalProfile] = useState<HospitalProfile>(() => {
+    const curHospId = localStorage.getItem('insta_current_hospital_id') || 'hosp-apollo';
+    const saved = localStorage.getItem(`insta_hospital_profile_${curHospId}`) || localStorage.getItem('insta_hospital_profile');
+    if (saved) {
+      try {
+        const prof = JSON.parse(saved);
+        if (prof.id === curHospId) return prof;
+      } catch (e) {}
+    }
+    return INITIAL_PROFILE;
+  });
+
+  const targetHospId = hospitalUser?.hospitalId || hospitalProfile?.id || localStorage.getItem('insta_current_hospital_id') || 'hosp-apollo';
+
   const [departments, setDepartments] = useState<HospitalDepartment[]>(() => {
-    const saved = localStorage.getItem('insta_hospital_departments');
+    const curHospId = localStorage.getItem('insta_current_hospital_id') || 'hosp-apollo';
+    const saved = localStorage.getItem(`insta_hospital_departments_${curHospId}`);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -537,54 +547,52 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         }
       } catch (e) {}
     }
-    return INITIAL_DEPARTMENTS;
+    // Only Apollo Spectra has these initial departments
+    if (curHospId === 'hosp-apollo') {
+      return INITIAL_DEPARTMENTS;
+    }
+    return [
+      { id: 'dept-gen', name: 'General Medicine', icon: '🩺', headDoctor: '', totalDoctors: 0, active: true },
+      { id: 'dept-opd', name: 'OPD / Consultation', icon: '🏥', headDoctor: '', totalDoctors: 0, active: true }
+    ];
   });
 
   const [doctors, setDoctors] = useState<HospitalDoctor[]>(() => {
-    const saved = localStorage.getItem('insta_hospital_doctors');
+    const curHospId = localStorage.getItem('insta_current_hospital_id') || 'hosp-apollo';
+    const saved = localStorage.getItem(`insta_hospital_doctors_${curHospId}`);
     if (saved) {
       try {
         const parsed: HospitalDoctor[] = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.map(d => {
-            const initDoc = INITIAL_DOCTORS.find(init => init.id === d.id);
-            return {
-              ...initDoc,
-              ...d,
-              specialization: d.specialization || (d as any).specialty || initDoc?.specialization || 'Specialist',
-              photo: d.photo || (d as any).image || initDoc?.photo || '',
-              opdDays: (Array.isArray(d.opdDays) && d.opdDays.length > 0)
-                ? d.opdDays
-                : (Array.isArray((d as any).availability?.days) ? (d as any).availability.days : initDoc?.opdDays || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']),
-              opdStartTime: d.opdStartTime || initDoc?.opdStartTime || '09:00 AM',
-              opdEndTime: d.opdEndTime || initDoc?.opdEndTime || '05:00 PM',
-              consultationDuration: d.consultationDuration || initDoc?.consultationDuration || 15,
-              maxTokensPerDay: d.maxTokensPerDay || initDoc?.maxTokensPerDay || 50,
-              sessions: (d.sessions && d.sessions.length > 0) ? d.sessions : initDoc?.sessions || [
-                { id: `sess-${d.id}-1`, name: 'Morning', startTime: d.opdStartTime || '09:00 AM', endTime: d.opdEndTime || '01:00 PM', maxTokens: Math.round((d.maxTokensPerDay || 50) * 0.6) || 30, consultationDuration: d.consultationDuration || 15, breakTime: 5, active: true },
-                { id: `sess-${d.id}-2`, name: 'Evening', startTime: '05:00 PM', endTime: '09:00 PM', maxTokens: Math.round((d.maxTokensPerDay || 50) * 0.4) || 20, consultationDuration: d.consultationDuration || 15, breakTime: 5, active: true }
-              ]
-            };
-          });
+        if (Array.isArray(parsed)) {
+          return parsed;
         }
       } catch (e) {}
     }
-    return INITIAL_DOCTORS;
+    // Only Apollo Spectra Hospital has default reference dummy doctors
+    if (curHospId === 'hosp-apollo') {
+      return INITIAL_DOCTORS;
+    }
+    // All other / new hospital accounts start with NO doctors!
+    return [];
   });
 
   const [staff, setStaff] = useState<HospitalStaffMember[]>(() => {
-    const saved = localStorage.getItem('insta_hospital_staff');
-    return saved ? JSON.parse(saved) : INITIAL_STAFF;
+    const curHospId = localStorage.getItem('insta_current_hospital_id') || 'hosp-apollo';
+    const saved = localStorage.getItem(`insta_hospital_staff_${curHospId}`);
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return curHospId === 'hosp-apollo' ? INITIAL_STAFF : [];
   });
 
   const [tokens, setTokens] = useState<TokenRecord[]>(() => {
-    const saved = localStorage.getItem('insta_hospital_tokens');
+    const curHospId = localStorage.getItem('insta_current_hospital_id') || 'hosp-apollo';
+    const saved = localStorage.getItem(`insta_hospital_tokens_${curHospId}`);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
           const clean = parsed.filter(t => !isDummyToken(t));
-          localStorage.setItem('insta_hospital_tokens', JSON.stringify(clean));
           return clean;
         }
       } catch (e) {}
@@ -593,13 +601,13 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   });
 
   const [patients, setPatients] = useState<PatientRecord[]>(() => {
-    const saved = localStorage.getItem('insta_hospital_patients');
+    const curHospId = localStorage.getItem('insta_current_hospital_id') || 'hosp-apollo';
+    const saved = localStorage.getItem(`insta_hospital_patients_${curHospId}`);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
           const clean = parsed.filter(p => !isDummyPatient(p));
-          localStorage.setItem('insta_hospital_patients', JSON.stringify(clean));
           return clean;
         }
       } catch (e) {}
@@ -608,15 +616,14 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   });
 
   const [scheduleConfig, setScheduleConfig] = useState<ScheduleConfig>(() => {
-    const saved = localStorage.getItem('insta_hospital_schedule');
+    const curHospId = localStorage.getItem('insta_current_hospital_id') || 'hosp-apollo';
+    const saved = localStorage.getItem(`insta_hospital_schedule_${curHospId}`);
     return saved ? JSON.parse(saved) : INITIAL_SCHEDULE;
   });
 
   const [notifications, setNotifications] = useState<NotificationMessage[]>([]);
   const [activeSection, setActiveSection] = useState('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-
-  const targetHospId = hospitalProfile?.id || hospitalUser?.hospitalId || 'hosp-apollo';
 
   const [authToken, setAuthToken] = useState<string>(() => {
     return localStorage.getItem('insta_hospital_auth_token') || `htok_${targetHospId}_default`;
@@ -696,7 +703,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       })
       .catch(err => console.warn('Could not fetch tokens from AWS RDS:', err));
 
-    // 2. Fetch live doctors
+    // 2. Fetch live doctors strictly for this hospital
     fetch(`/api/hospitals/${targetHospId}/doctors`, {
       headers: {
         'Authorization': `Bearer ${authToken}`,
@@ -705,15 +712,14 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     })
       .then(res => res.json())
       .then(data => {
-        if (data.success && Array.isArray(data.doctors) && data.doctors.length > 0) {
+        if (data.success && Array.isArray(data.doctors)) {
           setDoctors(data.doctors);
           localStorage.setItem(`insta_hospital_doctors_${targetHospId}`, JSON.stringify(data.doctors));
-          localStorage.setItem('insta_hospital_doctors', JSON.stringify(data.doctors));
         }
       })
       .catch(err => console.warn('Could not fetch doctors from AWS RDS:', err));
 
-    // 3. Fetch live departments
+    // 3. Fetch live departments strictly for this hospital
     fetch(`/api/hospitals/${targetHospId}/departments`, {
       headers: {
         'Authorization': `Bearer ${authToken}`,
@@ -722,10 +728,9 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     })
       .then(res => res.json())
       .then(data => {
-        if (data.success && Array.isArray(data.departments) && data.departments.length > 0) {
+        if (data.success && Array.isArray(data.departments)) {
           setDepartments(data.departments);
           localStorage.setItem(`insta_hospital_departments_${targetHospId}`, JSON.stringify(data.departments));
-          localStorage.setItem('insta_hospital_departments', JSON.stringify(data.departments));
         }
       })
       .catch(err => console.warn('Could not fetch departments from AWS RDS:', err));
@@ -835,31 +840,26 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           return [newPat, ...prev];
         });
       } else if (event.type === 'STORAGE_CHANGED' || event.type === 'CLOUD_SYNC_UPDATED' || event.type === 'HOSPITAL_DOCTORS_UPDATED' || event.type === 'HOSPITAL_PROFILE_UPDATED' || event.type === 'HOSPITAL_DEPARTMENTS_UPDATED' || event.type === 'HOSPITAL_TOKENS_UPDATED') {
-        const savedDocs = localStorage.getItem('insta_hospital_doctors');
+        const curHospId = targetHospId;
+        const savedDocs = localStorage.getItem(`insta_hospital_doctors_${curHospId}`);
         if (savedDocs) {
           try {
             const parsed = JSON.parse(savedDocs);
             if (Array.isArray(parsed)) {
-              setDoctors(parsed.map(d => {
-                const initDoc = INITIAL_DOCTORS.find(init => init.id === d.id);
-                return {
-                  ...initDoc,
-                  ...d,
-                  specialization: d.specialization || (d as any).specialty || initDoc?.specialization || 'Specialist',
-                  photo: d.photo || (d as any).image || initDoc?.photo || '',
-                  opdDays: (Array.isArray(d.opdDays) && d.opdDays.length > 0)
-                    ? d.opdDays
-                    : (Array.isArray((d as any).availability?.days) ? (d as any).availability.days : initDoc?.opdDays || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']),
-                };
-              }));
+              setDoctors(parsed);
             }
           } catch (e) {}
+        } else if (curHospId === 'hosp-apollo') {
+          setDoctors(INITIAL_DOCTORS);
+        } else {
+          setDoctors([]);
         }
-        const savedProfile = localStorage.getItem('insta_hospital_profile');
+
+        const savedProfile = localStorage.getItem(`insta_hospital_profile_${curHospId}`);
         if (savedProfile) {
           try { setHospitalProfile(JSON.parse(savedProfile)); } catch (e) {}
         }
-        const savedDepts = localStorage.getItem('insta_hospital_departments');
+        const savedDepts = localStorage.getItem(`insta_hospital_departments_${curHospId}`);
         if (savedDepts) {
           try {
             const parsed = JSON.parse(savedDepts);
@@ -872,7 +872,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             }
           } catch (e) {}
         }
-        const savedToks = localStorage.getItem('insta_hospital_tokens');
+        const savedToks = localStorage.getItem(`insta_hospital_tokens_${curHospId}`);
         if (savedToks) {
           try {
             const parsed = JSON.parse(savedToks);
@@ -923,7 +923,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, [targetHospId]);
 
   useEffect(() => {
-    localStorage.setItem('insta_hospital_doctors', JSON.stringify(doctors));
+    localStorage.setItem(`insta_hospital_doctors_${targetHospId}`, JSON.stringify(doctors));
     const mappedAppDoctors: Doctor[] = doctors.map(d => ({
       id: d.id,
       name: d.name,
@@ -943,9 +943,9 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           formatTimeSlot(d.opdEndTime, '05:00 PM')
         ]
       },
-      currentQueue: tokens.filter(t => t.doctorId === d.id && ['completed'].includes(t.status)).length,
-      nextAvailableToken: Math.max(1, tokens.filter(t => t.doctorId === d.id).length + 1),
-      estimatedWaitPerPatient: Number(d.consultationDuration) || 12,
+      currentQueue: (tokens || []).filter(t => t.doctorId === d.id && ['booked', 'waiting', 'checked-in'].includes(t.status)).length,
+      nextAvailableToken: (tokens || []).filter(t => t.doctorId === d.id).length + 1,
+      estimatedWaitPerPatient: Number(d.consultationDuration) || 15,
       active: d.active !== false,
       sessions: d.sessions || []
     }));
@@ -962,7 +962,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, [doctors, targetHospId, tokens]);
 
   useEffect(() => {
-    localStorage.setItem('insta_hospital_departments', JSON.stringify(departments));
+    localStorage.setItem(`insta_hospital_departments_${targetHospId}`, JSON.stringify(departments));
     const mappedDepts = departments.map(d => ({
       id: d.id,
       name: d.name,
@@ -1014,7 +1014,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       if (res.ok && data.success && data.token && data.user) {
         setAuthToken(data.token);
         localStorage.setItem('insta_hospital_auth_token', data.token);
-        setHospitalUser({
+        const u: HospitalUser = {
           id: data.user.id,
           name: data.user.name,
           email: data.user.email,
@@ -1023,7 +1023,10 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           hospitalName: data.user.hospitalName,
           avatar: '',
           isOnline: true
-        });
+        };
+        setHospitalUser(u);
+        localStorage.setItem('insta_hospital_user', JSON.stringify(u));
+        localStorage.setItem('insta_current_hospital_id', data.user.hospitalId);
         switchHospital(data.user.hospitalId);
         return { success: true, message: 'Login successful' };
       } else if (!res.ok) {
@@ -1046,7 +1049,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       return { success: false, message: 'Incorrect password. Please enter the correct password.' };
     }
 
-    const matchedUser = MOCK_USERS.find(u => u.id === cred.userId) || {
+    const matchedUser: HospitalUser = MOCK_USERS.find(u => u.id === cred.userId) || {
       id: `huser-${cred.hospitalId || 'apollo'}`,
       name: cred.name || 'Hospital Admin',
       email: cred.email,
@@ -1060,6 +1063,8 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const token = `htok_${matchedUser.hospitalId}_default`;
     setAuthToken(token);
     localStorage.setItem('insta_hospital_auth_token', token);
+    localStorage.setItem('insta_hospital_user', JSON.stringify(matchedUser));
+    localStorage.setItem('insta_current_hospital_id', matchedUser.hospitalId);
     setHospitalUser(matchedUser);
     switchHospital(matchedUser.hospitalId);
     return { success: true, message: 'Login successful.' };
@@ -1069,12 +1074,13 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setHospitalUser(null);
     setAuthToken('');
     localStorage.removeItem('insta_hospital_auth_token');
+    localStorage.removeItem('insta_hospital_user');
+    localStorage.removeItem('insta_current_hospital_id');
     setActiveSection('dashboard');
   };
 
   // Helper to sync doctors changes to AppContext (website patient side) and AWS backend
   const syncDoctorsGlobally = (updatedDocs: HospitalDoctor[]) => {
-    localStorage.setItem('insta_hospital_doctors', JSON.stringify(updatedDocs));
     localStorage.setItem(`insta_hospital_doctors_${targetHospId}`, JSON.stringify(updatedDocs));
 
     const patientDocs: Doctor[] = updatedDocs.filter(d => d.active !== false).map(d => ({
@@ -1142,7 +1148,6 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   // Helper to sync departments changes to AppContext and AWS backend
   const syncDepartmentsGlobally = (updatedDepts: HospitalDepartment[]) => {
-    localStorage.setItem('insta_hospital_departments', JSON.stringify(updatedDepts));
     localStorage.setItem(`insta_hospital_departments_${targetHospId}`, JSON.stringify(updatedDepts));
 
     const patientDepts = updatedDepts.filter(d => d.active !== false).map(d => ({
@@ -1665,7 +1670,19 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       })
       .catch(() => {});
 
-    if (target.doctors && target.doctors.length > 0) {
+    localStorage.setItem('insta_current_hospital_id', hospId);
+
+    // Isolate doctors strictly for this hospital
+    const savedDocs = localStorage.getItem(`insta_hospital_doctors_${hospId}`);
+    if (savedDocs) {
+      try {
+        setDoctors(JSON.parse(savedDocs));
+      } catch (e) {
+        setDoctors(hospId === 'hosp-apollo' ? INITIAL_DOCTORS : []);
+      }
+    } else if (hospId === 'hosp-apollo') {
+      setDoctors(INITIAL_DOCTORS);
+    } else if (target && target.doctors && target.doctors.length > 0) {
       const convertedDocs: HospitalDoctor[] = target.doctors.map(d => ({
         id: d.id,
         name: d.name,
@@ -1678,8 +1695,8 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         consultationFee: d.consultationFee,
         languages: ['English', 'Hindi'],
         gender: 'Male',
-        biography: `${d.name} is a renowned medical specialist with ${d.experience} years of clinical expertise.`,
-        opdDays: d.availability.days,
+        biography: `${d.name} is a medical specialist with ${d.experience} years of clinical expertise.`,
+        opdDays: d.availability?.days || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
         opdStartTime: '09:00 AM',
         opdEndTime: '05:00 PM',
         consultationDuration: d.estimatedWaitPerPatient || 15,
@@ -1687,8 +1704,8 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         onlineConsult: true,
         offlineConsult: true,
         active: true,
-        rating: d.rating,
-        totalPatients: d.reviewsCount || 100,
+        rating: d.rating || 5.0,
+        totalPatients: d.reviewsCount || 0,
         sessions: (d.sessions || []).map((s, idx) => ({
           id: s.id || `sess-${idx}`,
           name: s.name || 'General Session',
@@ -1701,21 +1718,65 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         }))
       }));
       setDoctors(convertedDocs);
-      localStorage.setItem('insta_hospital_doctors', JSON.stringify(convertedDocs));
+      localStorage.setItem(`insta_hospital_doctors_${hospId}`, JSON.stringify(convertedDocs));
+    } else {
+      // New or other hospital starts with clean 0 doctors!
+      setDoctors([]);
     }
 
-    if (target.departments && target.departments.length > 0) {
+    // Also fetch live doctors from backend for this hospital
+    fetch(`/api/hospitals/${hospId}/doctors`, {
+      headers: { 'Authorization': `Bearer ${newAuthToken}` }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.doctors)) {
+          setDoctors(data.doctors);
+          localStorage.setItem(`insta_hospital_doctors_${hospId}`, JSON.stringify(data.doctors));
+        }
+      })
+      .catch(() => {});
+
+    // Isolate departments strictly for this hospital
+    const savedDepts = localStorage.getItem(`insta_hospital_departments_${hospId}`);
+    if (savedDepts) {
+      try {
+        setDepartments(JSON.parse(savedDepts));
+      } catch (e) {
+        setDepartments(hospId === 'hosp-apollo' ? INITIAL_DEPARTMENTS : []);
+      }
+    } else if (hospId === 'hosp-apollo') {
+      setDepartments(INITIAL_DEPARTMENTS);
+    } else if (target && target.departments && target.departments.length > 0) {
       const convertedDepts: HospitalDepartment[] = target.departments.map(dep => ({
         id: dep.id,
         name: dep.name,
         icon: dep.icon || '🩺',
         headDoctor: '',
-        totalDoctors: target.doctors.filter(d => d.departmentId === dep.id).length,
+        totalDoctors: (target.doctors || []).filter(d => d.departmentId === dep.id).length,
         active: true
       }));
       setDepartments(convertedDepts);
-      localStorage.setItem('insta_hospital_departments', JSON.stringify(convertedDepts));
+      localStorage.setItem(`insta_hospital_departments_${hospId}`, JSON.stringify(convertedDepts));
+    } else {
+      setDepartments([
+        { id: `dept-${hospId}-gen`, name: 'General Medicine', icon: '🩺', headDoctor: '', totalDoctors: 0, active: true },
+        { id: `dept-${hospId}-opd`, name: 'OPD / Consultation', icon: '🏥', headDoctor: '', totalDoctors: 0, active: true }
+      ]);
     }
+
+    // Also fetch live departments from backend for this hospital
+    fetch(`/api/hospitals/${hospId}/departments`, {
+      headers: { 'Authorization': `Bearer ${newAuthToken}` }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.departments)) {
+          setDepartments(data.departments);
+          localStorage.setItem(`insta_hospital_departments_${hospId}`, JSON.stringify(data.departments));
+        }
+      })
+      .catch(() => {});
 
     broadcastGlobalSync('HOSPITAL_PROFILE_UPDATED', newProfile);
   };
