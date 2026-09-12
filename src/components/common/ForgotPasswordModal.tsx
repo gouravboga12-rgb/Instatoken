@@ -47,7 +47,7 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
     }
   };
 
-  const handleResetPassword = (e: React.FormEvent) => {
+  const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -61,16 +61,77 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
     }
 
     setLoading(true);
-    setTimeout(() => {
-      const verifyRes = verifyOTPCode(email, otpCode, otpType);
+    const verifyRes = verifyOTPCode(email, otpCode, otpType);
+    if (!verifyRes.success) {
+      setLoading(false);
+      setError(verifyRes.message);
+      return;
+    }
+
+    try {
+      const endpoint = userType === 'hospital'
+        ? '/api/auth/hospital-reset-password'
+        : '/api/customers/reset-password';
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim().toLowerCase(), newPassword })
+      });
+
+      const data = await res.json();
       setLoading(false);
 
-      if (verifyRes.success) {
+      if (data.success) {
+        // Sync local storage so offline/cache also recognizes the new password
+        if (userType === 'customer') {
+          const savedCusts = localStorage.getItem('insta_customers');
+          if (savedCusts) {
+            try {
+              const custs = JSON.parse(savedCusts);
+              const idx = custs.findIndex((c: any) => (c.email || '').toLowerCase() === email.trim().toLowerCase());
+              if (idx !== -1) {
+                custs[idx].password = newPassword;
+                localStorage.setItem('insta_customers', JSON.stringify(custs));
+              }
+            } catch (e) {}
+          }
+        } else {
+          const savedCreds = localStorage.getItem('insta_hospital_credentials');
+          let creds = savedCreds ? JSON.parse(savedCreds) : [];
+          const idx = creds.findIndex((c: any) => c.email.toLowerCase() === email.trim().toLowerCase());
+          if (idx !== -1) {
+            creds[idx].password = newPassword;
+          } else {
+            creds.push({ email: email.trim().toLowerCase(), password: newPassword });
+          }
+          localStorage.setItem('insta_hospital_credentials', JSON.stringify(creds));
+        }
+
         setSuccess(true);
       } else {
-        setError(verifyRes.message);
+        setError(data.message || 'Failed to reset password.');
       }
-    }, 600);
+    } catch (err: any) {
+      setLoading(false);
+      // If server unreachable, update locally if customer exists
+      if (userType === 'customer') {
+        const savedCusts = localStorage.getItem('insta_customers');
+        if (savedCusts) {
+          try {
+            const custs = JSON.parse(savedCusts);
+            const idx = custs.findIndex((c: any) => (c.email || '').toLowerCase() === email.trim().toLowerCase());
+            if (idx !== -1) {
+              custs[idx].password = newPassword;
+              localStorage.setItem('insta_customers', JSON.stringify(custs));
+              setSuccess(true);
+              return;
+            }
+          } catch (e) {}
+        }
+      }
+      setError(err?.message || 'Server error while resetting password.');
+    }
   };
 
   const handleCloseAll = () => {

@@ -54,26 +54,67 @@ export const HospitalSignup: React.FC = () => {
   const handleOtpSuccess = async () => {
     setShowOtpModal(false);
     setLoading(true);
-    await new Promise(r => setTimeout(r, 600));
 
-    // Update hospital profile & log in
-    updateHospitalProfile({
-      name: hospName,
-      type: category,
-      phone,
-      email,
-      city,
-      address,
-      registrationNumber: regNo || `KA/HOS/2026/${Math.floor(1000 + Math.random() * 9000)}`,
-    });
+    try {
+      // 1. Call backend hospital signup endpoint
+      const res = await fetch('/api/auth/hospital-signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: hospName,
+          email: email.trim().toLowerCase(),
+          password,
+          phone,
+          city,
+          address,
+          category,
+          registrationNumber: regNo || `KA/HOS/2026/${Math.floor(1000 + Math.random() * 9000)}`
+        })
+      });
 
-    setLoading(false);
-    setSuccessMsg(true);
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setLoading(false);
+        setError(data.message || 'Hospital registration failed.');
+        return;
+      }
 
-    setTimeout(() => {
-      hospitalLogin('admin@apollo.com', 'password');
-      navigate('/hospital/dashboard');
-    }, 1500);
+      // 2. Save credentials in local storage
+      const savedCreds = localStorage.getItem('insta_hospital_credentials');
+      let creds = savedCreds ? JSON.parse(savedCreds) : [];
+      creds = creds.filter((c: any) => c.email.toLowerCase() !== email.trim().toLowerCase());
+      creds.push({
+        email: email.trim().toLowerCase(),
+        password,
+        hospitalId: data.user?.hospitalId,
+        name: hospName,
+        hospitalName: hospName
+      });
+      localStorage.setItem('insta_hospital_credentials', JSON.stringify(creds));
+
+      // Update hospital profile in context
+      updateHospitalProfile({
+        id: data.user?.hospitalId,
+        name: hospName,
+        type: category,
+        phone,
+        email: email.trim().toLowerCase(),
+        city,
+        address,
+        registrationNumber: regNo || `KA/HOS/2026/${Math.floor(1000 + Math.random() * 9000)}`,
+      });
+
+      setLoading(false);
+      setSuccessMsg(true);
+
+      setTimeout(async () => {
+        await hospitalLogin(email.trim().toLowerCase(), password);
+        navigate('/hospital/dashboard');
+      }, 1200);
+    } catch (err: any) {
+      setLoading(false);
+      setError(err?.message || 'Hospital registration error.');
+    }
   };
 
   return (

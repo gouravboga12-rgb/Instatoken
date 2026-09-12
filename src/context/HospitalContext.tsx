@@ -218,7 +218,7 @@ interface HospitalContextType {
   sidebarCollapsed: boolean;
 
   // Auth
-  hospitalLogin: (email: string, password: string) => { success: boolean; message: string };
+  hospitalLogin: (email: string, password: string) => Promise<{ success: boolean; message: string }> | { success: boolean; message: string };
   hospitalLogout: () => void;
 
   // Navigation
@@ -998,45 +998,70 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     localStorage.setItem('insta_hospital_staff', JSON.stringify(staff));
   }, [staff]);
 
-  // Auth (Phase 22)
-  const hospitalLogin = (email: string, password: string) => {
-    // Attempt backend login for real session token
-    fetch('/api/auth/hospital-login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password })
-    })
-      .then(res => res.json())
-      .then(data => {
-        if (data.success && data.token && data.user) {
-          setAuthToken(data.token);
-          localStorage.setItem('insta_hospital_auth_token', data.token);
-          setHospitalUser({
-            id: data.user.id,
-            name: data.user.name,
-            email: data.user.email,
-            role: data.user.role,
-            hospitalId: data.user.hospitalId,
-            hospitalName: data.user.hospitalName,
-            avatar: '',
-            isOnline: true
-          });
-          switchHospital(data.user.hospitalId);
-        }
-      })
-      .catch(() => {});
+  // Auth (Phase 22) - Strict Password Authentication
+  const hospitalLogin = async (email: string, password: string): Promise<{ success: boolean; message: string }> => {
+    const cleanEmail = String(email).trim().toLowerCase();
+    const cleanPassword = String(password).trim();
 
-    // Fast local verification for instant UI response
-    const cred = MOCK_CREDENTIALS.find(c => c.email.toLowerCase() === email.toLowerCase() && c.password === password);
-    if (!cred) return { success: false, message: 'Invalid email or password.' };
-    const user = MOCK_USERS.find(u => u.id === cred.userId);
-    if (!user) return { success: false, message: 'User account not found.' };
+    // 1. Attempt live backend authentication
+    try {
+      const res = await fetch('/api/auth/hospital-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: cleanEmail, password: cleanPassword })
+      });
+      const data = await res.json();
+      if (res.ok && data.success && data.token && data.user) {
+        setAuthToken(data.token);
+        localStorage.setItem('insta_hospital_auth_token', data.token);
+        setHospitalUser({
+          id: data.user.id,
+          name: data.user.name,
+          email: data.user.email,
+          role: data.user.role,
+          hospitalId: data.user.hospitalId,
+          hospitalName: data.user.hospitalName,
+          avatar: '',
+          isOnline: true
+        });
+        switchHospital(data.user.hospitalId);
+        return { success: true, message: 'Login successful' };
+      } else if (!res.ok) {
+        return { success: false, message: data.message || 'Invalid email or password.' };
+      }
+    } catch (e) {
+      console.warn('Backend hospital login unreachable, checking local credentials:', e);
+    }
 
-    const token = `htok_${user.hospitalId}_default`;
+    // 2. Local verification against custom saved credentials + mock credentials
+    const savedCustomCredsRaw = localStorage.getItem('insta_hospital_credentials');
+    const customCreds = savedCustomCredsRaw ? JSON.parse(savedCustomCredsRaw) : [];
+    const allCreds = [...customCreds, ...MOCK_CREDENTIALS];
+
+    const cred = allCreds.find(c => (c.email || '').toLowerCase() === cleanEmail);
+    if (!cred) {
+      return { success: false, message: 'Invalid email or password.' };
+    }
+    if (String(cred.password) !== cleanPassword) {
+      return { success: false, message: 'Incorrect password. Please enter the correct password.' };
+    }
+
+    const matchedUser = MOCK_USERS.find(u => u.id === cred.userId) || {
+      id: `huser-${cred.hospitalId || 'apollo'}`,
+      name: cred.name || 'Hospital Admin',
+      email: cred.email,
+      role: cred.role || 'owner',
+      hospitalId: cred.hospitalId || 'hosp-apollo',
+      hospitalName: cred.hospitalName || 'Partner Hospital',
+      avatar: '',
+      isOnline: true
+    };
+
+    const token = `htok_${matchedUser.hospitalId}_default`;
     setAuthToken(token);
     localStorage.setItem('insta_hospital_auth_token', token);
-    setHospitalUser(user);
-    switchHospital(user.hospitalId);
+    setHospitalUser(matchedUser);
+    switchHospital(matchedUser.hospitalId);
     return { success: true, message: 'Login successful.' };
   };
 

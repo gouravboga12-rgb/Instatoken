@@ -967,18 +967,21 @@ app.post('/api/auth/hospital-login', async (req, res) => {
     return res.status(400).json({ success: false, message: 'Email and password are required' });
   }
 
+  const cleanEmail = email.trim().toLowerCase();
   const store = await getUnifiedStore();
-  const credentialsList = [
-    ...DEFAULT_HOSPITAL_CREDENTIALS,
-    ...(store.hospitalCredentials || [])
-  ];
+  const customCred = (store.hospitalCredentials || []).find(c => (c.email || '').toLowerCase() === cleanEmail);
+  const defaultCred = DEFAULT_HOSPITAL_CREDENTIALS.find(c => (c.email || '').toLowerCase() === cleanEmail);
+  const activeCred = customCred || defaultCred;
 
-  const matched = credentialsList.find(c => c.email.toLowerCase() === email.toLowerCase() && c.password === password);
-  if (!matched) {
+  if (!activeCred) {
     return res.status(401).json({ success: false, message: 'Invalid hospital credentials.' });
   }
 
-  const session = generateSessionToken(matched);
+  if (activeCred.password !== password) {
+    return res.status(401).json({ success: false, message: 'Incorrect password. Please try again.' });
+  }
+
+  const session = generateSessionToken(activeCred);
   res.json({
     success: true,
     message: 'Login successful',
@@ -1047,6 +1050,46 @@ app.post('/api/auth/hospital-signup', async (req, res) => {
       role: session.role
     }
   });
+});
+
+// POST /api/auth/hospital-reset-password
+app.post('/api/auth/hospital-reset-password', async (req, res) => {
+  try {
+    const { email, newPassword } = req.body;
+    if (!email || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Email and new password are required' });
+    }
+    if (String(newPassword).length < 6) {
+      return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
+    }
+
+    const cleanEmail = String(email).trim().toLowerCase();
+    const store = await getUnifiedStore();
+    store.hospitalCredentials = store.hospitalCredentials || [];
+
+    // Find in custom credentials or default credentials
+    let cred = store.hospitalCredentials.find(c => (c.email || '').toLowerCase() === cleanEmail);
+    if (!cred) {
+      const defaultCred = DEFAULT_HOSPITAL_CREDENTIALS.find(c => (c.email || '').toLowerCase() === cleanEmail);
+      if (defaultCred) {
+        cred = { ...defaultCred, password: String(newPassword) };
+        store.hospitalCredentials.push(cred);
+      }
+    } else {
+      cred.password = String(newPassword);
+    }
+
+    if (!cred) {
+      return res.status(404).json({ success: false, message: 'Hospital account not found with this email.' });
+    }
+
+    await saveUnifiedStore(store);
+    console.log(`🔑 Reset hospital password for: ${cleanEmail}`);
+    return res.json({ success: true, message: 'Hospital password reset successfully.' });
+  } catch (err) {
+    console.error('Hospital reset password error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
 });
 
 // GET /api/auth/hospital-me
@@ -1725,44 +1768,51 @@ app.get('/api/customers/profile', async (req, res) => {
   }
 });
 
-// POST /api/customers/login - Login / resolve customer account from AWS RDS
-app.post('/api/customers/login', async (req, res) => {
+// POST /api/customers/signup - Register new customer with password
+app.post('/api/customers/signup', async (req, res) => {
   try {
-    const { emailOrPhone, name } = req.body;
-    if (!emailOrPhone) {
-      return res.status(400).json({ success: false, message: 'Email or phone is required' });
+    const { name, email, phone, password } = req.body;
+    if (!name || !email || !phone || !password) {
+      return res.status(400).json({ success: false, message: 'Name, email, phone, and password are required.' });
     }
 
-    const cleanInput = String(emailOrPhone).trim();
-    const isEmail = cleanInput.includes('@');
-    const normPhone = isEmail ? '' : normalizeCustomerPhone(cleanInput);
-    const normEmail = isEmail ? cleanInput.toLowerCase() : '';
+    const cleanName = String(name).trim();
+    const cleanEmail = String(email).trim().toLowerCase();
+    const cleanPhone = String(phone).trim();
+    const normPhone = normalizeCustomerPhone(cleanPhone);
 
     const store = await getUnifiedStore();
     store.customers = store.customers || [];
 
-    let customer = store.customers.find(c => {
+    const existing = store.customers.find(c => {
       if (normPhone && normalizeCustomerPhone(c.phone) === normPhone) return true;
-      if (normEmail && (c.email || '').trim().toLowerCase() === normEmail) return true;
+      if (cleanEmail && (c.email || '').trim().toLowerCase() === cleanEmail) return true;
       return false;
     });
 
-    if (customer) {
-      console.log(`✅ Customer logged in from AWS RDS: ${customer.name} (${customer.phone || customer.email})`);
-      return res.json({ success: true, customer, isNew: false });
+    if (existing) {
+      // If customer already has a password set, do not allow duplicate signup
+      if (existing.password) {
+        return res.status(400).json({
+          success: false,
+          message: 'An account with this email or phone already exists. Please sign in.'
+        });
+      }
+      // If legacy customer without password, set their password now
+      existing.name = cleanName;
+      existing.email = cleanEmail;
+      existing.phone = cleanPhone;
+      existing.password = String(password);
+      await saveUnifiedStore(store);
+      return res.status(200).json({ success: true, customer: existing, message: 'Account updated successfully.' });
     }
-
-    // New customer registering
-    const defaultName = name 
-      || (isEmail 
-          ? cleanInput.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) 
-          : 'Patient');
 
     const newCustomer = {
       id: `cust-${Date.now()}`,
-      name: defaultName,
-      email: isEmail ? cleanInput : `${normPhone}@patient.instatoken.in`,
-      phone: !isEmail ? (cleanInput.startsWith('+') ? cleanInput : `+91 ${cleanInput}`) : '+91 9876543210',
+      name: cleanName,
+      email: cleanEmail,
+      phone: cleanPhone,
+      password: String(password),
       location: 'Hyderabad, Telangana',
       joinedDate: new Date().toISOString().split('T')[0],
       status: 'active',
@@ -1780,10 +1830,137 @@ app.post('/api/customers/login', async (req, res) => {
 
     store.customers.unshift(newCustomer);
     await saveUnifiedStore(store);
-    console.log(`✅ Created new customer in AWS RDS: ${newCustomer.name} (${newCustomer.phone})`);
-    res.status(201).json({ success: true, customer: newCustomer, isNew: true });
+    console.log(`✅ Registered new customer: ${newCustomer.name} (${newCustomer.phone})`);
+    res.status(201).json({ success: true, customer: newCustomer });
+  } catch (err) {
+    console.error('Customer signup error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/customers/login - Strict Password-Protected Customer Login
+app.post('/api/customers/login', async (req, res) => {
+  try {
+    const { emailOrPhone, password, isGoogleAuth, googleProfile } = req.body;
+    if (!emailOrPhone) {
+      return res.status(400).json({ success: false, message: 'Email or phone is required.' });
+    }
+
+    const cleanInput = String(emailOrPhone).trim();
+    const isEmail = cleanInput.includes('@');
+    const normPhone = isEmail ? '' : normalizeCustomerPhone(cleanInput);
+    const normEmail = isEmail ? cleanInput.toLowerCase() : '';
+
+    const store = await getUnifiedStore();
+    store.customers = store.customers || [];
+
+    let customer = store.customers.find(c => {
+      if (normPhone && normalizeCustomerPhone(c.phone) === normPhone) return true;
+      if (normEmail && (c.email || '').trim().toLowerCase() === normEmail) return true;
+      return false;
+    });
+
+    // Google OAuth Login bypasses password check
+    if (isGoogleAuth && isEmail) {
+      if (!customer) {
+        customer = {
+          id: `cust-${Date.now()}`,
+          name: googleProfile?.name || cleanInput.split('@')[0],
+          email: normEmail,
+          phone: '',
+          password: '',
+          location: 'Hyderabad, Telangana',
+          joinedDate: new Date().toISOString().split('T')[0],
+          status: 'active',
+          avatar: googleProfile?.picture || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+          familyMembers: [],
+          savedDoctors: [],
+          savedHospitals: [],
+          subscription: {
+            planName: "3-Day Pass",
+            expiresAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+            price: 10
+          },
+          bookings: []
+        };
+        store.customers.unshift(customer);
+        await saveUnifiedStore(store);
+      }
+      return res.json({ success: true, customer });
+    }
+
+    if (!customer) {
+      return res.status(404).json({
+        success: false,
+        message: 'No account found with this email or phone. Please sign up first.'
+      });
+    }
+
+    if (!password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password is required to sign in.'
+      });
+    }
+
+    // STRICT PASSWORD VERIFICATION
+    if (customer.password && String(customer.password) !== String(password)) {
+      console.warn(`[AUTH FAILED] Wrong password attempt for customer: ${customer.email || customer.phone}`);
+      return res.status(401).json({
+        success: false,
+        message: 'Incorrect password. Please enter the correct password.'
+      });
+    }
+
+    // If customer record was created prior without a password, lock it to this password now
+    if (!customer.password) {
+      customer.password = String(password);
+      await saveUnifiedStore(store);
+    }
+
+    console.log(`✅ Customer logged in successfully: ${customer.name} (${customer.phone || customer.email})`);
+    return res.json({ success: true, customer });
   } catch (err) {
     console.error('Customer login error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/customers/reset-password - Reset Customer Password (clears old password)
+app.post('/api/customers/reset-password', async (req, res) => {
+  try {
+    const { email, newPassword } = req.body;
+    if (!email || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Email and new password are required.' });
+    }
+
+    if (String(newPassword).length < 6) {
+      return res.status(400).json({ success: false, message: 'Password must be at least 6 characters.' });
+    }
+
+    const cleanEmail = String(email).trim().toLowerCase();
+    const store = await getUnifiedStore();
+    store.customers = store.customers || [];
+
+    const customer = store.customers.find(c => (c.email || '').trim().toLowerCase() === cleanEmail);
+    if (!customer) {
+      return res.status(404).json({
+        success: false,
+        message: 'No customer account found with this email address.'
+      });
+    }
+
+    // Clear old password and set the new one
+    customer.password = String(newPassword);
+    await saveUnifiedStore(store);
+
+    console.log(`🔑 Reset customer password successfully for: ${customer.name} (${cleanEmail})`);
+    return res.json({
+      success: true,
+      message: 'Password reset successfully. You can now log in with your new password.'
+    });
+  } catch (err) {
+    console.error('Customer reset password error:', err);
     res.status(500).json({ success: false, message: err.message });
   }
 });

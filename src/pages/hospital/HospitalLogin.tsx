@@ -19,7 +19,7 @@ export const HospitalLogin: React.FC = () => {
     setError('');
     setLoading(true);
     await new Promise(r => setTimeout(r, 600));
-    const result = hospitalLogin(email, password);
+    const result = await hospitalLogin(email, password);
     setLoading(false);
     if (result.success) {
       navigate('/hospital/dashboard');

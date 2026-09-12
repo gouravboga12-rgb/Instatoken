@@ -88,7 +88,7 @@ interface AppContextType {
   updateUserLocation: (locationName: string, coords?: { lat: number; lng: number }) => Promise<void>;
   getOrCreateCustomerAccount: (name: string, phone: string, email?: string) => CustomerAccount;
   login: (emailOrPhone: string, passwordOrOtp: string, optionalName?: string) => Promise<boolean> | boolean;
-  signup: (name: string, email: string, phone: string) => Promise<boolean> | boolean;
+  signup: (name: string, email: string, phone: string, password?: string) => Promise<boolean> | boolean;
   logout: () => void;
   addFamilyMember: (name: string, age: number, gender: string, relationship: string) => void;
   removeFamilyMember: (id: string) => void;
@@ -826,7 +826,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // --- Auth Functions ---
   const login = async (emailOrPhone: string, passwordOrOtp: string, optionalName?: string): Promise<boolean> => {
-    if (emailOrPhone.includes('admin') || passwordOrOtp === 'admin') {
+    if (emailOrPhone.includes('admin') && (passwordOrOtp === 'admin' || passwordOrOtp === 'admin123')) {
       setUser({
         name: "Admin Officer",
         email: "admin@instatoken.com",
@@ -839,100 +839,122 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       addNotification("Logged in as Admin", "Welcome to the InstaToken Central Command.", "success");
       return true;
-    } else {
-      const cleanInput = emailOrPhone.trim();
+    }
 
-      // 1. First attempt live authentication from AWS RDS PostgreSQL
-      try {
-        const res = await fetch('/api/customers/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ emailOrPhone: cleanInput, name: optionalName })
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.success && data.customer) {
-            const cust = data.customer;
-            const profile: UserProfile = {
-              name: cust.name,
-              email: cust.email,
-              phone: cust.phone,
-              role: 'patient',
-              savedHospitals: cust.savedHospitals || [],
-              savedDoctors: cust.savedDoctors || [],
-              familyMembers: cust.familyMembers || [],
-              subscription: cust.subscription || {
-                planName: "3-Day Pass",
-                expiresAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-                price: 10
-              },
-              location: cust.location,
-              lat: cust.lat,
-              lng: cust.lng
-            };
-            setUser(profile);
-            localStorage.setItem('insta_user', JSON.stringify(profile));
+    const cleanInput = emailOrPhone.trim();
+    const cleanPassword = passwordOrOtp.trim();
 
-            setCustomers(prev => {
-              const idx = prev.findIndex(c => c.id === cust.id || (cust.phone && c.phone === cust.phone));
-              let next;
-              if (idx !== -1) {
-                next = [...prev];
-                next[idx] = { ...next[idx], ...cust };
-              } else {
-                next = [cust, ...prev];
-              }
-              localStorage.setItem('insta_customers', JSON.stringify(next));
-              return next;
-            });
+    // 1. First attempt live authentication from backend
+    try {
+      const res = await fetch('/api/customers/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          emailOrPhone: cleanInput,
+          password: cleanPassword,
+          name: optionalName
+        })
+      });
 
-            addNotification("Logged in Successfully", `Welcome back, ${cust.name}!`, "success");
-            return true;
-          }
-        }
-      } catch (e) {
-        console.warn('Backend login fallback:', e);
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        // Backend explicitly rejected (e.g. wrong password or account not found)
+        throw new Error(data.message || 'Invalid credentials');
       }
 
-      // 2. Offline / Local fallback
-      const normPhone = cleanInput.replace(/\D/g, '').slice(-10);
-      const existing = customers.find(c => 
-        (c.email && c.email.toLowerCase() === cleanInput.toLowerCase()) ||
-        (normPhone && (c.phone || '').replace(/\D/g, '').slice(-10) === normPhone)
-      );
+      if (data.customer) {
+        const cust = data.customer;
+        const profile: UserProfile = {
+          name: cust.name,
+          email: cust.email,
+          phone: cust.phone,
+          role: 'patient',
+          savedHospitals: cust.savedHospitals || [],
+          savedDoctors: cust.savedDoctors || [],
+          familyMembers: cust.familyMembers || [],
+          subscription: cust.subscription || {
+            planName: "3-Day Pass",
+            expiresAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+            price: 10
+          },
+          location: cust.location,
+          lat: cust.lat,
+          lng: cust.lng
+        };
+        setUser(profile);
+        localStorage.setItem('insta_user', JSON.stringify(profile));
 
-      const resolvedName = existing?.name 
-        || optionalName
-        || (cleanInput.includes('@') 
-            ? cleanInput.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) 
-            : 'Patient');
+        setCustomers(prev => {
+          const idx = prev.findIndex(c => c.id === cust.id || (cust.phone && c.phone === cust.phone));
+          let next;
+          if (idx !== -1) {
+            next = [...prev];
+            next[idx] = { ...next[idx], ...cust };
+          } else {
+            next = [cust, ...prev];
+          }
+          localStorage.setItem('insta_customers', JSON.stringify(next));
+          return next;
+        });
 
-      const profile: UserProfile = {
-        name: resolvedName,
-        email: existing?.email || (cleanInput.includes('@') ? cleanInput : "patient@instatoken.com"),
-        phone: existing?.phone || (!cleanInput.includes('@') ? cleanInput : "+91 9876543210"),
-        role: "patient",
-        savedHospitals: existing?.bookings?.map(b => b.hospitalId) || [],
-        savedDoctors: [],
-        familyMembers: (existing as any)?.familyMembers || [],
-        subscription: (existing as any)?.subscription || {
-          planName: "3-Day Pass",
-          expiresAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-          price: 10
-        }
-      };
-      setUser(profile);
-      localStorage.setItem('insta_user', JSON.stringify(profile));
-      addNotification("Logged in Successfully", `Welcome back, ${resolvedName}!`, "success");
-      return true;
+        addNotification("Logged in Successfully", `Welcome back, ${cust.name}!`, "success");
+        return true;
+      }
+    } catch (err: any) {
+      // If error came from the server rejection (wrong password / account not found), rethrow immediately!
+      if (err?.message && !err.message.includes('Failed to fetch') && !err.message.includes('NetworkError') && !err.message.includes('fetch')) {
+        throw err;
+      }
+      console.warn('Backend login fallback:', err);
     }
+
+    // 2. Offline / Local fallback ONLY when backend is unreachable
+    const normPhone = cleanInput.replace(/\D/g, '').slice(-10);
+    const existing = customers.find(c =>
+      (c.email && c.email.toLowerCase() === cleanInput.toLowerCase()) ||
+      (normPhone && (c.phone || '').replace(/\D/g, '').slice(-10) === normPhone)
+    );
+
+    if (!existing) {
+      throw new Error('No account found with this email or phone. Please sign up first.');
+    }
+
+    const storedPass = (existing as any).password;
+    if (storedPass && storedPass !== cleanPassword) {
+      throw new Error('Incorrect password. Please enter the correct password.');
+    }
+
+    // Preserve the registered name — never overwrite with arbitrary strings!
+    const profile: UserProfile = {
+      name: existing.name,
+      email: existing.email || (cleanInput.includes('@') ? cleanInput : "patient@instatoken.com"),
+      phone: existing.phone || (!cleanInput.includes('@') ? cleanInput : "+91 9876543210"),
+      role: "patient",
+      savedHospitals: existing.bookings?.map(b => b.hospitalId) || [],
+      savedDoctors: [],
+      familyMembers: (existing as any)?.familyMembers || [],
+      subscription: (existing as any)?.subscription || {
+        planName: "3-Day Pass",
+        expiresAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+        price: 10
+      }
+    };
+    setUser(profile);
+    localStorage.setItem('insta_user', JSON.stringify(profile));
+    addNotification("Logged in Successfully", `Welcome back, ${existing.name}!`, "success");
+    return true;
   };
 
-  const signup = async (name: string, email: string, phone: string): Promise<boolean> => {
+  const signup = async (name: string, email: string, phone: string, password?: string): Promise<boolean> => {
+    const cleanName = name.trim();
+    const cleanEmail = email.trim();
+    const cleanPhone = phone.trim();
+    const cleanPassword = password ? String(password) : '';
+
     const profile: UserProfile = {
-      name: name.trim(),
-      email: email.trim(),
-      phone: phone.trim(),
+      name: cleanName,
+      email: cleanEmail,
+      phone: cleanPhone,
       role: 'patient',
       savedHospitals: [],
       savedDoctors: [],
@@ -946,29 +968,46 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setUser(profile);
     localStorage.setItem('insta_user', JSON.stringify(profile));
 
-    // Save directly to AWS RDS PostgreSQL
+    // Save directly to Backend
     try {
-      const res = await fetch('/api/customers/profile', {
+      const res = await fetch('/api/customers/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: profile.name,
-          email: profile.email,
-          phone: profile.phone,
-          location: currentLocation || "Hyderabad, Telangana"
+          name: cleanName,
+          email: cleanEmail,
+          phone: cleanPhone,
+          password: cleanPassword
         })
       });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.customer) {
-          setCustomers(prev => [data.customer, ...prev.filter(c => c.id !== data.customer.id)]);
-        }
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Signup failed');
       }
-    } catch (e) {
-      console.warn('Signup RDS sync error:', e);
+      if (data.customer) {
+        setCustomers(prev => [data.customer, ...prev.filter(c => c.id !== data.customer.id)]);
+      }
+    } catch (e: any) {
+      if (e?.message?.includes('already exists')) {
+        throw e;
+      }
+      console.warn('Signup server sync error:', e);
+      // Fallback local save with password
+      const localCust: CustomerAccount = {
+        id: `cust-${Date.now()}`,
+        name: cleanName,
+        email: cleanEmail,
+        phone: cleanPhone,
+        location: 'Hyderabad, Telangana',
+        joinedDate: new Date().toISOString().split('T')[0],
+        status: 'active',
+        bookings: []
+      };
+      (localCust as any).password = cleanPassword;
+      setCustomers(prev => [localCust, ...prev]);
     }
 
-    addNotification("Account Created", `Welcome ${name}! Start booking digital OPD tokens now.`, "success");
+    addNotification("Account Created", `Welcome ${cleanName}! Start booking digital OPD tokens now.`, "success");
     return true;
   };
 

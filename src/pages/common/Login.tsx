@@ -75,7 +75,7 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
     setShowOtpModal(false);
     setLoading(true);
     try {
-      await signup(name, email, phone);
+      await signup(name, email, phone, password);
       onSuccess();
     } catch (err: any) {
       setError(err?.message || 'Registration failed');
