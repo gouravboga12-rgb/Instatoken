@@ -147,6 +147,9 @@ export const HospitalLogin: React.FC = () => {
               <span>🏥</span>
               <span>Apollo Spectra Hospital (Demo Autofill & Login)</span>
             </button>
+            <p className="text-[10px] text-slate-500 text-center mt-2 font-medium">
+              Autofills: <span className="font-semibold text-slate-700">admin@apollo.com</span> • Password: <span className="font-semibold text-slate-700">password</span>
+            </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
