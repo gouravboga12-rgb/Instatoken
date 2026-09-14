@@ -135,6 +135,7 @@ interface AppContextType {
   setUserGeoHierarchy: (geo: GeoLocationDetails | null) => void;
   activeBanners: BannerRecord[];
   fetchActiveBanners: (geo?: GeoLocationDetails) => Promise<BannerRecord[]>;
+  refreshAppointments: () => Promise<Appointment[]>;
 }
 
 export const getHydratedHospitals = (): Hospital[] => {
@@ -807,25 +808,46 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
 
       } else if (event.type === 'APPOINTMENT_STATUS_UPDATED') {
-        const { id, status } = event.data || {};
-        if (id && status) {
-          setAppointments(prev => prev.map(a => a.id === id ? { ...a, status } : a));
+        const { id, status, tokenNo, doctorId, hospitalId } = event.data || {};
+        if (status) {
+          const normStatus = status as Appointment['status'];
+          setAppointments(prev => {
+            const updated = prev.map(a => {
+              const matches = a.id === id || (
+                Boolean(doctorId) && a.doctorId === doctorId &&
+                Number(a.tokenNumber) === Number(tokenNo) &&
+                (!hospitalId || a.hospitalId === hospitalId)
+              );
+              return matches ? { ...a, status: normStatus } : a;
+            });
+            localStorage.setItem('insta_appointments', JSON.stringify(updated));
+            return updated;
+          });
         }
 
       } else if (event.type === 'HOSPITAL_TOKENS_UPDATED') {
         const updatedTokens = event.data;
         if (Array.isArray(updatedTokens)) {
-          setAppointments(prev => prev.map(a => {
-            const matched = updatedTokens.find((t: any) => t.id === a.id);
-            if (matched) {
-              const newStatus = matched.status === 'completed' ? 'completed' :
-                ['cancelled', 'not-visited', 'skipped'].includes(matched.status) ? 'cancelled' :
-                matched.status === 'in-consultation' ? 'in-cabin' :
-                ['calling', 'checked-in'].includes(matched.status) ? 'checked-in' : 'booked';
-              return { ...a, status: newStatus };
-            }
-            return a;
-          }));
+          setAppointments(prev => {
+            const updated = prev.map(a => {
+              const matched = updatedTokens.find((t: any) =>
+                t.id === a.id ||
+                (t.doctorId === a.doctorId &&
+                 (Number(t.tokenNo) === Number(a.tokenNumber) || Number(t.tokenNumber) === Number(a.tokenNumber)) &&
+                 (!a.hospitalId || !t.hospitalId || a.hospitalId === t.hospitalId))
+              );
+              if (matched) {
+                const newStatus: Appointment['status'] = matched.status === 'completed' ? 'completed' :
+                  ['cancelled', 'not-visited', 'skipped'].includes(matched.status) ? 'cancelled' :
+                  matched.status === 'in-consultation' ? 'in-cabin' :
+                  ['calling', 'checked-in'].includes(matched.status) ? 'checked-in' : 'booked';
+                return { ...a, status: newStatus };
+              }
+              return a;
+            });
+            localStorage.setItem('insta_appointments', JSON.stringify(updated));
+            return updated;
+          });
         }
 
       } else if (event.type === 'HOSPITAL_COMMUNICATION_BROADCAST') {
@@ -2009,6 +2031,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
   };
 
+  const refreshAppointments = async (): Promise<Appointment[]> => {
+    try {
+      const res = await fetch('/api/appointments');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.appointments)) {
+          const map = new Map<string, Appointment>();
+          data.appointments.forEach((a: any) => {
+            if (!a || !a.id || a.id === 'tok-1001' || a.patientName === 'Guest Patient') return;
+            const norm: Appointment = {
+              ...a,
+              status: (a.status || 'booked') as Appointment['status']
+            };
+            if (!map.has(a.id) || norm.status === 'completed' || norm.status === 'cancelled') {
+              map.set(a.id, norm);
+            }
+          });
+          const clean = Array.from(map.values());
+          setAppointments(clean);
+          localStorage.setItem('insta_appointments', JSON.stringify(clean));
+          return clean;
+        }
+      }
+    } catch (e) {
+      console.warn('Error refreshing appointments:', e);
+    }
+    return appointments;
+  };
+
   return (
     <AppContext.Provider value={{
       user,
@@ -2057,7 +2108,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       userGeoHierarchy,
       setUserGeoHierarchy,
       activeBanners,
-      fetchActiveBanners
+      fetchActiveBanners,
+      refreshAppointments
     }}>
       {children}
     </AppContext.Provider>

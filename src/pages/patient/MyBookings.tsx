@@ -8,23 +8,56 @@ import { Button } from '../../components/ui/Button';
 import { ArrowLeft, Clock, Calendar, CheckCircle2, XCircle, AlertCircle, Trash2 } from 'lucide-react';
 
 export const MyBookings: React.FC = () => {
-  const { appointments, cancelAppointment, deleteAppointment, clearPastHistory } = useApp();
+  const { appointments, cancelAppointment, deleteAppointment, clearPastHistory, refreshAppointments } = useApp();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = React.useState<'active' | 'history'>('active');
 
-  // De-duplicate appointments by id and normalize status
+  // Auto-refresh appointments from backend on mount and window focus
+  React.useEffect(() => {
+    refreshAppointments();
+    const handleFocus = () => refreshAppointments();
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, []);
+
+  // De-duplicate appointments by id and normalize status with cross-panel token checks
   const dedupedAppts = React.useMemo(() => {
+    // Read local hospital tokens to cross-check real-time visited status
+    let localHospitalTokens: any[] = [];
+    try {
+      const savedToks = localStorage.getItem('insta_hospital_tokens');
+      if (savedToks) localHospitalTokens = JSON.parse(savedToks);
+    } catch (e) {}
+
     const map = new Map<string, Appointment>();
     (appointments || []).forEach(a => {
       if (!a || !a.id) return;
       if (a.id === 'tok-1001' || a.patientName === 'Guest Patient') return;
-      // Normalize missing status to 'booked'
+
+      // Check if hospital marked this token visited/completed locally
+      const matchedTok = localHospitalTokens.find((t: any) =>
+        t.id === a.id ||
+        (t.doctorId === a.doctorId &&
+         (Number(t.tokenNo) === Number(a.tokenNumber) || Number(t.tokenNumber) === Number(a.tokenNumber)) &&
+         (!a.date || !t.bookingDate || a.date === t.bookingDate))
+      );
+
+      let effectiveStatus = (a.status || 'booked') as Appointment['status'];
+      if (matchedTok) {
+        if (matchedTok.status === 'completed') {
+          effectiveStatus = 'completed';
+        } else if (['cancelled', 'not-visited', 'skipped'].includes(matchedTok.status)) {
+          effectiveStatus = 'cancelled';
+        }
+      }
+
+      // Normalize status
       const normAppt: Appointment = {
         ...a,
-        status: (a.status || 'booked') as Appointment['status']
+        status: effectiveStatus
       };
       // Keep newer or completed version
-      if (!map.has(a.id) || normAppt.status === 'completed') {
+      if (!map.has(a.id) || normAppt.status === 'completed' || normAppt.status === 'cancelled') {
         map.set(a.id, normAppt);
       }
     });

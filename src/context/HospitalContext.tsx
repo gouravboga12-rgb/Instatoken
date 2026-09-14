@@ -1627,6 +1627,10 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const updateTokenStatus = (id: string, status: TokenRecord['status']) => {
+    const targetToken = tokens.find(t => t.id === id);
+    const targetTokenNo = targetToken?.tokenNo || (targetToken as any)?.tokenNumber;
+    const targetDoctorId = targetToken?.doctorId;
+
     setTokens(prev => {
       const updated = prev.map(t => t.id === id ? {
         ...t,
@@ -1652,7 +1656,15 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       if (savedAppts) {
         const curAppts = JSON.parse(savedAppts);
         if (Array.isArray(curAppts)) {
-          const updatedAppts = curAppts.map((a: any) => a.id === id ? { ...a, status: apptStatus } : a);
+          const updatedAppts = curAppts.map((a: any) => {
+            const matches = a.id === id || (
+              targetToken &&
+              (a.hospitalId === targetHospId || !a.hospitalId) &&
+              a.doctorId === targetDoctorId &&
+              (Number(a.tokenNumber) === Number(targetTokenNo) || Number(a.tokenNo) === Number(targetTokenNo))
+            );
+            return matches ? { ...a, status: apptStatus } : a;
+          });
           localStorage.setItem('insta_appointments', JSON.stringify(updatedAppts));
         }
       }
@@ -1664,13 +1676,27 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         if (Array.isArray(curCusts)) {
           const updatedCusts = curCusts.map((c: any) => ({
             ...c,
-            bookings: (c.bookings || []).map((b: any) => b.id === id ? { ...b, status: apptStatus } : b)
+            bookings: (c.bookings || []).map((b: any) => {
+              const matches = b.id === id || (
+                targetToken &&
+                (b.hospitalId === targetHospId || !b.hospitalId) &&
+                b.doctorId === targetDoctorId &&
+                (Number(b.tokenNumber) === Number(targetTokenNo) || Number(b.tokenNo) === Number(targetTokenNo))
+              );
+              return matches ? { ...b, status: apptStatus } : b;
+            })
           }));
           localStorage.setItem('insta_customers', JSON.stringify(updatedCusts));
         }
       }
 
-      broadcastGlobalSync('APPOINTMENT_STATUS_UPDATED', { id, status: apptStatus });
+      broadcastGlobalSync('APPOINTMENT_STATUS_UPDATED', {
+        id,
+        status: apptStatus,
+        tokenNo: targetTokenNo,
+        doctorId: targetDoctorId,
+        hospitalId: targetHospId
+      });
     } catch (e) {}
 
     // Post status update to backend (tokens + appointments)

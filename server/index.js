@@ -2357,17 +2357,24 @@ app.get('/api/hospitals/:hospitalId/tokens', requireHospitalAuth, async (req, re
   if (isDbConnected) {
     try {
       const dbTokens = await query(
-        `SELECT data FROM tokens WHERE hospital_id = $1 ORDER BY created_at DESC`,
+        `SELECT id, status, data FROM tokens WHERE hospital_id = $1 ORDER BY created_at DESC`,
         [hospitalId]
       );
       if (dbTokens.rows.length > 0) {
         dbTokens.rows.forEach(r => {
           if (r.data && !isDummyTokenRecord(r.data)) {
-            const idx = tokens.findIndex(t => t.id === r.data.id);
+            const raw = r.data;
+            const tokenObj = typeof raw === 'string' ? JSON.parse(raw) : raw;
+            const normalizedToken = {
+              ...tokenObj,
+              id: r.id || tokenObj.id,
+              status: r.status || tokenObj.status || 'booked'
+            };
+            const idx = tokens.findIndex(t => t.id === normalizedToken.id);
             if (idx === -1) {
-              tokens.push(r.data);
+              tokens.push(normalizedToken);
             } else {
-              tokens[idx] = { ...tokens[idx], ...r.data };
+              tokens[idx] = { ...tokens[idx], ...normalizedToken };
             }
           }
         });
@@ -2449,7 +2456,7 @@ app.patch('/api/hospitals/:hospitalId/tokens/:tokenId/status', requireHospitalAu
 
   const apptStatus = status === 'completed' ? 'completed' : ['cancelled', 'not-visited', 'skipped'].includes(status) ? 'cancelled' : 'booked';
   store.appointments = (store.appointments || []).map(a => {
-    if (a.id === tokenId) {
+    if (a.id === tokenId || (targetToken && a.hospitalId === targetToken.hospitalId && a.doctorId === targetToken.doctorId && (a.tokenNumber === targetToken.tokenNo || a.tokenNumber === targetToken.tokenNumber))) {
       return { ...a, status: apptStatus };
     }
     return a;
@@ -2459,19 +2466,31 @@ app.patch('/api/hospitals/:hospitalId/tokens/:tokenId/status', requireHospitalAu
     try {
       if (targetToken) {
         await query(
-          `UPDATE tokens SET status = $1, data = $2, updated_at = NOW() WHERE id = $3`,
+          `UPDATE tokens SET status = $1, data = (COALESCE(data, '{}'::jsonb) || $2::jsonb), updated_at = NOW() WHERE id = $3`,
           [status, JSON.stringify(targetToken), tokenId]
         );
       } else {
         await query(
-          `UPDATE tokens SET status = $1, updated_at = NOW() WHERE id = $2`,
+          `UPDATE tokens SET status = $1, data = (COALESCE(data, '{}'::jsonb) || jsonb_build_object('status', $1::text)), updated_at = NOW() WHERE id = $2`,
           [status, tokenId]
         );
       }
+
+      // Update matching appointment in PostgreSQL
       await query(
-        `UPDATE appointments SET status = $1, data = jsonb_set(data, '{status}', to_jsonb($1::text)), updated_at = NOW() WHERE id = $2`,
+        `UPDATE appointments SET status = $1, data = (COALESCE(data, '{}'::jsonb) || jsonb_build_object('status', $1::text)), updated_at = NOW() WHERE id = $2`,
         [apptStatus, tokenId]
       );
+
+      // Also update by hospital, doctor and token number if ID differs
+      if (targetToken && (targetToken.tokenNo || targetToken.tokenNumber)) {
+        const tokNum = (targetToken.tokenNo || targetToken.tokenNumber).toString();
+        await query(
+          `UPDATE appointments SET status = $1, data = (COALESCE(data, '{}'::jsonb) || jsonb_build_object('status', $1::text)), updated_at = NOW() 
+           WHERE hospital_id = $2 AND doctor_id = $3 AND (data->>'tokenNumber' = $4 OR data->>'tokenNo' = $4)`,
+          [apptStatus, hospitalId, targetToken.doctorId, tokNum]
+        );
+      }
     } catch (dbErr) {
       console.error('Error updating token status in AWS RDS:', dbErr.message);
     }
@@ -2498,7 +2517,7 @@ app.patch('/api/appointments/:id/status', async (req, res) => {
   if (isDbConnected) {
     try {
       await query(
-        `UPDATE appointments SET status = $1, data = jsonb_set(data, '{status}', to_jsonb($1::text)), updated_at = NOW() WHERE id = $2`,
+        `UPDATE appointments SET status = $1, data = (COALESCE(data, '{}'::jsonb) || jsonb_build_object('status', $1::text)), updated_at = NOW() WHERE id = $2`,
         [status, id]
       );
     } catch (e) {
@@ -2622,14 +2641,26 @@ app.get('/api/appointments/:id', async (req, res) => {
   const { id } = req.params;
   if (isDbConnected) {
     try {
-      const dbRes = await query(`SELECT data FROM appointments WHERE id = $1`, [id]);
+      const dbRes = await query(`SELECT id, status, data FROM appointments WHERE id = $1`, [id]);
       if (dbRes.rows.length > 0 && dbRes.rows[0].data) {
-        return res.json({ success: true, appointment: dbRes.rows[0].data });
+        const raw = dbRes.rows[0].data;
+        const dataObj = typeof raw === 'string' ? JSON.parse(raw) : (raw || {});
+        return res.json({
+          success: true,
+          appointment: {
+            ...dataObj,
+            id: dbRes.rows[0].id || dataObj.id,
+            status: dbRes.rows[0].status || dataObj.status || 'booked'
+          }
+        });
       }
 
-      const tokRes = await query(`SELECT data FROM tokens WHERE id = $1`, [id]);
+      const tokRes = await query(`SELECT id, status, data FROM tokens WHERE id = $1`, [id]);
       if (tokRes.rows.length > 0 && tokRes.rows[0].data) {
-        const tok = tokRes.rows[0].data;
+        const rawTok = tokRes.rows[0].data;
+        const tok = typeof rawTok === 'string' ? JSON.parse(rawTok) : (rawTok || {});
+        const effectiveStatus = tokRes.rows[0].status || tok.status || 'booked';
+        const apptStatus = effectiveStatus === 'completed' ? 'completed' : ['cancelled', 'not-visited', 'skipped'].includes(effectiveStatus) ? 'cancelled' : 'booked';
         const apptFromTok = {
           id: tok.id,
           tokenNumber: tok.tokenNo || tok.tokenNumber || 1,
@@ -2649,7 +2680,7 @@ app.get('/api/appointments/:id', async (req, res) => {
           fee: tok.consultationFee || 500,
           platformFee: tok.platformFee || 25,
           totalFee: tok.totalFee || tok.platformFee || 25,
-          status: tok.status || 'booked',
+          status: apptStatus,
           paymentId: tok.paymentId || `PAY-${tok.id}`,
           paymentMethod: tok.paymentMethod || 'Online',
           estimatedWaitTime: tok.estimatedWait || 15,
@@ -2679,9 +2710,17 @@ app.get('/api/appointments/:id', async (req, res) => {
 app.get('/api/appointments', async (req, res) => {
   if (isDbConnected) {
     try {
-      const dbRes = await query(`SELECT data FROM appointments ORDER BY created_at DESC`);
+      const dbRes = await query(`SELECT id, status, data FROM appointments ORDER BY created_at DESC`);
       if (dbRes.rows.length > 0) {
-        const appts = dbRes.rows.map(r => r.data).filter(Boolean);
+        const appts = dbRes.rows.map(r => {
+          if (!r.data) return null;
+          const dataObj = typeof r.data === 'string' ? JSON.parse(r.data) : r.data;
+          return {
+            ...dataObj,
+            id: r.id || dataObj.id,
+            status: r.status || dataObj.status || 'booked'
+          };
+        }).filter(Boolean);
         return res.json({ success: true, appointments: appts });
       }
     } catch (err) {

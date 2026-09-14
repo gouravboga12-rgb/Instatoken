@@ -23,7 +23,7 @@ import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { Footer } from './components/common/Footer';
 import { 
   Home as HomeIcon, Search as SearchIcon, Award, User as UserIcon, 
-  MapPin, Bell, ChevronDown, Loader2, RotateCw
+  MapPin, Bell, ChevronDown, Loader2, RotateCw, Search, X
 } from 'lucide-react';
 import { triggerManualSync } from './utils/syncBus';
 
@@ -34,6 +34,7 @@ const TopNavbar: React.FC = () => {
   const unreadNotifs = notifications.filter(n => !n.read).length;
   const [showLocationsDropdown, setShowLocationsDropdown] = useState(false);
   const [locating, setLocating] = useState(false);
+  const [locationSearch, setLocationSearch] = useState('');
 
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -47,14 +48,31 @@ const TopNavbar: React.FC = () => {
     }
   };
 
-  const locations = [
+  const defaultLocations = [
+    "Warangal, Telangana",
     "Karimnagar, Telangana",
     "Choppadandi, Karimnagar",
-    "Warangal, Telangana",
     "Gachibowli, Hyderabad",
+    "Banjara Hills, Hyderabad",
+    "Madhapur, Hyderabad",
+    "Secunderabad, Telangana",
     "Vijayawada, Andhra Pradesh",
-    "Koramangala, Bengaluru"
+    "Visakhapatnam, Andhra Pradesh",
+    "Guntur, Andhra Pradesh",
+    "Koramangala, Bengaluru",
+    "Indiranagar, Bengaluru",
+    "Whitefield, Bengaluru",
+    "Mumbai, Maharashtra",
+    "Pune, Maharashtra",
+    "Chennai, Tamil Nadu",
+    "New Delhi, Delhi"
   ];
+
+  const filteredLocations = React.useMemo(() => {
+    const q = locationSearch.trim().toLowerCase();
+    if (!q) return defaultLocations;
+    return defaultLocations.filter(loc => loc.toLowerCase().includes(q));
+  }, [locationSearch]);
 
   return (
     <header className="hidden md:block bg-white border-b border-slate-100 sticky top-0 z-40">
@@ -113,10 +131,13 @@ const TopNavbar: React.FC = () => {
               <>
                 <div 
                   className="fixed inset-0 z-40" 
-                  onClick={() => setShowLocationsDropdown(false)}
+                  onClick={() => {
+                    setShowLocationsDropdown(false);
+                    setLocationSearch('');
+                  }}
                 />
-                <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-100 rounded-2xl shadow-xl z-50 p-2 py-1.5 animate-in fade-in slide-in-from-top-1 duration-100">
-                  <span className="text-[9px] font-black text-slate-400 block px-3 py-1 uppercase tracking-wider">Select Location Area</span>
+                <div className="absolute right-0 mt-2 w-72 bg-white border border-slate-100 rounded-2xl shadow-xl z-50 p-2.5 animate-in fade-in slide-in-from-top-1 duration-100">
+                  <span className="text-[9px] font-black text-slate-400 block px-2 py-0.5 uppercase tracking-wider">Select Location Area</span>
 
                   {/* GPS Detect Button */}
                   <button
@@ -126,37 +147,93 @@ const TopNavbar: React.FC = () => {
                       setTimeout(() => {
                         setLocating(false);
                         setShowLocationsDropdown(false);
+                        setLocationSearch('');
                       }, 4000);
                     }}
                     disabled={locating}
-                    className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold bg-blue-50 text-blue-600 hover:bg-blue-100 transition-all cursor-pointer border-none mb-1 disabled:opacity-60"
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold bg-blue-50 text-blue-600 hover:bg-blue-100 transition-all cursor-pointer border-none mb-2 disabled:opacity-60"
                   >
                     {locating 
-                      ? <Loader2 size={12} className="animate-spin shrink-0" />
-                      : <MapPin size={12} className="shrink-0" />
+                      ? <Loader2 size={13} className="animate-spin shrink-0" />
+                      : <MapPin size={13} className="shrink-0" />
                     }
                     <span>{locating ? 'Detecting location...' : 'Use Current Location (GPS)'}</span>
                   </button>
 
+                  {/* Location Search Input Option (As requested) */}
+                  <div className="relative mb-2">
+                    <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={locationSearch}
+                      onChange={e => setLocationSearch(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' && locationSearch.trim()) {
+                          const customLoc = locationSearch.trim();
+                          setCurrentLocation(customLoc);
+                          setShowLocationsDropdown(false);
+                          setLocationSearch('');
+                        }
+                      }}
+                      placeholder="Search city, district, area..."
+                      className="w-full pl-8 pr-7 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:bg-white text-slate-800 placeholder-slate-400 transition-all font-medium"
+                      autoFocus
+                    />
+                    {locationSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setLocationSearch('')}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 border-none bg-transparent cursor-pointer p-0.5"
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+
                   <div className="border-t border-slate-100 my-1" />
 
-                  <div className="max-h-52 overflow-y-auto">
-                    {locations.map((loc) => (
+                  <div className="max-h-56 overflow-y-auto space-y-0.5">
+                    {/* If user typed custom query not in default, offer it as first option */}
+                    {locationSearch.trim() && !filteredLocations.some(l => l.toLowerCase() === locationSearch.trim().toLowerCase()) && (
+                      <button
+                        onClick={() => {
+                          setCurrentLocation(locationSearch.trim());
+                          setShowLocationsDropdown(false);
+                          setLocationSearch('');
+                        }}
+                        className="w-full text-left px-3 py-2 rounded-xl text-xs font-bold text-blue-600 bg-blue-50/60 hover:bg-blue-100/70 transition-all cursor-pointer border border-dashed border-blue-200 mb-1 flex items-center gap-1.5"
+                      >
+                        <MapPin size={12} className="shrink-0 text-blue-600" />
+                        <span className="truncate">Set to <strong>"{locationSearch.trim()}"</strong></span>
+                      </button>
+                    )}
+
+                    {filteredLocations.map((loc) => (
                       <button
                         key={loc}
                         onClick={() => {
                           setCurrentLocation(loc);
                           setShowLocationsDropdown(false);
+                          setLocationSearch('');
                         }}
-                        className={`w-full text-left px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border-none ${
+                        className={`w-full text-left px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border-none flex items-center justify-between ${
                           currentLocation === loc 
                             ? 'bg-blue-50 text-blue-600' 
                             : 'text-slate-650 hover:bg-slate-50'
                         }`}
                       >
-                        {loc}
+                        <span className="truncate">{loc}</span>
+                        {currentLocation === loc && (
+                          <span className="text-[10px] bg-blue-600 text-white px-1.5 py-0.2 rounded-md font-extrabold shrink-0">Selected</span>
+                        )}
                       </button>
                     ))}
+
+                    {filteredLocations.length === 0 && !locationSearch.trim() && (
+                      <div className="text-center py-3 text-xs text-slate-400">
+                        No locations found
+                      </div>
+                    )}
                   </div>
                 </div>
               </>
