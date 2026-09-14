@@ -1552,6 +1552,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
               </button>
               <button
                 onClick={async () => {
+                  if (!hospitalToDelete?.id) return;
                   setIsDeletingHosp(true);
                   try {
                     await deleteHospital(hospitalToDelete.id);

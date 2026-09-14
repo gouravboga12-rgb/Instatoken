@@ -38,7 +38,7 @@ export const HospitalSettings: React.FC = () => {
   const [customMediaType, setCustomMediaType] = useState<'image' | 'video'>('image');
   const [customMediaCaption, setCustomMediaCaption] = useState('');
 
-  const isApollo = (hospitalProfile?.id || 'hosp-apollo') === 'hosp-apollo';
+  const isApollo = hospitalProfile?.id === 'hosp-apollo';
 
   const [form, setForm] = useState({
     name: hospitalProfile?.name || (isApollo ? 'Apollo Spectra Hospital' : ''),
@@ -341,7 +341,8 @@ export const HospitalSettings: React.FC = () => {
     updateHospitalProfile(updated);
 
     // Explicit direct post to backend with auth for instantaneous global persistence
-    const targetHId = hospitalProfile?.id || 'hosp-apollo';
+    const targetHId = hospitalProfile?.id;
+    if (!targetHId) return;
     fetch(`/api/hospitals/${targetHId}/profile`, {
       method: 'POST',
       headers: {

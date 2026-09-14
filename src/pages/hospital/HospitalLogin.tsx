@@ -28,20 +28,6 @@ export const HospitalLogin: React.FC = () => {
     }
   };
 
-  const loginApolloDemo = async () => {
-    setEmail('admin@apollo.com');
-    setPassword('password');
-    setError('');
-    setLoading(true);
-    const result = await hospitalLogin('admin@apollo.com', 'password');
-    setLoading(false);
-    if (result.success) {
-      navigate('/hospital/dashboard');
-    } else {
-      setError(result.message);
-    }
-  };
-
   return (
     <div className="min-h-screen flex bg-slate-950">
       {/* Left Panel – Branding */}
@@ -130,26 +116,6 @@ export const HospitalLogin: React.FC = () => {
             </div>
             <h2 className="text-3xl font-black text-slate-900 tracking-tight">Welcome Back</h2>
             <p className="text-slate-500 text-sm mt-2">Sign in to your hospital management account</p>
-          </div>
-
-          {/* Demo Quick Fill for Apollo Spectra Hospital */}
-          <div className="bg-blue-50/80 border border-blue-100 rounded-2xl p-3.5 mb-6">
-            <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-2 flex items-center justify-between">
-              <span>Quick Demo Login</span>
-              <span className="text-[9px] font-bold text-blue-500 bg-blue-100/70 px-1.5 py-0.5 rounded">Apollo Spectra</span>
-            </p>
-            <button
-              type="button"
-              onClick={loginApolloDemo}
-              disabled={loading}
-              className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black py-2.5 px-4 rounded-xl transition-all shadow-sm hover:shadow active:scale-[0.99] cursor-pointer border-none"
-            >
-              <span>🏥</span>
-              <span>Apollo Spectra Hospital (Demo Autofill & Login)</span>
-            </button>
-            <p className="text-[10px] text-slate-500 text-center mt-2 font-medium">
-              Autofills: <span className="font-semibold text-slate-700">admin@apollo.com</span> • Password: <span className="font-semibold text-slate-700">password</span>
-            </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">

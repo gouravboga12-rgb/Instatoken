@@ -222,7 +222,7 @@ const TopHeader: React.FC<{ onMenuToggle: () => void }> = ({ onMenuToggle }) => 
         </p>
         <div className="flex items-center gap-2 mt-0.5">
           <p className="text-[11px] font-extrabold text-slate-700 truncate max-w-[240px]">
-            {hospitalProfile?.name || hospitalUser?.hospitalName || 'Apollo Spectra Hospital'}
+            {hospitalProfile?.name || hospitalUser?.hospitalName || 'Hospital Management Panel'}
           </p>
           <span className="text-slate-200">·</span>
           <span className={`text-[9px] font-black px-2 py-0.5 rounded-full capitalize ${roleColor}`}>

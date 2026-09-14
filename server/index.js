@@ -493,6 +493,7 @@ async function getUnifiedStore() {
         if (!store.hospitalSchedules) store.hospitalSchedules = {};
         if (!store.hospitalStaff) store.hospitalStaff = {};
         if (!store.hospitalCredentials) store.hospitalCredentials = [];
+        if (!store.deletedHospitalIds) store.deletedHospitalIds = [];
         if (!store.customers || !Array.isArray(store.customers)) store.customers = [];
         if (!store.locationBanners || !Array.isArray(store.locationBanners)) {
           store.locationBanners = INITIAL_LOCATION_BANNERS;
@@ -722,8 +723,12 @@ app.post('/api/sync', async (req, res) => {
   // Protect hospitals list from stale mock data overwrites and merge safely
   if (hospitals && Array.isArray(hospitals) && hospitals.length > 0) {
     store.hospitals = store.hospitals || [];
+    const deletedSet = new Set(store.deletedHospitalIds || []);
     hospitals.forEach(incomingHosp => {
       if (!incomingHosp || !incomingHosp.id) return;
+      // Do NOT restore hospitals that were permanently deleted
+      if (deletedSet.has(incomingHosp.id)) return;
+
       const currentProf = store.hospitalProfiles?.[incomingHosp.id];
       if (
         currentProf?.address &&
@@ -901,21 +906,23 @@ function requireHospitalAuth(req, res, next) {
 
   let session = ACTIVE_SESSIONS.get(tokenStr);
 
-  // Auto-accept default demo token pattern if restarted
+  // Auto-accept default token pattern if restarted
   if (!session && tokenStr.startsWith('htok_')) {
     const parts = tokenStr.split('_');
-    const hospId = parts[1] || 'hosp-apollo';
-    const matched = DEFAULT_HOSPITAL_CREDENTIALS.find(c => c.hospitalId === hospId);
-    session = {
-      token: tokenStr,
-      hospitalId: matched ? matched.hospitalId : hospId,
-      hospitalName: matched ? matched.hospitalName : 'Hospital Admin',
-      email: matched ? matched.email : `admin@${hospId}.com`,
-      role: matched ? matched.role : 'owner',
-      name: matched ? matched.name : 'Hospital Admin',
-      createdAt: Date.now()
-    };
-    ACTIVE_SESSIONS.set(tokenStr, session);
+    const hospId = parts[1];
+    if (hospId) {
+      const matched = DEFAULT_HOSPITAL_CREDENTIALS.find(c => c.hospitalId === hospId);
+      session = {
+        token: tokenStr,
+        hospitalId: matched ? matched.hospitalId : hospId,
+        hospitalName: matched ? matched.hospitalName : 'Hospital Admin',
+        email: matched ? matched.email : `admin@${hospId}.com`,
+        role: matched ? matched.role : 'owner',
+        name: matched ? matched.name : 'Hospital Admin',
+        createdAt: Date.now()
+      };
+      ACTIVE_SESSIONS.set(tokenStr, session);
+    }
   }
 
   if (!session) {
@@ -1173,17 +1180,36 @@ app.delete('/api/hospitals/:id', async (req, res) => {
     // 1. Remove from store.hospitals
     store.hospitals = (store.hospitals || []).filter(h => h.id !== id);
 
-    // 2. Remove associated profiles, doctors, depts, schedules
+    // 2. Remove associated credentials & sessions
+    store.hospitalCredentials = (store.hospitalCredentials || []).filter(c => c.hospitalId !== id);
+    for (const [tok, sess] of ACTIVE_SESSIONS.entries()) {
+      if (sess.hospitalId === id) {
+        ACTIVE_SESSIONS.delete(tok);
+      }
+    }
+
+    // 3. Add to tombstone deletedHospitalIds so sync cannot restore it
+    store.deletedHospitalIds = store.deletedHospitalIds || [];
+    if (!store.deletedHospitalIds.includes(id)) {
+      store.deletedHospitalIds.push(id);
+    }
+
+    // 4. Remove associated profiles, doctors, depts, schedules, staff, patients, tokens, appointments
     if (store.hospitalProfiles) delete store.hospitalProfiles[id];
     if (store.hospitalDoctors) delete store.hospitalDoctors[id];
     if (store.hospitalDepartments) delete store.hospitalDepartments[id];
     if (store.hospitalSchedules) delete store.hospitalSchedules[id];
     if (store.hospitalStaff) delete store.hospitalStaff[id];
     if (store.hospitalPatients) delete store.hospitalPatients[id];
+    store.tokens = (store.tokens || []).filter(t => t.hospitalId !== id);
+    store.appointments = (store.appointments || []).filter(a => a.hospitalId !== id);
 
-    // 3. Purge from relational PostgreSQL tables if connected
+    // 5. Purge from relational PostgreSQL tables if connected
     if (isDbConnected) {
       try {
+        await query(`DELETE FROM tokens WHERE hospital_id = $1`, [id]);
+        await query(`DELETE FROM appointments WHERE hospital_id = $1`, [id]);
+        await query(`DELETE FROM hospital_patients WHERE hospital_id = $1`, [id]);
         await query(`DELETE FROM hospital_doctors WHERE hospital_id = $1`, [id]);
         await query(`DELETE FROM hospital_departments WHERE hospital_id = $1`, [id]);
         await query(`DELETE FROM hospital_schedules WHERE hospital_id = $1`, [id]);
@@ -1195,7 +1221,7 @@ app.delete('/api/hospitals/:id', async (req, res) => {
     }
 
     await saveUnifiedStore(store);
-    console.log(`✅ Permanently deleted hospital ${id} from AWS RDS`);
+    console.log(`✅ Permanently deleted hospital ${id} from AWS RDS, credentials purged, and tombstone recorded`);
     res.json({ success: true, message: `Hospital ${id} permanently deleted`, deletedId: id });
   } catch (err) {
     console.error('Error deleting hospital:', err);

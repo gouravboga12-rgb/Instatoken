@@ -214,7 +214,7 @@ export const getHydratedHospitals = (): Hospital[] => {
     } catch (e) {}
   }
 
-  const targetHospitalId = hospitalPanelProfile?.id || 'hosp-apollo';
+  const targetHospitalId = hospitalPanelProfile?.id || '';
   return baseHospitals.map(h => {
     let specificProfile: any = null;
     try {
@@ -222,7 +222,7 @@ export const getHydratedHospitals = (): Hospital[] => {
       if (specificRaw) specificProfile = JSON.parse(specificRaw);
     } catch (e) {}
 
-    const prof = (h.id === targetHospitalId ? hospitalPanelProfile : specificProfile) || (h.id === 'hosp-apollo' ? hospitalPanelProfile : null);
+    const prof = (targetHospitalId && h.id === targetHospitalId ? hospitalPanelProfile : specificProfile);
 
     if (prof) {
       return {
@@ -563,11 +563,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (data.success && Array.isArray(data.hospitals) && data.hospitals.length > 0) {
           setHospitals(data.hospitals);
           localStorage.setItem('insta_hospitals', JSON.stringify(data.hospitals));
+          const activePanelHospId = localStorage.getItem('insta_current_hospital_id') || '';
           if (data.store?.hospitalDoctors) {
             Object.entries(data.store.hospitalDoctors).forEach(([hId, docs]: [string, any]) => {
               if (docs && Array.isArray(docs)) {
                 localStorage.setItem(`insta_hospital_doctors_${hId}`, JSON.stringify(docs));
-                if (hId === 'hosp-apollo') {
+                if (activePanelHospId && hId === activePanelHospId) {
                   localStorage.setItem('insta_hospital_doctors', JSON.stringify(docs));
                 }
               }
@@ -577,7 +578,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             Object.entries(data.store.hospitalDepartments).forEach(([hId, depts]: [string, any]) => {
               if (depts && Array.isArray(depts)) {
                 localStorage.setItem(`insta_hospital_departments_${hId}`, JSON.stringify(depts));
-                if (hId === 'hosp-apollo') {
+                if (activePanelHospId && hId === activePanelHospId) {
                   localStorage.setItem('insta_hospital_departments', JSON.stringify(depts));
                 }
               }
@@ -587,7 +588,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             Object.entries(data.store.hospitalProfiles).forEach(([hospId, prof]: [string, any]) => {
               if (prof) {
                 localStorage.setItem(`insta_hospital_profile_${hospId}`, JSON.stringify(prof));
-                if (hospId === 'hosp-apollo') {
+                if (activePanelHospId && hospId === activePanelHospId) {
                   localStorage.setItem('insta_hospital_profile', JSON.stringify(prof));
                 }
               }
@@ -1467,16 +1468,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addHospital = (hosp: Omit<Hospital, 'id' | 'rating' | 'reviewsCount' | 'distance' | 'doctors'>) => {
+    const newHospId = `hosp-${Date.now().toString(36)}`;
     const newHosp: Hospital = {
       ...hosp,
-      id: `hosp-${Date.now()}`,
+      id: newHospId,
       rating: 5.0,
       reviewsCount: 1,
       distance: parseFloat((Math.random() * 5 + 1).toFixed(1)),
       doctors: []
     };
-    setHospitals(prev => [...prev, newHosp]);
-    addNotification("Hospital Registered", `${hosp.name} added to the platform.`, "success");
+    setHospitals(prev => {
+      const updated = [...prev, newHosp];
+      localStorage.setItem('insta_hospitals', JSON.stringify(updated));
+      fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          hospitals: updated,
+          hospitalProfiles: {
+            [newHospId]: {
+              id: newHospId,
+              name: newHosp.name,
+              category: newHosp.category,
+              address: newHosp.address,
+              contact: newHosp.contact,
+              about: newHosp.about,
+              facilities: newHosp.facilities,
+              image: newHosp.image,
+              lat: newHosp.lat,
+              lng: newHosp.lng
+            }
+          }
+        })
+      }).catch(err => console.warn('Failed to persist new hospital to backend:', err));
+      return updated;
+    });
+    addNotification("Hospital Registered", `${hosp.name} added and saved to AWS RDS.`, "success");
   };
 
   const updateHospital = (hospitalId: string, updates: Partial<Hospital>) => {
@@ -1554,24 +1581,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const deleteHospital = async (hospitalId: string): Promise<boolean> => {
     try {
+      // 1. Immediately prune locally
+      setHospitals(prev => {
+        const filtered = prev.filter(h => h.id !== hospitalId);
+        localStorage.setItem('insta_hospitals', JSON.stringify(filtered));
+        return filtered;
+      });
+      localStorage.removeItem(`insta_hospital_profile_${hospitalId}`);
+      localStorage.removeItem(`insta_hospital_doctors_${hospitalId}`);
+      localStorage.removeItem(`insta_hospital_departments_${hospitalId}`);
+
+      // 2. Call backend permanent delete
       const res = await fetch(`/api/hospitals/${hospitalId}`, { method: 'DELETE' });
-      if (res.ok) {
-        setHospitals(prev => {
-          const filtered = prev.filter(h => h.id !== hospitalId);
-          localStorage.setItem('insta_hospitals', JSON.stringify(filtered));
-          return filtered;
-        });
-        localStorage.removeItem(`insta_hospital_profile_${hospitalId}`);
-        localStorage.removeItem(`insta_hospital_doctors_${hospitalId}`);
-        localStorage.removeItem(`insta_hospital_departments_${hospitalId}`);
-        broadcastGlobalSync('HOSPITAL_DELETED', { hospitalId });
-        addNotification("Hospital Deleted", "Hospital and its records permanently removed from AWS RDS.", "warning");
-        return true;
-      }
+      broadcastGlobalSync('HOSPITAL_DELETED', { hospitalId });
+      addNotification("Hospital Deleted", "Hospital and its records permanently removed from AWS RDS.", "warning");
+      return res.ok;
     } catch (e) {
       console.error('Error deleting hospital:', e);
+      return false;
     }
-    return false;
   };
 
   const toggleCustomerStatus = (customerId: string) => {
