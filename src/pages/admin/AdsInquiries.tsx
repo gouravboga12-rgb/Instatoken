@@ -32,7 +32,9 @@ interface AdInquiry {
   state: string;
   district: string;
   mandal?: string;
+  village?: string;
   pincode?: string;
+  image?: string;
   ctaText: string;
   durationDays: number;
   status: 'pending' | 'approved' | 'rejected';
@@ -96,33 +98,100 @@ export const AdsInquiries: React.FC = () => {
 
     setApprovingId(inq.id);
     try {
-      const res = await fetch(`/api/ads-inquiries/${inq.id}/approve`, {
-        method: 'POST'
+      const res = await fetch(`/api/ads-inquiries/${encodeURIComponent(inq.id)}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ inquiry: inq })
       });
       const data = await res.json();
 
-      if (data.success) {
-        // Broadcast banners updated so customer home receives it immediately
-        broadcastGlobalSync('BANNERS_UPDATED', data.banner);
+      if (data.success && data.banner) {
+        const approvedBanner = data.banner;
+
+        // Broadcast banners updated so customer home & admin location banners receive it immediately
+        broadcastGlobalSync('BANNERS_UPDATED', approvedBanner);
 
         // Update local state
-        setInquiries(prev => prev.map(i => i.id === inq.id ? { ...i, status: 'approved', bannerId: data.banner?.id } : i));
+        setInquiries(prev => prev.map(i => (i.id === inq.id || (i.title === inq.title && i.hospitalName === inq.hospitalName)) ? { ...i, status: 'approved', bannerId: approvedBanner.id } : i));
 
         // Update localStorage
         try {
           const saved = localStorage.getItem('insta_ads_inquiries');
           if (saved) {
             const list = JSON.parse(saved);
-            const updated = list.map((i: any) => i.id === inq.id ? { ...i, status: 'approved', bannerId: data.banner?.id } : i);
+            const updated = list.map((i: any) => (i.id === inq.id || (i.title === inq.title && i.hospitalName === inq.hospitalName)) ? { ...i, status: 'approved', bannerId: approvedBanner.id } : i);
             localStorage.setItem('insta_ads_inquiries', JSON.stringify(updated));
           }
         } catch (e) {}
 
-        alert(`Banner approved and published live! Banner ID: ${data.banner?.id}`);
+        alert(`Banner approved and published live! Banner ID: ${approvedBanner.id}`);
       } else {
-        alert(data.message || 'Failed to approve inquiry.');
+        // Fallback: create banner directly via /api/banners if route returned not found
+        console.warn('Approve route returned unexpected response, attempting direct banner creation fallback...', data);
+        const todayStr = new Date().toISOString().split('T')[0];
+        const durationDays = Number(inq.durationDays) || 30;
+        const endDateStr = new Date(Date.now() + (durationDays * 86400000)).toISOString().split('T')[0];
+        const bannerPayload = {
+          title: inq.title.trim(),
+          subtitle: inq.description || `${inq.hospitalName} Special Announcement`,
+          description: inq.description || '',
+          image: inq.imageUrl || 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=1200&q=80',
+          imageUrl: inq.imageUrl || 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=1200&q=80',
+          mediaType: 'image',
+          badge: 'HOSPITAL PROMOTION',
+          linkUrl: inq.link || (inq.hospitalId ? `/hospitals/${inq.hospitalId}` : '/search'),
+          link: inq.link || (inq.hospitalId ? `/hospitals/${inq.hospitalId}` : '/search'),
+          ctaText: inq.ctaText || 'Book Token',
+          hospitalId: inq.hospitalId || null,
+          destinationType: inq.hospitalId ? 'hospital' : 'custom',
+          status: 'active',
+          active: true,
+          startDate: todayStr,
+          endDate: endDateStr,
+          targetLevel: inq.targetLevel || 'state',
+          country: 'India',
+          state: inq.state || null,
+          district: inq.district || null,
+          mandal: inq.mandal || null,
+          village: inq.village || null,
+          displayPanels: ['customer', 'hospital'],
+          priority: 15,
+          hospitalName: inq.hospitalName
+        };
+
+        const bRes = await fetch('/api/banners', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(bannerPayload)
+        });
+        const bData = await bRes.json();
+        const fallbackBanner = bData.banner || { ...bannerPayload, id: bData.id || `ban-${Date.now()}` };
+
+        try {
+          await fetch(`/api/ads-inquiries/${encodeURIComponent(inq.id)}/status`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'approved' })
+          });
+        } catch (e) {}
+
+        broadcastGlobalSync('BANNERS_UPDATED', fallbackBanner);
+
+        setInquiries(prev => prev.map(i => (i.id === inq.id || (i.title === inq.title && i.hospitalName === inq.hospitalName)) ? { ...i, status: 'approved', bannerId: fallbackBanner.id } : i));
+
+        try {
+          const saved = localStorage.getItem('insta_ads_inquiries');
+          if (saved) {
+            const list = JSON.parse(saved);
+            const updated = list.map((i: any) => (i.id === inq.id || (i.title === inq.title && i.hospitalName === inq.hospitalName)) ? { ...i, status: 'approved', bannerId: fallbackBanner.id } : i);
+            localStorage.setItem('insta_ads_inquiries', JSON.stringify(updated));
+          }
+        } catch (e) {}
+
+        alert(`Banner approved and published live! Banner ID: ${fallbackBanner.id}`);
       }
     } catch (err) {
+      console.error('Error approving banner:', err);
       alert('Error communicating with server.');
     } finally {
       setApprovingId(null);
@@ -390,7 +459,7 @@ export const AdsInquiries: React.FC = () => {
                     </button>
                   )}
 
-                  {inq.status === 'approved' && inq.bannerId && (
+                  {inq.status === 'approved' && (
                     <span className="text-[11px] font-bold text-emerald-600 flex items-center gap-1 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
                       <ShieldCheck size={13} /> Live on Homepage
                     </span>

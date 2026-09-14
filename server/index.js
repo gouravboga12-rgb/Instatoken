@@ -3314,23 +3314,23 @@ app.patch('/api/ads-inquiries/:id/status', async (req, res) => {
   const store = await getUnifiedStore();
   store.adsInquiries = store.adsInquiries || [];
 
-  let updated = null;
-  store.adsInquiries = store.adsInquiries.map(i => {
-    if (i.id === id) {
-      updated = {
-        ...i,
-        status: status || i.status,
-        adminNotes: adminNotes !== undefined ? adminNotes : i.adminNotes,
-        updatedAt: new Date().toISOString()
-      };
-      return updated;
-    }
-    return i;
-  });
+  let targetIndex = store.adsInquiries.findIndex(i => i.id === id);
+  if (targetIndex === -1 && id) {
+    targetIndex = store.adsInquiries.findIndex(i => i.id && (i.id.startsWith(id.substring(0, 14)) || id.startsWith(i.id.substring(0, 14))));
+  }
 
-  if (!updated) {
+  if (targetIndex === -1) {
     return res.status(404).json({ success: false, message: 'Inquiry not found' });
   }
+
+  const existing = store.adsInquiries[targetIndex];
+  const updated = {
+    ...existing,
+    status: status || existing.status,
+    adminNotes: adminNotes !== undefined ? adminNotes : existing.adminNotes,
+    updatedAt: new Date().toISOString()
+  };
+  store.adsInquiries[targetIndex] = updated;
 
   store.lastUpdated = Date.now();
   await saveUnifiedStore(store);
@@ -3339,56 +3339,106 @@ app.patch('/api/ads-inquiries/:id/status', async (req, res) => {
 
 // POST /api/ads-inquiries/:id/approve - Approve inquiry and automatically create active banner
 app.post('/api/ads-inquiries/:id/approve', async (req, res) => {
-  const { id } = req.params;
-  const store = await getUnifiedStore();
-  store.adsInquiries = store.adsInquiries || [];
-  store.locationBanners = store.locationBanners || INITIAL_LOCATION_BANNERS;
+  try {
+    const { id } = req.params;
+    const clientInquiry = req.body?.inquiry || req.body;
+    const store = await getUnifiedStore();
+    store.adsInquiries = store.adsInquiries || [];
+    store.locationBanners = store.locationBanners || INITIAL_LOCATION_BANNERS;
 
-  const inquiry = store.adsInquiries.find(i => i.id === id);
-  if (!inquiry) {
-    return res.status(404).json({ success: false, message: 'Inquiry not found' });
+    // 1. Locate inquiry by id, or fallback to matching client inquiry details
+    let inquiry = store.adsInquiries.find(i => i.id === id);
+    if (!inquiry && clientInquiry) {
+      inquiry = store.adsInquiries.find(i =>
+        i.id === clientInquiry.id ||
+        (i.hospitalId && clientInquiry.hospitalId && i.hospitalId === clientInquiry.hospitalId && i.title === clientInquiry.title) ||
+        (i.title && clientInquiry.title && i.title.trim().toLowerCase() === clientInquiry.title.trim().toLowerCase())
+      );
+      if (!inquiry && clientInquiry.title) {
+        inquiry = { ...clientInquiry };
+        store.adsInquiries.unshift(inquiry);
+      }
+    }
+
+    // 2. Loose prefix match if still not found
+    if (!inquiry) {
+      inquiry = store.adsInquiries.find(i =>
+        (i.id && id && (i.id.startsWith(id.substring(0, 14)) || id.startsWith(i.id.substring(0, 14))))
+      );
+    }
+
+    if (!inquiry) {
+      return res.status(404).json({ success: false, message: 'Inquiry not found' });
+    }
+
+    const todayDate = new Date();
+    const todayStr = todayDate.toISOString().split('T')[0];
+    const durationDays = Number(inquiry.durationDays) || 30;
+    const endDateStr = new Date(Date.now() + (durationDays * 86400000)).toISOString().split('T')[0];
+    const rawImage = inquiry.imageUrl || inquiry.image || 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=1200&q=80';
+    const finalImage = await resolveBannerImage(rawImage);
+    const targetLink = inquiry.link || (inquiry.hospitalId ? `/hospitals/${inquiry.hospitalId}` : '/search');
+
+    // Create the banner with complete fields compatible with both LocationBanners and Customer Home
+    const newBanner = {
+      id: `ban-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`,
+      title: inquiry.title.trim(),
+      subtitle: inquiry.description || `${inquiry.hospitalName || 'Hospital'} Special Announcement`,
+      description: inquiry.description || '',
+      image: finalImage,
+      imageUrl: finalImage,
+      mediaType: 'image',
+      badge: 'HOSPITAL PROMOTION',
+      link: targetLink,
+      linkUrl: targetLink,
+      ctaText: inquiry.ctaText || 'Book Token',
+      hospitalId: inquiry.hospitalId || null,
+      destinationType: inquiry.hospitalId ? 'hospital' : 'custom',
+      status: 'active',
+      active: true,
+      startDate: todayStr,
+      endDate: endDateStr,
+      targetLevel: inquiry.targetLevel || 'state',
+      country: 'India',
+      state: inquiry.state || '',
+      district: inquiry.district || '',
+      mandal: inquiry.mandal || '',
+      village: inquiry.village || '',
+      pincode: inquiry.pincode || '',
+      displayPanels: ['customer', 'hospital'],
+      priority: 15,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      hospitalName: inquiry.hospitalName || ''
+    };
+
+    store.locationBanners.unshift(newBanner);
+
+    // Mark inquiry as approved
+    inquiry.status = 'approved';
+    inquiry.bannerId = newBanner.id;
+    inquiry.updatedAt = new Date().toISOString();
+
+    const inqIdx = store.adsInquiries.findIndex(i => i.id === inquiry.id);
+    if (inqIdx >= 0) {
+      store.adsInquiries[inqIdx] = inquiry;
+    } else {
+      store.adsInquiries.unshift(inquiry);
+    }
+
+    store.lastUpdated = Date.now();
+    await saveUnifiedStore(store);
+
+    res.json({
+      success: true,
+      message: 'Inquiry approved and banner published live',
+      banner: newBanner,
+      inquiry
+    });
+  } catch (err) {
+    console.error('Error approving ad inquiry:', err);
+    res.status(500).json({ success: false, message: err.message || 'Failed to approve inquiry' });
   }
-
-  // Create the banner
-  const newBanner = {
-    id: `banner-ad-${Date.now()}`,
-    title: inquiry.title,
-    subtitle: inquiry.description || `${inquiry.hospitalName} Special Announcement`,
-    description: inquiry.description || '',
-    targetLevel: inquiry.targetLevel || 'state',
-    state: inquiry.state || '',
-    district: inquiry.district || '',
-    mandal: inquiry.mandal || '',
-    village: inquiry.village || '',
-    pincode: inquiry.pincode || '',
-    country: 'India',
-    imageUrl: inquiry.imageUrl || 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=1200&q=80',
-    link: inquiry.link || (inquiry.hospitalId ? `/hospitals/${inquiry.hospitalId}` : '/'),
-    ctaText: inquiry.ctaText || 'Book Token',
-    badge: 'HOSPITAL PROMOTION',
-    priority: 10,
-    status: 'active',
-    startDate: new Date().toISOString(),
-    endDate: new Date(Date.now() + (Number(inquiry.durationDays || 30) * 86400000)).toISOString(),
-    createdAt: new Date().toISOString(),
-    hospitalId: inquiry.hospitalId,
-    hospitalName: inquiry.hospitalName
-  };
-
-  store.locationBanners.unshift(newBanner);
-
-  // Mark inquiry as approved
-  store.adsInquiries = store.adsInquiries.map(i => i.id === id ? {
-    ...i,
-    status: 'approved',
-    bannerId: newBanner.id,
-    updatedAt: new Date().toISOString()
-  } : i);
-
-  store.lastUpdated = Date.now();
-  await saveUnifiedStore(store);
-
-  res.json({ success: true, message: 'Inquiry approved and banner published live', banner: newBanner, inquiry });
 });
 
 
