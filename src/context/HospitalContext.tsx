@@ -157,9 +157,9 @@ export interface HospitalStaffMember {
   id: string;
   employeeId: string;
   name: string;
-  photo: string;
+  photo?: string;
   phone: string;
-  email: string;
+  email?: string;
   departmentId: string;
   departmentName: string;
   designation: string;
@@ -1398,15 +1398,33 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         { date: new Date().toISOString().split('T')[0], status: 'present', checkIn: '09:00 AM' }
       ]
     };
-    setStaff(prev => [newStaff, ...prev]);
+    setStaff(prev => {
+      const updated = [newStaff, ...prev];
+      if (targetHospId) {
+        localStorage.setItem(`insta_hospital_staff_${targetHospId}`, JSON.stringify(updated));
+      }
+      return updated;
+    });
   };
 
   const updateStaffMember = (id: string, updates: Partial<HospitalStaffMember>) => {
-    setStaff(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
+    setStaff(prev => {
+      const updated = prev.map(s => s.id === id ? { ...s, ...updates } : s);
+      if (targetHospId) {
+        localStorage.setItem(`insta_hospital_staff_${targetHospId}`, JSON.stringify(updated));
+      }
+      return updated;
+    });
   };
 
   const deleteStaffMember = (id: string) => {
-    setStaff(prev => prev.filter(s => s.id !== id));
+    setStaff(prev => {
+      const updated = prev.filter(s => s.id !== id);
+      if (targetHospId) {
+        localStorage.setItem(`insta_hospital_staff_${targetHospId}`, JSON.stringify(updated));
+      }
+      return updated;
+    });
   };
 
   const markStaffAttendance = (
@@ -1417,23 +1435,29 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     checkOut?: string,
     notes?: string
   ) => {
-    setStaff(prev => prev.map(s => {
-      if (s.id !== staffId) return s;
-      const existingIdx = s.attendance.findIndex(a => a.date === date);
-      let updatedAttendance = [...s.attendance];
-      if (existingIdx >= 0) {
-        updatedAttendance[existingIdx] = {
-          ...updatedAttendance[existingIdx],
-          status,
-          checkIn: checkIn || updatedAttendance[existingIdx].checkIn,
-          checkOut: checkOut || updatedAttendance[existingIdx].checkOut,
-          notes: notes || updatedAttendance[existingIdx].notes
-        };
-      } else {
-        updatedAttendance.push({ date, status, checkIn, checkOut, notes });
+    setStaff(prev => {
+      const updated = prev.map(s => {
+        if (s.id !== staffId) return s;
+        const existingIdx = s.attendance.findIndex(a => a.date === date);
+        let updatedAttendance = [...s.attendance];
+        if (existingIdx >= 0) {
+          updatedAttendance[existingIdx] = {
+            ...updatedAttendance[existingIdx],
+            status,
+            checkIn: checkIn || updatedAttendance[existingIdx].checkIn,
+            checkOut: checkOut || updatedAttendance[existingIdx].checkOut,
+            notes: notes || updatedAttendance[existingIdx].notes
+          };
+        } else {
+          updatedAttendance.push({ date, status, checkIn, checkOut, notes });
+        }
+        return { ...s, attendance: updatedAttendance };
+      });
+      if (targetHospId) {
+        localStorage.setItem(`insta_hospital_staff_${targetHospId}`, JSON.stringify(updated));
       }
-      return { ...s, attendance: updatedAttendance };
-    }));
+      return updated;
+    });
   };
 
   // Tokens

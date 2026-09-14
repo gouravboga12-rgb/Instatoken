@@ -4,7 +4,7 @@ import type { HospitalStaffMember, StaffAttendanceRecord } from '../../context/H
 import {
   Users, UserPlus, Search, Phone, Mail, Clock,
   CheckCircle2, XCircle, AlertCircle, Trash2, Edit3,
-  Building2
+  Building2, Upload, User
 } from 'lucide-react';
 
 export const HospitalStaff: React.FC = () => {
@@ -61,12 +61,27 @@ export const HospitalStaff: React.FC = () => {
   }).length;
   const totalMonthlyPayroll = staff.reduce((acc, s) => acc + (Number(s.salary) || 0), 0);
 
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        alert('Image size should be less than 2MB');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData(prev => ({ ...prev, photo: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleOpenAdd = () => {
     setEditingStaff(null);
     setFormData({
       employeeId: `EMP-${Math.floor(1000 + Math.random() * 9000)}`,
       name: '',
-      photo: `https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80`,
+      photo: '',
       phone: '',
       email: '',
       departmentId: departments[0]?.id || 'dept-general',
@@ -86,9 +101,9 @@ export const HospitalStaff: React.FC = () => {
     setFormData({
       employeeId: member.employeeId,
       name: member.name,
-      photo: member.photo,
+      photo: member.photo || '',
       phone: member.phone,
-      email: member.email,
+      email: member.email || '',
       departmentId: member.departmentId,
       departmentName: member.departmentName,
       designation: member.designation,
@@ -262,11 +277,17 @@ export const HospitalStaff: React.FC = () => {
                       {/* Employee Info */}
                       <td className="py-3.5 px-4">
                         <div className="flex items-center gap-3">
-                          <img
-                            src={member.photo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80'}
-                            alt={member.name}
-                            className="w-10 h-10 rounded-full object-cover border border-slate-200"
-                          />
+                          {member.photo ? (
+                            <img
+                              src={member.photo}
+                              alt={member.name}
+                              className="w-10 h-10 rounded-full object-cover border border-slate-200"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 font-extrabold text-xs shrink-0">
+                              {member.name ? member.name.charAt(0).toUpperCase() : <User size={16} />}
+                            </div>
+                          )}
                           <div>
                             <p className="font-extrabold text-slate-900 text-sm leading-tight">{member.name}</p>
                             <span className="inline-block mt-0.5 px-2 py-0.5 bg-blue-50 text-blue-700 font-mono text-[10px] font-bold rounded-md">
@@ -428,7 +449,9 @@ export const HospitalStaff: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="text-[11px] font-bold text-slate-700 block mb-1">Email Address</label>
+                  <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                    Email Address <span className="text-slate-400 font-normal">(Optional)</span>
+                  </label>
                   <input
                     type="email"
                     placeholder="staff@hospital.com"
@@ -511,15 +534,48 @@ export const HospitalStaff: React.FC = () => {
                 </div>
               </div>
 
-              <div>
-                <label className="text-[11px] font-bold text-slate-700 block mb-1">Profile Photo URL (AWS S3 Ready)</label>
-                <input
-                  type="url"
-                  placeholder="https://..."
-                  value={formData.photo}
-                  onChange={(e) => setFormData({ ...formData, photo: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500"
-                />
+              {/* Photo Upload Section */}
+              <div className="flex flex-col sm:flex-row items-center gap-4 p-4 bg-slate-50 border border-slate-100 rounded-2xl">
+                <div className="w-16 h-16 rounded-2xl bg-white border border-slate-200 shadow-xs overflow-hidden shrink-0 flex items-center justify-center text-slate-400 font-extrabold text-lg">
+                  {formData.photo ? (
+                    <img src={formData.photo} alt="Staff preview" className="w-full h-full object-cover" />
+                  ) : (
+                    <User size={28} className="text-slate-300" />
+                  )}
+                </div>
+                <div className="flex-1 space-y-1.5 text-center sm:text-left">
+                  <label className="text-xs font-extrabold text-slate-700 block">
+                    Staff Photo <span className="text-slate-400 font-normal">(Optional)</span>
+                  </label>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold px-3 py-1.5 rounded-xl cursor-pointer inline-flex items-center gap-1.5 transition-colors shadow-xs">
+                      <Upload size={13} />
+                      <span>Upload Photo</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handlePhotoUpload}
+                        className="hidden"
+                      />
+                    </label>
+                    {formData.photo && (
+                      <button
+                        type="button"
+                        onClick={() => setFormData(prev => ({ ...prev, photo: '' }))}
+                        className="text-xs font-bold text-red-600 hover:bg-red-50 px-2.5 py-1.5 rounded-xl border border-red-200 cursor-pointer transition-colors"
+                      >
+                        Remove Photo
+                      </button>
+                    )}
+                  </div>
+                  {formData.photo && formData.photo.startsWith('data:') && (
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 inline-flex items-center gap-1">
+                        ✓ Photo uploaded from device
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="flex justify-end gap-2 pt-4 border-t border-slate-100">
