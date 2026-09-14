@@ -789,6 +789,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           'info'
         );
 
+      } else if (event.type === 'APPOINTMENT_ADDED') {
+        const appt = event.data;
+        if (appt && appt.id) {
+          setAppointments(prev => [appt, ...prev.filter(a => a.id !== appt.id)]);
+        }
+
+      } else if (event.type === 'HOSPITAL_COMMUNICATION_BROADCAST') {
+        const { message, hospitalName, type } = event.data || {};
+        if (message) {
+          addNotification(
+            type === 'push' ? `Push Alert: ${hospitalName || 'Hospital'}` : `Hospital Alert: ${hospitalName || 'Hospital'}`,
+            message,
+            'info'
+          );
+        }
+
       } else if (event.type === 'CLOUD_SYNC_UPDATED') {
         // Backend poller found newer data — re-hydrate from updated localStorage
         setHospitals(getHydratedHospitals());

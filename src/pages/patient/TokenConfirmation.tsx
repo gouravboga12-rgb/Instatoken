@@ -51,12 +51,61 @@ export const TokenConfirmation: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [showQr, setShowQr] = useState(false);
 
-  // Look in React state first, then fallback to fetched appointment
+  // Check local appointment cache first for instant synchronous resolution
+  const savedLocalAppointment = React.useMemo(() => {
+    if (!appointmentId) return null;
+    try {
+      const saved = localStorage.getItem('insta_appointments');
+      if (saved) {
+        const list = JSON.parse(saved);
+        if (Array.isArray(list)) {
+          const found = list.find((a: any) => a.id === appointmentId || String(a.tokenNumber) === appointmentId);
+          if (found) return found;
+        }
+      }
+      const savedToks = localStorage.getItem('insta_hospital_tokens');
+      if (savedToks) {
+        const tList = JSON.parse(savedToks);
+        if (Array.isArray(tList)) {
+          const tok = tList.find((t: any) => t.id === appointmentId || String(t.tokenNo) === appointmentId);
+          if (tok) {
+            return {
+              id: tok.id,
+              tokenNumber: tok.tokenNo || 1,
+              patientName: tok.patientName || 'Patient',
+              age: tok.patientAge || 28,
+              gender: tok.patientGender || 'Male',
+              phone: tok.patientPhone || '',
+              email: tok.email || '',
+              address: tok.address || '',
+              hospitalId: tok.hospitalId,
+              hospitalName: tok.hospitalName || 'Hospital',
+              doctorId: tok.doctorId,
+              doctorName: tok.doctorName || 'Doctor',
+              departmentName: tok.departmentName || 'General Medicine',
+              date: tok.bookingDate || new Date().toISOString().split('T')[0],
+              time: tok.time || '10:00 AM',
+              fee: tok.consultationFee || 500,
+              status: tok.status || 'booked',
+              paymentId: `OFFLINE-${tok.tokenNo}`,
+              paymentMethod: 'Counter / Walk-in Cash',
+              estimatedWaitTime: tok.estimatedWait || 15
+            };
+          }
+        }
+      }
+    } catch (e) {}
+    return null;
+  }, [appointmentId]);
+
+  // Look in React state first, then fallback to local cache, then fetched appointment
   const inMemoryAppointment = appointments.find(a => a.id === appointmentId) || (appointmentId ? null : appointments[0]);
-  const appointment = inMemoryAppointment || fetchedAppointment;
+  const appointment = inMemoryAppointment || savedLocalAppointment || fetchedAppointment;
+
+  const hasHospitalSession = Boolean(localStorage.getItem('insta_hospital_user') || localStorage.getItem('insta_hospital_auth_token'));
 
   useEffect(() => {
-    if (inMemoryAppointment) {
+    if (inMemoryAppointment || savedLocalAppointment) {
       setIsLoading(false);
       return;
     }
@@ -181,8 +230,26 @@ export const TokenConfirmation: React.FC = () => {
   });
 
   return (
-    <div className="pb-24 bg-slate-50 min-h-screen md:min-h-0 md:pb-6 max-w-5xl mx-auto">
+    <div className="pb-24 bg-slate-50 min-h-screen md:min-h-0 md:pb-6 max-w-5xl mx-auto px-4 sm:px-6 pt-4">
       
+      {/* Hospital Panel Quick Return Banner */}
+      {hasHospitalSession && (
+        <div className="mb-4 bg-slate-900 text-white px-4 py-3 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-md border border-slate-800 animate-fadeIn">
+          <div className="flex items-center gap-2">
+            <span className="px-2 py-0.5 rounded-lg bg-blue-600 text-white text-[10px] font-black uppercase tracking-wider">Hospital Panel</span>
+            <span className="text-xs font-bold text-slate-200">
+              Customer Token #{appointment?.tokenNumber || 1} generated successfully
+            </span>
+          </div>
+          <button
+            onClick={() => navigate('/hospital/tokens/all')}
+            className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl border-none cursor-pointer flex items-center gap-1.5 transition-all self-start sm:self-auto shadow-sm"
+          >
+            <span>← Return to Hospital Panel</span>
+          </button>
+        </div>
+      )}
+
       {/* Success Banner */}
       <div className="flex flex-col items-center text-center py-6 px-5 relative overflow-hidden bg-white rounded-3xl border border-slate-100 mb-6 shadow-sm">
         <button 

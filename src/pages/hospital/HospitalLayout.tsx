@@ -21,7 +21,7 @@ import { DepartmentManagement } from './DepartmentManagement';
 import {
   LayoutDashboard, Plus, List, Wifi, WifiOff, Calendar, RefreshCw,
   Users, Stethoscope, Building2,
-  MessageSquare, BarChart2, Download, Settings,
+  BarChart2, Download, Settings,
   ChevronLeft, ChevronRight, Bell, Search, LogOut, Menu, X, Activity,
   CreditCard, DollarSign, Sliders
 } from 'lucide-react';
@@ -86,8 +86,7 @@ const buildNav = (doctors: HospitalDoctor[], tokens: TokenRecord[]): { section: 
       { id: 'patients', label: 'Patients', icon: <Users size={15} />, path: '/hospital/patients' },
     ]},
     { section: 'Communication', items: [
-      { id: 'communication', label: 'Push Notification', icon: <Bell size={15} />, path: '/hospital/communication' },
-      { id: 'sms', label: 'SMS / WhatsApp', icon: <MessageSquare size={15} />, path: '/hospital/communication?tab=sms' },
+      { id: 'communication', label: 'Push Notifications', icon: <Bell size={15} />, path: '/hospital/communication' },
     ]},
     { section: 'Reports & Analytics', items: [
       { id: 'reports', label: 'Reports & Analytics', icon: <BarChart2 size={15} />, path: '/hospital/reports' },

@@ -78,6 +78,7 @@ export interface TokenRecord {
   revisitValidUpto?: string;
   notes?: string;
   hospitalId?: string;
+  hospitalName?: string;
   isExisting?: boolean;
   rmpReference?: { name: string; phone: string } | null;
 }
@@ -138,7 +139,7 @@ export interface ScheduleConfig {
 
 export interface NotificationMessage {
   id: string;
-  type: 'push' | 'sms' | 'whatsapp' | 'email';
+  type: 'inapp' | 'push' | 'sms' | 'whatsapp' | 'email';
   recipient: string;
   message: string;
   sentAt: string;
@@ -1480,6 +1481,8 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const todayStr = new Date().toISOString().split('T')[0];
     const timeStr = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
 
+    const resolvedHospitalName = hospitalProfile?.name || hospitals.find(h => h.id === targetHospId)?.name || 'Hospital';
+
     const newToken: TokenRecord = {
       id: `tok-${Date.now()}`,
       tokenNo: maxToken + 1,
@@ -1502,7 +1505,8 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       paymentStatus: 'pending',
       paymentMethod: 'Cash',
       isRevisit: false,
-      hospitalId: targetHospId
+      hospitalId: targetHospId,
+      hospitalName: resolvedHospitalName
     };
 
     const updated = [newToken, ...tokens];
@@ -1539,7 +1543,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         email: '',
         address: form.address || '',
         hospitalId: targetHospId,
-        hospitalName: hospitalProfile?.name || 'Apollo Spectra Hospital',
+        hospitalName: resolvedHospitalName,
         doctorId: newToken.doctorId,
         doctorName: newToken.doctorName,
         departmentName: newToken.departmentName,
@@ -1553,6 +1557,14 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         createdAt: new Date().toISOString()
       };
       localStorage.setItem('insta_appointments', JSON.stringify([newAppt, ...curAppts]));
+
+      fetch('/api/appointments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ appointment: newAppt })
+      }).catch(() => {});
+
+      broadcastGlobalSync('APPOINTMENT_ADDED', newAppt);
     } catch (e) {}
 
     // Register / update hospital patient record (Phase 20)
@@ -1738,7 +1750,14 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   // Notifications
   const sendNotification = (msg: Omit<NotificationMessage, 'id' | 'sentAt' | 'status'>) => {
-    setNotifications(prev => [...prev, { ...msg, id: `notif-${Date.now()}`, sentAt: new Date().toISOString(), status: 'sent' }]);
+    const newNotif: NotificationMessage = { ...msg, id: `notif-${Date.now()}`, sentAt: new Date().toISOString(), status: 'sent' };
+    setNotifications(prev => [newNotif, ...prev]);
+
+    // Broadcast live to patient app & website
+    broadcastGlobalSync('HOSPITAL_COMMUNICATION_BROADCAST', {
+      ...newNotif,
+      hospitalName: hospitalProfile?.name || 'Hospital'
+    });
   };
 
   const availableHospitals = (hospitals || []).map(h => ({ id: h.id, name: h.name, category: h.category }));

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useLocation, useSearchParams } from 'react-router-dom';
+import { useLocation, useSearchParams, useNavigate } from 'react-router-dom';
 import { useHospital } from '../../context/HospitalContext';
 import { useApp } from '../../context/AppContext';
 import type { TokenRecord, PatientRecord } from '../../context/HospitalContext';
@@ -274,7 +274,8 @@ const WalkInGenerator: React.FC<{
   onCreated?: (token: TokenRecord) => void;
   onRequestCreateAccount?: () => void;
 }> = ({ initialDoctorId, initialDepartmentId, onCreated, onRequestCreateAccount }) => {
-  const { generateWalkInToken, doctors, departments, scheduleConfig, patients } = useHospital();
+  const navigate = useNavigate();
+  const { generateWalkInToken, doctors, departments, scheduleConfig, patients, hospitalProfile } = useHospital();
   const { user, customers, appointments } = useApp();
 
   const getInitialDoctorAndDept = () => {
@@ -515,6 +516,8 @@ const WalkInGenerator: React.FC<{
     setGenerated(token);
     setError('');
     if (onCreated) onCreated(token);
+    // Redirect to customer account token confirmation page
+    navigate(`/confirmation/${token.id}`);
   };
 
   const handleReset = () => {
@@ -816,7 +819,7 @@ const WalkInGenerator: React.FC<{
 
           {/* Printable Ticket */}
           <div className="bg-slate-50 border-2 border-dashed border-slate-300 rounded-3xl p-6 text-center space-y-4 max-w-md mx-auto">
-            <div className="text-xs font-black text-slate-400 uppercase tracking-widest">Apollo Spectra Hospital</div>
+            <div className="text-xs font-black text-slate-400 uppercase tracking-widest">{hospitalProfile?.name || 'Hospital'}</div>
             <div className="text-xs text-slate-600 font-medium">Walk-in OPD Queue Slip</div>
 
             <div className="py-3 border-y border-dashed border-slate-200">
@@ -1678,19 +1681,28 @@ const TokenTable: React.FC<{
 };
 
 // ─── Walk-In Modal Wrapper ────────────────────────────────────────────────
-const WalkInModal: React.FC<{ onClose: () => void; onRequestCreateAccount: () => void }> = ({ onClose, onRequestCreateAccount }) => (
-  <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl p-6 relative max-h-[90vh] overflow-y-auto">
-      <button
-        onClick={onClose}
-        className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 cursor-pointer border-none"
-      >
-        <X size={18} />
-      </button>
-      <WalkInGenerator onCreated={() => {}} onRequestCreateAccount={onRequestCreateAccount} />
+const WalkInModal: React.FC<{ onClose: () => void; onRequestCreateAccount: () => void }> = ({ onClose, onRequestCreateAccount }) => {
+  const navigate = useNavigate();
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl p-6 relative max-h-[90vh] overflow-y-auto">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 cursor-pointer border-none"
+        >
+          <X size={18} />
+        </button>
+        <WalkInGenerator
+          onCreated={(tok) => {
+            onClose();
+            navigate(`/confirmation/${tok.id}`);
+          }}
+          onRequestCreateAccount={onRequestCreateAccount}
+        />
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 // ─── Main TokenManagement Component ───────────────────────────────────────
 export const TokenManagement: React.FC = () => {
