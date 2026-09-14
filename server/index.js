@@ -425,12 +425,13 @@ function mapHospitalDoctorsToPublic(docs) {
     rating: Number(d.rating) || 4.9,
     reviewsCount: Number(d.reviewsCount || d.totalPatients) || 120,
     image: d.photo || d.image || '',
-    availability: d.availability || {
-      days: Array.isArray(d.opdDays) && d.opdDays.length > 0 ? d.opdDays : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+    availability: {
+      days: Array.isArray(d.opdDays) && d.opdDays.length > 0 ? d.opdDays : (d.availability?.days || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']),
       slots: Array.isArray(d.sessions) && d.sessions.length > 0
         ? d.sessions.filter(s => s.active !== false).map(s => `${s.startTime} - ${s.endTime}`)
         : ['09:00 AM - 01:00 PM', '05:00 PM - 09:00 PM']
     },
+    opdDays: Array.isArray(d.opdDays) && d.opdDays.length > 0 ? d.opdDays : (d.availability?.days || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']),
     currentQueue: d.currentQueue || 0,
     nextAvailableToken: d.nextAvailableToken || 1,
     estimatedWaitPerPatient: d.estimatedWaitPerPatient || d.consultationDuration || 15,
@@ -1407,6 +1408,33 @@ app.post('/api/hospitals/:id/profile', requireHospitalAuth, async (req, res) => 
 
   await saveUnifiedStore(store);
   res.json({ success: true, hospitalId: id, profile, hospitals: store.hospitals });
+});
+
+// ─── Hospital Schedules & Booking Rules ──────────────────────────────────────
+app.get('/api/hospitals/:id/schedules', async (req, res) => {
+  const { id } = req.params;
+  const store = await getUnifiedStore();
+  const schedule = store.hospitalSchedules?.[id] || {
+    bookingOpensDaysBefore: 3,
+    advanceBookingLimit: 7,
+    bufferTime: 15,
+    dailyTokenLimit: 150,
+    walkInPercentage: 30,
+    onlinePercentage: 70,
+    emergencySlots: 5,
+    autoContinuity: true
+  };
+  res.json({ success: true, hospitalId: id, schedule });
+});
+
+app.post('/api/hospitals/:id/schedules', async (req, res) => {
+  const { id } = req.params;
+  const { schedule } = req.body;
+  const store = await getUnifiedStore();
+  store.hospitalSchedules = store.hospitalSchedules || {};
+  store.hospitalSchedules[id] = schedule;
+  await saveUnifiedStore(store);
+  res.json({ success: true, hospitalId: id, schedule });
 });
 
 // ─── Hospital Departments (Phase 21 & 22) ────────────────────────────────────

@@ -1152,6 +1152,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           days: (d.opdDays && d.opdDays.length > 0) ? d.opdDays : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
           slots: docSessions.filter(s => s.active !== false).map(s => `${s.startTime} - ${s.endTime}`)
         },
+        opdDays: (d.opdDays && d.opdDays.length > 0) ? d.opdDays : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
         currentQueue: 0,
         nextAvailableToken: 1,
         estimatedWaitPerPatient: Number(d.consultationDuration) || 15,
@@ -1669,6 +1670,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setScheduleConfig(prev => {
       const updated = { ...prev, ...config };
       localStorage.setItem('insta_hospital_schedule', JSON.stringify(updated));
+      localStorage.setItem(`insta_hospital_schedule_${targetHospId}`, JSON.stringify(updated));
       fetch(`/api/hospitals/${targetHospId}/schedules`, {
         method: 'POST',
         headers: {
@@ -1677,7 +1679,16 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         },
         body: JSON.stringify({ schedule: updated })
       }).catch(e => console.warn('Failed to save schedule to AWS RDS:', e));
-      broadcastGlobalSync('HOSPITAL_SCHEDULE_UPDATED', updated);
+
+      fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          hospitalSchedules: { [targetHospId]: updated }
+        })
+      }).catch(() => {});
+
+      broadcastGlobalSync('HOSPITAL_SCHEDULE_UPDATED', { hospitalId: targetHospId, schedule: updated });
       return updated;
     });
   };

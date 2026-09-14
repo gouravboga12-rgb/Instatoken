@@ -26,6 +26,8 @@ export interface Doctor {
     breakTime?: number;
     active: boolean;
   }>;
+  opdDays?: string[];
+  active?: boolean;
 }
 
 export interface Department {

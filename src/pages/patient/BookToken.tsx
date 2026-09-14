@@ -43,27 +43,7 @@ const formatDateOption = (dateStr: string) => {
   return null;
 };
 
-const generateDynamicDateOptions = () => {
-  const options = [];
-  for (let i = 0; i < 5; i++) {
-    const d = new Date();
-    d.setHours(12, 0, 0, 0);
-    d.setDate(d.getDate() + i);
-    
-    const year = d.getFullYear();
-    const monthVal = String(d.getMonth() + 1).padStart(2, '0');
-    const dateNumVal = String(d.getDate()).padStart(2, '0');
-    const dateStr = `${year}-${monthVal}-${dateNumVal}`;
-    
-    options.push({
-      label: i === 0 ? 'Today' : weekdaysList[d.getDay()],
-      dayNum: String(d.getDate()),
-      month: monthsList[d.getMonth()],
-      dateStr: dateStr
-    });
-  }
-  return options;
-};
+
 
 export const BookToken: React.FC = () => {
   const { hospitalId, doctorId } = useParams<{ hospitalId: string; doctorId: string }>();
@@ -147,6 +127,86 @@ export const BookToken: React.FC = () => {
     });
   }, [activeSessionsList]);
 
+  // Resolve doctor's configured working days
+  const doctorWorkingDays: string[] = useMemo(() => {
+    // 1. Direct doctor opdDays
+    if (Array.isArray(doctor?.opdDays) && doctor.opdDays.length > 0) return doctor.opdDays;
+    // 2. Doctor availability.days
+    if (Array.isArray(doctor?.availability?.days) && doctor.availability.days.length > 0) return doctor.availability.days;
+    // 3. Check local storage for this hospital's doctors
+    if (typeof window !== 'undefined' && hospitalId && doctor?.id) {
+      try {
+        const savedDocs = localStorage.getItem(`insta_hospital_doctors_${hospitalId}`) || localStorage.getItem('insta_hospital_doctors');
+        if (savedDocs) {
+          const parsed = JSON.parse(savedDocs);
+          const found = parsed.find((d: any) => d.id === doctor.id);
+          if (found?.opdDays && Array.isArray(found.opdDays) && found.opdDays.length > 0) {
+            return found.opdDays;
+          }
+        }
+      } catch (e) {}
+    }
+    return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  }, [doctor, hospitalId, syncVersion]);
+
+  // Resolve Hospital Booking Rules
+  const [scheduleConfig, setScheduleConfig] = useState<{
+    bookingOpensDaysBefore: number;
+    advanceBookingLimit: number;
+  }>(() => {
+    try {
+      const saved = localStorage.getItem(`insta_hospital_schedule_${hospitalId}`) || localStorage.getItem('insta_hospital_schedule');
+      if (saved) {
+        const p = JSON.parse(saved);
+        return {
+          bookingOpensDaysBefore: Number(p.bookingOpensDaysBefore) || 3,
+          advanceBookingLimit: Number(p.advanceBookingLimit) || 7
+        };
+      }
+    } catch (e) {}
+    return { bookingOpensDaysBefore: 3, advanceBookingLimit: 7 };
+  });
+
+  useEffect(() => {
+    if (!hospitalId) return;
+    fetch(`/api/hospitals/${hospitalId}/schedules`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.schedule) {
+          setScheduleConfig({
+            bookingOpensDaysBefore: Number(data.schedule.bookingOpensDaysBefore) || 3,
+            advanceBookingLimit: Number(data.schedule.advanceBookingLimit) || 7
+          });
+        }
+      })
+      .catch(() => {});
+  }, [hospitalId, syncVersion]);
+
+  // How many days into the future slots can be booked
+  const maxBookingDays = useMemo(() => {
+    const openDays = Number(scheduleConfig?.bookingOpensDaysBefore) || 3;
+    const maxDays = Number(scheduleConfig?.advanceBookingLimit) || 7;
+    return Math.max(1, Math.min(openDays, maxDays));
+  }, [scheduleConfig]);
+
+  const maxAllowedDateStr = useMemo(() => {
+    const d = new Date();
+    d.setHours(12, 0, 0, 0);
+    d.setDate(d.getDate() + (maxBookingDays - 1));
+    const year = d.getFullYear();
+    const monthVal = String(d.getMonth() + 1).padStart(2, '0');
+    const dateNumVal = String(d.getDate()).padStart(2, '0');
+    return `${year}-${monthVal}-${dateNumVal}`;
+  }, [maxBookingDays]);
+
+  const isDoctorAvailableOnDate = (dateStr: string): boolean => {
+    const parts = dateStr.split('-');
+    if (parts.length !== 3) return true;
+    const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    const dayName = weekdaysList[d.getDay()];
+    return doctorWorkingDays.includes(dayName);
+  };
+
   // States
   const [selectedDate, setSelectedDate] = useState<string>(getTodayDateStr());
   const [selectedSession, setSelectedSession] = useState<string>(activeSessionsList[0]?.name || 'Morning');
@@ -164,6 +224,61 @@ export const BookToken: React.FC = () => {
   
   const [error, setError] = useState('');
 
+  const dateInputRef = useRef<HTMLInputElement>(null);
+
+  // Generate date pills dynamically constrained by hospital booking window and doctor's schedule
+  const dateOptions = useMemo(() => {
+    const pills = [];
+    for (let i = 0; i < maxBookingDays; i++) {
+      const d = new Date();
+      d.setHours(12, 0, 0, 0);
+      d.setDate(d.getDate() + i);
+
+      const year = d.getFullYear();
+      const monthVal = String(d.getMonth() + 1).padStart(2, '0');
+      const dateNumVal = String(d.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${monthVal}-${dateNumVal}`;
+      const weekdayName = weekdaysList[d.getDay()];
+      const isWorking = doctorWorkingDays.includes(weekdayName);
+
+      pills.push({
+        label: i === 0 ? 'Today' : weekdayName,
+        dayNum: String(d.getDate()),
+        month: monthsList[d.getMonth()],
+        dateStr,
+        isWorking,
+        weekdayName
+      });
+    }
+
+    const exists = pills.some(p => p.dateStr === selectedDate);
+    if (!exists && selectedDate && selectedDate >= getTodayDateStr() && selectedDate <= maxAllowedDateStr) {
+      const customPill = formatDateOption(selectedDate);
+      if (customPill) {
+        const parts = selectedDate.split('-');
+        const cd = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+        const weekdayName = weekdaysList[cd.getDay()];
+        const isWorking = doctorWorkingDays.includes(weekdayName);
+        pills.push({ ...customPill, isWorking, weekdayName });
+      }
+    }
+    return pills;
+  }, [maxBookingDays, doctorWorkingDays, selectedDate, maxAllowedDateStr]);
+
+  // Auto-switch away from doctor's off-day or dates exceeding the booking window
+  useEffect(() => {
+    if (!selectedDate) {
+      const firstAvailable = dateOptions.find(p => p.isWorking);
+      if (firstAvailable) setSelectedDate(firstAvailable.dateStr);
+      return;
+    }
+    if (selectedDate > maxAllowedDateStr || !isDoctorAvailableOnDate(selectedDate)) {
+      const firstAvailable = dateOptions.find(p => p.isWorking);
+      if (firstAvailable) {
+        setSelectedDate(firstAvailable.dateStr);
+      }
+    }
+  }, [selectedDate, maxAllowedDateStr, dateOptions, doctorWorkingDays]);
 
   if (!hospital || !doctor) {
     return (
@@ -189,21 +304,6 @@ export const BookToken: React.FC = () => {
     );
   }
 
-  const dateInputRef = useRef<HTMLInputElement>(null);
-
-  // Generate date pills dynamically including custom selected date
-  const dateOptions = useMemo(() => {
-    const basePills = generateDynamicDateOptions();
-    const exists = basePills.some(p => p.dateStr === selectedDate);
-    if (!exists && selectedDate) {
-      const customPill = formatDateOption(selectedDate);
-      if (customPill) {
-        return [...basePills.slice(0, 4), customPill];
-      }
-    }
-    return basePills;
-  }, [selectedDate]);
-
   const handleOpenCalendar = () => {
     if (dateInputRef.current) {
       if ('showPicker' in dateInputRef.current && typeof dateInputRef.current.showPicker === 'function') {
@@ -224,6 +324,16 @@ export const BookToken: React.FC = () => {
     }
     if (!phone.trim()) {
       setError('Please enter mobile number');
+      return;
+    }
+    if (!isDoctorAvailableOnDate(selectedDate)) {
+      const parts = selectedDate.split('-');
+      const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+      setError(`Dr. ${doctor.name} is not available on ${weekdaysList[d.getDay()]}s (Doctor Off). Please select an active OPD day.`);
+      return;
+    }
+    if (selectedDate > maxAllowedDateStr) {
+      setError(`Selected date exceeds the hospital's advance booking window of ${maxBookingDays} days.`);
       return;
     }
 
@@ -370,13 +480,18 @@ export const BookToken: React.FC = () => {
 
         <form onSubmit={handleProceedToBooking} className="space-y-5">
           
-          {/* Section 1: Select Date matching Image 3 */}
+          {/* Section 1: Select Date constrained by hospital rules and doctor opdDays */}
           <div>
             <div className="flex justify-between items-center mb-2.5">
-              <h4 className="text-xs font-extrabold text-slate-900 flex items-center gap-1.5">
-                <CalendarIcon size={16} className="text-blue-600" />
-                <span>1. Select Date</span>
-              </h4>
+              <div>
+                <h4 className="text-xs font-extrabold text-slate-900 flex items-center gap-1.5">
+                  <CalendarIcon size={16} className="text-blue-600" />
+                  <span>1. Select Date</span>
+                </h4>
+                <span className="text-[10px] font-semibold text-slate-400">
+                  Advance booking open: {maxBookingDays} days
+                </span>
+              </div>
               <div className="relative">
                 <button 
                   type="button" 
@@ -390,11 +505,27 @@ export const BookToken: React.FC = () => {
                   ref={dateInputRef}
                   type="date"
                   min={getTodayDateStr()}
+                  max={maxAllowedDateStr}
                   value={selectedDate}
                   onChange={(e) => {
-                    if (e.target.value) {
-                      setSelectedDate(e.target.value);
+                    const val = e.target.value;
+                    if (!val) return;
+                    if (val < getTodayDateStr()) {
+                      setError('Cannot select past dates.');
+                      return;
                     }
+                    if (val > maxAllowedDateStr) {
+                      setError(`Advance booking is only allowed up to ${maxBookingDays} days in advance for this hospital (${maxAllowedDateStr}).`);
+                      return;
+                    }
+                    if (!isDoctorAvailableOnDate(val)) {
+                      const parts = val.split('-');
+                      const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+                      setError(`Dr. ${doctor.name} is not available on ${weekdaysList[d.getDay()]}s (Doctor Off). Please select an active OPD day.`);
+                      return;
+                    }
+                    setSelectedDate(val);
+                    setError('');
                   }}
                   className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
                 />
@@ -402,23 +533,42 @@ export const BookToken: React.FC = () => {
             </div>
 
             {/* Horizontal Date Selector Pills */}
-            <div className="grid grid-cols-5 gap-2">
+            <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-5 gap-2">
               {dateOptions.map((dt) => {
                 const isActive = selectedDate === dt.dateStr;
+                const isWorking = dt.isWorking;
+
                 return (
                   <button
                     key={dt.dateStr}
                     type="button"
-                    onClick={() => setSelectedDate(dt.dateStr)}
-                    className={`py-3 px-2 rounded-2xl flex flex-col items-center justify-center border transition-all cursor-pointer ${
-                      isActive 
-                        ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-500/20 scale-105' 
-                        : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+                    disabled={!isWorking}
+                    onClick={() => {
+                      if (!isWorking) {
+                        setError(`Dr. ${doctor.name} is not available on ${dt.weekdayName}s (Doctor Off).`);
+                        return;
+                      }
+                      setSelectedDate(dt.dateStr);
+                      setError('');
+                    }}
+                    title={!isWorking ? `Dr. ${doctor.name} is off on ${dt.weekdayName}s` : undefined}
+                    className={`py-3 px-2 rounded-2xl flex flex-col items-center justify-center border transition-all relative ${
+                      !isWorking
+                        ? 'bg-slate-50/70 border-slate-200 text-slate-400 cursor-not-allowed opacity-60'
+                        : isActive 
+                          ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-500/20 scale-105 cursor-pointer' 
+                          : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300 cursor-pointer'
                     }`}
                   >
-                    <span className={`text-[10px] font-bold ${isActive ? 'text-white' : 'text-slate-500'}`}>{dt.label}</span>
-                    <span className="text-lg font-black mt-0.5">{dt.dayNum}</span>
-                    <span className={`text-[9px] font-medium ${isActive ? 'text-white/80' : 'text-slate-400'}`}>{dt.month}</span>
+                    <span className={`text-[10px] font-bold ${isActive ? 'text-white' : !isWorking ? 'text-slate-400' : 'text-slate-500'}`}>
+                      {dt.label}
+                    </span>
+                    <span className={`text-lg font-black mt-0.5 ${!isWorking ? 'text-slate-400 line-through decoration-slate-300' : ''}`}>
+                      {dt.dayNum}
+                    </span>
+                    <span className={`text-[9.5px] font-extrabold ${isActive ? 'text-white' : !isWorking ? 'text-rose-500' : 'text-slate-400'}`}>
+                      {!isWorking ? 'Off' : dt.month}
+                    </span>
                   </button>
                 );
               })}
