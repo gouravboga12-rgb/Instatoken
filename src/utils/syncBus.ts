@@ -286,3 +286,6 @@ export const subscribeGlobalSync = (callback: SyncCallback) => {
     }
   };
 };
+
+export const onGlobalSync = subscribeGlobalSync;
+

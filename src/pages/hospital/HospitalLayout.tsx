@@ -13,6 +13,7 @@ import { DoctorManagement } from './DoctorManagement';
 import { PatientManagement } from './PatientManagement';
 
 import { CommunicationCenter } from './CommunicationCenter';
+import { AdsPromotion } from './AdsPromotion';
 import { BillingPayments } from './BillingPayments';
 import { ReportsAnalytics } from './ReportsAnalytics';
 import { HospitalSettings } from './HospitalSettings';
@@ -23,13 +24,13 @@ import {
   Users, Stethoscope, Building2,
   BarChart2, Download, Settings,
   ChevronLeft, ChevronRight, Bell, Search, LogOut, Menu, X, Activity,
-  CreditCard, DollarSign, Sliders
+  CreditCard, DollarSign, Sliders, Megaphone
 } from 'lucide-react';
 
 // ─── RBAC permission map ──────────────────────────────────────────────────────
 const ROLE_SECTIONS: Record<string, string[]> = {
-  owner:        ['dashboard','doctor-screens','token-manage','tokens','add-token','all-tokens','online-tokens','offline-tokens','today-tokens','upcoming-tokens','completed-tokens','cancelled-tokens','revisit-tokens','revenue','doctors','departments','sessions','staff','patients','communication','billing','reports','settings'],
-  admin:        ['dashboard','doctor-screens','token-manage','tokens','add-token','all-tokens','online-tokens','offline-tokens','today-tokens','upcoming-tokens','completed-tokens','cancelled-tokens','revisit-tokens','revenue','doctors','departments','sessions','staff','patients','reports'],
+  owner:        ['dashboard','doctor-screens','token-manage','tokens','add-token','all-tokens','online-tokens','offline-tokens','today-tokens','upcoming-tokens','completed-tokens','cancelled-tokens','revisit-tokens','revenue','doctors','departments','sessions','staff','patients','communication','ads-promotion','billing','reports','settings'],
+  admin:        ['dashboard','doctor-screens','token-manage','tokens','add-token','all-tokens','online-tokens','offline-tokens','today-tokens','upcoming-tokens','completed-tokens','cancelled-tokens','revisit-tokens','revenue','doctors','departments','sessions','staff','patients','communication','ads-promotion','reports'],
   receptionist: ['dashboard','doctor-screens','token-manage','add-token','all-tokens','today-tokens','staff','patients'],
   doctor:       ['dashboard','doctor-screens','today-tokens','patients'],
   accountant:   ['dashboard','revenue','billing','reports'],
@@ -87,6 +88,7 @@ const buildNav = (doctors: HospitalDoctor[], tokens: TokenRecord[]): { section: 
     ]},
     { section: 'Communication', items: [
       { id: 'communication', label: 'Push Notifications', icon: <Bell size={15} />, path: '/hospital/communication' },
+      { id: 'ads-promotion', label: 'Ads & Promotion', icon: <Megaphone size={15} />, path: '/hospital/ads-promotion' },
     ]},
     { section: 'Reports & Analytics', items: [
       { id: 'reports', label: 'Reports & Analytics', icon: <BarChart2 size={15} />, path: '/hospital/reports' },
@@ -353,6 +355,7 @@ export const HospitalLayout: React.FC = () => {
               <Route path="patients" element={<PatientManagement />} />
 
               <Route path="communication" element={<CommunicationCenter />} />
+              <Route path="ads-promotion" element={<AdsPromotion />} />
               <Route path="billing" element={<BillingPayments />} />
               <Route path="reports" element={<ReportsAnalytics />} />
               <Route path="settings" element={<HospitalSettings />} />

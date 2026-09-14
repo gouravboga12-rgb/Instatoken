@@ -12,8 +12,27 @@ export const MyBookings: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = React.useState<'active' | 'history'>('active');
 
-  const activeAppts = appointments.filter(a => a.status === 'booked');
-  const pastAppts = appointments.filter(a => a.status !== 'booked');
+  // De-duplicate appointments by id and normalize status
+  const dedupedAppts = React.useMemo(() => {
+    const map = new Map<string, Appointment>();
+    (appointments || []).forEach(a => {
+      if (!a || !a.id) return;
+      if (a.id === 'tok-1001' || a.patientName === 'Guest Patient') return;
+      // Normalize missing status to 'booked'
+      const normAppt: Appointment = {
+        ...a,
+        status: (a.status || 'booked') as Appointment['status']
+      };
+      // Keep newer or completed version
+      if (!map.has(a.id) || normAppt.status === 'completed') {
+        map.set(a.id, normAppt);
+      }
+    });
+    return Array.from(map.values());
+  }, [appointments]);
+
+  const activeAppts = dedupedAppts.filter(a => a.status === 'booked' || a.status === 'checked-in' || a.status === 'in-cabin');
+  const pastAppts = dedupedAppts.filter(a => a.status === 'completed' || a.status === 'cancelled');
 
   const handleCancelClick = (id: string) => {
     if (window.confirm("Are you sure you want to cancel this OPD token? Please note: Token booking fee is NON-REFUNDABLE upon cancellation.")) {
@@ -22,7 +41,8 @@ export const MyBookings: React.FC = () => {
   };
 
   const renderCard = (appt: Appointment) => {
-    const isActive = appt.status === 'booked';
+    const currentStatus = appt.status || 'booked';
+    const isActive = currentStatus === 'booked' || currentStatus === 'checked-in' || currentStatus === 'in-cabin';
 
     return (
       <Card
@@ -38,10 +58,10 @@ export const MyBookings: React.FC = () => {
           <div className="flex justify-between items-start">
             <div>
               <Badge 
-                variant={appt.status === 'booked' ? 'blue' : appt.status === 'completed' ? 'green' : 'red'} 
-                className="text-[9px] px-2 py-0.5 rounded-md mb-2"
+                variant={currentStatus === 'completed' ? 'green' : currentStatus === 'cancelled' ? 'red' : currentStatus === 'in-cabin' || currentStatus === 'checked-in' ? 'orange' : 'blue'} 
+                className="text-[9px] px-2 py-0.5 rounded-md mb-2 uppercase"
               >
-                {appt.status.toUpperCase()}
+                {currentStatus === 'in-cabin' ? 'In Consultation' : currentStatus === 'checked-in' ? 'Checked In' : currentStatus.toUpperCase()}
               </Badge>
               <h4 className="font-extrabold text-slate-800 text-sm tracking-tight">{appt.hospitalName}</h4>
               <p className="text-[10px] text-slate-500 font-semibold mt-0.5">{appt.doctorName} • {appt.departmentName}</p>

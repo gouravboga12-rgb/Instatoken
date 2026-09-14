@@ -291,7 +291,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
-          const clean = parsed.filter(a => a.id !== 'tok-1001' && a.patientName !== 'Guest Patient');
+          const map = new Map<string, Appointment>();
+          parsed.forEach((a: any) => {
+            if (!a || !a.id || a.id === 'tok-1001' || a.patientName === 'Guest Patient') return;
+            const norm: Appointment = {
+              ...a,
+              status: (a.status || 'booked') as Appointment['status']
+            };
+            if (!map.has(a.id) || norm.status === 'completed') {
+              map.set(a.id, norm);
+            }
+          });
+          const clean = Array.from(map.values());
           localStorage.setItem('insta_appointments', JSON.stringify(clean));
           return clean;
         }
@@ -793,6 +804,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const appt = event.data;
         if (appt && appt.id) {
           setAppointments(prev => [appt, ...prev.filter(a => a.id !== appt.id)]);
+        }
+
+      } else if (event.type === 'APPOINTMENT_STATUS_UPDATED') {
+        const { id, status } = event.data || {};
+        if (id && status) {
+          setAppointments(prev => prev.map(a => a.id === id ? { ...a, status } : a));
+        }
+
+      } else if (event.type === 'HOSPITAL_TOKENS_UPDATED') {
+        const updatedTokens = event.data;
+        if (Array.isArray(updatedTokens)) {
+          setAppointments(prev => prev.map(a => {
+            const matched = updatedTokens.find((t: any) => t.id === a.id);
+            if (matched) {
+              const newStatus = matched.status === 'completed' ? 'completed' :
+                ['cancelled', 'not-visited', 'skipped'].includes(matched.status) ? 'cancelled' :
+                matched.status === 'in-consultation' ? 'in-cabin' :
+                ['calling', 'checked-in'].includes(matched.status) ? 'checked-in' : 'booked';
+              return { ...a, status: newStatus };
+            }
+            return a;
+          }));
         }
 
       } else if (event.type === 'HOSPITAL_COMMUNICATION_BROADCAST') {

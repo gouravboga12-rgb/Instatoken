@@ -1639,7 +1639,41 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       return updated;
     });
 
-    // Post status update to backend (Phase 21 & 22)
+    // Map hospital token status to customer appointment status
+    const apptStatus: 'booked' | 'in-cabin' | 'checked-in' | 'completed' | 'cancelled' =
+      status === 'completed' ? 'completed' :
+      ['cancelled', 'not-visited', 'skipped'].includes(status) ? 'cancelled' :
+      status === 'in-consultation' ? 'in-cabin' :
+      ['calling', 'checked-in'].includes(status) ? 'checked-in' : 'booked';
+
+    // Synchronize customer appointment store
+    try {
+      const savedAppts = localStorage.getItem('insta_appointments');
+      if (savedAppts) {
+        const curAppts = JSON.parse(savedAppts);
+        if (Array.isArray(curAppts)) {
+          const updatedAppts = curAppts.map((a: any) => a.id === id ? { ...a, status: apptStatus } : a);
+          localStorage.setItem('insta_appointments', JSON.stringify(updatedAppts));
+        }
+      }
+
+      // Synchronize customer account bookings
+      const savedCusts = localStorage.getItem('insta_customers');
+      if (savedCusts) {
+        const curCusts = JSON.parse(savedCusts);
+        if (Array.isArray(curCusts)) {
+          const updatedCusts = curCusts.map((c: any) => ({
+            ...c,
+            bookings: (c.bookings || []).map((b: any) => b.id === id ? { ...b, status: apptStatus } : b)
+          }));
+          localStorage.setItem('insta_customers', JSON.stringify(updatedCusts));
+        }
+      }
+
+      broadcastGlobalSync('APPOINTMENT_STATUS_UPDATED', { id, status: apptStatus });
+    } catch (e) {}
+
+    // Post status update to backend (tokens + appointments)
     fetch(`/api/hospitals/${targetHospId}/tokens/${id}/status`, {
       method: 'PATCH',
       headers: {
@@ -1647,6 +1681,12 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         'Authorization': `Bearer ${authToken}`
       },
       body: JSON.stringify({ status })
+    }).catch(() => {});
+
+    fetch(`/api/appointments/${id}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: apptStatus })
     }).catch(() => {});
   };
 

@@ -11,12 +11,13 @@ import {
   DollarSign, Building2, CheckCircle2, Search, Plus,
   Users, UserCheck, UserX,
   AlertTriangle, Download, X, Calendar, Upload, User,
-  MapPin, Trash2, Loader2, LogOut, Mail, Phone, PhoneCall
+  MapPin, Trash2, Loader2, LogOut, Mail, Phone, PhoneCall, Megaphone
 } from 'lucide-react';
 import { LocationBanners } from './LocationBanners';
+import { AdsInquiries } from './AdsInquiries';
 
 interface AdminDashboardProps {
-  initialTab?: 'stats' | 'hospitals' | 'customers' | 'financials' | 'add-hospital' | 'add-doctor' | 'banners';
+  initialTab?: 'stats' | 'hospitals' | 'customers' | 'financials' | 'add-hospital' | 'add-doctor' | 'banners' | 'ads-inquiries';
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) => {
@@ -32,10 +33,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
   const [isDeletingHosp, setIsDeletingHosp] = useState(false);
 
   const [adminTab, setAdminTab] = useState<
-    'stats' | 'hospitals' | 'customers' | 'financials' | 'add-hospital' | 'add-doctor' | 'banners'
+    'stats' | 'hospitals' | 'customers' | 'financials' | 'add-hospital' | 'add-doctor' | 'banners' | 'ads-inquiries'
   >(() => {
     if (initialTab) return initialTab;
     if (location.pathname === '/admin/banners') return 'banners';
+    if (location.pathname === '/admin/ads-inquiries') return 'ads-inquiries';
     return 'stats';
   });
 
@@ -320,6 +322,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                 Geo
               </span>
             </button>
+
+            <button
+              onClick={() => setAdminTab('ads-inquiries')}
+              className={`w-full text-left px-3.5 py-2 text-xs font-bold rounded-xl flex items-center justify-between transition-all cursor-pointer border-none ${
+                adminTab === 'ads-inquiries' ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <Megaphone size={15} /> Ads Inquiries
+              </div>
+              <span className="bg-amber-500/20 text-[9px] font-extrabold px-2 py-0.5 rounded-full text-amber-300">
+                Hospital
+              </span>
+            </button>
           </div>
         </div>
 
@@ -367,7 +383,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
 
           {/* Mobile Nav Tabs */}
           <div className="flex overflow-x-auto px-2 border-b border-slate-800 text-[10px] font-bold uppercase tracking-wider no-scrollbar">
-            {(['stats', 'hospitals', 'customers', 'banners', 'financials'] as const).map(tab => (
+            {(['stats', 'hospitals', 'customers', 'banners', 'ads-inquiries', 'financials'] as const).map(tab => (
               <button
                 key={tab}
                 onClick={() => setAdminTab(tab)}
@@ -375,7 +391,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                   adminTab === tab ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400'
                 }`}
               >
-                {tab === 'stats' ? 'Overview' : tab === 'hospitals' ? 'Hospitals' : tab === 'customers' ? 'Customers' : tab === 'banners' ? 'Banners' : 'Revenue'}
+                {tab === 'stats' ? 'Overview' : tab === 'hospitals' ? 'Hospitals' : tab === 'customers' ? 'Customers' : tab === 'banners' ? 'Banners' : tab === 'ads-inquiries' ? 'Ads Inquiries' : 'Revenue'}
               </button>
             ))}
           </div>
@@ -1386,6 +1402,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
         {adminTab === 'banners' && (
           <div className="animate-in fade-in duration-200">
             <LocationBanners />
+          </div>
+        )}
+
+        {/* ── TAB: HOSPITAL ADS INQUIRIES ───────────────────────────────── */}
+        {adminTab === 'ads-inquiries' && (
+          <div className="animate-in fade-in duration-200">
+            <AdsInquiries />
           </div>
         )}
 

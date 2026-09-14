@@ -2447,6 +2447,14 @@ app.patch('/api/hospitals/:hospitalId/tokens/:tokenId/status', requireHospitalAu
     return t;
   });
 
+  const apptStatus = status === 'completed' ? 'completed' : ['cancelled', 'not-visited', 'skipped'].includes(status) ? 'cancelled' : 'booked';
+  store.appointments = (store.appointments || []).map(a => {
+    if (a.id === tokenId) {
+      return { ...a, status: apptStatus };
+    }
+    return a;
+  });
+
   if (isDbConnected) {
     try {
       if (targetToken) {
@@ -2461,8 +2469,8 @@ app.patch('/api/hospitals/:hospitalId/tokens/:tokenId/status', requireHospitalAu
         );
       }
       await query(
-        `UPDATE appointments SET status = $1, updated_at = NOW() WHERE id = $2`,
-        [status, tokenId]
+        `UPDATE appointments SET status = $1, data = jsonb_set(data, '{status}', to_jsonb($1::text)), updated_at = NOW() WHERE id = $2`,
+        [apptStatus, tokenId]
       );
     } catch (dbErr) {
       console.error('Error updating token status in AWS RDS:', dbErr.message);
@@ -2471,6 +2479,35 @@ app.patch('/api/hospitals/:hospitalId/tokens/:tokenId/status', requireHospitalAu
 
   await saveUnifiedStore(store);
   res.json({ success: true, hospitalId, tokenId, status, token: targetToken });
+});
+
+// ─── Update Appointment Status Directly ──────────────────────────────────────
+app.patch('/api/appointments/:id/status', async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  if (!status) return res.status(400).json({ success: false, message: 'Status required' });
+
+  const store = await getUnifiedStore();
+  store.appointments = (store.appointments || []).map(a => {
+    if (a.id === id) {
+      return { ...a, status };
+    }
+    return a;
+  });
+
+  if (isDbConnected) {
+    try {
+      await query(
+        `UPDATE appointments SET status = $1, data = jsonb_set(data, '{status}', to_jsonb($1::text)), updated_at = NOW() WHERE id = $2`,
+        [status, id]
+      );
+    } catch (e) {
+      console.warn('Error updating appointment status in RDS:', e.message);
+    }
+  }
+
+  await saveUnifiedStore(store);
+  res.json({ success: true, id, status });
 });
 
 // ─── Direct Token Lookup ─────────────────────────────────────────────────────
@@ -2494,7 +2531,7 @@ app.get('/api/tokens/:id', async (req, res) => {
 
 // ─── Appointments API (Customer Token Bookings) ─────────────────────────────
 app.post('/api/appointments', async (req, res) => {
-  const appt = req.body;
+  const appt = req.body?.appointment || req.body;
   if (!appt || !appt.id) {
     return res.status(400).json({ success: false, message: 'Invalid appointment payload' });
   }
@@ -3216,6 +3253,144 @@ app.delete('/api/banners/:id', async (req, res) => {
 
   res.json({ success: true, message: 'Banner deleted successfully', deletedId: id });
 });
+
+// ─── Ads Inquiries API (Hospital Ad / Promotion Requests) ───────────────────
+// POST /api/ads-inquiries - Hospital submits an ad inquiry
+app.post('/api/ads-inquiries', async (req, res) => {
+  const store = await getUnifiedStore();
+  store.adsInquiries = store.adsInquiries || [];
+  
+  const inquiry = {
+    id: `ad-inq-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+    hospitalId: req.body.hospitalId || '',
+    hospitalName: req.body.hospitalName || 'Hospital',
+    contactPerson: req.body.contactPerson || '',
+    contactPhone: req.body.contactPhone || '',
+    contactEmail: req.body.contactEmail || '',
+    title: req.body.title || 'Special Hospital Promotion',
+    description: req.body.description || '',
+    link: req.body.link || '',
+    imageUrl: req.body.imageUrl || '',
+    targetLevel: req.body.targetLevel || 'state',
+    state: req.body.state || '',
+    district: req.body.district || '',
+    mandal: req.body.mandal || '',
+    village: req.body.village || '',
+    pincode: req.body.pincode || '',
+    ctaText: req.body.ctaText || 'Book Token',
+    durationDays: req.body.durationDays || 30,
+    status: 'pending', // 'pending' | 'approved' | 'rejected'
+    notes: req.body.notes || '',
+    createdAt: new Date().toISOString()
+  };
+
+  store.adsInquiries.unshift(inquiry);
+  store.lastUpdated = Date.now();
+  await saveUnifiedStore(store);
+
+  res.status(201).json({ success: true, inquiry });
+});
+
+// GET /api/ads-inquiries - Admin gets all inquiries (or filtered by hospital)
+app.get('/api/ads-inquiries', async (req, res) => {
+  const { hospitalId, status } = req.query;
+  const store = await getUnifiedStore();
+  let inquiries = store.adsInquiries || [];
+
+  if (hospitalId) {
+    inquiries = inquiries.filter(i => i.hospitalId === hospitalId);
+  }
+  if (status) {
+    inquiries = inquiries.filter(i => i.status === status);
+  }
+
+  res.json({ success: true, total: inquiries.length, inquiries });
+});
+
+// PATCH /api/ads-inquiries/:id/status - Update inquiry status
+app.patch('/api/ads-inquiries/:id/status', async (req, res) => {
+  const { id } = req.params;
+  const { status, adminNotes } = req.body;
+  const store = await getUnifiedStore();
+  store.adsInquiries = store.adsInquiries || [];
+
+  let updated = null;
+  store.adsInquiries = store.adsInquiries.map(i => {
+    if (i.id === id) {
+      updated = {
+        ...i,
+        status: status || i.status,
+        adminNotes: adminNotes !== undefined ? adminNotes : i.adminNotes,
+        updatedAt: new Date().toISOString()
+      };
+      return updated;
+    }
+    return i;
+  });
+
+  if (!updated) {
+    return res.status(404).json({ success: false, message: 'Inquiry not found' });
+  }
+
+  store.lastUpdated = Date.now();
+  await saveUnifiedStore(store);
+  res.json({ success: true, inquiry: updated });
+});
+
+// POST /api/ads-inquiries/:id/approve - Approve inquiry and automatically create active banner
+app.post('/api/ads-inquiries/:id/approve', async (req, res) => {
+  const { id } = req.params;
+  const store = await getUnifiedStore();
+  store.adsInquiries = store.adsInquiries || [];
+  store.locationBanners = store.locationBanners || INITIAL_LOCATION_BANNERS;
+
+  const inquiry = store.adsInquiries.find(i => i.id === id);
+  if (!inquiry) {
+    return res.status(404).json({ success: false, message: 'Inquiry not found' });
+  }
+
+  // Create the banner
+  const newBanner = {
+    id: `banner-ad-${Date.now()}`,
+    title: inquiry.title,
+    subtitle: inquiry.description || `${inquiry.hospitalName} Special Announcement`,
+    description: inquiry.description || '',
+    targetLevel: inquiry.targetLevel || 'state',
+    state: inquiry.state || '',
+    district: inquiry.district || '',
+    mandal: inquiry.mandal || '',
+    village: inquiry.village || '',
+    pincode: inquiry.pincode || '',
+    country: 'India',
+    imageUrl: inquiry.imageUrl || 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=1200&q=80',
+    link: inquiry.link || (inquiry.hospitalId ? `/hospitals/${inquiry.hospitalId}` : '/'),
+    ctaText: inquiry.ctaText || 'Book Token',
+    badge: 'HOSPITAL PROMOTION',
+    priority: 10,
+    status: 'active',
+    startDate: new Date().toISOString(),
+    endDate: new Date(Date.now() + (Number(inquiry.durationDays || 30) * 86400000)).toISOString(),
+    createdAt: new Date().toISOString(),
+    hospitalId: inquiry.hospitalId,
+    hospitalName: inquiry.hospitalName
+  };
+
+  store.locationBanners.unshift(newBanner);
+
+  // Mark inquiry as approved
+  store.adsInquiries = store.adsInquiries.map(i => i.id === id ? {
+    ...i,
+    status: 'approved',
+    bannerId: newBanner.id,
+    updatedAt: new Date().toISOString()
+  } : i);
+
+  store.lastUpdated = Date.now();
+  await saveUnifiedStore(store);
+
+  res.json({ success: true, message: 'Inquiry approved and banner published live', banner: newBanner, inquiry });
+});
+
 
 
 // Legacy tokens endpoint
