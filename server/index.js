@@ -133,15 +133,35 @@ const INITIAL_PROFILE = {
 };
 
 const INITIAL_DEPARTMENTS = [
-  { id: 'dept-cardio', name: 'Cardiology', icon: '❤️', headDoctor: 'Dr. Arvind Sharma', totalDoctors: 2, active: true },
-  { id: 'dept-neuro', name: 'Neurology', icon: '🧠', headDoctor: 'Dr. Sarah Jenkins', totalDoctors: 1, active: true },
-  { id: 'dept-ortho', name: 'Orthopedics', icon: '🦴', headDoctor: 'Dr. Ramesh Patel', totalDoctors: 2, active: true },
-  { id: 'dept-pedia', name: 'Pediatrics', icon: '👶', headDoctor: 'Dr. Anjali Sharma', totalDoctors: 1, active: true },
-  { id: 'dept-gynaec', name: 'Gynecology', icon: '🌸', headDoctor: 'Dr. Meera Nair', totalDoctors: 1, active: true },
-  { id: 'dept-general', name: 'General Medicine', icon: '🩺', headDoctor: 'Dr. Vivek Singh', totalDoctors: 3, active: true },
+  { id: 'dept-cardio', name: 'Cardiology', icon: '❤️', headDoctor: '', totalDoctors: 0, active: true },
+  { id: 'dept-neuro', name: 'Neurology', icon: '🧠', headDoctor: '', totalDoctors: 0, active: true },
+  { id: 'dept-ortho', name: 'Orthopedics', icon: '🦴', headDoctor: '', totalDoctors: 0, active: true },
+  { id: 'dept-pedia', name: 'Pediatrics', icon: '👶', headDoctor: '', totalDoctors: 0, active: true },
+  { id: 'dept-gynaec', name: 'Gynecology', icon: '🌸', headDoctor: '', totalDoctors: 0, active: true },
+  { id: 'dept-general', name: 'General Medicine', icon: '🩺', headDoctor: '', totalDoctors: 0, active: true },
   { id: 'dept-eye', name: 'Ophthalmology', icon: '👁️', headDoctor: '', totalDoctors: 0, active: true },
   { id: 'dept-dental', name: 'Dental', icon: '🦷', headDoctor: '', totalDoctors: 0, active: true },
 ];
+
+function ensureDefaultDepartments(existingDepts) {
+  if (!Array.isArray(existingDepts) || existingDepts.length === 0) {
+    return INITIAL_DEPARTMENTS.map(d => ({ ...d }));
+  }
+  const isOnlyOldPlaceholders = existingDepts.length <= 2 && existingDepts.every(d => 
+    (d.id?.includes('gen') || d.id?.includes('opd')) && d.name !== 'General Medicine'
+  );
+  if (isOnlyOldPlaceholders) {
+    return INITIAL_DEPARTMENTS.map(d => ({ ...d }));
+  }
+  const result = [...existingDepts];
+  INITIAL_DEPARTMENTS.forEach(defDept => {
+    const exists = result.some(d => d.id === defDept.id || d.name?.toLowerCase() === defDept.name.toLowerCase());
+    if (!exists) {
+      result.push({ ...defDept });
+    }
+  });
+  return result;
+}
 
 const INITIAL_HOSPITALS = [
   {
@@ -443,9 +463,10 @@ function ensureHospitalProfilesSynced(store) {
       if (store.hospitalDoctors && store.hospitalDoctors[hosp.id] && store.hospitalDoctors[hosp.id].length > 0) {
         hosp.doctors = mapHospitalDoctorsToPublic(store.hospitalDoctors[hosp.id]);
       }
-      if (store.hospitalDepartments && store.hospitalDepartments[hosp.id] && store.hospitalDepartments[hosp.id].length > 0) {
-        hosp.departments = mapHospitalDeptsToPublic(store.hospitalDepartments[hosp.id]);
-      }
+      store.hospitalDepartments = store.hospitalDepartments || {};
+      store.hospitalDepartments[hosp.id] = ensureDefaultDepartments(store.hospitalDepartments[hosp.id]);
+      hosp.departments = mapHospitalDeptsToPublic(store.hospitalDepartments[hosp.id]);
+      hosp.categories = Array.from(new Set(store.hospitalDepartments[hosp.id].filter(d => d.active !== false).map(d => d.name)));
     });
   }
 }
@@ -1030,7 +1051,7 @@ app.post('/api/auth/hospital-signup', async (req, res) => {
   store.hospitalDoctors = store.hospitalDoctors || {};
   store.hospitalDoctors[newHospitalId] = [];
   store.hospitalDepartments = store.hospitalDepartments || {};
-  store.hospitalDepartments[newHospitalId] = [];
+  store.hospitalDepartments[newHospitalId] = INITIAL_DEPARTMENTS.map(d => ({ ...d }));
   store.hospitalPatients = store.hospitalPatients || {};
   store.hospitalPatients[newHospitalId] = [];
   store.hospitalStaff = store.hospitalStaff || {};
@@ -1052,6 +1073,23 @@ app.post('/api/auth/hospital-signup', async (req, res) => {
          ON CONFLICT (hospital_id) DO UPDATE SET profile_data = $2`,
         [newHospitalId, JSON.stringify(newProfile)]
       );
+      for (const dept of INITIAL_DEPARTMENTS) {
+        await query(
+          `INSERT INTO hospital_departments (id, hospital_id, name, icon, head_doctor, total_doctors, active, data, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+           ON CONFLICT (id, hospital_id) DO NOTHING`,
+          [
+            dept.id,
+            newHospitalId,
+            dept.name,
+            dept.icon || '🩺',
+            dept.headDoctor || '',
+            0,
+            true,
+            JSON.stringify(dept)
+          ]
+        );
+      }
     } catch (dbErr) {
       console.warn('Error saving new hospital to RDS tables:', dbErr.message);
     }
@@ -1371,7 +1409,38 @@ app.get('/api/hospitals/:id/departments', requireHospitalAuth, async (req, res) 
 
   if (departments.length === 0) {
     const store = await getUnifiedStore();
-    departments = store.hospitalDepartments?.[id] || (id === 'hosp-apollo' ? INITIAL_DEPARTMENTS : []);
+    departments = store.hospitalDepartments?.[id] || [];
+  }
+
+  departments = ensureDefaultDepartments(departments);
+
+  const store = await getUnifiedStore();
+  store.hospitalDepartments = store.hospitalDepartments || {};
+  store.hospitalDepartments[id] = departments;
+  await saveUnifiedStore(store);
+
+  if (isDbConnected) {
+    try {
+      for (const dept of departments) {
+        await query(
+          `INSERT INTO hospital_departments (id, hospital_id, name, icon, head_doctor, total_doctors, active, data, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+           ON CONFLICT (id, hospital_id) DO NOTHING`,
+          [
+            dept.id,
+            id,
+            dept.name,
+            dept.icon || '🩺',
+            dept.headDoctor || '',
+            Number(dept.totalDoctors) || 0,
+            dept.active !== false,
+            JSON.stringify(dept)
+          ]
+        );
+      }
+    } catch (dbErr) {
+      console.warn('Error auto-syncing departments to RDS:', dbErr.message);
+    }
   }
 
   res.json({ success: true, hospitalId: id, departments });
@@ -1400,7 +1469,7 @@ app.post('/api/hospitals/:id/departments', requireHospitalAuth, async (req, res)
         await query(
           `INSERT INTO hospital_departments (id, hospital_id, name, icon, head_doctor, total_doctors, active, data, created_at)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
-           ON CONFLICT (id) DO UPDATE SET name = $3, icon = $4, active = $7, data = $8`,
+           ON CONFLICT (id, hospital_id) DO UPDATE SET name = $3, icon = $4, head_doctor = $5, total_doctors = $6, active = $7, data = $8`,
           [
             dept.id,
             id,

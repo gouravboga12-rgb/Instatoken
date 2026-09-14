@@ -325,16 +325,36 @@ const INITIAL_PROFILE: HospitalProfile = {
   brandColor: '#2563EB',
 };
 
-const INITIAL_DEPARTMENTS: HospitalDepartment[] = [
-  { id: 'dept-cardio', name: 'Cardiology', icon: '❤️', headDoctor: 'Dr. Arvind Sharma', totalDoctors: 2, active: true },
-  { id: 'dept-neuro', name: 'Neurology', icon: '🧠', headDoctor: 'Dr. Sarah Jenkins', totalDoctors: 1, active: true },
-  { id: 'dept-ortho', name: 'Orthopedics', icon: '🦴', headDoctor: 'Dr. Ramesh Patel', totalDoctors: 2, active: true },
-  { id: 'dept-pedia', name: 'Pediatrics', icon: '👶', headDoctor: 'Dr. Anjali Sharma', totalDoctors: 1, active: true },
-  { id: 'dept-gynaec', name: 'Gynecology', icon: '🌸', headDoctor: 'Dr. Meera Nair', totalDoctors: 1, active: true },
-  { id: 'dept-general', name: 'General Medicine', icon: '🩺', headDoctor: 'Dr. Vivek Singh', totalDoctors: 3, active: true },
+export const INITIAL_DEPARTMENTS: HospitalDepartment[] = [
+  { id: 'dept-cardio', name: 'Cardiology', icon: '❤️', headDoctor: '', totalDoctors: 0, active: true },
+  { id: 'dept-neuro', name: 'Neurology', icon: '🧠', headDoctor: '', totalDoctors: 0, active: true },
+  { id: 'dept-ortho', name: 'Orthopedics', icon: '🦴', headDoctor: '', totalDoctors: 0, active: true },
+  { id: 'dept-pedia', name: 'Pediatrics', icon: '👶', headDoctor: '', totalDoctors: 0, active: true },
+  { id: 'dept-gynaec', name: 'Gynecology', icon: '🌸', headDoctor: '', totalDoctors: 0, active: true },
+  { id: 'dept-general', name: 'General Medicine', icon: '🩺', headDoctor: '', totalDoctors: 0, active: true },
   { id: 'dept-eye', name: 'Ophthalmology', icon: '👁️', headDoctor: '', totalDoctors: 0, active: true },
   { id: 'dept-dental', name: 'Dental', icon: '🦷', headDoctor: '', totalDoctors: 0, active: true },
 ];
+
+export function ensureDefaultDepartments(existingDepts?: HospitalDepartment[] | null): HospitalDepartment[] {
+  if (!Array.isArray(existingDepts) || existingDepts.length === 0) {
+    return INITIAL_DEPARTMENTS.map(d => ({ ...d }));
+  }
+  const isOnlyOldPlaceholders = existingDepts.length <= 2 && existingDepts.every(d => 
+    (d.id?.includes('gen') || d.id?.includes('opd')) && d.name !== 'General Medicine'
+  );
+  if (isOnlyOldPlaceholders) {
+    return INITIAL_DEPARTMENTS.map(d => ({ ...d }));
+  }
+  const result = [...existingDepts];
+  INITIAL_DEPARTMENTS.forEach(defDept => {
+    const exists = result.some(d => d.id === defDept.id || d.name?.toLowerCase() === defDept.name.toLowerCase());
+    if (!exists) {
+      result.push({ ...defDept });
+    }
+  });
+  return result;
+}
 
 const INITIAL_DOCTORS: HospitalDoctor[] = [
   {
@@ -576,22 +596,16 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.map((d: any) => ({
+          const mapped = parsed.map((d: any) => ({
             ...d,
             icon: d.icon || '🩺',
             active: d.active !== false
           }));
+          return ensureDefaultDepartments(mapped);
         }
       } catch (e) {}
     }
-    // Only Apollo Spectra has these initial departments
-    if (curHospId === 'hosp-apollo') {
-      return INITIAL_DEPARTMENTS;
-    }
-    return [
-      { id: 'dept-gen', name: 'General Medicine', icon: '🩺', headDoctor: '', totalDoctors: 0, active: true },
-      { id: 'dept-opd', name: 'OPD / Consultation', icon: '🏥', headDoctor: '', totalDoctors: 0, active: true }
-    ];
+    return ensureDefaultDepartments([]);
   });
 
   const [doctors, setDoctors] = useState<HospitalDoctor[]>(() => {
@@ -1779,12 +1793,15 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const savedDepts = localStorage.getItem(`insta_hospital_departments_${hospId}`);
     if (savedDepts) {
       try {
-        setDepartments(JSON.parse(savedDepts));
+        const parsed = JSON.parse(savedDepts);
+        const finalDepts = ensureDefaultDepartments(parsed);
+        setDepartments(finalDepts);
+        localStorage.setItem(`insta_hospital_departments_${hospId}`, JSON.stringify(finalDepts));
       } catch (e) {
-        setDepartments(hospId === 'hosp-apollo' ? INITIAL_DEPARTMENTS : []);
+        const depts = ensureDefaultDepartments([]);
+        setDepartments(depts);
+        localStorage.setItem(`insta_hospital_departments_${hospId}`, JSON.stringify(depts));
       }
-    } else if (hospId === 'hosp-apollo') {
-      setDepartments(INITIAL_DEPARTMENTS);
     } else if (target && target.departments && target.departments.length > 0) {
       const convertedDepts: HospitalDepartment[] = target.departments.map(dep => ({
         id: dep.id,
@@ -1794,13 +1811,13 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         totalDoctors: (target.doctors || []).filter(d => d.departmentId === dep.id).length,
         active: true
       }));
-      setDepartments(convertedDepts);
-      localStorage.setItem(`insta_hospital_departments_${hospId}`, JSON.stringify(convertedDepts));
+      const finalDepts = ensureDefaultDepartments(convertedDepts);
+      setDepartments(finalDepts);
+      localStorage.setItem(`insta_hospital_departments_${hospId}`, JSON.stringify(finalDepts));
     } else {
-      setDepartments([
-        { id: `dept-${hospId}-gen`, name: 'General Medicine', icon: '🩺', headDoctor: '', totalDoctors: 0, active: true },
-        { id: `dept-${hospId}-opd`, name: 'OPD / Consultation', icon: '🏥', headDoctor: '', totalDoctors: 0, active: true }
-      ]);
+      const depts = ensureDefaultDepartments([]);
+      setDepartments(depts);
+      localStorage.setItem(`insta_hospital_departments_${hospId}`, JSON.stringify(depts));
     }
 
     // Also fetch live departments from backend for this hospital
@@ -1810,8 +1827,9 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       .then(res => res.json())
       .then(data => {
         if (data.success && Array.isArray(data.departments)) {
-          setDepartments(data.departments);
-          localStorage.setItem(`insta_hospital_departments_${hospId}`, JSON.stringify(data.departments));
+          const finalDepts = ensureDefaultDepartments(data.departments);
+          setDepartments(finalDepts);
+          localStorage.setItem(`insta_hospital_departments_${hospId}`, JSON.stringify(finalDepts));
         }
       })
       .catch(() => {});

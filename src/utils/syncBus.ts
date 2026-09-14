@@ -33,7 +33,7 @@ export const formatTimeSlot = (timeStr?: string, defaultFallback: string = '09:0
 
 // ─── Remote API Cloud Synchronization ─────────────────────────────────────────
 
-const API_BASE = '/api';
+const API_BASE = (import.meta as any).env?.VITE_API_URL || '/api';
 
 export const pushCloudSync = async (payload: {
   hospitals?: any[];
@@ -115,104 +115,174 @@ export const broadcastGlobalSync = (type: string, data?: any) => {
   }
 };
 
-export const subscribeGlobalSync = (callback: SyncCallback) => {
-  if (typeof window === 'undefined') return () => {};
+// ─── Centralized Cloud Sync & Event Bus (Manual & Local Events) ────────────────
 
-  const handleBroadcastMessage = (event: MessageEvent) => {
-    if (event.data && event.data.type) {
-      callback(event.data);
-    }
-  };
+const subscribers = new Set<SyncCallback>();
+let lastKnownServerTime = 0;
+let isSyncInProgress = false;
 
-  const handleLocalEvent = (event: Event) => {
-    const customEvent = event as CustomEvent;
-    if (customEvent.detail && customEvent.detail.type) {
-      callback(customEvent.detail);
-    }
-  };
+export const runCloudSyncOnce = async (force: boolean = false): Promise<boolean> => {
+  if (isSyncInProgress) return false;
+  isSyncInProgress = true;
 
-  const handleStorageEvent = (event: StorageEvent) => {
-    if (event.key && event.key.startsWith('insta_')) {
-      callback({ type: 'STORAGE_CHANGED', data: { key: event.key, newValue: event.newValue } });
+  try {
+    const serverData = await fetchCloudSync();
+    if (!serverData) return false;
+
+    if (force || (serverData.lastUpdated && serverData.lastUpdated > lastKnownServerTime)) {
+      lastKnownServerTime = serverData.lastUpdated || Date.now();
+
+      let hasChanged = false;
+      if (serverData.hospitalDoctors) {
+        const targetHospId = Object.keys(serverData.hospitalDoctors)[0] || 'hosp-apollo';
+        const docs = serverData.hospitalDoctors[targetHospId];
+        if (docs && Array.isArray(docs) && docs.length > 0) {
+          const currentDocs = localStorage.getItem('insta_hospital_doctors');
+          if (force || JSON.stringify(docs) !== currentDocs) {
+            localStorage.setItem('insta_hospital_doctors', JSON.stringify(docs));
+            hasChanged = true;
+          }
+        }
+      }
+
+      if (serverData.hospitalProfiles) {
+        const targetHospId = Object.keys(serverData.hospitalProfiles)[0] || 'hosp-apollo';
+        const prof = serverData.hospitalProfiles[targetHospId];
+        if (prof) {
+          const currentProf = localStorage.getItem('insta_hospital_profile');
+          if (force || JSON.stringify(prof) !== currentProf) {
+            localStorage.setItem('insta_hospital_profile', JSON.stringify(prof));
+            hasChanged = true;
+          }
+        }
+      }
+
+      if (serverData.hospitalDepartments) {
+        const targetHospId = Object.keys(serverData.hospitalDepartments)[0] || 'hosp-apollo';
+        const depts = serverData.hospitalDepartments[targetHospId];
+        if (depts && Array.isArray(depts)) {
+          const normalizedDepts = depts.map((d: any) => ({
+            ...d,
+            active: d.active !== false
+          }));
+          const currentDepts = localStorage.getItem('insta_hospital_departments');
+          if (force || JSON.stringify(normalizedDepts) !== currentDepts) {
+            localStorage.setItem('insta_hospital_departments', JSON.stringify(normalizedDepts));
+            hasChanged = true;
+          }
+        }
+      }
+
+      if (serverData.hospitals && Array.isArray(serverData.hospitals) && serverData.hospitals.length > 0) {
+        const currentHosp = localStorage.getItem('insta_hospitals');
+        if (force || JSON.stringify(serverData.hospitals) !== currentHosp) {
+          localStorage.setItem('insta_hospitals', JSON.stringify(serverData.hospitals));
+          hasChanged = true;
+        }
+      }
+
+      if (hasChanged || force) {
+        const eventPayload = { type: 'CLOUD_SYNC_UPDATED', data: serverData };
+        subscribers.forEach(cb => {
+          try {
+            cb(eventPayload);
+          } catch (e) {
+            console.error('Error notifying sync subscriber', e);
+          }
+        });
+      }
     }
-  };
+    return true;
+  } catch (e) {
+    return false;
+  } finally {
+    isSyncInProgress = false;
+  }
+};
+
+/**
+ * Explicit manual refresh trigger callable from any Header button,
+ * pull-to-refresh action, or on-scroll event.
+ */
+export const triggerManualSync = async (): Promise<boolean> => {
+  return await runCloudSyncOnce(true);
+};
+
+const handleBroadcastMessage = (event: MessageEvent) => {
+  if (event.data && event.data.type) {
+    subscribers.forEach(cb => {
+      try {
+        cb(event.data);
+      } catch (e) {}
+    });
+  }
+};
+
+const handleLocalEvent = (event: Event) => {
+  const customEvent = event as CustomEvent;
+  if (customEvent.detail && customEvent.detail.type) {
+    subscribers.forEach(cb => {
+      try {
+        cb(customEvent.detail);
+      } catch (e) {}
+    });
+  }
+};
+
+const handleStorageEvent = (event: StorageEvent) => {
+  if (event.key && event.key.startsWith('insta_')) {
+    const payload = { type: 'STORAGE_CHANGED', data: { key: event.key, newValue: event.newValue } };
+    subscribers.forEach(cb => {
+      try {
+        cb(payload);
+      } catch (e) {}
+    });
+  }
+};
+
+let listenersActive = false;
+let initialSyncDone = false;
+
+const startCentralListeners = () => {
+  if (listenersActive || typeof window === 'undefined') return;
+  listenersActive = true;
+
+  // Single initial sync when the app first loads
+  if (!initialSyncDone) {
+    initialSyncDone = true;
+    runCloudSyncOnce(false).catch(() => {});
+  }
 
   if (broadcastChannel) {
     broadcastChannel.addEventListener('message', handleBroadcastMessage);
   }
   window.addEventListener(LOCAL_EVENT_NAME, handleLocalEvent);
   window.addEventListener('storage', handleStorageEvent);
+};
 
-  // 4. Background Poller to sync with AWS backend every 4 seconds (for other devices/browsers)
-  let lastKnownServerTime = 0;
-  const pollInterval = setInterval(async () => {
-    try {
-      const serverData = await fetchCloudSync();
-      if (serverData && serverData.lastUpdated && serverData.lastUpdated > lastKnownServerTime) {
-        lastKnownServerTime = serverData.lastUpdated;
-
-        let hasChanged = false;
-        if (serverData.hospitalDoctors) {
-          const targetHospId = Object.keys(serverData.hospitalDoctors)[0] || 'hosp-apollo';
-          const docs = serverData.hospitalDoctors[targetHospId];
-          if (docs && Array.isArray(docs) && docs.length > 0) {
-            const currentDocs = localStorage.getItem('insta_hospital_doctors');
-            if (JSON.stringify(docs) !== currentDocs) {
-              localStorage.setItem('insta_hospital_doctors', JSON.stringify(docs));
-              hasChanged = true;
-            }
-          }
-        }
-
-        if (serverData.hospitalProfiles) {
-          const targetHospId = Object.keys(serverData.hospitalProfiles)[0] || 'hosp-apollo';
-          const prof = serverData.hospitalProfiles[targetHospId];
-          if (prof) {
-            const currentProf = localStorage.getItem('insta_hospital_profile');
-            if (JSON.stringify(prof) !== currentProf) {
-              localStorage.setItem('insta_hospital_profile', JSON.stringify(prof));
-              hasChanged = true;
-            }
-          }
-        }
-
-        if (serverData.hospitalDepartments) {
-          const targetHospId = Object.keys(serverData.hospitalDepartments)[0] || 'hosp-apollo';
-          const depts = serverData.hospitalDepartments[targetHospId];
-          if (depts && Array.isArray(depts)) {
-            const normalizedDepts = depts.map((d: any) => ({
-              ...d,
-              active: d.active !== false
-            }));
-            const currentDepts = localStorage.getItem('insta_hospital_departments');
-            if (JSON.stringify(normalizedDepts) !== currentDepts) {
-              localStorage.setItem('insta_hospital_departments', JSON.stringify(normalizedDepts));
-              hasChanged = true;
-            }
-          }
-        }
-
-        if (serverData.hospitals && Array.isArray(serverData.hospitals) && serverData.hospitals.length > 0) {
-          const currentHosp = localStorage.getItem('insta_hospitals');
-          if (JSON.stringify(serverData.hospitals) !== currentHosp) {
-            localStorage.setItem('insta_hospitals', JSON.stringify(serverData.hospitals));
-            hasChanged = true;
-          }
-        }
-
-        if (hasChanged) {
-          callback({ type: 'CLOUD_SYNC_UPDATED', data: serverData });
-        }
-      }
-    } catch (e) {}
-  }, 3500);
-
-  return () => {
-    clearInterval(pollInterval);
-    if (broadcastChannel) {
-      broadcastChannel.removeEventListener('message', handleBroadcastMessage);
-    }
+const stopCentralListeners = () => {
+  listenersActive = false;
+  if (broadcastChannel) {
+    broadcastChannel.removeEventListener('message', handleBroadcastMessage);
+  }
+  if (typeof window !== 'undefined') {
     window.removeEventListener(LOCAL_EVENT_NAME, handleLocalEvent);
     window.removeEventListener('storage', handleStorageEvent);
+  }
+};
+
+export const subscribeGlobalSync = (callback: SyncCallback) => {
+  if (typeof window === 'undefined') return () => {};
+
+  subscribers.add(callback);
+  if (subscribers.size === 1) {
+    startCentralListeners();
+  }
+
+  return () => {
+    subscribers.delete(callback);
+    if (subscribers.size === 0) {
+      stopCentralListeners();
+    }
   };
 };

@@ -84,16 +84,18 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
     }
   };
 
-  const handleGoogleAuth = useGoogleLogin({
+  const [googleLoading, setGoogleLoading] = useState(false);
+
+  const triggerGoogleLogin = useGoogleLogin({
     onSuccess: async (tokenResponse) => {
       setLoading(true);
+      setGoogleLoading(true);
       setError('');
       try {
         const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
           headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
         });
         const profile = await res.json();
-        setLoading(false);
         if (profile?.email) {
           await login(profile.email, 'google', profile.name || profile.given_name, true, profile);
           onSuccess();
@@ -101,15 +103,88 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
           setError('Could not retrieve email from Google profile.');
         }
       } catch (err: any) {
-        setLoading(false);
         setError(err?.message || 'Google Sign-In failed.');
+      } finally {
+        setLoading(false);
+        setGoogleLoading(false);
       }
     },
     onError: (errorResponse) => {
+      setLoading(false);
+      setGoogleLoading(false);
       console.warn('Google Sign-In error / popup closed:', errorResponse);
-      setError('Google Sign-In was cancelled or failed.');
+      if ((errorResponse as any)?.error === 'popup_closed_by_user') {
+        return;
+      }
+      setError('Google Sign-In was cancelled or blocked. Please enable popups.');
     },
+    onNonOAuthError: (nonOAuthError) => {
+      setLoading(false);
+      setGoogleLoading(false);
+      console.warn('Google non-OAuth error:', nonOAuthError);
+      setError('Unable to open Google Sign-In. Please check your browser extensions or ad-blocker.');
+    }
   });
+
+  const handleGoogleAuth = () => {
+    setError('');
+    const googleObj = (window as any).google;
+    
+    // Check if Google SDK is loaded
+    if (!googleObj || !googleObj.accounts || !googleObj.accounts.oauth2) {
+      setError('Google Sign-In service is loading or blocked by an ad-blocker. Please disable ad-blockers or reload.');
+      if (!document.querySelector('script[src*="accounts.google.com/gsi/client"]')) {
+        const s = document.createElement('script');
+        s.src = 'https://accounts.google.com/gsi/client';
+        s.async = true;
+        document.head.appendChild(s);
+      }
+      return;
+    }
+
+    try {
+      triggerGoogleLogin();
+    } catch (err: any) {
+      console.warn('React OAuth trigger failed, using direct client fallback:', err);
+      try {
+        const client = googleObj.accounts.oauth2.initTokenClient({
+          client_id: "775908901707-28ldlr19llkdrok9h8g0lethcunk6tf2.apps.googleusercontent.com",
+          scope: 'openid profile email',
+          callback: async (tokenResponse: any) => {
+            if (tokenResponse.error) {
+              setError('Google authorization failed: ' + tokenResponse.error);
+              return;
+            }
+            setLoading(true);
+            setGoogleLoading(true);
+            try {
+              const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+              });
+              const profile = await res.json();
+              if (profile?.email) {
+                await login(profile.email, 'google', profile.name || profile.given_name, true, profile);
+                onSuccess();
+              } else {
+                setError('Could not retrieve email from Google profile.');
+              }
+            } catch (e: any) {
+              setError(e?.message || 'Google Sign-In failed');
+            } finally {
+              setLoading(false);
+              setGoogleLoading(false);
+            }
+          },
+          error_callback: () => {
+            setError('Google Sign-In popup was blocked or closed. Please allow popups.');
+          }
+        });
+        client.requestAccessToken();
+      } catch (directErr: any) {
+        setError('Could not launch Google Sign-In: ' + (directErr?.message || ''));
+      }
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row md:items-center md:justify-center p-0 md:p-8">
@@ -434,16 +509,26 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
             <div className="mb-4">
               <button 
                 type="button"
-                onClick={() => handleGoogleAuth()}
-                className="flex w-full items-center justify-center gap-2 py-2.5 px-3 border border-slate-200 rounded-xl bg-white text-slate-700 text-xs font-bold hover:bg-slate-50 transition-all cursor-pointer shadow-xs"
+                onClick={handleGoogleAuth}
+                disabled={loading || googleLoading}
+                className="flex w-full items-center justify-center gap-2 py-2.5 px-3 border border-slate-200 rounded-xl bg-white text-slate-700 text-xs font-bold hover:bg-slate-50 transition-all cursor-pointer shadow-xs disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24">
-                  <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.67 1.64 15.04 1 12 1 7.35 1 3.37 3.65 1.39 7.56l3.85 2.99c.9-2.7 3.42-4.51 6.76-4.51z"/>
-                  <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.46c-.28 1.48-1.12 2.73-2.38 3.58l3.7 2.87c2.16-1.99 3.41-4.92 3.41-8.6z"/>
-                  <path fill="#FBBC05" d="M5.24 10.55c-.24-.72-.38-1.49-.38-2.28s.14-1.56.38-2.28L1.39 7.01C.5 8.81 0 10.84 0 12.99s.5 4.18 1.39 5.98l3.85-2.99c-.24-.72-.38-1.49-.38-2.28z"/>
-                  <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.91l-3.7-2.87c-1.18.79-2.69 1.26-4.26 1.26-3.34 0-5.86-1.81-6.76-4.51L1.39 16.96C3.37 20.35 7.35 23 12 23z"/>
-                </svg>
-                Google
+                {googleLoading ? (
+                  <span className="flex items-center gap-2 text-slate-600">
+                    <span className="w-3.5 h-3.5 border-2 border-slate-400 border-t-blue-600 rounded-full animate-spin"></span>
+                    <span>Connecting to Google...</span>
+                  </span>
+                ) : (
+                  <>
+                    <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24">
+                      <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.67 1.64 15.04 1 12 1 7.35 1 3.37 3.65 1.39 7.56l3.85 2.99c.9-2.7 3.42-4.51 6.76-4.51z"/>
+                      <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.46c-.28 1.48-1.12 2.73-2.38 3.58l3.7 2.87c2.16-1.99 3.41-4.92 3.41-8.6z"/>
+                      <path fill="#FBBC05" d="M5.24 10.55c-.24-.72-.38-1.49-.38-2.28s.14-1.56.38-2.28L1.39 7.01C.5 8.81 0 10.84 0 12.99s.5 4.18 1.39 5.98l3.85-2.99c-.24-.72-.38-1.49-.38-2.28z"/>
+                      <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.91l-3.7-2.87c-1.18.79-2.69 1.26-4.26 1.26-3.34 0-5.86-1.81-6.76-4.51L1.39 16.96C3.37 20.35 7.35 23 12 23z"/>
+                    </svg>
+                    <span>{mode === 'signup' ? 'Sign up with Google' : 'Sign in with Google'}</span>
+                  </>
+                )}
               </button>
             </div>
 

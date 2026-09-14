@@ -11,9 +11,10 @@ import {
   Menu, BellRing, ShieldCheck, 
   Zap, ChevronDown, Building2, Share2,
   Users, ArrowRight, Navigation,
-  X, Home as HomeIcon, LogOut
+  X, Home as HomeIcon, LogOut, RotateCw
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { triggerManualSync } from '../../utils/syncBus';
 
 interface HomeProps {
   onSearchSelect: (filterType?: string) => void;
@@ -40,6 +41,48 @@ export const Home: React.FC<HomeProps> = ({
 
   // FAQ accordion state
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
+
+  // Pull-to-refresh & manual sync state
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [pullY, setPullY] = useState(0);
+  const [touchStartY, setTouchStartY] = useState(0);
+
+  const handleManualRefresh = async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    try {
+      await triggerManualSync();
+    } finally {
+      setTimeout(() => {
+        setIsRefreshing(false);
+        setPullY(0);
+      }, 500);
+    }
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (window.scrollY <= 5) {
+      setTouchStartY(e.touches[0].clientY);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (window.scrollY <= 5 && touchStartY > 0) {
+      const diff = e.touches[0].clientY - touchStartY;
+      if (diff > 0 && diff < 120) {
+        setPullY(diff);
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (pullY > 55 && !isRefreshing) {
+      handleManualRefresh();
+    } else {
+      setPullY(0);
+    }
+    setTouchStartY(0);
+  };
 
   const locations = [
     "Karimnagar, Telangana",
@@ -453,7 +496,12 @@ export const Home: React.FC<HomeProps> = ({
   // RENDER 2: MAIN PATIENT HOME PAGE (Matching Image 5)
   // ─────────────────────────────────────────────────────────────────────────────
   return (
-    <div className="pb-24 bg-slate-50 min-h-screen md:bg-transparent md:min-h-0 md:pb-6">
+    <div 
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      className="pb-24 bg-slate-50 min-h-screen md:bg-transparent md:min-h-0 md:pb-6 relative"
+    >
       
       {/* 1. Header Bar (Image 5 style: Menu, InstaToken, Location dropdown, Bell badge, Cart - visible on mobile) */}
       <div className="md:hidden sticky top-0 bg-white/95 backdrop-blur-md px-5 py-3.5 flex items-center justify-between border-b border-slate-100 z-30">
@@ -525,8 +573,16 @@ export const Home: React.FC<HomeProps> = ({
           </div>
         )}
 
-        {/* Right Side Icons: Notification Bell */}
-        <div className="flex items-center gap-2">
+        {/* Right Side Icons: Manual Refresh & Notification Bell */}
+        <div className="flex items-center gap-1.5">
+          <button 
+            type="button"
+            onClick={handleManualRefresh}
+            title="Refresh latest updates"
+            className="p-2 text-slate-700 hover:text-blue-600 transition-colors cursor-pointer"
+          >
+            <RotateCw size={17} className={isRefreshing ? 'animate-spin text-blue-600' : 'text-slate-600'} />
+          </button>
           <button 
             onClick={onOpenNotifications}
             className="relative p-2 text-slate-700 hover:text-blue-600 transition-colors cursor-pointer"
@@ -538,6 +594,14 @@ export const Home: React.FC<HomeProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Pull down indicator for mobile */}
+      {(pullY > 15 || isRefreshing) && (
+        <div className="md:hidden flex items-center justify-center py-2 bg-blue-50/90 text-blue-600 text-xs font-bold transition-all border-b border-blue-100/60 animate-in fade-in">
+          <RotateCw size={13} className={`mr-2 ${pullY > 55 || isRefreshing ? 'animate-spin' : ''}`} />
+          <span>{isRefreshing ? 'Syncing latest tokens...' : (pullY > 55 ? 'Release to refresh' : 'Pull down to refresh')}</span>
+        </div>
+      )}
 
       <div className="px-5 md:px-0 mt-4 md:mt-0 w-full space-y-6">
         

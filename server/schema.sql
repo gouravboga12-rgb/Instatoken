@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS hospital_profiles (
 );
 
 CREATE TABLE IF NOT EXISTS hospital_departments (
-    id VARCHAR(100) PRIMARY KEY,
+    id VARCHAR(100) NOT NULL,
     hospital_id VARCHAR(100) NOT NULL,
     name VARCHAR(255) NOT NULL,
     icon VARCHAR(50),
@@ -37,7 +37,8 @@ CREATE TABLE IF NOT EXISTS hospital_departments (
     total_doctors INTEGER DEFAULT 0,
     active BOOLEAN DEFAULT TRUE,
     data JSONB,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id, hospital_id)
 );
 
 CREATE TABLE IF NOT EXISTS hospital_doctors (

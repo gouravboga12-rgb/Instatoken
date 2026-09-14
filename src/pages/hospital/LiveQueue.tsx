@@ -1,9 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { useHospital } from '../../context/HospitalContext';
 import { Radio, CheckCircle, Play, RefreshCw } from 'lucide-react';
+import { triggerManualSync } from '../../utils/syncBus';
 
 export const LiveQueue: React.FC = () => {
   const { tokens, doctors, updateTokenStatus } = useHospital();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    try {
+      await triggerManualSync();
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 500);
+    }
+  };
   
   // Real-time ticking clock / wait time simulator
   const [pulse, setPulse] = useState(true);
@@ -46,10 +58,14 @@ export const LiveQueue: React.FC = () => {
           </div>
           <p className="text-xs text-slate-400 mt-1">Real-time cabin monitors and active patient queues</p>
         </div>
-        <div className="bg-white border border-slate-100 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-600 flex items-center gap-1.5 shadow-sm">
-          <RefreshCw size={12} className="animate-spin text-blue-600" />
-          <span>Syncing automatically</span>
-        </div>
+        <button 
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+          className="bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 px-3.5 py-1.5 rounded-xl text-xs font-bold text-slate-700 flex items-center gap-2 shadow-2xs transition-all cursor-pointer"
+        >
+          <RefreshCw size={13} className={isRefreshing ? 'animate-spin text-blue-600' : 'text-slate-500'} />
+          <span>{isRefreshing ? 'Updating Queue...' : 'Refresh Queue'}</span>
+        </button>
       </div>
 
       {/* Stats Board */}

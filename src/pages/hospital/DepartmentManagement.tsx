@@ -16,7 +16,10 @@ const DEFAULT_SERVICES: Record<string, string[]> = {
   'dept-ortho': ['Fracture & Trauma Care', 'Joint Replacement (Knee & Hip)', 'Arthroscopic Surgery', 'Spine & Disc Clinic', 'Sports Medicine & Rehab', 'Physiotherapy'],
   'dept-pedia': ['Well-Baby Clinic', 'Neonatal Intensive Care (NICU)', 'Pediatric Vaccination', 'Growth & Developmental Assessment', 'Childhood Asthma Clinic'],
   'dept-neuro': ['Stroke Management Unit', 'EEG & EMG Diagnostics', 'Epilepsy Clinic', 'Headache & Migraine Center', 'Neuropathy Treatment'],
+  'dept-gynaec': ['Prenatal & Postnatal Care', 'High-Risk Pregnancy Care', 'Gynecological Surgeries', 'Laparoscopy Clinic', 'Infertility Screening & Counseling', 'Women Health Checkups'],
+  'dept-general': ['Comprehensive Health Checkups', 'Hypertension & Diabetes Care', 'Fever & Infection Management', 'Preventive Health Counseling', 'Geriatric Care & Lifestyle Support'],
   'dept-derma': ['Clinical Dermatology', 'Acne & Scar Treatment', 'Laser Skin Surgery', 'Hair & Scalp Therapy', 'Allergy Patch Testing'],
+  'dept-eye': ['Comprehensive Eye Checkup', 'Cataract & Lasik Evaluation', 'Retina & Glaucoma Clinic', 'Diabetic Eye Screening', 'Pediatric Ophthalmology'],
   'dept-ophta': ['Comprehensive Eye Checkup', 'Cataract & Lasik Evaluation', 'Retina & Glaucoma Clinic', 'Diabetic Eye Screening', 'Pediatric Ophthalmology'],
   'dept-dental': ['Root Canal Treatment (RCT)', 'Dental Implants', 'Orthodontic Braces', 'Teeth Whitening & Scaling', 'Oral & Maxillofacial Surgery']
 };

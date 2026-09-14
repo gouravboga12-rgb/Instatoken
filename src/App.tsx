@@ -22,8 +22,9 @@ import { HospitalLayout } from './pages/hospital/HospitalLayout';
 import { Footer } from './components/common/Footer';
 import { 
   Home as HomeIcon, Search as SearchIcon, Award, User as UserIcon, 
-  MapPin, Bell, ChevronDown, Loader2
+  MapPin, Bell, ChevronDown, Loader2, RotateCw
 } from 'lucide-react';
+import { triggerManualSync } from './utils/syncBus';
 
 const TopNavbar: React.FC = () => {
   const { user, notifications, currentLocation, setCurrentLocation, detectAndSetLocation } = useApp();
@@ -32,6 +33,18 @@ const TopNavbar: React.FC = () => {
   const unreadNotifs = notifications.filter(n => !n.read).length;
   const [showLocationsDropdown, setShowLocationsDropdown] = useState(false);
   const [locating, setLocating] = useState(false);
+
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleManualRefresh = async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    try {
+      await triggerManualSync();
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 500);
+    }
+  };
 
   const locations = [
     "Karimnagar, Telangana",
@@ -148,6 +161,16 @@ const TopNavbar: React.FC = () => {
               </>
             )}
           </div>
+
+          {/* Manual Refresh Sync Button */}
+          <button 
+            onClick={handleManualRefresh}
+            title="Refresh latest queues and appointments"
+            className="flex items-center gap-1.5 text-xs font-bold text-slate-650 hover:text-blue-600 bg-slate-50 hover:bg-slate-100/90 border border-slate-200 rounded-xl px-2.5 py-1.5 transition-all cursor-pointer shadow-2xs"
+          >
+            <RotateCw size={14} className={isRefreshing ? 'animate-spin text-blue-600' : 'text-slate-500'} />
+            <span className="text-[11px] hidden xl:inline">{isRefreshing ? 'Syncing...' : 'Refresh'}</span>
+          </button>
 
           <button 
             onClick={() => navigate('/notifications')}

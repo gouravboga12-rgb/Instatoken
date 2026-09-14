@@ -136,7 +136,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
       facilities: ["ICU", "Ambulance", "Pharmacy", "Diagnostic Lab"],
       gallery: [],
       departments: [
-        { id: "dept-general", name: "General Medicine", icon: "Stethoscope" }
+        { id: "dept-cardio", name: "Cardiology", icon: "Heart" },
+        { id: "dept-neuro", name: "Neurology", icon: "Brain" },
+        { id: "dept-ortho", name: "Orthopedics", icon: "Activity" },
+        { id: "dept-pedia", name: "Pediatrics", icon: "Baby" },
+        { id: "dept-gynaec", name: "Gynecology", icon: "Users" },
+        { id: "dept-general", name: "General Medicine", icon: "Stethoscope" },
+        { id: "dept-eye", name: "Ophthalmology", icon: "Eye" },
+        { id: "dept-dental", name: "Dental", icon: "Smile" }
       ],
       image: "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&q=80&w=400",
       lat: 12.93,
@@ -1321,12 +1328,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                     onChange={(e) => setDocDeptId(e.target.value)}
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none"
                   >
-                    <option value="dept-general">General Medicine</option>
                     <option value="dept-cardio">Cardiology</option>
+                    <option value="dept-neuro">Neurology</option>
+                    <option value="dept-ortho">Orthopedics</option>
                     <option value="dept-pedia">Pediatrics</option>
-                    <option value="dept-dental">Dental Care</option>
-                    <option value="dept-eye">Ophthalmology</option>
                     <option value="dept-gynaec">Gynecology</option>
+                    <option value="dept-general">General Medicine</option>
+                    <option value="dept-eye">Ophthalmology</option>
+                    <option value="dept-dental">Dental</option>
                   </select>
                 </div>
               </div>

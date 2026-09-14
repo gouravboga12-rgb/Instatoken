@@ -163,14 +163,14 @@ export const CATEGORIES = [
 ];
 
 export const DEPARTMENTS: Department[] = [
-  { id: "dept-general", name: "General Medicine", icon: "Stethoscope" },
   { id: "dept-cardio", name: "Cardiology", icon: "Heart" },
-  { id: "dept-ortho", name: "Orthopedic", icon: "Activity" },
-  { id: "dept-pedia", name: "Pediatrics", icon: "Baby" },
-  { id: "dept-dental", name: "Dental Care", icon: "Smile" },
-  { id: "dept-eye", name: "Ophthalmology", icon: "Eye" },
   { id: "dept-neuro", name: "Neurology", icon: "Brain" },
-  { id: "dept-gynaec", name: "Gynecology", icon: "Users" }
+  { id: "dept-ortho", name: "Orthopedics", icon: "Activity" },
+  { id: "dept-pedia", name: "Pediatrics", icon: "Baby" },
+  { id: "dept-gynaec", name: "Gynecology", icon: "Users" },
+  { id: "dept-general", name: "General Medicine", icon: "Stethoscope" },
+  { id: "dept-eye", name: "Ophthalmology", icon: "Eye" },
+  { id: "dept-dental", name: "Dental", icon: "Smile" }
 ];
 
 export const HOSPITALS: Hospital[] = [
@@ -193,14 +193,7 @@ export const HOSPITALS: Hospital[] = [
     ],
     about: "Apollo Spectra is a state-of-the-art multi-specialty hospital committed to bringing you the best clinical outcomes in a simplified, service-oriented environment. Equipped with advanced diagnostic infrastructure and led by top healthcare specialists.",
     facilities: ["24/7 Emergency", "ICU", "Pharmacy", "Ambulance", "Lab Testing", "Cafeteria"],
-    departments: [
-      DEPARTMENTS[0], // General
-      DEPARTMENTS[1], // Cardio
-      DEPARTMENTS[2], // Ortho
-      DEPARTMENTS[3], // Pediatrics
-      DEPARTMENTS[6], // Neuro
-      DEPARTMENTS[7]  // Gynecology
-    ],
+    departments: DEPARTMENTS,
     timings: "Open 24 Hours (OPD: 09:00 AM - 05:00 PM)",
     contact: "+91 80 4668 8888",
     lat: 17.37336200634615,

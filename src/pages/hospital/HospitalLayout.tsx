@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import { useHospital } from '../../context/HospitalContext';
 import type { HospitalDoctor, TokenRecord } from '../../context/HospitalContext';
+import { triggerManualSync } from '../../utils/syncBus';
 import { HospitalDashboard } from './HospitalDashboard';
 import { TokenManagement } from './TokenManagement';
 import { TokenManage } from './TokenManage';
@@ -180,6 +181,17 @@ const TopHeader: React.FC<{ onMenuToggle: () => void }> = ({ onMenuToggle }) => 
   const [searchQuery, setSearchQuery] = useState('');
   const todayStr = new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
   const todayTokens = tokens.filter(t => ['booked','waiting','checked-in'].includes(t.status)).length;
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleManualRefresh = async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    try {
+      await triggerManualSync();
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 500);
+    }
+  };
 
   const handleLogout = () => {
     hospitalLogout();
@@ -243,6 +255,16 @@ const TopHeader: React.FC<{ onMenuToggle: () => void }> = ({ onMenuToggle }) => 
         <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
         <span className="text-[11px] font-extrabold text-emerald-700">{todayTokens} Active</span>
       </div>
+
+      {/* Manual Sync / Refresh Button */}
+      <button 
+        onClick={handleManualRefresh}
+        title="Sync latest hospital appointments and queues"
+        className="flex items-center gap-1.5 text-xs font-bold text-slate-650 hover:text-blue-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl px-2.5 py-1.5 transition-all cursor-pointer shadow-2xs"
+      >
+        <RefreshCw size={13} className={isRefreshing ? 'animate-spin text-blue-600' : 'text-slate-500'} />
+        <span className="text-[11px] hidden sm:inline">{isRefreshing ? 'Syncing...' : 'Sync'}</span>
+      </button>
 
       {/* Notification */}
       <button className="relative p-2 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer">

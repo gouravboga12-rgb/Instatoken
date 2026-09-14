@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useHospital } from '../../context/HospitalContext';
+import { useHospital, INITIAL_DEPARTMENTS } from '../../context/HospitalContext';
 import type { HospitalDoctor, HospitalDepartment } from '../../context/HospitalContext';
 import { Plus, Edit3, Trash2, Eye, EyeOff, Search, Upload, User } from 'lucide-react';
 
@@ -8,16 +8,7 @@ interface DoctorManagementProps {
   tab?: 'doctors' | 'departments';
 }
 
-const DEFAULT_FALLBACK_DEPTS: HospitalDepartment[] = [
-  { id: 'dept-cardio', name: 'Cardiology', icon: '❤️', headDoctor: 'Dr. Arvind Sharma', totalDoctors: 2, active: true },
-  { id: 'dept-neuro', name: 'Neurology', icon: '🧠', headDoctor: 'Dr. Sarah Jenkins', totalDoctors: 1, active: true },
-  { id: 'dept-ortho', name: 'Orthopedics', icon: '🦴', headDoctor: 'Dr. Ramesh Patel', totalDoctors: 2, active: true },
-  { id: 'dept-pedia', name: 'Pediatrics', icon: '👶', headDoctor: 'Dr. Anjali Sharma', totalDoctors: 1, active: true },
-  { id: 'dept-gynaec', name: 'Gynecology', icon: '🌸', headDoctor: 'Dr. Meera Nair', totalDoctors: 1, active: true },
-  { id: 'dept-general', name: 'General Medicine', icon: '🩺', headDoctor: 'Dr. Vivek Singh', totalDoctors: 3, active: true },
-  { id: 'dept-eye', name: 'Ophthalmology', icon: '👁️', headDoctor: '', totalDoctors: 0, active: true },
-  { id: 'dept-dental', name: 'Dental', icon: '🦷', headDoctor: '', totalDoctors: 0, active: true },
-];
+const DEFAULT_FALLBACK_DEPTS: HospitalDepartment[] = INITIAL_DEPARTMENTS;
 
 export const DoctorManagement: React.FC<DoctorManagementProps> = ({ tab: initialTab = 'doctors' }) => {
   const {
