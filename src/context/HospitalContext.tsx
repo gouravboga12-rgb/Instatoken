@@ -897,29 +897,28 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           try {
             const parsed = JSON.parse(savedDocs);
             if (Array.isArray(parsed)) {
-              setDoctors(parsed);
+              setDoctors(prev => (JSON.stringify(prev) !== savedDocs ? parsed : prev));
             }
           } catch (e) {}
-        } else if (curHospId === 'hosp-apollo') {
-          setDoctors(INITIAL_DOCTORS);
-        } else {
-          setDoctors([]);
         }
 
         const savedProfile = localStorage.getItem(`insta_hospital_profile_${curHospId}`);
         if (savedProfile) {
-          try { setHospitalProfile(JSON.parse(savedProfile)); } catch (e) {}
+          try { 
+            const parsedProf = JSON.parse(savedProfile);
+            setHospitalProfile(prev => (JSON.stringify(prev) !== savedProfile ? parsedProf : prev));
+          } catch (e) {}
         }
         const savedDepts = localStorage.getItem(`insta_hospital_departments_${curHospId}`);
         if (savedDepts) {
           try {
             const parsed = JSON.parse(savedDepts);
             if (Array.isArray(parsed)) {
-              setDepartments(parsed.map((d: any) => ({
+              setDepartments(prev => (JSON.stringify(prev) !== savedDepts ? parsed.map((d: any) => ({
                 ...d,
                 icon: d.icon || '🩺',
                 active: d.active !== false
-              })));
+              })) : prev));
             }
           } catch (e) {}
         }
@@ -928,7 +927,8 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           try {
             const parsed = JSON.parse(savedToks);
             if (Array.isArray(parsed)) {
-              setTokens(parsed.filter(t => !isDummyToken(t)));
+              const clean = parsed.filter(t => !isDummyToken(t));
+              setTokens(prev => (JSON.stringify(prev) !== JSON.stringify(clean) ? clean : prev));
             }
           } catch (e) {}
         }
@@ -1004,12 +1004,6 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (updateHospitalDoctors) {
       updateHospitalDoctors(targetHospId, mappedAppDoctors);
     }
-    broadcastGlobalSync('HOSPITAL_DOCTORS_UPDATED', { hospitalId: targetHospId, doctors: mappedAppDoctors });
-    fetch(`/api/hospitals/${targetHospId}/doctors`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ doctors: mappedAppDoctors })
-    }).catch(() => {});
   }, [doctors, targetHospId, tokens]);
 
   useEffect(() => {
@@ -1025,12 +1019,6 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (updateHospitalDepartments) {
       updateHospitalDepartments(targetHospId, mappedDepts);
     }
-    broadcastGlobalSync('HOSPITAL_DEPARTMENTS_UPDATED', { hospitalId: targetHospId, departments: mappedDepts });
-    fetch(`/api/hospitals/${targetHospId}/departments`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ departments: mappedDepts })
-    }).catch(() => {});
   }, [departments, targetHospId]);
 
   useEffect(() => {
