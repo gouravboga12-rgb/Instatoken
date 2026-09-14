@@ -28,7 +28,17 @@ export const HospitalDetails: React.FC<HospitalDetailsProps> = ({ onDoctorSelect
   const mediaList = useMemo(() => {
     const rawGallery = (hospital as any)?.gallery;
     if (Array.isArray(rawGallery) && rawGallery.length > 0) {
-      return rawGallery;
+      return rawGallery.map((item: any, i: number) => {
+        if (typeof item === 'string') {
+          return { id: `gal-${i}`, type: 'image', url: item, caption: hospital?.name || 'Hospital' };
+        }
+        return {
+          id: item?.id || `gal-${i}`,
+          type: item?.type || 'image',
+          url: item?.url || item?.image || '',
+          caption: item?.caption || hospital?.name || 'Hospital'
+        };
+      });
     }
     return [
       { id: 'cover', type: 'image', url: hospital?.image || '', caption: hospital?.name || 'Hospital' }
@@ -55,6 +65,55 @@ export const HospitalDetails: React.FC<HospitalDetailsProps> = ({ onDoctorSelect
   }
 
   const isSaved = user?.savedHospitals.includes(hospital.id) || false;
+
+  const formattedTimings = useMemo(() => {
+    const raw = (hospital as any)?.timings;
+    if (!raw) return 'Open 24 Hours (OPD: 09:00 AM - 05:00 PM)';
+    if (typeof raw === 'string') return raw;
+    if (Array.isArray(raw)) {
+      if (raw.length === 0) return 'Open 24 Hours (OPD: 09:00 AM - 05:00 PM)';
+      const first = raw[0];
+      if (first && typeof first === 'object') {
+        const parts = raw
+          .filter((t: any) => t && (t.open || t.close))
+          .map((t: any) => `${t.day || ''}: ${t.open || ''} - ${t.close || ''}`.trim())
+          .filter(Boolean);
+        if (parts.length > 0) return parts.join(', ');
+        return `${first.open || '09:00 AM'} - ${first.close || '05:00 PM'}`;
+      }
+      return raw.map(String).join(', ');
+    }
+    if (typeof raw === 'object') {
+      return `${raw.open || '09:00 AM'} - ${raw.close || '05:00 PM'}`;
+    }
+    return String(raw);
+  }, [hospital]);
+
+  const formattedFacilities = useMemo(() => {
+    const raw = (hospital as any)?.facilities;
+    if (!Array.isArray(raw)) return [];
+    return raw.map((fac: any) => {
+      if (typeof fac === 'string') return fac;
+      if (fac && typeof fac === 'object') return fac.name || fac.title || JSON.stringify(fac);
+      return String(fac);
+    });
+  }, [hospital]);
+
+  const formattedContact = useMemo(() => {
+    const raw = (hospital as any)?.contact;
+    if (!raw) return '';
+    if (typeof raw === 'string') return raw;
+    if (typeof raw === 'object') return raw.phone || raw.number || String(raw);
+    return String(raw);
+  }, [hospital]);
+
+  const formattedEmergencyContact = useMemo(() => {
+    const raw = (hospital as any)?.emergencyContact;
+    if (!raw) return '';
+    if (typeof raw === 'string') return raw;
+    if (typeof raw === 'object') return raw.phone || raw.number || String(raw);
+    return String(raw);
+  }, [hospital]);
 
   const filteredDoctors = selectedDeptId === 'All' 
     ? (hospital.doctors || [])
@@ -386,16 +445,18 @@ export const HospitalDetails: React.FC<HospitalDetailsProps> = ({ onDoctorSelect
             <div className="border-t border-slate-100 pt-3 mt-3 space-y-1.5 text-xs text-slate-600 font-semibold">
               <div className="flex items-center gap-2">
                 <Clock size={14} className="text-blue-600 shrink-0" />
-                <span>Timings: {hospital.timings}</span>
+                <span>Timings: {formattedTimings}</span>
               </div>
-              <div className="flex items-center gap-2">
-                <Phone size={14} className="text-blue-600 shrink-0" />
-                <span>Contact: {hospital.contact}</span>
-              </div>
-              {hospital.emergencyContact && (
+              {formattedContact && (
+                <div className="flex items-center gap-2">
+                  <Phone size={14} className="text-blue-600 shrink-0" />
+                  <span>Contact: {formattedContact}</span>
+                </div>
+              )}
+              {formattedEmergencyContact && (
                 <div className="flex items-center gap-2 text-red-600 font-bold">
                   <AlertTriangle size={14} className="text-red-600 shrink-0" />
-                  <span>24/7 Emergency: {hospital.emergencyContact}</span>
+                  <span>24/7 Emergency: {formattedEmergencyContact}</span>
                 </div>
               )}
               <div className="flex items-center gap-2 pt-1 border-t border-slate-50">
@@ -418,7 +479,7 @@ export const HospitalDetails: React.FC<HospitalDetailsProps> = ({ onDoctorSelect
           <Card className="p-5 border-none shadow-2xs bg-white rounded-3xl">
             <h4 className="text-xs font-black text-slate-800 uppercase tracking-wide mb-2.5">Hospital Facilities</h4>
             <div className="grid grid-cols-2 gap-2 text-xs text-slate-600 font-semibold">
-              {hospital.facilities.map((fac, idx) => (
+              {formattedFacilities.map((fac, idx) => (
                 <div key={idx} className="flex items-center gap-1.5">
                   <CheckCircle size={14} className="text-emerald-500 shrink-0" />
                   <span>{fac}</span>
