@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useApp } from './AppContext';
 import type { Doctor } from '../utils/mockData';
-import { broadcastGlobalSync, subscribeGlobalSync, formatTimeSlot } from '../utils/syncBus';
+import { broadcastGlobalSync, subscribeGlobalSync } from '../utils/syncBus';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -980,23 +980,11 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return unsubscribe;
   }, []);
 
-  // ─── Local Sync to AppContext & localStorage ──────────────────────────────
+  // ─── Local Sync to localStorage ──────────────────────────────
   useEffect(() => {
     if (!targetHospId || !hospitalUser) return;
     localStorage.setItem('insta_hospital_profile', JSON.stringify(hospitalProfile));
-    if (updateHospital) {
-      updateHospital(targetHospId, {
-        name: hospitalProfile.name,
-        category: hospitalProfile.type,
-        address: hospitalProfile.address,
-        contact: hospitalProfile.phone,
-        about: hospitalProfile.about,
-        facilities: hospitalProfile.facilities,
-        image: hospitalProfile.coverImage || hospitalProfile.logo,
-        lat: hospitalProfile.lat !== undefined ? Number(hospitalProfile.lat) : undefined,
-        lng: hospitalProfile.lng !== undefined ? Number(hospitalProfile.lng) : undefined,
-      });
-    }
+    localStorage.setItem(`insta_hospital_profile_${targetHospId}`, JSON.stringify(hospitalProfile));
   }, [hospitalProfile, targetHospId, hospitalUser]);
 
   // Fetch latest saved profile from backend on mount so we never rely on stale defaults
@@ -1020,51 +1008,11 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   useEffect(() => {
     if (!targetHospId || !hospitalUser) return;
     localStorage.setItem(`insta_hospital_doctors_${targetHospId}`, JSON.stringify(doctors));
-    const mappedAppDoctors: Doctor[] = doctors.map(d => ({
-      id: d.id,
-      name: d.name,
-      specialty: d.specialization || d.departmentName || "Specialist",
-      departmentId: d.departmentId || "dept-general",
-      qualification: d.qualification || "MBBS",
-      experience: Number(d.experience) || 5,
-      consultationFee: Number(d.consultationFee) || 500,
-      rating: Number(d.rating) || 4.8,
-      reviewsCount: Number(d.totalPatients) || 120,
-      image: d.photo || "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&auto=format&fit=crop&q=80",
-      availability: {
-        days: d.opdDays && d.opdDays.length > 0 ? d.opdDays : ["Mon", "Tue", "Wed", "Thu", "Fri"],
-        slots: [
-          formatTimeSlot(d.opdStartTime, '09:00 AM'),
-          "10:00 AM", "11:00 AM", "02:00 PM", "03:00 PM",
-          formatTimeSlot(d.opdEndTime, '05:00 PM')
-        ]
-      },
-      currentQueue: (tokens || []).filter(t => t.doctorId === d.id && ['booked', 'waiting', 'checked-in'].includes(t.status)).length,
-      nextAvailableToken: (tokens || []).filter(t => t.doctorId === d.id).length + 1,
-      estimatedWaitPerPatient: Number(d.consultationDuration) || 15,
-      active: d.active !== false,
-      sessions: d.sessions || []
-    }));
-
-    if (updateHospitalDoctors) {
-      updateHospitalDoctors(targetHospId, mappedAppDoctors);
-    }
-  }, [doctors, targetHospId, tokens, hospitalUser]);
+  }, [doctors, targetHospId, hospitalUser]);
 
   useEffect(() => {
     if (!targetHospId || !hospitalUser) return;
     localStorage.setItem(`insta_hospital_departments_${targetHospId}`, JSON.stringify(departments));
-    const mappedDepts = departments.map(d => ({
-      id: d.id,
-      name: d.name,
-      icon: d.icon || '🩺',
-      active: d.active !== false,
-      headDoctor: d.headDoctor || '',
-      totalDoctors: d.totalDoctors || 0
-    }));
-    if (updateHospitalDepartments) {
-      updateHospitalDepartments(targetHospId, mappedDepts);
-    }
   }, [departments, targetHospId, hospitalUser]);
 
   useEffect(() => {
