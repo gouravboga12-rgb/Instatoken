@@ -55,6 +55,7 @@ export interface Hospital {
   contact: string;
   emergencyContact?: string;
   whatsapp?: string;
+  website?: string;
   lat: number;
   lng: number;
   status?: 'active' | 'disabled';

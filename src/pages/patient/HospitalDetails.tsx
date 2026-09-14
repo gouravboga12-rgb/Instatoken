@@ -7,9 +7,76 @@ import { Button } from '../../components/ui/Button';
 import { 
   ArrowLeft, Star, MapPin, Clock, Heart, Share2, 
   Phone, CheckCircle, Stethoscope, Navigation, AlertTriangle,
-  ChevronLeft, ChevronRight, Video
+  ChevronLeft, ChevronRight, Video, MessageSquare, Mail, Globe
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
+
+const formatTime12Hour = (timeStr: string): string => {
+  if (!timeStr) return '';
+  const trimmed = timeStr.trim();
+  if (/am|pm/i.test(trimmed)) return trimmed;
+  const parts = trimmed.split(':');
+  if (parts.length < 2) return trimmed;
+  let h = parseInt(parts[0], 10);
+  const m = parts[1].padStart(2, '0');
+  if (isNaN(h)) return trimmed;
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12;
+  if (h === 0) h = 12;
+  return `${String(h).padStart(2, '0')}:${m} ${ampm}`;
+};
+
+interface GroupedTimingItem {
+  days: string;
+  hours: string;
+}
+
+const getGroupedTimings = (rawTimings: any): GroupedTimingItem[] => {
+  if (!rawTimings) {
+    return [{ days: 'Mon – Sun', hours: '09:00 AM – 08:00 PM' }];
+  }
+  if (typeof rawTimings === 'string') {
+    return [{ days: 'OPD Schedule', hours: rawTimings }];
+  }
+  if (Array.isArray(rawTimings)) {
+    if (rawTimings.length === 0) {
+      return [{ days: 'Mon – Sun', hours: '09:00 AM – 08:00 PM' }];
+    }
+    if (typeof rawTimings[0] === 'object' && rawTimings[0] !== null) {
+      const groups: { startDay: string; endDay: string; open: string; close: string }[] = [];
+
+      rawTimings.forEach((item: any) => {
+        const day = item.day || '';
+        const open = item.open ? formatTime12Hour(item.open) : '';
+        const close = item.close ? formatTime12Hour(item.close) : '';
+        if (!day) return;
+
+        const last = groups[groups.length - 1];
+        if (last && last.open === open && last.close === close) {
+          last.endDay = day;
+        } else {
+          groups.push({ startDay: day, endDay: day, open, close });
+        }
+      });
+
+      return groups.map(g => {
+        const daysLabel = g.startDay === g.endDay ? g.startDay : `${g.startDay} – ${g.endDay}`;
+        const hoursLabel = (g.open && g.close) ? `${g.open} – ${g.close}` : (g.open || g.close || 'Closed');
+        return { days: daysLabel, hours: hoursLabel };
+      });
+    }
+
+    return [{ days: 'OPD Schedule', hours: rawTimings.map(String).join(', ') }];
+  }
+
+  if (typeof rawTimings === 'object' && rawTimings !== null) {
+    const o = formatTime12Hour(rawTimings.open || '');
+    const c = formatTime12Hour(rawTimings.close || '');
+    return [{ days: 'Daily', hours: o && c ? `${o} – ${c}` : '09:00 AM – 08:00 PM' }];
+  }
+
+  return [{ days: 'OPD Schedule', hours: String(rawTimings) }];
+};
 
 interface HospitalDetailsProps {
   onDoctorSelect: (hospitalId: string, doctorId: string) => void;
@@ -66,28 +133,59 @@ export const HospitalDetails: React.FC<HospitalDetailsProps> = ({ onDoctorSelect
 
   const isSaved = user?.savedHospitals.includes(hospital.id) || false;
 
-  const formattedTimings = useMemo(() => {
-    const raw = (hospital as any)?.timings;
-    if (!raw) return 'Open 24 Hours (OPD: 09:00 AM - 05:00 PM)';
-    if (typeof raw === 'string') return raw;
-    if (Array.isArray(raw)) {
-      if (raw.length === 0) return 'Open 24 Hours (OPD: 09:00 AM - 05:00 PM)';
-      const first = raw[0];
-      if (first && typeof first === 'object') {
-        const parts = raw
-          .filter((t: any) => t && (t.open || t.close))
-          .map((t: any) => `${t.day || ''}: ${t.open || ''} - ${t.close || ''}`.trim())
-          .filter(Boolean);
-        if (parts.length > 0) return parts.join(', ');
-        return `${first.open || '09:00 AM'} - ${first.close || '05:00 PM'}`;
+  const [liveProfile, setLiveProfile] = useState<any>(null);
+
+  useEffect(() => {
+    if (!id) return;
+    fetch(`/api/hospitals/${id}/profile`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.profile) {
+          setLiveProfile(data.profile);
+        }
+      })
+      .catch(() => {});
+  }, [id]);
+
+  const emergencyPhone = useMemo(() => {
+    if (liveProfile?.emergencyNumber) return String(liveProfile.emergencyNumber).trim();
+    if (liveProfile?.emergencyContact) return String(liveProfile.emergencyContact).trim();
+    if (hospital?.emergencyContact) return String(hospital.emergencyContact).trim();
+    if ((hospital as any)?.emergencyNumber) return String((hospital as any).emergencyNumber).trim();
+    try {
+      const cached = localStorage.getItem(`insta_hospital_profile_${id}`);
+      if (cached) {
+        const p = JSON.parse(cached);
+        if (p.emergencyNumber) return String(p.emergencyNumber).trim();
+        if (p.emergencyContact) return String(p.emergencyContact).trim();
       }
-      return raw.map(String).join(', ');
-    }
-    if (typeof raw === 'object') {
-      return `${raw.open || '09:00 AM'} - ${raw.close || '05:00 PM'}`;
-    }
-    return String(raw);
-  }, [hospital]);
+    } catch (e) {}
+    return '';
+  }, [liveProfile, hospital, id]);
+
+  const mainContactPhone = useMemo(() => {
+    if (liveProfile?.phone) return String(liveProfile.phone).trim();
+    if (hospital?.contact) return String(hospital.contact).trim();
+    if (hospital?.phone) return String(hospital.phone).trim();
+    return '';
+  }, [liveProfile, hospital]);
+
+  const whatsappPhone = useMemo(() => {
+    return (liveProfile?.whatsapp || hospital?.whatsapp || '').trim();
+  }, [liveProfile, hospital]);
+
+  const officialEmail = useMemo(() => {
+    return (liveProfile?.email || hospital?.email || '').trim();
+  }, [liveProfile, hospital]);
+
+  const officialWebsite = useMemo(() => {
+    return (liveProfile?.website || (hospital as any)?.website || '').trim();
+  }, [liveProfile, hospital]);
+
+  const groupedTimings = useMemo(() => {
+    const raw = liveProfile?.timings || (hospital as any)?.timings;
+    return getGroupedTimings(raw);
+  }, [liveProfile, hospital]);
 
   const formattedFacilities = useMemo(() => {
     const raw = (hospital as any)?.facilities;
@@ -97,22 +195,6 @@ export const HospitalDetails: React.FC<HospitalDetailsProps> = ({ onDoctorSelect
       if (fac && typeof fac === 'object') return fac.name || fac.title || JSON.stringify(fac);
       return String(fac);
     });
-  }, [hospital]);
-
-  const formattedContact = useMemo(() => {
-    const raw = (hospital as any)?.contact;
-    if (!raw) return '';
-    if (typeof raw === 'string') return raw;
-    if (typeof raw === 'object') return raw.phone || raw.number || String(raw);
-    return String(raw);
-  }, [hospital]);
-
-  const formattedEmergencyContact = useMemo(() => {
-    const raw = (hospital as any)?.emergencyContact;
-    if (!raw) return '';
-    if (typeof raw === 'string') return raw;
-    if (typeof raw === 'object') return raw.phone || raw.number || String(raw);
-    return String(raw);
   }, [hospital]);
 
   const filteredDoctors = selectedDeptId === 'All' 
@@ -437,29 +519,122 @@ export const HospitalDetails: React.FC<HospitalDetailsProps> = ({ onDoctorSelect
 
         {/* Left Column (Overview & Facilities) (Mobile: SECOND, Desktop: FIRST) */}
         <div className="w-full md:col-span-5 space-y-4 md:sticky md:top-24 mb-6 md:mb-0 order-last md:order-first">
-          {/* ABOUT HOSPITAL & FACILITIES SECTION */}
-          <Card className="p-5 border-none shadow-2xs bg-white rounded-3xl">
-            <h4 className="text-xs font-black text-slate-800 uppercase tracking-wide mb-2.5">About Hospital</h4>
-            <p className="text-xs text-slate-500 leading-relaxed font-medium">{hospital.about}</p>
-            
-            <div className="border-t border-slate-100 pt-3 mt-3 space-y-1.5 text-xs text-slate-600 font-semibold">
-              <div className="flex items-center gap-2">
-                <Clock size={14} className="text-blue-600 shrink-0" />
-                <span>Timings: {formattedTimings}</span>
+          
+          {/* 24/7 EMERGENCY HELPLINE PROMINENT BANNER */}
+          {emergencyPhone && (
+            <div className="bg-gradient-to-r from-red-600 to-rose-600 text-white rounded-3xl p-4 shadow-md flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center shrink-0">
+                  <AlertTriangle size={20} className="text-white" />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-red-100 block">24/7 Emergency Helpline</span>
+                  <span className="text-sm md:text-base font-black tracking-tight truncate block">{emergencyPhone}</span>
+                </div>
               </div>
-              {formattedContact && (
-                <div className="flex items-center gap-2">
-                  <Phone size={14} className="text-blue-600 shrink-0" />
-                  <span>Contact: {formattedContact}</span>
+              <a
+                href={`tel:${emergencyPhone.replace(/\s+/g, '')}`}
+                className="bg-white text-red-700 hover:bg-red-50 text-xs font-black px-3.5 py-2 rounded-xl shrink-0 shadow-sm transition-transform active:scale-95 flex items-center gap-1.5 cursor-pointer"
+              >
+                <Phone size={13} className="fill-red-700 text-red-700" />
+                <span>Call Now</span>
+              </a>
+            </div>
+          )}
+
+          {/* ABOUT HOSPITAL & FACILITIES SECTION */}
+          <Card className="p-5 border-none shadow-2xs bg-white rounded-3xl space-y-4">
+            <div>
+              <h4 className="text-xs font-black text-slate-800 uppercase tracking-wide mb-1.5">About Hospital</h4>
+              <p className="text-xs text-slate-500 leading-relaxed font-medium">{hospital.about || 'Leading healthcare institution providing patient-centric care and modern medical facilities.'}</p>
+            </div>
+            
+            {/* OPD TIMINGS CARD */}
+            <div className="bg-slate-50 border border-slate-150 rounded-2xl p-3.5 space-y-2">
+              <div className="flex items-center justify-between text-xs font-black text-slate-800">
+                <div className="flex items-center gap-1.5">
+                  <Clock size={14} className="text-blue-600" />
+                  <span>OPD Timings</span>
+                </div>
+                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-full">Open</span>
+              </div>
+              <div className="space-y-1.5 pt-1">
+                {groupedTimings.map((t, idx) => (
+                  <div key={idx} className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-slate-700">{t.days}</span>
+                    <span className="font-semibold text-slate-600 bg-white border border-slate-200 px-2.5 py-0.5 rounded-lg shadow-2xs text-[11px]">{t.hours}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* CONTACT LINES */}
+            <div className="border-t border-slate-100 pt-3 space-y-2 text-xs">
+              {mainContactPhone && (
+                <div className="flex items-center justify-between py-0.5">
+                  <div className="flex items-center gap-2 text-slate-600 font-semibold">
+                    <Phone size={14} className="text-blue-600 shrink-0" />
+                    <span>Reception: <strong className="text-slate-800 font-bold">{mainContactPhone}</strong></span>
+                  </div>
+                  <a 
+                    href={`tel:${mainContactPhone.replace(/\s+/g, '')}`}
+                    className="text-[11px] font-bold text-blue-600 hover:underline cursor-pointer"
+                  >
+                    Call
+                  </a>
                 </div>
               )}
-              {formattedEmergencyContact && (
-                <div className="flex items-center gap-2 text-red-600 font-bold">
-                  <AlertTriangle size={14} className="text-red-600 shrink-0" />
-                  <span>24/7 Emergency: {formattedEmergencyContact}</span>
+
+              {whatsappPhone && (
+                <div className="flex items-center justify-between py-0.5">
+                  <div className="flex items-center gap-2 text-slate-600 font-semibold">
+                    <MessageSquare size={14} className="text-emerald-600 shrink-0" />
+                    <span>WhatsApp: <strong className="text-slate-800 font-bold">{whatsappPhone}</strong></span>
+                  </div>
+                  <a 
+                    href={`https://wa.me/${whatsappPhone.replace(/\D/g, '')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] font-bold text-emerald-600 hover:underline cursor-pointer"
+                  >
+                    Chat
+                  </a>
                 </div>
               )}
-              <div className="flex items-center gap-2 pt-1 border-t border-slate-50">
+
+              {officialEmail && (
+                <div className="flex items-center justify-between py-0.5">
+                  <div className="flex items-center gap-2 text-slate-600 font-semibold truncate pr-2">
+                    <Mail size={14} className="text-slate-400 shrink-0" />
+                    <span className="truncate">{officialEmail}</span>
+                  </div>
+                  <a 
+                    href={`mailto:${officialEmail}`}
+                    className="text-[11px] font-bold text-slate-500 hover:underline shrink-0 cursor-pointer"
+                  >
+                    Email
+                  </a>
+                </div>
+              )}
+
+              {officialWebsite && (
+                <div className="flex items-center justify-between py-0.5">
+                  <div className="flex items-center gap-2 text-slate-600 font-semibold truncate pr-2">
+                    <Globe size={14} className="text-slate-400 shrink-0" />
+                    <span className="truncate">{officialWebsite.replace(/^https?:\/\//, '')}</span>
+                  </div>
+                  <a 
+                    href={officialWebsite.startsWith('http') ? officialWebsite : `https://${officialWebsite}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] font-bold text-slate-500 hover:underline shrink-0 cursor-pointer"
+                  >
+                    Visit ↗
+                  </a>
+                </div>
+              )}
+
+              <div className="flex items-center gap-2 pt-2 border-t border-slate-50">
                 <Navigation size={14} className="text-blue-600 shrink-0" />
                 <a 
                   href={hospital.lat && hospital.lng 
