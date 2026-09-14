@@ -39,7 +39,7 @@ export const BillingPayments: React.FC = () => {
       {/* Header */}
       <div>
         <h2 className="text-xl font-black text-slate-800">Billing & Transactions</h2>
-        <p className="text-xs text-slate-400 mt-1">Manage consultation fee collections, GST breakdowns, and patient refunds</p>
+        <p className="text-xs text-slate-400 mt-1">Manage consultation fee collections and patient refunds</p>
       </div>
 
       {/* Finance Stats Row */}
@@ -95,15 +95,14 @@ export const BillingPayments: React.FC = () => {
               <table className="w-full min-w-[600px]">
                 <thead className="bg-slate-50 border-b border-slate-100">
                   <tr>
-                    {['Txn ID', 'Patient', 'Doc Consultation', 'Fee', 'GST (18%)', 'Total Paid', 'Status', 'Invoice'].map(h => (
+                    {['Txn ID', 'Patient', 'Doc Consultation', 'Fee', 'Total Paid', 'Status', 'Invoice'].map(h => (
                       <th key={h} className="px-4 py-3 text-left text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {filteredPayments.map(p => {
-                    const gst = parseFloat((p.consultationFee * 0.18).toFixed(2));
-                    const total = p.consultationFee + gst;
+                    const total = p.consultationFee;
                     return (
                       <tr key={p.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors text-xs">
                         <td className="px-4 py-3 font-mono text-slate-500 text-[10px]">{p.id.slice(0, 8)}</td>
@@ -116,7 +115,6 @@ export const BillingPayments: React.FC = () => {
                           <p className="text-[10px] text-slate-450 mt-0.5">{p.departmentName}</p>
                         </td>
                         <td className="px-4 py-3 text-slate-655 font-bold">₹{p.consultationFee}</td>
-                        <td className="px-4 py-3 text-slate-450">₹{gst}</td>
                         <td className="px-4 py-3 text-slate-800 font-extrabold">₹{total}</td>
                         <td className="px-4 py-3">
                           <span className={`text-[9px] font-bold px-2 py-0.5 border rounded-full capitalize ${paymentStatusColors[p.paymentStatus] || 'bg-slate-100 text-slate-700'}`}>
@@ -124,7 +122,7 @@ export const BillingPayments: React.FC = () => {
                           </span>
                         </td>
                         <td className="px-4 py-3">
-                          <button className="p-1.5 bg-slate-100 hover:bg-blue-50 text-slate-400 hover:text-blue-600 rounded-xl cursor-pointer border-none transition-colors" title="Download Tax Invoice">
+                          <button className="p-1.5 bg-slate-100 hover:bg-blue-50 text-slate-400 hover:text-blue-600 rounded-xl cursor-pointer border-none transition-colors" title="Download Invoice">
                             <Download size={13} />
                           </button>
                         </td>
@@ -150,7 +148,7 @@ export const BillingPayments: React.FC = () => {
                   </div>
                   <div className="text-right">
                     <span className="font-black text-slate-800 text-sm">₹{doc.consultationFee}</span>
-                    <p className="text-[9px] text-slate-400 mt-0.5">Base + 18% GST</p>
+                    <p className="text-[9px] text-slate-400 mt-0.5">Consultation Fee</p>
                   </div>
                 </div>
               ))}

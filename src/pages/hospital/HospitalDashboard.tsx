@@ -146,7 +146,7 @@ export const HospitalDashboard: React.FC = () => {
   const recentActivities = [
     { title: 'Created token G118 for Lakshmi Prasanna', author: 'Divya Sharma', time: '2 min ago' },
     { title: 'Completed consultation for Venkat Reddy', author: 'Dr. Anitha Rao', time: '9 min ago' },
-    { title: 'Generated GST invoice INV-20486 (₹800)', author: 'Lalitha Devi', time: '17 min ago' },
+    { title: 'Generated invoice INV-20486 (₹800)', author: 'Lalitha Devi', time: '17 min ago' },
     { title: 'Marked attendance for evening shift (46 staff)', author: 'Pallavi Reddy', time: '38 min ago' },
     { title: 'Payroll for July 2026 generated — 218 employees', author: 'System', time: '1 hr ago' },
   ];

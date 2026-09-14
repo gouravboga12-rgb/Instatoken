@@ -727,8 +727,8 @@ export const HospitalSettings: React.FC = () => {
                     <input type="text" value={form.registrationNumber} onChange={e => setForm({ ...form, registrationNumber: e.target.value })} className={inputCls} />
                   </div>
                   <div>
-                    <label className={labelCls}>GST Number</label>
-                    <input type="text" value={form.gstNumber} onChange={e => setForm({ ...form, gstNumber: e.target.value })} className={inputCls} />
+                    <label className={labelCls}>License Number</label>
+                    <input type="text" value={form.licenseNumber} onChange={e => setForm({ ...form, licenseNumber: e.target.value })} className={inputCls} />
                   </div>
                 </div>
               </div>
