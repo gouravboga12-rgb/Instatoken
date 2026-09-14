@@ -67,13 +67,40 @@ export const DoctorManagement: React.FC<DoctorManagementProps> = ({ tab: initial
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setDocForm(prev => ({ ...prev, photo: reader.result as string }));
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxDim = 400;
+        let width = img.width;
+        let height = img.height;
+        if (width > height) {
+          if (width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          }
+        } else {
+          if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressed = canvas.toDataURL('image/jpeg', 0.82);
+          setDocForm(prev => ({ ...prev, photo: compressed }));
+        } else {
+          setDocForm(prev => ({ ...prev, photo: event.target?.result as string }));
+        }
       };
-      reader.readAsDataURL(file);
-    }
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
   };
 
   // Form Fields for Department

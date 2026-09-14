@@ -19,6 +19,7 @@ import { HospitalProvider } from './context/HospitalContext';
 import { HospitalLogin } from './pages/hospital/HospitalLogin';
 import { HospitalSignup } from './pages/hospital/HospitalSignup';
 import { HospitalLayout } from './pages/hospital/HospitalLayout';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { Footer } from './components/common/Footer';
 import { 
   Home as HomeIcon, Search as SearchIcon, Award, User as UserIcon, 
@@ -419,13 +420,15 @@ const AppContent: React.FC = () => {
 
 function App() {
   return (
-    <AppProvider>
-      <HospitalProvider>
-        <Router>
-          <AppContent />
-        </Router>
-      </HospitalProvider>
-    </AppProvider>
+    <ErrorBoundary fallbackTitle="InstaToken Application Error">
+      <AppProvider>
+        <HospitalProvider>
+          <Router>
+            <AppContent />
+          </Router>
+        </HospitalProvider>
+      </AppProvider>
+    </ErrorBoundary>
   );
 }
 

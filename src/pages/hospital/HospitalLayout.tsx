@@ -3,6 +3,7 @@ import { Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import { useHospital } from '../../context/HospitalContext';
 import type { HospitalDoctor, TokenRecord } from '../../context/HospitalContext';
 import { triggerManualSync } from '../../utils/syncBus';
+import { ErrorBoundary } from '../../components/common/ErrorBoundary';
 import { HospitalDashboard } from './HospitalDashboard';
 import { TokenManagement } from './TokenManagement';
 import { TokenManage } from './TokenManage';
@@ -337,26 +338,28 @@ export const HospitalLayout: React.FC = () => {
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <TopHeader onMenuToggle={() => setMobileSidebarOpen(true)} />
         <main className="flex-1 overflow-y-auto bg-slate-50">
-          <Routes>
-            <Route path="dashboard" element={<HospitalDashboard />} />
-            <Route path="tokens/add" element={<TokenManagement />} />
-            <Route path="tokens/manage" element={<TokenManage />} />
-            <Route path="tokens/doctor/:doctorId" element={<DoctorTokenScreen />} />
-            <Route path="tokens/*" element={<TokenManagement />} />
-            <Route path="revenue" element={<RevenueOverview />} />
-            <Route path="doctors" element={<DoctorManagement tab="doctors" />} />
-            <Route path="departments" element={<DepartmentManagement />} />
-            <Route path="departments/:deptId" element={<DepartmentManagement />} />
-            <Route path="schedule" element={<TokenManage />} />
-            <Route path="staff" element={<HospitalStaff />} />
-            <Route path="patients" element={<PatientManagement />} />
+          <ErrorBoundary fallbackTitle="Hospital Panel View Error">
+            <Routes>
+              <Route path="dashboard" element={<HospitalDashboard />} />
+              <Route path="tokens/add" element={<TokenManagement />} />
+              <Route path="tokens/manage" element={<TokenManage />} />
+              <Route path="tokens/doctor/:doctorId" element={<DoctorTokenScreen />} />
+              <Route path="tokens/*" element={<TokenManagement />} />
+              <Route path="revenue" element={<RevenueOverview />} />
+              <Route path="doctors" element={<DoctorManagement tab="doctors" />} />
+              <Route path="departments" element={<DepartmentManagement />} />
+              <Route path="departments/:deptId" element={<DepartmentManagement />} />
+              <Route path="schedule" element={<TokenManage />} />
+              <Route path="staff" element={<HospitalStaff />} />
+              <Route path="patients" element={<PatientManagement />} />
 
-            <Route path="communication" element={<CommunicationCenter />} />
-            <Route path="billing" element={<BillingPayments />} />
-            <Route path="reports" element={<ReportsAnalytics />} />
-            <Route path="settings" element={<HospitalSettings />} />
-            <Route path="*" element={<Navigate to="dashboard" replace />} />
-          </Routes>
+              <Route path="communication" element={<CommunicationCenter />} />
+              <Route path="billing" element={<BillingPayments />} />
+              <Route path="reports" element={<ReportsAnalytics />} />
+              <Route path="settings" element={<HospitalSettings />} />
+              <Route path="*" element={<Navigate to="dashboard" replace />} />
+            </Routes>
+          </ErrorBoundary>
         </main>
       </div>
     </div>

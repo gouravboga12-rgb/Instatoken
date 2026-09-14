@@ -1524,7 +1524,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateHospitalDoctors = (hospitalId: string, newDoctors: Doctor[]) => {
     setHospitals(prev => {
       const updated = prev.map(h => h.id === hospitalId ? { ...h, doctors: newDoctors } : h);
-      localStorage.setItem('insta_hospitals', JSON.stringify(updated));
+      try {
+        localStorage.setItem('insta_hospitals', JSON.stringify(updated));
+      } catch (e) {
+        console.warn('Could not cache insta_hospitals to localStorage:', e);
+      }
       return updated;
     });
     broadcastGlobalSync('HOSPITAL_DOCTORS_UPDATED', { hospitalId, doctors: newDoctors });
@@ -1533,7 +1537,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateHospitalDepartments = (hospitalId: string, newDepts: { id: string; name: string; icon: string }[]) => {
     setHospitals(prev => {
       const updated = prev.map(h => h.id === hospitalId ? { ...h, departments: newDepts } : h);
-      localStorage.setItem('insta_hospitals', JSON.stringify(updated));
+      try {
+        localStorage.setItem('insta_hospitals', JSON.stringify(updated));
+      } catch (e) {
+        console.warn('Could not cache insta_hospitals to localStorage:', e);
+      }
       return updated;
     });
     broadcastGlobalSync('HOSPITAL_DEPARTMENTS_UPDATED', { hospitalId, departments: newDepts });

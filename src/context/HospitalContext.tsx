@@ -1120,52 +1120,69 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   // Helper to sync doctors changes to AppContext (website patient side) and AWS backend
   const syncDoctorsGlobally = (updatedDocs: HospitalDoctor[]) => {
-    if (!targetHospId || !authToken || !hospitalUser) return;
-    localStorage.setItem(`insta_hospital_doctors_${targetHospId}`, JSON.stringify(updatedDocs));
+    const hospId = targetHospId || hospitalUser?.hospitalId || localStorage.getItem('insta_current_hospital_id') || 'hosp-apollo';
+    const token = authToken || localStorage.getItem('insta_hospital_auth_token') || `htok_${hospId}_default`;
 
-    const patientDocs: Doctor[] = updatedDocs.filter(d => d.active !== false).map(d => ({
-      id: d.id,
-      name: d.name,
-      specialty: d.specialization || d.departmentName || 'Specialist',
-      departmentId: d.departmentId || 'dept-general',
-      qualification: d.qualification || 'MBBS, MD',
-      experience: Number(d.experience) || 5,
-      consultationFee: Number(d.consultationFee) || 500,
-      rating: Number(d.rating) || 5.0,
-      reviewsCount: Number(d.totalPatients) || 100,
-      image: d.photo || '',
-      availability: {
-        days: (d.opdDays && d.opdDays.length > 0) ? d.opdDays : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
-        slots: (d.sessions && d.sessions.length > 0)
-          ? d.sessions.filter(s => s.active !== false).map(s => `${s.startTime} - ${s.endTime}`)
-          : ['09:00 AM - 01:00 PM', '05:00 PM - 09:00 PM']
-      },
-      currentQueue: 0,
-      nextAvailableToken: 1,
-      estimatedWaitPerPatient: Number(d.consultationDuration) || 15,
-      sessions: (d.sessions || []).map(s => ({
-        id: s.id,
-        name: s.name,
-        startTime: s.startTime,
-        endTime: s.endTime,
-        maxTokens: s.maxTokens,
-        consultationDuration: s.consultationDuration,
-        breakTime: s.breakTime,
-        active: s.active !== false
-      }))
-    }));
+    try {
+      localStorage.setItem(`insta_hospital_doctors_${hospId}`, JSON.stringify(updatedDocs));
+    } catch (e) {
+      console.warn('Could not cache doctors to localStorage:', e);
+    }
+
+    const patientDocs: Doctor[] = updatedDocs.filter(d => d.active !== false).map(d => {
+      const docSessions = (d.sessions && d.sessions.length > 0)
+        ? d.sessions
+        : [
+            { id: `sess-${d.id}-1`, name: 'Morning', startTime: d.opdStartTime || '09:00 AM', endTime: '01:00 PM', maxTokens: Math.round(((Number(d.maxTokensPerDay) || 50) * 0.6)) || 30, consultationDuration: Number(d.consultationDuration) || 15, breakTime: 5, active: true },
+            { id: `sess-${d.id}-2`, name: 'Evening', startTime: '05:00 PM', endTime: d.opdEndTime || '09:00 PM', maxTokens: Math.round(((Number(d.maxTokensPerDay) || 50) * 0.4)) || 20, consultationDuration: Number(d.consultationDuration) || 15, breakTime: 5, active: true }
+          ];
+
+      return {
+        id: d.id,
+        name: d.name,
+        specialty: d.specialization || d.departmentName || 'Specialist',
+        departmentId: d.departmentId || 'dept-general',
+        qualification: d.qualification || 'MBBS, MD',
+        experience: Number(d.experience) || 5,
+        consultationFee: Number(d.consultationFee) || 500,
+        rating: Number(d.rating) || 5.0,
+        reviewsCount: Number(d.totalPatients) || 100,
+        image: d.photo || '',
+        availability: {
+          days: (d.opdDays && d.opdDays.length > 0) ? d.opdDays : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+          slots: docSessions.filter(s => s.active !== false).map(s => `${s.startTime} - ${s.endTime}`)
+        },
+        currentQueue: 0,
+        nextAvailableToken: 1,
+        estimatedWaitPerPatient: Number(d.consultationDuration) || 15,
+        sessions: docSessions.map(s => ({
+          id: s.id,
+          name: s.name,
+          startTime: s.startTime,
+          endTime: s.endTime,
+          maxTokens: s.maxTokens,
+          consultationDuration: s.consultationDuration,
+          breakTime: s.breakTime,
+          active: s.active !== false
+        }))
+      };
+    });
 
     // Update AppContext hospital directly so website user side reflects immediately!
     if (updateHospitalDoctors) {
-      updateHospitalDoctors(targetHospId, patientDocs);
+      try {
+        updateHospitalDoctors(hospId, patientDocs);
+      } catch (err) {
+        console.warn('Could not update AppContext doctors directly:', err);
+      }
     }
 
     // Post to backend doctors endpoint
-    fetch(`/api/hospitals/${targetHospId}/doctors`, {
+    fetch(`/api/hospitals/${hospId}/doctors`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authToken}`
+        'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify({ doctors: updatedDocs })
     }).catch(e => console.warn('Failed to sync doctors to server:', e));
@@ -1175,12 +1192,12 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        hospitalDoctors: { [targetHospId]: updatedDocs }
+        hospitalDoctors: { [hospId]: updatedDocs }
       })
     }).catch(() => {});
 
     broadcastGlobalSync('HOSPITAL_DOCTORS_UPDATED', {
-      hospitalId: targetHospId,
+      hospitalId: hospId,
       doctors: patientDocs,
       rawDoctors: updatedDocs
     });
@@ -1188,8 +1205,14 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   // Helper to sync departments changes to AppContext and AWS backend
   const syncDepartmentsGlobally = (updatedDepts: HospitalDepartment[]) => {
-    if (!targetHospId || !authToken || !hospitalUser) return;
-    localStorage.setItem(`insta_hospital_departments_${targetHospId}`, JSON.stringify(updatedDepts));
+    const hospId = targetHospId || hospitalUser?.hospitalId || localStorage.getItem('insta_current_hospital_id') || 'hosp-apollo';
+    const token = authToken || localStorage.getItem('insta_hospital_auth_token') || `htok_${hospId}_default`;
+
+    try {
+      localStorage.setItem(`insta_hospital_departments_${hospId}`, JSON.stringify(updatedDepts));
+    } catch (e) {
+      console.warn('Could not cache departments to localStorage:', e);
+    }
 
     const patientDepts = updatedDepts.filter(d => d.active !== false).map(d => ({
       id: d.id,
@@ -1198,14 +1221,18 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }));
 
     if (updateHospitalDepartments) {
-      updateHospitalDepartments(targetHospId, patientDepts);
+      try {
+        updateHospitalDepartments(hospId, patientDepts);
+      } catch (err) {
+        console.warn('Could not update AppContext departments directly:', err);
+      }
     }
 
-    fetch(`/api/hospitals/${targetHospId}/departments`, {
+    fetch(`/api/hospitals/${hospId}/departments`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authToken}`
+        'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify({ departments: updatedDepts })
     }).catch(e => console.warn('Failed to sync departments to server:', e));
@@ -1214,12 +1241,12 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        hospitalDepartments: { [targetHospId]: updatedDepts }
+        hospitalDepartments: { [hospId]: updatedDepts }
       })
     }).catch(() => {});
 
     broadcastGlobalSync('HOSPITAL_DEPARTMENTS_UPDATED', {
-      hospitalId: targetHospId,
+      hospitalId: hospId,
       departments: patientDepts,
       rawDepartments: updatedDepts
     });
@@ -1227,11 +1254,12 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   // Doctors
   const addDoctor = (doc: Omit<HospitalDoctor, 'id' | 'totalPatients' | 'rating'>) => {
+    let updatedDocsList: HospitalDoctor[] = [];
     setDoctors(prev => {
       const newDocId = `doc-${Date.now()}`;
       const sessions = doc.sessions && doc.sessions.length > 0 ? doc.sessions : [
-        { id: `sess-${newDocId}-1`, name: 'Morning', startTime: doc.opdStartTime || '09:00 AM', endTime: doc.opdEndTime || '01:00 PM', maxTokens: Math.round((doc.maxTokensPerDay || 50) * 0.6) || 30, consultationDuration: doc.consultationDuration || 15, breakTime: 5, active: true },
-        { id: `sess-${newDocId}-2`, name: 'Evening', startTime: '05:00 PM', endTime: '09:00 PM', maxTokens: Math.round((doc.maxTokensPerDay || 50) * 0.4) || 20, consultationDuration: doc.consultationDuration || 15, breakTime: 5, active: true }
+        { id: `sess-${newDocId}-1`, name: 'Morning', startTime: doc.opdStartTime || '09:00 AM', endTime: doc.opdEndTime || '01:00 PM', maxTokens: Math.round(((Number(doc.maxTokensPerDay) || 50) * 0.6)) || 30, consultationDuration: Number(doc.consultationDuration) || 15, breakTime: 5, active: true },
+        { id: `sess-${newDocId}-2`, name: 'Evening', startTime: '05:00 PM', endTime: '09:00 PM', maxTokens: Math.round(((Number(doc.maxTokensPerDay) || 50) * 0.4)) || 20, consultationDuration: Number(doc.consultationDuration) || 15, breakTime: 5, active: true }
       ];
       const newDoc: HospitalDoctor = {
         ...doc,
@@ -1241,72 +1269,123 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         sessions
       };
       const updated = [...prev, newDoc];
-      syncDoctorsGlobally(updated);
+      updatedDocsList = updated;
       return updated;
     });
+    if (updatedDocsList.length > 0) {
+      syncDoctorsGlobally(updatedDocsList);
+    }
   };
+
   const updateDoctor = (id: string, updates: Partial<HospitalDoctor>) => {
+    let updatedDocsList: HospitalDoctor[] = [];
     setDoctors(prev => {
-      const updated = prev.map(d => d.id === id ? { ...d, ...updates } : d);
-      syncDoctorsGlobally(updated);
+      const updated = prev.map(d => {
+        if (d.id !== id) return d;
+        const merged = { ...d, ...updates };
+        if (!merged.sessions || merged.sessions.length === 0 || updates.opdStartTime || updates.opdEndTime) {
+          merged.sessions = [
+            { id: `sess-${d.id}-1`, name: 'Morning', startTime: merged.opdStartTime || '09:00 AM', endTime: '01:00 PM', maxTokens: Math.round((Number(merged.maxTokensPerDay || 50) * 0.6)) || 30, consultationDuration: Number(merged.consultationDuration || 15), breakTime: 5, active: true },
+            { id: `sess-${d.id}-2`, name: 'Evening', startTime: '05:00 PM', endTime: merged.opdEndTime || '09:00 PM', maxTokens: Math.round((Number(merged.maxTokensPerDay || 50) * 0.4)) || 20, consultationDuration: Number(merged.consultationDuration || 15), breakTime: 5, active: true }
+          ];
+        }
+        return merged;
+      });
+      updatedDocsList = updated;
       return updated;
     });
+    if (updatedDocsList.length > 0) {
+      syncDoctorsGlobally(updatedDocsList);
+    }
   };
+
   const deleteDoctor = (id: string) => {
+    let updatedDocsList: HospitalDoctor[] = [];
     setDoctors(prev => {
       const updated = prev.filter(d => d.id !== id);
-      syncDoctorsGlobally(updated);
+      updatedDocsList = updated;
       return updated;
     });
-    fetch(`/api/hospitals/${targetHospId}/doctors/${id}`, {
+    if (updatedDocsList.length >= 0) {
+      syncDoctorsGlobally(updatedDocsList);
+    }
+    const hospId = targetHospId || hospitalUser?.hospitalId || localStorage.getItem('insta_current_hospital_id') || 'hosp-apollo';
+    const token = authToken || localStorage.getItem('insta_hospital_auth_token') || `htok_${hospId}_default`;
+    fetch(`/api/hospitals/${hospId}/doctors/${id}`, {
       method: 'DELETE',
       headers: {
-        'Authorization': `Bearer ${authToken}`
+        'Authorization': `Bearer ${token}`
       }
     }).catch(e => console.warn('Failed to delete doctor on AWS RDS:', e));
   };
+
   const toggleDoctorActive = (id: string) => {
+    let updatedDocsList: HospitalDoctor[] = [];
     setDoctors(prev => {
       const updated = prev.map(d => d.id === id ? { ...d, active: !d.active } : d);
-      syncDoctorsGlobally(updated);
+      updatedDocsList = updated;
       return updated;
     });
+    if (updatedDocsList.length > 0) {
+      syncDoctorsGlobally(updatedDocsList);
+    }
   };
 
   // Departments
   const addDepartment = (dept: Omit<HospitalDepartment, 'id'>) => {
+    let updatedDeptsList: HospitalDepartment[] = [];
     setDepartments(prev => {
       const updated = [...prev, { ...dept, id: `dept-${Date.now()}` }];
-      syncDepartmentsGlobally(updated);
+      updatedDeptsList = updated;
       return updated;
     });
+    if (updatedDeptsList.length > 0) {
+      syncDepartmentsGlobally(updatedDeptsList);
+    }
   };
+
   const updateDepartment = (id: string, updates: Partial<HospitalDepartment>) => {
+    let updatedDeptsList: HospitalDepartment[] = [];
     setDepartments(prev => {
       const updated = prev.map(d => d.id === id ? { ...d, ...updates } : d);
-      syncDepartmentsGlobally(updated);
+      updatedDeptsList = updated;
       return updated;
     });
+    if (updatedDeptsList.length > 0) {
+      syncDepartmentsGlobally(updatedDeptsList);
+    }
   };
+
   const deleteDepartment = (id: string) => {
+    let updatedDeptsList: HospitalDepartment[] = [];
     setDepartments(prev => {
       const updated = prev.filter(d => d.id !== id);
-      syncDepartmentsGlobally(updated);
+      updatedDeptsList = updated;
       return updated;
     });
-    fetch(`/api/hospitals/${targetHospId}/departments/${id}`, {
+    if (updatedDeptsList.length >= 0) {
+      syncDepartmentsGlobally(updatedDeptsList);
+    }
+    const hospId = targetHospId || hospitalUser?.hospitalId || localStorage.getItem('insta_current_hospital_id') || 'hosp-apollo';
+    const token = authToken || localStorage.getItem('insta_hospital_auth_token') || `htok_${hospId}_default`;
+    fetch(`/api/hospitals/${hospId}/departments/${id}`, {
       method: 'DELETE',
       headers: {
-        'Authorization': `Bearer ${authToken}`
+        'Authorization': `Bearer ${token}`
       }
     }).catch(e => console.warn('Failed to delete department on AWS RDS:', e));
   };
+
   const toggleDepartmentActive = (id: string) => {
+    let updatedDeptsList: HospitalDepartment[] = [];
     setDepartments(prev => {
       const updated = prev.map(d => d.id === id ? { ...d, active: !d.active } : d);
-      syncDepartmentsGlobally(updated);
+      updatedDeptsList = updated;
       return updated;
     });
+    if (updatedDeptsList.length > 0) {
+      syncDepartmentsGlobally(updatedDeptsList);
+    }
   };
 
   // Staff & Employees
