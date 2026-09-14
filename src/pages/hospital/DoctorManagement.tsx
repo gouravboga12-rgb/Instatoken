@@ -56,8 +56,6 @@ export const DoctorManagement: React.FC<DoctorManagementProps> = ({ tab: initial
     gender: 'Male',
     biography: '',
     opdDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
-    opdStartTime: '09:00',
-    opdEndTime: '13:00',
     consultationDuration: '15',
     maxTokensPerDay: '50',
     onlineConsult: true,
@@ -111,37 +109,7 @@ export const DoctorManagement: React.FC<DoctorManagementProps> = ({ tab: initial
     active: true
   });
 
-const to24Hour = (timeStr?: string): string => {
-  if (!timeStr) return '09:00';
-  const clean = timeStr.trim();
-  if (!clean.toUpperCase().includes('AM') && !clean.toUpperCase().includes('PM')) {
-    return clean;
-  }
-  const parts = clean.split(' ');
-  const timePart = parts[0] || '09:00';
-  const modifier = parts[1] || 'AM';
-  let [hours, minutes] = timePart.split(':');
-  let h = parseInt(hours, 10) || 9;
-  if (modifier.toUpperCase() === 'PM' && h < 12) h += 12;
-  if (modifier.toUpperCase() === 'AM' && h === 12) h = 0;
-  return `${h < 10 ? '0' + h : h}:${minutes || '00'}`;
-};
 
-const to12Hour = (timeStr?: string): string => {
-  if (!timeStr) return '09:00 AM';
-  const clean = timeStr.trim();
-  if (clean.toUpperCase().includes('AM') || clean.toUpperCase().includes('PM')) {
-    return clean;
-  }
-  const [hStr, mStr] = clean.split(':');
-  let h = parseInt(hStr, 10);
-  const m = mStr ? mStr.slice(0, 2) : '00';
-  if (isNaN(h)) return '09:00 AM';
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  h = h % 12;
-  if (h === 0) h = 12;
-  return `${h < 10 ? '0' + h : h}:${m} ${ampm}`;
-};
 
   const handleDocSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -158,14 +126,15 @@ const to12Hour = (timeStr?: string): string => {
       languages: docForm.languages ? docForm.languages.split(',').map(l => l.trim()).filter(Boolean) : ['English'],
       gender: docForm.gender as 'Male' | 'Female' | 'Other',
       biography: docForm.biography,
-      opdDays: docForm.opdDays && docForm.opdDays.length > 0 ? docForm.opdDays : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
-      opdStartTime: to12Hour(docForm.opdStartTime),
-      opdEndTime: to12Hour(docForm.opdEndTime),
+      opdDays: editingDoc?.opdDays || (docForm.opdDays && docForm.opdDays.length > 0 ? docForm.opdDays : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']),
+      opdStartTime: editingDoc?.opdStartTime || '09:00 AM',
+      opdEndTime: editingDoc?.opdEndTime || '05:00 PM',
       consultationDuration: parseInt(docForm.consultationDuration) || 15,
       maxTokensPerDay: parseInt(docForm.maxTokensPerDay) || 50,
       onlineConsult: docForm.onlineConsult,
       offlineConsult: docForm.offlineConsult,
-      active: docForm.active
+      active: docForm.active,
+      sessions: editingDoc?.sessions || undefined
     };
 
     if (editingDoc) {
@@ -210,8 +179,6 @@ const to12Hour = (timeStr?: string): string => {
       gender: doc.gender || 'Male',
       biography: doc.biography || '',
       opdDays: doc.opdDays || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
-      opdStartTime: to24Hour(doc.opdStartTime),
-      opdEndTime: to24Hour(doc.opdEndTime),
       consultationDuration: String(doc.consultationDuration || 15),
       maxTokensPerDay: String(doc.maxTokensPerDay || 50),
       onlineConsult: doc.onlineConsult !== false,
@@ -291,7 +258,7 @@ const to12Hour = (timeStr?: string): string => {
                 setDocForm({
                   name: '', photo: '', qualification: '', specialization: '', departmentId: availableDepartments[0]?.id || departments[0]?.id || '',
                   experience: '5', consultationFee: '500', languages: 'English, Hindi', gender: 'Male', biography: '',
-                  opdDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'], opdStartTime: '09:00', opdEndTime: '13:00',
+                  opdDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
                   consultationDuration: '15', maxTokensPerDay: '50', onlineConsult: true, offlineConsult: true, active: true
                 });
                 setShowDocModal(true);
@@ -319,7 +286,7 @@ const to12Hour = (timeStr?: string): string => {
                   setDocForm({
                     name: '', photo: '', qualification: '', specialization: '', departmentId: availableDepartments[0]?.id || departments[0]?.id || '',
                     experience: '5', consultationFee: '500', languages: 'English, Hindi', gender: 'Male', biography: '',
-                    opdDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'], opdStartTime: '09:00', opdEndTime: '13:00',
+                    opdDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
                     consultationDuration: '15', maxTokensPerDay: '50', onlineConsult: true, offlineConsult: true, active: true
                   });
                   setShowDocModal(true);
@@ -382,7 +349,11 @@ const to12Hour = (timeStr?: string): string => {
                         </div>
                         <div>
                           <span className="text-[9px] text-slate-450 block font-bold uppercase tracking-wider">OPD Timings</span>
-                          <span className="text-slate-800 truncate block">{doc.opdStartTime || '09:00 AM'} - {doc.opdEndTime || '05:00 PM'}</span>
+                          <span className="text-slate-800 truncate block">
+                            {doc.sessions && doc.sessions.filter(s => s.active !== false).length > 0
+                              ? doc.sessions.filter(s => s.active !== false).map(s => `${s.startTime} - ${s.endTime}`).join(', ')
+                              : `${doc.opdStartTime || '09:00 AM'} - ${doc.opdEndTime || '05:00 PM'}`}
+                          </span>
                         </div>
                         <div className="col-span-2">
                           <span className="text-[9px] text-slate-450 block font-bold uppercase tracking-wider">OPD Days</span>
@@ -658,14 +629,6 @@ const to12Hour = (timeStr?: string): string => {
                   <input type="number" value={docForm.experience} onChange={e => setDocForm({...docForm, experience: e.target.value})} placeholder="10" required className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500" />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1.5">OPD Start Time</label>
-                  <input type="time" value={docForm.opdStartTime} onChange={e => setDocForm({...docForm, opdStartTime: e.target.value})} required className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500" />
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1.5">OPD End Time</label>
-                  <input type="time" value={docForm.opdEndTime} onChange={e => setDocForm({...docForm, opdEndTime: e.target.value})} required className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500" />
-                </div>
-                <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1.5">Gender</label>
                   <select value={docForm.gender} onChange={e => setDocForm({...docForm, gender: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 bg-white">
                     <option>Male</option>
@@ -676,6 +639,9 @@ const to12Hour = (timeStr?: string): string => {
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1.5">Languages (Comma separated)</label>
                   <input type="text" value={docForm.languages} onChange={e => setDocForm({...docForm, languages: e.target.value})} placeholder="English, Hindi" className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500" />
+                </div>
+                <div className="col-span-2 py-2 px-3 bg-blue-50/70 border border-blue-100 rounded-xl text-[11px] text-blue-700 font-semibold">
+                  💡 OPD Shift hours and working days are managed in <strong>Sessions & Schedule</strong>.
                 </div>
                 <div className="col-span-2">
                   <label className="text-xs font-bold text-slate-700 block mb-1.5">Biography</label>
