@@ -775,7 +775,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   // Auto-fetch patients, tokens, doctors, departments, schedules for current hospital directly from AWS RDS
   useEffect(() => {
-    if (!targetHospId) return;
+    if (!targetHospId || !hospitalUser || !authToken) return;
 
     fetchPatients();
 
@@ -842,7 +842,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         }
       })
       .catch(err => console.warn('Could not fetch schedules from AWS RDS:', err));
-  }, [targetHospId, authToken]);
+  }, [targetHospId, authToken, hospitalUser]);
 
   // ─── Cross-tab & Real-time Global Sync ─────────────────────────────────────
   useEffect(() => {
@@ -933,6 +933,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         });
       } else if (event.type === 'STORAGE_CHANGED' || event.type === 'CLOUD_SYNC_UPDATED' || event.type === 'HOSPITAL_DOCTORS_UPDATED' || event.type === 'HOSPITAL_PROFILE_UPDATED' || event.type === 'HOSPITAL_DEPARTMENTS_UPDATED' || event.type === 'HOSPITAL_TOKENS_UPDATED') {
         const curHospId = targetHospId;
+        if (!curHospId) return;
         const savedDocs = localStorage.getItem(`insta_hospital_doctors_${curHospId}`);
         if (savedDocs) {
           try {
@@ -981,6 +982,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   // ─── Local Sync to AppContext & localStorage ──────────────────────────────
   useEffect(() => {
+    if (!targetHospId || !hospitalUser) return;
     localStorage.setItem('insta_hospital_profile', JSON.stringify(hospitalProfile));
     if (updateHospital) {
       updateHospital(targetHospId, {
@@ -995,11 +997,11 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         lng: hospitalProfile.lng !== undefined ? Number(hospitalProfile.lng) : undefined,
       });
     }
-  }, [hospitalProfile, targetHospId]);
+  }, [hospitalProfile, targetHospId, hospitalUser]);
 
   // Fetch latest saved profile from backend on mount so we never rely on stale defaults
   useEffect(() => {
-    if (!targetHospId) return;
+    if (!targetHospId || !hospitalUser) return;
     fetch('/api/hospitals')
       .then(res => res.json())
       .then(data => {
@@ -1013,9 +1015,10 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         }
       })
       .catch(err => console.warn('Could not load hospital profile from server:', err));
-  }, [targetHospId]);
+  }, [targetHospId, hospitalUser]);
 
   useEffect(() => {
+    if (!targetHospId || !hospitalUser) return;
     localStorage.setItem(`insta_hospital_doctors_${targetHospId}`, JSON.stringify(doctors));
     const mappedAppDoctors: Doctor[] = doctors.map(d => ({
       id: d.id,
@@ -1046,9 +1049,10 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (updateHospitalDoctors) {
       updateHospitalDoctors(targetHospId, mappedAppDoctors);
     }
-  }, [doctors, targetHospId, tokens]);
+  }, [doctors, targetHospId, tokens, hospitalUser]);
 
   useEffect(() => {
+    if (!targetHospId || !hospitalUser) return;
     localStorage.setItem(`insta_hospital_departments_${targetHospId}`, JSON.stringify(departments));
     const mappedDepts = departments.map(d => ({
       id: d.id,
@@ -1061,11 +1065,12 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (updateHospitalDepartments) {
       updateHospitalDepartments(targetHospId, mappedDepts);
     }
-  }, [departments, targetHospId]);
+  }, [departments, targetHospId, hospitalUser]);
 
   useEffect(() => {
+    if (!targetHospId || !hospitalUser) return;
     localStorage.setItem('insta_hospital_tokens', JSON.stringify(tokens));
-  }, [tokens]);
+  }, [tokens, targetHospId, hospitalUser]);
 
   useEffect(() => {
     localStorage.setItem('insta_hospital_patients', JSON.stringify(patients));
@@ -1167,6 +1172,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   // Helper to sync doctors changes to AppContext (website patient side) and AWS backend
   const syncDoctorsGlobally = (updatedDocs: HospitalDoctor[]) => {
+    if (!targetHospId || !authToken || !hospitalUser) return;
     localStorage.setItem(`insta_hospital_doctors_${targetHospId}`, JSON.stringify(updatedDocs));
 
     const patientDocs: Doctor[] = updatedDocs.filter(d => d.active !== false).map(d => ({
@@ -1234,6 +1240,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   // Helper to sync departments changes to AppContext and AWS backend
   const syncDepartmentsGlobally = (updatedDepts: HospitalDepartment[]) => {
+    if (!targetHospId || !authToken || !hospitalUser) return;
     localStorage.setItem(`insta_hospital_departments_${targetHospId}`, JSON.stringify(updatedDepts));
 
     const patientDepts = updatedDepts.filter(d => d.active !== false).map(d => ({
