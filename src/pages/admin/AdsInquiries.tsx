@@ -13,7 +13,8 @@ import {
   AlertCircle,
   Eye,
   RefreshCw,
-  ShieldCheck
+  ShieldCheck,
+  Building2
 } from 'lucide-react';
 
 interface AdInquiry {
@@ -179,64 +180,64 @@ export const AdsInquiries: React.FC = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <div className="p-2 bg-blue-600/10 text-blue-500 rounded-xl">
+            <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
               <Megaphone size={20} />
             </div>
-            <h2 className="text-xl font-black text-white tracking-tight">Ads Inquiries</h2>
+            <h2 className="text-xl font-black text-slate-900 tracking-tight">Ads Inquiries</h2>
           </div>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-slate-500 font-medium mt-1">
             Review banner advertising inquiries from hospitals and publish directly into live regional banners
           </p>
         </div>
 
         <button
           onClick={loadInquiries}
-          className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer border border-slate-700"
+          className="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer border border-slate-200 shadow-xs"
         >
-          <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
+          <RefreshCw size={13} className={loading ? 'animate-spin text-blue-600' : ''} /> Refresh
         </button>
       </div>
 
       {/* Metrics Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: 'Total Inquiries', count: inquiries.length, sub: 'All Campaigns', color: 'text-blue-400 bg-blue-500/10' },
-          { label: 'Pending Review', count: pendingCount, sub: 'Needs Action', color: 'text-amber-400 bg-amber-500/10' },
-          { label: 'Approved & Live', count: approvedCount, sub: 'Published Banners', color: 'text-emerald-400 bg-emerald-500/10' },
-          { label: 'Rejected', count: rejectedCount, sub: 'Declined Inquiries', color: 'text-rose-400 bg-rose-500/10' }
+          { label: 'Total Inquiries', count: inquiries.length, sub: 'All Campaigns', color: 'text-blue-600 bg-blue-50' },
+          { label: 'Pending Review', count: pendingCount, sub: 'Needs Action', color: 'text-amber-600 bg-amber-50' },
+          { label: 'Approved & Live', count: approvedCount, sub: 'Published Banners', color: 'text-emerald-600 bg-emerald-50' },
+          { label: 'Rejected', count: rejectedCount, sub: 'Declined Inquiries', color: 'text-rose-600 bg-rose-50' }
         ].map(m => (
-          <div key={m.label} className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-sm">
+          <div key={m.label} className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs">
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">{m.label}</span>
             <div className="flex items-baseline gap-2 mt-1">
-              <span className="text-2xl font-black text-white">{m.count}</span>
-              <span className="text-[10px] text-slate-400">{m.sub}</span>
+              <span className="text-2xl font-black text-slate-800">{m.count}</span>
+              <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-md ${m.color}`}>{m.sub}</span>
             </div>
           </div>
         ))}
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 bg-slate-900/80 p-3.5 rounded-2xl border border-slate-800">
+      <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs">
         <div className="relative flex-1 max-w-md">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search hospital, campaign title, state or district..."
-            className="w-full pl-9 pr-4 py-2 bg-slate-800/80 border border-slate-700/60 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+            className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500"
           />
         </div>
 
-        <div className="flex bg-slate-800 rounded-xl p-1 shrink-0">
+        <div className="flex bg-slate-100 rounded-xl p-1 shrink-0">
           {(['all', 'pending', 'approved', 'rejected'] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setStatusFilter(tab)}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg cursor-pointer transition-all border-none capitalize ${
+              className={`px-3.5 py-1.5 text-xs font-bold rounded-lg cursor-pointer transition-all border-none capitalize ${
                 statusFilter === tab
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-white text-blue-600 shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800'
               }`}
             >
               {tab}
@@ -247,13 +248,13 @@ export const AdsInquiries: React.FC = () => {
 
       {/* Inquiries Cards Grid */}
       {loading ? (
-        <div className="text-center py-16 text-slate-500 text-xs">Loading hospital ad inquiries...</div>
+        <div className="text-center py-16 text-slate-400 text-xs">Loading hospital ad inquiries...</div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-16 bg-slate-900/40 border border-dashed border-slate-800 rounded-3xl p-6">
-          <AlertCircle size={28} className="mx-auto text-slate-600 mb-2" />
-          <p className="text-sm font-bold text-slate-400">No ad inquiries found</p>
-          <p className="text-xs text-slate-500 mt-1">
-            {search || statusFilter !== 'all' ? 'Try adjusting your search or status filter.' : 'Hospital promotion requests will appear here.'}
+        <div className="text-center py-16 bg-white border border-dashed border-slate-200 rounded-3xl p-6 shadow-xs">
+          <AlertCircle size={32} className="mx-auto text-slate-300 mb-2" />
+          <p className="text-sm font-bold text-slate-700">No ad inquiries found</p>
+          <p className="text-xs text-slate-400 mt-1">
+            {search || statusFilter !== 'all' ? 'Try adjusting your search or status filter.' : 'Hospital promotion requests will appear here when submitted from the hospital panel.'}
           </p>
         </div>
       ) : (
@@ -261,25 +262,25 @@ export const AdsInquiries: React.FC = () => {
           {filtered.map(inq => (
             <div
               key={inq.id}
-              className="bg-slate-900/90 border border-slate-800 hover:border-slate-700 rounded-3xl p-5 shadow-sm space-y-4 transition-all"
+              className="bg-white border border-slate-200/90 hover:border-blue-300 rounded-3xl p-5 shadow-xs space-y-4 transition-all"
             >
               {/* Card Top Header */}
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <span className="text-[10px] font-black uppercase tracking-wider text-blue-400 block">
-                    {inq.hospitalName}
-                  </span>
-                  <h4 className="text-sm font-black text-white mt-0.5 leading-snug">
+                  <div className="flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-blue-600">
+                    <Building2 size={11} /> {inq.hospitalName}
+                  </div>
+                  <h4 className="text-sm font-black text-slate-900 mt-0.5 leading-snug">
                     {inq.title}
                   </h4>
                 </div>
                 <span
                   className={`text-[10px] font-black px-2.5 py-1 rounded-full border shrink-0 capitalize ${
                     inq.status === 'approved'
-                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                       : inq.status === 'rejected'
-                      ? 'bg-rose-500/10 text-rose-400 border-rose-500/30'
-                      : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                      ? 'bg-rose-50 text-rose-700 border-rose-200'
+                      : 'bg-amber-50 text-amber-700 border-amber-200'
                   }`}
                 >
                   {inq.status === 'approved' ? 'Approved & Live' : inq.status === 'rejected' ? 'Rejected' : 'Pending Review'}
@@ -290,17 +291,17 @@ export const AdsInquiries: React.FC = () => {
               {inq.imageUrl && (
                 <div
                   onClick={() => setPreviewImage(inq.imageUrl)}
-                  className="relative rounded-2xl overflow-hidden border border-slate-800 group cursor-pointer"
+                  className="relative rounded-2xl overflow-hidden border border-slate-100 group cursor-pointer bg-slate-900"
                 >
                   <img
                     src={inq.imageUrl}
                     alt={inq.title}
-                    className="w-full h-40 object-cover group-hover:scale-105 transition-transform duration-300"
+                    className="w-full h-40 object-cover group-hover:scale-105 transition-transform duration-300 opacity-90 group-hover:opacity-100"
                   />
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5 text-white text-xs font-bold">
                     <Eye size={16} /> Click to Expand
                   </div>
-                  <div className="absolute bottom-2 left-2 px-2 py-0.5 bg-black/70 backdrop-blur-md rounded text-[9px] font-bold text-slate-300">
+                  <div className="absolute bottom-2 left-2 px-2.5 py-0.5 bg-black/70 backdrop-blur-md rounded-md text-[9px] font-bold text-white">
                     CTA: {inq.ctaText || 'Book Token'}
                   </div>
                 </div>
@@ -308,36 +309,36 @@ export const AdsInquiries: React.FC = () => {
 
               {/* Description */}
               {inq.description && (
-                <p className="text-xs text-slate-300 bg-slate-800/50 p-3 rounded-xl border border-slate-800/80">
+                <p className="text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100">
                   {inq.description}
                 </p>
               )}
 
               {/* Location & Campaign Meta */}
-              <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-400 bg-slate-950/60 p-3 rounded-xl border border-slate-800/60">
+              <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-500 bg-slate-50/70 p-3 rounded-xl border border-slate-100">
                 <div className="flex items-center gap-1.5">
-                  <MapPin size={12} className="text-blue-400 shrink-0" />
+                  <MapPin size={12} className="text-blue-500 shrink-0" />
                   <span className="truncate">
-                    Level: <strong className="text-slate-200 capitalize">{inq.targetLevel}</strong>
+                    Level: <strong className="text-slate-700 capitalize">{inq.targetLevel}</strong>
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <Globe size={12} className="text-indigo-400 shrink-0" />
+                  <Globe size={12} className="text-indigo-500 shrink-0" />
                   <span className="truncate">
-                    Geo: <strong className="text-slate-200">{inq.district || inq.state || 'All India'}</strong>
+                    Geo: <strong className="text-slate-700">{inq.district || inq.state || 'All India'}</strong>
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <Calendar size={12} className="text-amber-400 shrink-0" />
-                  <span>Duration: <strong className="text-slate-200">{inq.durationDays} Days</strong></span>
+                  <Calendar size={12} className="text-amber-500 shrink-0" />
+                  <span>Duration: <strong className="text-slate-700">{inq.durationDays} Days</strong></span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <ExternalLink size={12} className="text-emerald-400 shrink-0" />
+                  <ExternalLink size={12} className="text-emerald-500 shrink-0" />
                   <a
                     href={inq.link}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-blue-400 hover:underline truncate"
+                    className="text-blue-600 hover:underline truncate font-semibold"
                   >
                     Target Link
                   </a>
@@ -345,15 +346,15 @@ export const AdsInquiries: React.FC = () => {
               </div>
 
               {/* Hospital Contact Info */}
-              <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-[11px] text-slate-400">
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-[11px] text-slate-500">
                 <div>
-                  <span className="text-slate-500">Contact:</span> <strong className="text-slate-300">{inq.contactPerson}</strong>
+                  <span className="text-slate-400">Contact:</span> <strong className="text-slate-700">{inq.contactPerson}</strong>
                 </div>
                 <div className="flex items-center gap-2">
                   {inq.contactPhone && (
                     <a
                       href={`tel:${inq.contactPhone}`}
-                      className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors flex items-center gap-1 no-underline text-[10px]"
+                      className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors flex items-center gap-1 no-underline text-[10px] font-bold"
                       title="Call Contact"
                     >
                       <Phone size={11} /> {inq.contactPhone}
@@ -362,7 +363,7 @@ export const AdsInquiries: React.FC = () => {
                   {inq.contactEmail && (
                     <a
                       href={`mailto:${inq.contactEmail}?subject=Regarding%20InstaToken%20Banner%20Ad`}
-                      className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors flex items-center gap-1 no-underline text-[10px]"
+                      className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors flex items-center gap-1 no-underline text-[10px]"
                       title="Email Contact"
                     >
                       <Mail size={11} />
@@ -372,8 +373,8 @@ export const AdsInquiries: React.FC = () => {
               </div>
 
               {/* Actions Row */}
-              <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-2">
-                <span className="text-[10px] text-slate-500 font-mono">
+              <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                <span className="text-[10px] text-slate-400 font-mono">
                   {new Date(inq.createdAt).toLocaleDateString()}
                 </span>
 
@@ -382,7 +383,7 @@ export const AdsInquiries: React.FC = () => {
                     <button
                       onClick={() => handleApprove(inq)}
                       disabled={approvingId === inq.id}
-                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1 cursor-pointer border-none shadow-sm shadow-emerald-600/20"
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1 cursor-pointer border-none shadow-xs"
                     >
                       <CheckCircle2 size={13} />
                       {approvingId === inq.id ? 'Publishing...' : 'Approve & Create Banner'}
@@ -390,7 +391,7 @@ export const AdsInquiries: React.FC = () => {
                   )}
 
                   {inq.status === 'approved' && inq.bannerId && (
-                    <span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1">
+                    <span className="text-[11px] font-bold text-emerald-600 flex items-center gap-1 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
                       <ShieldCheck size={13} /> Live on Homepage
                     </span>
                   )}
@@ -401,7 +402,7 @@ export const AdsInquiries: React.FC = () => {
                         setRejectModalInquiry(inq);
                         setRejectReason('');
                       }}
-                      className="px-2.5 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                      className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 rounded-xl text-xs font-bold transition-colors cursor-pointer"
                     >
                       Reject
                     </button>
@@ -415,31 +416,31 @@ export const AdsInquiries: React.FC = () => {
 
       {/* Reject Modal */}
       {rejectModalInquiry && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full space-y-4 shadow-xl">
-            <h4 className="text-sm font-black text-white">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 max-w-md w-full space-y-4 shadow-xl">
+            <h4 className="text-sm font-black text-slate-800">
               Reject Ad Inquiry for {rejectModalInquiry.hospitalName}
             </h4>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-slate-500">
               Provide a reason so the hospital administrator understands why the request was declined.
             </p>
             <textarea
               value={rejectReason}
               onChange={e => setRejectReason(e.target.value)}
-              placeholder="e.g. Creative resolution does not meet 1200x400 requirements, please re-upload."
+              placeholder="e.g. Creative resolution does not meet requirements, please re-upload."
               rows={3}
-              className="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-rose-500"
+              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-rose-500"
             />
             <div className="flex justify-end gap-2 pt-2">
               <button
                 onClick={() => setRejectModalInquiry(null)}
-                className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold cursor-pointer border-none"
+                className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold cursor-pointer border-none"
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirmReject}
-                className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-black cursor-pointer border-none shadow-sm"
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-black cursor-pointer border-none shadow-xs"
               >
                 Confirm Rejection
               </button>
