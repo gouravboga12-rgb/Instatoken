@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useHospital } from '../../context/HospitalContext';
-import { subscribeGlobalSync } from '../../utils/syncBus';
 import {
-  Users, Ticket, Clock, TrendingUp, TrendingDown,
+  Users, Ticket, Clock, TrendingUp,
   UserPlus, Plus, ArrowRight, Stethoscope, Bell,
-  CheckCircle2, X, Printer, MapPin, Megaphone, ExternalLink
+  CheckCircle2, X, Printer, Activity
 } from 'lucide-react';
 
 export const HospitalDashboard: React.FC = () => {
@@ -14,6 +13,8 @@ export const HospitalDashboard: React.FC = () => {
     hospitalProfile,
     tokens,
     doctors,
+    departments,
+    staff,
     generateWalkInToken
   } = useHospital();
   const navigate = useNavigate();
@@ -24,8 +25,15 @@ export const HospitalDashboard: React.FC = () => {
   const [walkInPhone, setWalkInPhone] = useState('');
   const [walkInGender, setWalkInGender] = useState<'Male' | 'Female' | 'Other'>('Male');
   const [walkInAge, setWalkInAge] = useState('32');
-  const [walkInDoctorId, setWalkInDoctorId] = useState(doctors[0]?.id || 'doc-arvind');
+  const [walkInDoctorId, setWalkInDoctorId] = useState(doctors[0]?.id || '');
   const [generatedSlip, setGeneratedSlip] = useState<any>(null);
+
+  // Sync walkInDoctorId when doctors load
+  useEffect(() => {
+    if (doctors.length > 0 && (!walkInDoctorId || !doctors.some(d => d.id === walkInDoctorId))) {
+      setWalkInDoctorId(doctors[0].id);
+    }
+  }, [doctors, walkInDoctorId]);
 
   // Auto-refresh pulse timer (simulated live update every 5 seconds)
   const [livePulse, setLivePulse] = useState(false);
@@ -37,45 +45,12 @@ export const HospitalDashboard: React.FC = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // Regional location-based banners state
-  const [regionalBanners, setRegionalBanners] = useState<any[]>([]);
-  const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
-  const [bannerDismissed, setBannerDismissed] = useState(false);
+  // Format greeting & dates
+  const rawName = hospitalUser?.name || hospitalProfile?.name || 'Hospital';
+  const firstName = rawName.replace(/^Dr\.\s*/i, '').split(' ')[0] || 'Hospital';
 
-  useEffect(() => {
-    const fetchRegionalBanners = async () => {
-      try {
-        const country = hospitalProfile?.country || 'India';
-        const state = hospitalProfile?.state || 'Telangana';
-        const district = hospitalProfile?.city || 'Hyderabad';
-        const mandal = hospitalProfile?.area || '';
-        const params = new URLSearchParams({ panel: 'hospital', country, state, district, mandal });
-        const res = await fetch(`/api/banners/active?${params.toString()}`);
-        if (res.ok) {
-          const data = await res.json();
-          const list = Array.isArray(data) ? data : (Array.isArray(data.banners) ? data.banners : []);
-          setRegionalBanners(list);
-        }
-      } catch (err) {
-        console.error('Failed to load regional banners for hospital', err);
-      }
-    };
-    fetchRegionalBanners();
-
-    const unsubscribe = subscribeGlobalSync((event) => {
-      if (event.type === 'BANNERS_UPDATED' || event.type === 'BANNER_DELETED') {
-        fetchRegionalBanners();
-      }
-    });
-    return () => unsubscribe();
-  }, [hospitalProfile]);
-
-  // Format greeting
-  const rawName = hospitalUser?.name || 'Dr. Rajesh Kumar';
-  const firstName = rawName.replace(/^Dr\.\s*/i, '').split(' ')[0] || 'Doctor';
-
-  // Date formatting
   const today = new Date();
+  const todayStr = today.toISOString().split('T')[0];
   const dateFormatted = today.toLocaleDateString('en-IN', {
     weekday: 'long',
     day: 'numeric',
@@ -83,73 +58,327 @@ export const HospitalDashboard: React.FC = () => {
     year: 'numeric'
   });
 
-  // Calculate live stats
-  const totalTokensCount = tokens.length > 0 ? tokens.length : 248;
-  const offlineTokensCount = tokens.filter(t => t.type === 'offline').length || 162;
-  const onlineTokensCount = tokens.filter(t => t.type === 'online').length || 86;
-  const inQueueCount = tokens.filter(t => ['booked', 'waiting', 'checked-in'].includes(t.status)).length || 14;
-  const activeDoctorsCount = doctors.filter(d => d.active !== false).length || 4;
+  // Filter today's tokens accurately
+  const isTodayToken = (t: any) => {
+    if (!t.bookingDate) return true;
+    if (t.bookingDate === todayStr) return true;
+    const d = new Date(t.bookingDate);
+    if (!isNaN(d.getTime())) {
+      return d.toISOString().split('T')[0] === todayStr || d.toDateString() === today.toDateString();
+    }
+    return true;
+  };
 
-  // Static reference queue rows (merged with real tokens if any)
-  const defaultLiveQueue = [
-    { id: 'O103', tokenNo: 103, patientName: 'Ayesha Begum', dept: 'Orthopaedics', doctor: 'Dr. Suresh Babu', waitTime: '0 min', status: 'in-consult' as const },
-    { id: 'P104', tokenNo: 104, patientName: 'Karthik Chowdary', dept: 'Paediatrics', doctor: 'Dr. Kavya Sree', waitTime: '15 min', status: 'waiting' as const },
-    { id: 'D105', tokenNo: 105, patientName: 'Sindhu Rani', dept: 'Dermatology', doctor: 'Dr. Farhan Ali', waitTime: '18 min', status: 'waiting' as const },
-    { id: 'E106', tokenNo: 106, patientName: 'Mohan Rao', dept: 'ENT', doctor: 'Dr. Meera Nair', waitTime: '21 min', status: 'waiting' as const },
-    { id: 'C108', tokenNo: 108, patientName: 'Arjun Varma', dept: 'Cardiology', doctor: 'Dr. Anitha Rao', waitTime: '0 min', status: 'skipped' as const },
-    { id: 'O109', tokenNo: 109, patientName: 'Sunitha Devi', dept: 'Orthopaedics', doctor: 'Dr. Suresh Babu', waitTime: '30 min', status: 'waiting' as const },
-  ];
+  const todayTokens = useMemo(() => {
+    const filtered = tokens.filter(isTodayToken);
+    return filtered.length > 0 ? filtered : tokens;
+  }, [tokens, todayStr]);
 
-  const displayQueue = tokens.length >= 3
-    ? tokens.slice(0, 6).map((t, idx) => ({
-        id: `${t.departmentName ? t.departmentName.charAt(0) : 'T'}${t.tokenNo}`,
+  // 1. Today's Patients
+  const totalTokensCount = todayTokens.length;
+  const offlineTokensCount = todayTokens.filter(t => t.type === 'offline').length;
+  const onlineTokensCount = todayTokens.filter(t => t.type === 'online').length;
+
+  // 2. Today's Revenue & Collections
+  const todayEarnedRevenue = useMemo(() => {
+    return todayTokens
+      .filter(t => t.status === 'completed' || t.paymentStatus === 'paid')
+      .reduce((sum, t) => {
+        const doc = doctors.find(d => d.id === t.doctorId);
+        return sum + (t.consultationFee || doc?.consultationFee || 500);
+      }, 0);
+  }, [todayTokens, doctors]);
+
+  const todayPendingRevenue = useMemo(() => {
+    return todayTokens
+      .filter(t => t.status !== 'completed' && t.status !== 'cancelled' && t.paymentStatus !== 'paid')
+      .reduce((sum, t) => {
+        const doc = doctors.find(d => d.id === t.doctorId);
+        return sum + (t.consultationFee || doc?.consultationFee || 500);
+      }, 0);
+  }, [todayTokens, doctors]);
+
+  // 3. Patients in Queue
+  const queueTokens = useMemo(() => {
+    return todayTokens.filter(t =>
+      ['booked', 'waiting', 'checked-in', 'calling', 'in-consultation', 'in-consult'].includes(t.status as string)
+    );
+  }, [todayTokens]);
+
+  const inQueueCount = queueTokens.length;
+  const inConsultCount = queueTokens.filter(t => t.status === 'in-consultation' || (t.status as string) === 'in-consult' || t.status === 'calling').length;
+  const waitingCount = queueTokens.filter(t => ['waiting', 'booked', 'checked-in'].includes(t.status as string)).length;
+
+  // 4. Avg. Waiting Time
+  const avgWaitMin = useMemo(() => {
+    const waitingOnly = queueTokens.filter(t => t.status !== 'in-consultation' && (t.status as string) !== 'in-consult');
+    if (waitingOnly.length === 0) return 0;
+    const withWait = waitingOnly.filter(t => typeof t.estimatedWait === 'number' && t.estimatedWait > 0);
+    if (withWait.length > 0) {
+      return Math.round(withWait.reduce((acc, t) => acc + (t.estimatedWait || 0), 0) / withWait.length);
+    }
+    return Math.min(45, Math.max(5, waitingOnly.length * 10));
+  }, [queueTokens]);
+
+  const activeDoctorsCount = doctors.filter(d => d.active !== false).length;
+
+  // 7-Day Revenue & Footfall dynamic calculation
+  const last7DaysData = useMemo(() => {
+    const days: { label: string; dateStr: string; footfall: number; revenue: number }[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      const dayLabel = d.toLocaleDateString('en-IN', { weekday: 'short' });
+
+      const dayTokens = tokens.filter(t => {
+        if (!t.bookingDate) return i === 0;
+        return t.bookingDate === dateStr || new Date(t.bookingDate).toDateString() === d.toDateString();
+      });
+
+      const dayRevenue = dayTokens
+        .filter(t => t.status === 'completed' || t.paymentStatus === 'paid')
+        .reduce((acc, t) => {
+          const doc = doctors.find(doc => doc.id === t.doctorId);
+          return acc + (t.consultationFee || doc?.consultationFee || 500);
+        }, 0);
+
+      days.push({
+        label: dayLabel,
+        dateStr,
+        footfall: dayTokens.length,
+        revenue: dayRevenue
+      });
+    }
+    return days;
+  }, [tokens, doctors]);
+
+  const max7DayRevenue = Math.max(...last7DaysData.map(d => d.revenue), 1000);
+  const total7DayRevenue = last7DaysData.reduce((acc, d) => acc + d.revenue, 0);
+
+  const chartPoints = useMemo(() => {
+    return last7DaysData.map((d, idx) => {
+      const x = 50 + idx * (590 / 6);
+      const ratio = max7DayRevenue > 0 ? d.revenue / max7DayRevenue : 0;
+      const y = 190 - ratio * 155;
+      return { x, y, revenue: d.revenue, footfall: d.footfall, label: d.label };
+    });
+  }, [last7DaysData, max7DayRevenue]);
+
+  const splinePath = useMemo(() => {
+    if (chartPoints.length === 0) return '';
+    let d = `M ${chartPoints[0].x} ${chartPoints[0].y}`;
+    for (let i = 0; i < chartPoints.length - 1; i++) {
+      const p0 = chartPoints[i];
+      const p1 = chartPoints[i + 1];
+      const cx1 = p0.x + (p1.x - p0.x) / 2;
+      const cx2 = p0.x + (p1.x - p0.x) / 2;
+      d += ` C ${cx1} ${p0.y}, ${cx2} ${p1.y}, ${p1.x} ${p1.y}`;
+    }
+    return d;
+  }, [chartPoints]);
+
+  const areaPath = useMemo(() => {
+    if (!splinePath || chartPoints.length === 0) return '';
+    return `${splinePath} L ${chartPoints[chartPoints.length - 1].x} 190 L ${chartPoints[0].x} 190 Z`;
+  }, [splinePath, chartPoints]);
+
+  // Format number for chart Y axis
+  const formatK = (val: number) => {
+    if (val >= 100000) return `${Math.round(val / 1000)}k`;
+    if (val >= 1000) return `${(val / 1000).toFixed(val % 1000 === 0 ? 0 : 1)}k`;
+    return `${val}`;
+  };
+
+  // Department mix data calculated dynamically
+  const DEPT_COLORS = ['#1E40AF', '#15803D', '#EA580C', '#06B6D4', '#A855F7', '#2563EB', '#D97706', '#E11D48'];
+
+  const departmentMixData = useMemo(() => {
+    const deptMap = new Map<string, { name: string; count: number }>();
+
+    // Seed departments from hospital configuration
+    if (departments.length > 0) {
+      departments.forEach(dept => {
+        deptMap.set(dept.name.toLowerCase(), { name: dept.name, count: 0 });
+      });
+    }
+
+    todayTokens.forEach(t => {
+      const deptName = t.departmentName || 'General Medicine';
+      const key = deptName.toLowerCase();
+      if (deptMap.has(key)) {
+        deptMap.get(key)!.count += 1;
+      } else {
+        deptMap.set(key, { name: deptName, count: 1 });
+      }
+    });
+
+    const list = Array.from(deptMap.values())
+      .filter(d => d.count > 0 || departments.some(dept => dept.name.toLowerCase() === d.name.toLowerCase()))
+      .slice(0, 6);
+
+    const total = list.reduce((sum, d) => sum + d.count, 0);
+
+    let accumulated = 0;
+    return list.map((item, idx) => {
+      const percent = total > 0 ? (item.count / total) : 0;
+      const dashLength = percent * 408.4;
+      const offset = -(accumulated * 408.4);
+      accumulated += percent;
+
+      return {
+        name: item.name,
+        count: item.count,
+        percent: Math.round(percent * 100),
+        color: DEPT_COLORS[idx % DEPT_COLORS.length],
+        dashLength,
+        offset
+      };
+    });
+  }, [departments, todayTokens]);
+
+  const totalDeptPatients = departmentMixData.reduce((acc, d) => acc + d.count, 0);
+
+  // Live queue rows directly from real tokens
+  const realLiveQueue = useMemo(() => {
+    const statusPriority: Record<string, number> = {
+      'calling': 1,
+      'in-consultation': 2,
+      'in-consult': 2,
+      'waiting': 3,
+      'checked-in': 4,
+      'booked': 5,
+      'completed': 6,
+      'skipped': 7,
+      'cancelled': 8
+    };
+
+    const sorted = [...todayTokens].sort((a, b) => {
+      const pA = statusPriority[a.status] || 9;
+      const pB = statusPriority[b.status] || 9;
+      if (pA !== pB) return pA - pB;
+      return (a.tokenNo || 0) - (b.tokenNo || 0);
+    });
+
+    return sorted.slice(0, 6).map((t, idx) => {
+      const prefix = t.departmentName ? t.departmentName.charAt(0).toUpperCase() : 'T';
+      const formattedId = `${prefix}${String(t.tokenNo).padStart(3, '0')}`;
+      const waitTime = ['completed', 'in-consultation', 'in-consult'].includes(t.status as string)
+        ? '0 min'
+        : `${t.estimatedWait || Math.max(5, (idx + 1) * 8)} min`;
+
+      return {
+        id: formattedId,
+        rawId: t.id,
         tokenNo: t.tokenNo,
-        patientName: t.patientName,
+        patientName: t.patientName || 'Patient',
         dept: t.departmentName || 'General Medicine',
         doctor: t.doctorName || 'Consultant Doctor',
-        waitTime: (t.status as string) === 'in-consult' || t.status === 'completed' ? '0 min' : `${Math.max(5, (idx + 1) * 6)} min`,
-        status: t.status === 'completed' ? 'in-consult' as const : t.status === 'cancelled' ? 'skipped' as const : t.status as any
-      }))
-    : defaultLiveQueue;
+        waitTime,
+        status: t.status
+      };
+    });
+  }, [todayTokens]);
 
-  // Doctor availability list
-  const doctorAvailabilityList = [
-    { name: 'Dr. Ravi Teja', timing: '09:00 – 13:00', active: true, used: 38, total: 60 },
-    { name: 'Dr. Anitha Rao', timing: '10:00 – 14:00', active: true, used: 21, total: 30 },
-    { name: 'Dr. Suresh Babu', timing: '16:00 – 20:00', active: false, used: 26, total: 40 },
-    { name: 'Dr. Kavya Sree', timing: '09:30 – 13:30', active: true, used: 33, total: 50 },
-  ];
+  // Doctor availability & Token capacity used directly from real doctors
+  const doctorAvailabilityList = useMemo(() => {
+    return doctors.map(doc => {
+      const docTokens = todayTokens.filter(t => t.doctorId === doc.id);
+      const used = docTokens.length;
+      const total = doc.maxTokensPerDay || (doc.sessions?.reduce((sum, s) => sum + (s.maxTokens || 0), 0) || 40);
+      const timing = (doc.opdStartTime && doc.opdEndTime)
+        ? `${doc.opdStartTime} – ${doc.opdEndTime}`
+        : '09:00 – 17:00';
 
-  // Department mix data
-  const deptMix = [
-    { name: 'General Medicine', count: 62, color: '#1E40AF' },
-    { name: 'Cardiology', count: 28, color: '#15803D' },
-    { name: 'Orthopaedics', count: 31, color: '#EA580C' },
-    { name: 'Paediatrics', count: 44, color: '#06B6D4' },
-    { name: 'Dermatology', count: 19, color: '#A855F7' },
-    { name: 'ENT', count: 22, color: '#2563EB' }
-  ];
+      return {
+        id: doc.id,
+        name: doc.name,
+        specialty: doc.specialization || doc.departmentName || 'Consultant',
+        timing,
+        active: doc.active !== false,
+        used,
+        total: Math.max(used, total)
+      };
+    });
+  }, [doctors, todayTokens]);
 
-  // Department revenue data
-  const deptRevenue = [
-    { name: 'General Medicine', rev: 185, label: '185k' },
-    { name: 'Cardiology', rev: 235, label: '235k' },
-    { name: 'Orthopaedics', rev: 155, label: '155k' },
-    { name: 'Paediatrics', rev: 130, label: '130k' },
-    { name: 'Dermatology', rev: 95, label: '95k' },
-    { name: 'ENT', rev: 88, label: '88k' },
-    { name: 'Radiology', rev: 218, label: '218k' },
-    { name: 'Pharmacy', rev: 168, label: '168k' },
-  ];
+  // Department revenue data from real tokens
+  const deptRevenue = useMemo(() => {
+    const deptRevMap = new Map<string, { name: string; rev: number }>();
 
-  // Recent activity list
-  const recentActivities = [
-    { title: 'Created token G118 for Lakshmi Prasanna', author: 'Divya Sharma', time: '2 min ago' },
-    { title: 'Completed consultation for Venkat Reddy', author: 'Dr. Anitha Rao', time: '9 min ago' },
-    { title: 'Generated invoice INV-20486 (₹800)', author: 'Lalitha Devi', time: '17 min ago' },
-    { title: 'Marked attendance for evening shift (46 staff)', author: 'Pallavi Reddy', time: '38 min ago' },
-    { title: 'Payroll for July 2026 generated — 218 employees', author: 'System', time: '1 hr ago' },
-  ];
+    departments.forEach(dept => {
+      deptRevMap.set(dept.name.toLowerCase(), { name: dept.name, rev: 0 });
+    });
+
+    tokens.forEach(t => {
+      const deptName = t.departmentName || 'General Medicine';
+      const key = deptName.toLowerCase();
+      const fee = t.consultationFee || 500;
+      if (t.status === 'completed' || t.paymentStatus === 'paid') {
+        if (deptRevMap.has(key)) {
+          deptRevMap.get(key)!.rev += fee;
+        } else {
+          deptRevMap.set(key, { name: deptName, rev: fee });
+        }
+      }
+    });
+
+    return Array.from(deptRevMap.values()).slice(0, 8);
+  }, [departments, tokens]);
+
+  const maxDeptRevenue = Math.max(...deptRevenue.map(d => d.rev), 1000);
+
+  // Recent activity list dynamically generated from actual hospital events
+  const recentActivities = useMemo(() => {
+    const list: { title: string; author: string; time: string }[] = [];
+
+    // Recent tokens
+    tokens.slice(0, 8).forEach(t => {
+      if (t.status === 'completed') {
+        list.push({
+          title: `Completed consultation for ${t.patientName}`,
+          author: t.doctorName || 'Doctor',
+          time: t.time || 'Today'
+        });
+      } else if (t.status === 'in-consultation' || (t.status as string) === 'in-consult' || t.status === 'calling') {
+        list.push({
+          title: `Consultation calling/in progress for ${t.patientName}`,
+          author: t.doctorName || 'Doctor',
+          time: t.time || 'In progress'
+        });
+      } else {
+        list.push({
+          title: `Created token #${t.tokenNo} for ${t.patientName}`,
+          author: t.type === 'online' ? 'Online Booking' : (hospitalUser?.name || 'Reception'),
+          time: t.time || 'Today'
+        });
+      }
+    });
+
+    // Staff attendance records
+    staff.forEach(s => {
+      const att = s.attendance?.find(a => a.date === todayStr);
+      if (att && att.checkIn) {
+        list.push({
+          title: `Marked attendance for ${s.name} (${s.shift} shift)`,
+          author: s.departmentName || 'Staff',
+          time: att.checkIn
+        });
+      }
+    });
+
+    if (list.length === 0) {
+      return [
+        {
+          title: 'Hospital OPD Dashboard active',
+          author: hospitalUser?.name || 'Administrator',
+          time: 'Today'
+        }
+      ];
+    }
+
+    return list.slice(0, 5);
+  }, [tokens, staff, todayStr, hospitalUser]);
 
   const handleCreateWalkIn = (e: React.FormEvent) => {
     e.preventDefault();
@@ -157,10 +386,10 @@ export const HospitalDashboard: React.FC = () => {
     const doc = doctors.find(d => d.id === walkInDoctorId) || doctors[0];
     const newToken = generateWalkInToken({
       patientName: walkInName.trim(),
-      patientPhone: walkInPhone.trim() || '+91 98450 12345',
+      patientPhone: walkInPhone.trim() || '+91 98450 00000',
       patientGender: walkInGender,
       patientAge: parseInt(walkInAge) || 30,
-      doctorId: doc?.id || 'doc-1',
+      doctorId: doc?.id || doctors[0]?.id || '',
       departmentId: doc?.departmentId || 'dept-general',
       session: 'morning'
     });
@@ -170,7 +399,7 @@ export const HospitalDashboard: React.FC = () => {
   return (
     <div className="p-5 sm:p-7 space-y-6 max-w-[1680px] mx-auto bg-slate-50 min-h-screen">
       
-      {/* ─── 1. TOP EXECUTIVE WELCOME HEADER (Image 29) ─────────────────────────── */}
+      {/* ─── 1. TOP EXECUTIVE WELCOME HEADER ─────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight">
@@ -203,103 +432,7 @@ export const HospitalDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* ─── REGIONAL PUBLIC HEALTH & LOCATION BANNER ────────────────────── */}
-      {regionalBanners.length > 0 && !bannerDismissed && (
-        <div className="relative overflow-hidden bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white rounded-3xl p-5 shadow-lg border border-blue-800/40 animate-in fade-in slide-in-from-top-2 duration-300">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
-            <div className="flex items-start sm:items-center gap-3.5">
-              {regionalBanners[currentBannerIndex]?.mediaType === 'video' || /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(regionalBanners[currentBannerIndex]?.imageUrl || regionalBanners[currentBannerIndex]?.image || '') ? (
-                <video 
-                  src={regionalBanners[currentBannerIndex].imageUrl || regionalBanners[currentBannerIndex].image} 
-                  autoPlay
-                  loop
-                  muted
-                  playsInline
-                  className="w-14 h-14 rounded-2xl object-cover border border-white/20 shrink-0 shadow-md"
-                />
-              ) : regionalBanners[currentBannerIndex]?.imageUrl || regionalBanners[currentBannerIndex]?.image ? (
-                <img 
-                  src={regionalBanners[currentBannerIndex].imageUrl || regionalBanners[currentBannerIndex].image} 
-                  alt={regionalBanners[currentBannerIndex].title} 
-                  className="w-14 h-14 rounded-2xl object-cover border border-white/20 shrink-0 shadow-md"
-                />
-              ) : (
-                <div className="w-12 h-12 rounded-2xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center shrink-0">
-                  <Megaphone size={22} className="text-blue-400" />
-                </div>
-              )}
-
-              <div>
-                <div className="flex items-center gap-2 flex-wrap mb-1">
-                  <span className="text-[10px] font-black tracking-widest uppercase bg-blue-500/30 text-blue-300 px-2 py-0.5 rounded-full border border-blue-400/20 flex items-center gap-1">
-                    <MapPin size={10} />
-                    {regionalBanners[currentBannerIndex]?.targetLevel?.toUpperCase()} ALERT · {regionalBanners[currentBannerIndex]?.state || regionalBanners[currentBannerIndex]?.district || 'REGIONAL'}
-                  </span>
-                  {regionalBanners[currentBannerIndex]?.badge && (
-                    <span className="text-[10px] font-bold bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full border border-amber-400/20">
-                      {regionalBanners[currentBannerIndex].badge}
-                    </span>
-                  )}
-                  {regionalBanners.length > 1 && (
-                    <span className="text-[10px] font-semibold text-slate-400">
-                      {currentBannerIndex + 1} of {regionalBanners.length}
-                    </span>
-                  )}
-                </div>
-                <h3 className="text-sm sm:text-base font-black text-white leading-snug">
-                  {regionalBanners[currentBannerIndex]?.title}
-                </h3>
-                <p className="text-xs text-slate-300 font-medium line-clamp-1 sm:line-clamp-none max-w-2xl mt-0.5">
-                  {regionalBanners[currentBannerIndex]?.description}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2.5 shrink-0 self-end md:self-center">
-              {regionalBanners.length > 1 && (
-                <div className="flex items-center gap-1 mr-2">
-                  <button 
-                    onClick={() => setCurrentBannerIndex((prev) => (prev - 1 + regionalBanners.length) % regionalBanners.length)}
-                    className="w-7 h-7 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all cursor-pointer border-none"
-                    title="Previous banner"
-                  >
-                    ←
-                  </button>
-                  <button 
-                    onClick={() => setCurrentBannerIndex((prev) => (prev + 1) % regionalBanners.length)}
-                    className="w-7 h-7 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all cursor-pointer border-none"
-                    title="Next banner"
-                  >
-                    →
-                  </button>
-                </div>
-              )}
-
-              {regionalBanners[currentBannerIndex]?.linkUrl && (
-                <a 
-                  href={regionalBanners[currentBannerIndex].linkUrl} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 transition-colors no-underline shadow-md shadow-blue-500/20"
-                >
-                  <span>{regionalBanners[currentBannerIndex]?.ctaText || 'Learn More'}</span>
-                  <ExternalLink size={12} />
-                </a>
-              )}
-
-              <button 
-                onClick={() => setBannerDismissed(true)} 
-                className="p-1.5 text-slate-400 hover:text-white rounded-xl hover:bg-white/10 transition-colors border-none cursor-pointer"
-                title="Dismiss announcement"
-              >
-                <X size={15} />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ─── 2. TOP KPI CARDS (4-CARD GRID) (Image 29) ─────────────────────────── */}
+      {/* ─── 2. TOP KPI CARDS (4-CARD GRID) ─────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
         
         {/* Card 1: Today's patients */}
@@ -310,7 +443,7 @@ export const HospitalDashboard: React.FC = () => {
                 <Users size={18} />
               </div>
               <span className="inline-flex items-center gap-0.5 text-xs font-black text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-lg">
-                <TrendingUp size={12} /> 8.4%
+                <TrendingUp size={12} /> Live
               </span>
             </div>
             <div className="mt-4">
@@ -329,12 +462,12 @@ export const HospitalDashboard: React.FC = () => {
               <path
                 d="M 0 32 Q 30 28, 60 30 T 120 20 T 170 22 T 200 16 L 200 40 L 0 40 Z"
                 fill="#64748B"
-                opacity="0.3"
+                opacity="0.15"
               />
               <path
                 d="M 0 32 Q 30 28, 60 30 T 120 20 T 170 22 T 200 16"
                 fill="none"
-                stroke="#64748B"
+                stroke="#3B82F6"
                 strokeWidth="2.5"
                 strokeLinecap="round"
               />
@@ -350,16 +483,16 @@ export const HospitalDashboard: React.FC = () => {
                 ₹
               </div>
               <span className="inline-flex items-center gap-0.5 text-xs font-black text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-lg">
-                <TrendingUp size={12} /> 12.1%
+                <TrendingUp size={12} /> Today
               </span>
             </div>
             <div className="mt-4">
               <h2 className="text-3xl font-black text-slate-800 tracking-tight leading-none">
-                ₹2,68,400
+                ₹{todayEarnedRevenue.toLocaleString('en-IN')}
               </h2>
               <p className="text-xs font-bold text-slate-500 mt-1.5">Today's revenue</p>
               <p className="text-[11px] font-semibold text-slate-400 mt-0.5">
-                ₹41,200 pending collection
+                ₹{todayPendingRevenue.toLocaleString('en-IN')} pending collection
               </p>
             </div>
           </div>
@@ -368,13 +501,13 @@ export const HospitalDashboard: React.FC = () => {
             <svg className="w-full h-full" viewBox="0 0 200 40" preserveAspectRatio="none">
               <path
                 d="M 0 34 Q 35 30, 70 24 T 130 18 T 170 22 T 200 12 L 200 40 L 0 40 Z"
-                fill="#64748B"
-                opacity="0.3"
+                fill="#10B981"
+                opacity="0.15"
               />
               <path
                 d="M 0 34 Q 35 30, 70 24 T 130 18 T 170 22 T 200 12"
                 fill="none"
-                stroke="#64748B"
+                stroke="#10B981"
                 strokeWidth="2.5"
                 strokeLinecap="round"
               />
@@ -389,8 +522,8 @@ export const HospitalDashboard: React.FC = () => {
               <div className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
                 <Ticket size={18} />
               </div>
-              <span className="inline-flex items-center gap-0.5 text-xs font-black text-rose-600 bg-rose-50 px-2.5 py-0.5 rounded-lg">
-                <TrendingDown size={12} /> 3.2%
+              <span className="inline-flex items-center gap-0.5 text-xs font-black text-amber-600 bg-amber-50 px-2.5 py-0.5 rounded-lg">
+                <Activity size={12} /> Active
               </span>
             </div>
             <div className="mt-4">
@@ -399,7 +532,7 @@ export const HospitalDashboard: React.FC = () => {
               </h2>
               <p className="text-xs font-bold text-slate-500 mt-1.5">Patients in queue</p>
               <p className="text-[11px] font-semibold text-slate-400 mt-0.5">
-                3 emergency · 2 VIP
+                {inConsultCount} in consult · {waitingCount} waiting
               </p>
             </div>
           </div>
@@ -413,13 +546,13 @@ export const HospitalDashboard: React.FC = () => {
               <div className="w-10 h-10 rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center">
                 <Clock size={18} />
               </div>
-              <span className="inline-flex items-center gap-0.5 text-xs font-black text-rose-600 bg-rose-50 px-2.5 py-0.5 rounded-lg">
-                <TrendingDown size={12} /> 6.5%
+              <span className="inline-flex items-center gap-0.5 text-xs font-black text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-lg">
+                OPD Target
               </span>
             </div>
             <div className="mt-4">
               <h2 className="text-3xl font-black text-slate-800 tracking-tight leading-none">
-                14 min
+                {avgWaitMin} min
               </h2>
               <p className="text-xs font-bold text-slate-500 mt-1.5">Avg. waiting time</p>
               <p className="text-[11px] font-semibold text-slate-400 mt-0.5">
@@ -432,7 +565,7 @@ export const HospitalDashboard: React.FC = () => {
 
       </div>
 
-      {/* ─── 3. MIDDLE ROW: REVENUE & FOOTFALL + DEPARTMENT MIX (Image 29 & 30) ──── */}
+      {/* ─── 3. MIDDLE ROW: REVENUE & FOOTFALL + DEPARTMENT MIX ──── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* Left: Revenue & Footfall Area Spline Chart (col-span-2) */}
@@ -443,11 +576,11 @@ export const HospitalDashboard: React.FC = () => {
               <p className="text-xs text-slate-400 font-semibold mt-0.5">Last 7 days</p>
             </div>
             <span className="text-xs font-black text-emerald-600 bg-emerald-50 px-3 py-1 rounded-xl">
-              +12.1% vs last week
+              ₹{total7DayRevenue.toLocaleString('en-IN')} total 7-day revenue
             </span>
           </div>
 
-          {/* SVG Spline Chart with Y Axis and Mon-Sun Labels */}
+          {/* Dynamic SVG Spline Chart with Y Axis and Mon-Sun Labels */}
           <div className="w-full relative pt-2">
             <svg className="w-full h-56 overflow-visible" viewBox="0 0 650 200">
               <defs>
@@ -464,41 +597,54 @@ export const HospitalDashboard: React.FC = () => {
               <line x1="45" y1="155" x2="640" y2="155" stroke="#F1F5F9" strokeDasharray="4,4" strokeWidth="1" />
               <line x1="45" y1="190" x2="640" y2="190" stroke="#E2E8F0" strokeWidth="1" />
 
-              {/* Y Axis Labels */}
-              <text x="5" y="24" className="fill-slate-400 text-[11px] font-bold">320k</text>
-              <text x="5" y="69" className="fill-slate-400 text-[11px] font-bold">240k</text>
-              <text x="5" y="114" className="fill-slate-400 text-[11px] font-bold">160k</text>
-              <text x="12" y="159" className="fill-slate-400 text-[11px] font-bold">80k</text>
-              <text x="18" y="194" className="fill-slate-400 text-[11px] font-bold">0k</text>
+              {/* Dynamic Y Axis Labels */}
+              <text x="5" y="24" className="fill-slate-400 text-[11px] font-bold">{formatK(max7DayRevenue)}</text>
+              <text x="5" y="69" className="fill-slate-400 text-[11px] font-bold">{formatK(Math.round(max7DayRevenue * 0.75))}</text>
+              <text x="5" y="114" className="fill-slate-400 text-[11px] font-bold">{formatK(Math.round(max7DayRevenue * 0.5))}</text>
+              <text x="12" y="159" className="fill-slate-400 text-[11px] font-bold">{formatK(Math.round(max7DayRevenue * 0.25))}</text>
+              <text x="18" y="194" className="fill-slate-400 text-[11px] font-bold">0</text>
 
               {/* Gradient Area Fill */}
-              <path
-                d="M 50 115 C 110 90, 160 120, 220 95 C 280 70, 320 60, 380 50 C 440 38, 480 20, 520 25 C 560 30, 600 90, 640 140 L 640 190 L 50 190 Z"
-                fill="url(#chartGrad)"
-              />
+              {areaPath && (
+                <path
+                  d={areaPath}
+                  fill="url(#chartGrad)"
+                />
+              )}
 
               {/* Spline Line */}
-              <path
-                d="M 50 115 C 110 90, 160 120, 220 95 C 280 70, 320 60, 380 50 C 440 38, 480 20, 520 25 C 560 30, 600 90, 640 140"
-                fill="none"
-                stroke="#2563EB"
-                strokeWidth="3.2"
-                strokeLinecap="round"
-              />
+              {splinePath && (
+                <path
+                  d={splinePath}
+                  fill="none"
+                  stroke="#2563EB"
+                  strokeWidth="3.2"
+                  strokeLinecap="round"
+                />
+              )}
 
-              {/* Active hover node at peak */}
-              <circle cx="520" cy="25" r="5" fill="#2563EB" stroke="#FFFFFF" strokeWidth="3" />
+              {/* Nodes along the curve */}
+              {chartPoints.map((pt, i) => (
+                <g key={i} className="group cursor-pointer">
+                  <circle
+                    cx={pt.x}
+                    cy={pt.y}
+                    r="4.5"
+                    fill="#2563EB"
+                    stroke="#FFFFFF"
+                    strokeWidth="2.5"
+                    className="transition-transform group-hover:scale-150"
+                  />
+                  <title>{`${pt.label}: ₹${pt.revenue.toLocaleString('en-IN')} (${pt.footfall} patients)`}</title>
+                </g>
+              ))}
             </svg>
 
             {/* X-Axis Days Labels */}
             <div className="flex justify-between pl-12 pr-4 pt-3 text-xs font-bold text-slate-400">
-              <span>Mon</span>
-              <span>Tue</span>
-              <span>Wed</span>
-              <span>Thu</span>
-              <span>Fri</span>
-              <span>Sat</span>
-              <span>Sun</span>
+              {last7DaysData.map(d => (
+                <span key={d.dateStr}>{d.label}</span>
+              ))}
             </div>
           </div>
         </div>
@@ -507,50 +653,77 @@ export const HospitalDashboard: React.FC = () => {
         <div className="bg-white rounded-3xl border border-slate-100 p-6 shadow-xs flex flex-col justify-between">
           <div>
             <h3 className="text-base font-black text-slate-800">Department mix</h3>
-            <p className="text-xs text-slate-400 font-semibold mt-0.5">Patients today</p>
+            <p className="text-xs text-slate-400 font-semibold mt-0.5">
+              {totalDeptPatients} {totalDeptPatients === 1 ? 'patient' : 'patients'} today
+            </p>
           </div>
 
           {/* SVG Donut Chart */}
-          <div className="flex items-center justify-center py-4">
+          <div className="flex items-center justify-center py-4 relative">
             <svg width="180" height="180" viewBox="0 0 180 180" className="rotate-[-90deg]">
-              {/* Segment 1: General Medicine (30%) */}
-              <circle cx="90" cy="90" r="65" fill="none" stroke="#1E40AF" strokeWidth="26"
-                strokeDasharray="122.5 408" strokeDashoffset="0" />
-              {/* Segment 2: Cardiology (14%) */}
-              <circle cx="90" cy="90" r="65" fill="none" stroke="#15803D" strokeWidth="26"
-                strokeDasharray="57.1 408" strokeDashoffset="-125" />
-              {/* Segment 3: Orthopaedics (15%) */}
-              <circle cx="90" cy="90" r="65" fill="none" stroke="#EA580C" strokeWidth="26"
-                strokeDasharray="61.2 408" strokeDashoffset="-184" />
-              {/* Segment 4: Paediatrics (21%) */}
-              <circle cx="90" cy="90" r="65" fill="none" stroke="#06B6D4" strokeWidth="26"
-                strokeDasharray="85.7 408" strokeDashoffset="-247" />
-              {/* Segment 5: Dermatology (9%) */}
-              <circle cx="90" cy="90" r="65" fill="none" stroke="#A855F7" strokeWidth="26"
-                strokeDasharray="36.7 408" strokeDashoffset="-335" />
-              {/* Segment 6: ENT (11%) */}
-              <circle cx="90" cy="90" r="65" fill="none" stroke="#2563EB" strokeWidth="26"
-                strokeDasharray="44.9 408" strokeDashoffset="-374" />
+              {/* Background Ring */}
+              <circle
+                cx="90"
+                cy="90"
+                r="65"
+                fill="none"
+                stroke="#F1F5F9"
+                strokeWidth="24"
+              />
+              {/* Dynamic Segments */}
+              {totalDeptPatients > 0 ? (
+                departmentMixData.map((item, idx) => (
+                  <circle
+                    key={idx}
+                    cx="90"
+                    cy="90"
+                    r="65"
+                    fill="none"
+                    stroke={item.color}
+                    strokeWidth="24"
+                    strokeDasharray={`${item.dashLength} 408.4`}
+                    strokeDashoffset={item.offset}
+                    className="transition-all duration-500"
+                  />
+                ))
+              ) : (
+                <circle
+                  cx="90"
+                  cy="90"
+                  r="65"
+                  fill="none"
+                  stroke="#E2E8F0"
+                  strokeWidth="24"
+                />
+              )}
             </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+              <span className="text-2xl font-black text-slate-800">{totalDeptPatients}</span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Patients</span>
+            </div>
           </div>
 
-          {/* Legend Table (matching image 30) */}
-          <div className="space-y-2 text-xs font-semibold text-slate-600 border-t border-slate-50 pt-3">
-            {deptMix.map(item => (
-              <div key={item.name} className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-                  <span>{item.name}</span>
+          {/* Legend Table */}
+          <div className="space-y-2 text-xs font-semibold text-slate-600 border-t border-slate-50 pt-3 max-h-48 overflow-y-auto">
+            {departmentMixData.length > 0 ? (
+              departmentMixData.map(item => (
+                <div key={item.name} className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                    <span className="truncate max-w-[140px]">{item.name}</span>
+                  </div>
+                  <span className="font-extrabold text-slate-800">{item.count}</span>
                 </div>
-                <span className="font-extrabold text-slate-800">{item.count}</span>
-              </div>
-            ))}
+              ))
+            ) : (
+              <p className="text-xs text-slate-400 text-center py-2">No departments registered</p>
+            )}
           </div>
         </div>
 
       </div>
 
-      {/* ─── 4. LOWER-MIDDLE ROW: LIVE QUEUE + DOCTOR AVAILABILITY (Images 30 & 31) ─ */}
+      {/* ─── 4. LOWER-MIDDLE ROW: LIVE QUEUE + DOCTOR AVAILABILITY ─ */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* Left: Live Queue Table (col-span-2) */}
@@ -562,7 +735,7 @@ export const HospitalDashboard: React.FC = () => {
                 <span className={`w-2 h-2 rounded-full bg-emerald-500 ${livePulse ? 'scale-150 transition-transform' : ''}`} />
               </div>
               <p className="text-xs text-slate-400 font-semibold mt-0.5">
-                Auto-refreshing every 5 seconds
+                Auto-refreshing live hospital queue
               </p>
             </div>
             
@@ -575,51 +748,84 @@ export const HospitalDashboard: React.FC = () => {
           </div>
 
           {/* Live Queue Items List */}
-          <div className="divide-y divide-slate-100">
-            {displayQueue.map(item => (
-              <div key={item.id} className="py-3.5 flex items-center justify-between gap-3 hover:bg-slate-50/50 px-2 rounded-2xl transition-colors">
-                <div className="flex items-center gap-3.5 min-w-0">
-                  {/* Token Badge */}
-                  <div className="w-12 h-9 rounded-xl bg-blue-50 text-blue-700 font-black text-xs flex items-center justify-center shrink-0 border border-blue-100">
-                    {item.id}
-                  </div>
-                  <div className="min-w-0">
-                    <h4 className="font-extrabold text-xs sm:text-sm text-slate-800 truncate">
-                      {item.patientName}
-                    </h4>
-                    <p className="text-[11px] font-semibold text-slate-400 truncate mt-0.5">
-                      {item.dept} · {item.doctor}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-4 shrink-0">
-                  {/* Wait Time */}
-                  <div className="hidden sm:flex items-center gap-1 text-xs font-semibold text-slate-500">
-                    <Clock size={13} className="text-slate-400" />
-                    <span>{item.waitTime}</span>
+          {realLiveQueue.length > 0 ? (
+            <div className="divide-y divide-slate-100">
+              {realLiveQueue.map(item => (
+                <div key={item.rawId || item.id} className="py-3.5 flex items-center justify-between gap-3 hover:bg-slate-50/50 px-2 rounded-2xl transition-colors">
+                  <div className="flex items-center gap-3.5 min-w-0">
+                    {/* Token Badge */}
+                    <div className="w-12 h-9 rounded-xl bg-blue-50 text-blue-700 font-black text-xs flex items-center justify-center shrink-0 border border-blue-100">
+                      {item.id}
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className="font-extrabold text-xs sm:text-sm text-slate-800 truncate">
+                        {item.patientName}
+                      </h4>
+                      <p className="text-[11px] font-semibold text-slate-400 truncate mt-0.5">
+                        {item.dept} · {item.doctor}
+                      </p>
+                    </div>
                   </div>
 
-                  {/* Status Pill */}
-                  {item.status === 'in-consult' && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black bg-blue-50 text-blue-600 border border-blue-100">
-                      <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse" /> In Consult
-                    </span>
-                  )}
-                  {item.status === 'waiting' && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black bg-amber-50 text-amber-600 border border-amber-100">
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500" /> Waiting
-                    </span>
-                  )}
-                  {item.status === 'skipped' && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black bg-rose-50 text-rose-600 border border-rose-100">
-                      <span className="w-1.5 h-1.5 rounded-full bg-rose-500" /> Skipped
-                    </span>
-                  )}
+                  <div className="flex items-center gap-4 shrink-0">
+                    {/* Wait Time */}
+                    <div className="hidden sm:flex items-center gap-1 text-xs font-semibold text-slate-500">
+                      <Clock size={13} className="text-slate-400" />
+                      <span>{item.waitTime}</span>
+                    </div>
+
+                    {/* Status Pill */}
+                    {(item.status === 'in-consultation' || (item.status as string) === 'in-consult') && (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black bg-blue-50 text-blue-600 border border-blue-100">
+                        <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse" /> In Consult
+                      </span>
+                    )}
+                    {item.status === 'calling' && (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black bg-purple-50 text-purple-600 border border-purple-100">
+                        <span className="w-1.5 h-1.5 rounded-full bg-purple-600 animate-ping" /> Calling
+                      </span>
+                    )}
+                    {['waiting', 'booked', 'checked-in'].includes(item.status as string) && (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black bg-amber-50 text-amber-600 border border-amber-100">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500" /> Waiting
+                      </span>
+                    )}
+                    {item.status === 'completed' && (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black bg-emerald-50 text-emerald-600 border border-emerald-100">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Completed
+                      </span>
+                    )}
+                    {item.status === 'skipped' && (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black bg-rose-50 text-rose-600 border border-rose-100">
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500" /> Skipped
+                      </span>
+                    )}
+                    {!['in-consult', 'in-consultation', 'calling', 'waiting', 'booked', 'checked-in', 'completed', 'skipped'].includes(item.status as string) && (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black bg-slate-100 text-slate-600">
+                        {item.status}
+                      </span>
+                    )}
+                  </div>
                 </div>
+              ))}
+            </div>
+          ) : (
+            <div className="py-12 text-center space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto">
+                <Ticket size={24} />
               </div>
-            ))}
-          </div>
+              <h4 className="text-sm font-bold text-slate-700">No active queue right now</h4>
+              <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                There are no waiting patients in OPD. Click below to issue a walk-in token or add a new patient.
+              </p>
+              <button
+                onClick={() => setShowWalkInModal(true)}
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3.5 py-2 rounded-xl transition-colors cursor-pointer border-none"
+              >
+                <UserPlus size={14} /> Walk-in patient
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Right: Doctor availability & Token capacity used (col-span-1) */}
@@ -628,70 +834,79 @@ export const HospitalDashboard: React.FC = () => {
           {/* Part A: Doctor availability */}
           <div>
             <h3 className="text-base font-black text-slate-800 mb-4">Doctor availability</h3>
-            <div className="space-y-3.5">
-              {doctorAvailabilityList.map(doc => (
-                <div key={doc.name} className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-2xl bg-slate-50 text-slate-400 border border-slate-100 flex items-center justify-center shrink-0">
-                      <Stethoscope size={16} />
+            {doctorAvailabilityList.length > 0 ? (
+              <div className="space-y-3.5">
+                {doctorAvailabilityList.map(doc => (
+                  <div key={doc.id || doc.name} className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-2xl bg-slate-50 text-slate-400 border border-slate-100 flex items-center justify-center shrink-0">
+                        <Stethoscope size={16} />
+                      </div>
+                      <div>
+                        <h4 className="font-extrabold text-xs text-slate-800">{doc.name}</h4>
+                        <p className="text-[11px] font-semibold text-slate-400">{doc.timing}</p>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="font-extrabold text-xs text-slate-800">{doc.name}</h4>
-                      <p className="text-[11px] font-semibold text-slate-400">{doc.timing}</p>
-                    </div>
-                  </div>
 
-                  <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full flex items-center gap-1 ${
-                    doc.active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
-                  }`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${doc.active ? 'bg-emerald-500' : 'bg-slate-400'}`} />
-                    {doc.active ? 'Active' : 'Inactive'}
-                  </span>
-                </div>
-              ))}
-            </div>
+                    <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full flex items-center gap-1 ${
+                      doc.active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${doc.active ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                      {doc.active ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-slate-400 py-3">No doctors registered yet.</p>
+            )}
           </div>
 
-          {/* Part B: Token capacity used (matching image 31) */}
+          {/* Part B: Token capacity used */}
           <div className="border-t border-slate-100 pt-5">
             <h3 className="text-xs font-black text-slate-700 uppercase tracking-wider mb-3">
               Token capacity used
             </h3>
-            <div className="space-y-3">
-              {doctorAvailabilityList.map(doc => {
-                const percent = Math.round((doc.used / doc.total) * 100);
-                return (
-                  <div key={doc.name} className="space-y-1">
-                    <div className="flex justify-between text-xs font-bold">
-                      <span className="text-slate-700">{doc.name}</span>
-                      <span className="text-slate-400 font-semibold">{doc.used}/{doc.total}</span>
+            {doctorAvailabilityList.length > 0 ? (
+              <div className="space-y-3">
+                {doctorAvailabilityList.map(doc => {
+                  const percent = doc.total > 0 ? Math.round((doc.used / doc.total) * 100) : 0;
+                  return (
+                    <div key={doc.id || doc.name} className="space-y-1">
+                      <div className="flex justify-between text-xs font-bold">
+                        <span className="text-slate-700 truncate max-w-[150px]">{doc.name}</span>
+                        <span className="text-slate-400 font-semibold">{doc.used}/{doc.total}</span>
+                      </div>
+                      <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                        <div
+                          className="bg-blue-600 h-full rounded-full transition-all duration-500"
+                          style={{ width: `${Math.min(100, percent)}%` }}
+                        />
+                      </div>
                     </div>
-                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                      <div
-                        className="bg-blue-600 h-full rounded-full transition-all duration-500"
-                        style={{ width: `${percent}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-xs text-slate-400 py-2">No active doctors to track capacity.</p>
+            )}
           </div>
 
         </div>
 
       </div>
 
-      {/* ─── 5. BOTTOM ROW: DEPARTMENT REVENUE + RECENT ACTIVITY (Image 31) ──────── */}
+      {/* ─── 5. BOTTOM ROW: DEPARTMENT REVENUE + RECENT ACTIVITY ──────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* Left: Department Revenue Bar Chart (col-span-2) */}
         <div className="lg:col-span-2 bg-white rounded-3xl border border-slate-100 p-6 shadow-xs flex flex-col justify-between">
           <div className="mb-4">
             <h3 className="text-base font-black text-slate-800">Department revenue</h3>
+            <p className="text-xs text-slate-400 font-semibold mt-0.5">Revenue earned from visited consultations</p>
           </div>
 
-          {/* Vertical Bar Chart matching reference image 31 */}
+          {/* Vertical Bar Chart matching actual departments and tokens */}
           <div className="w-full relative pt-2">
             <svg className="w-full h-56 overflow-visible" viewBox="0 0 650 200">
               {/* Horizontal Grid lines */}
@@ -701,21 +916,21 @@ export const HospitalDashboard: React.FC = () => {
               <line x1="45" y1="155" x2="640" y2="155" stroke="#F1F5F9" strokeDasharray="4,4" strokeWidth="1" />
               <line x1="45" y1="190" x2="640" y2="190" stroke="#E2E8F0" strokeWidth="1" />
 
-              {/* Y Axis Labels */}
-              <text x="5" y="24" className="fill-slate-400 text-[11px] font-bold">240k</text>
-              <text x="5" y="69" className="fill-slate-400 text-[11px] font-bold">180k</text>
-              <text x="5" y="114" className="fill-slate-400 text-[11px] font-bold">120k</text>
-              <text x="12" y="159" className="fill-slate-400 text-[11px] font-bold">60k</text>
-              <text x="18" y="194" className="fill-slate-400 text-[11px] font-bold">0k</text>
+              {/* Dynamic Y Axis Labels */}
+              <text x="5" y="24" className="fill-slate-400 text-[11px] font-bold">{formatK(maxDeptRevenue)}</text>
+              <text x="5" y="69" className="fill-slate-400 text-[11px] font-bold">{formatK(Math.round(maxDeptRevenue * 0.75))}</text>
+              <text x="5" y="114" className="fill-slate-400 text-[11px] font-bold">{formatK(Math.round(maxDeptRevenue * 0.5))}</text>
+              <text x="12" y="159" className="fill-slate-400 text-[11px] font-bold">{formatK(Math.round(maxDeptRevenue * 0.25))}</text>
+              <text x="18" y="194" className="fill-slate-400 text-[11px] font-bold">0</text>
 
-              {/* 8 Columns Bars */}
+              {/* Department Columns Bars */}
               {deptRevenue.map((item, idx) => {
-                const barWidth = 32;
-                const colSpacing = 72;
+                const totalBars = deptRevenue.length || 1;
+                const colSpacing = Math.min(72, Math.floor(540 / totalBars));
+                const barWidth = Math.min(32, colSpacing - 12);
                 const x = 70 + idx * colSpacing;
-                const maxVal = 250;
-                const barHeight = (item.rev / maxVal) * 165;
-                const y = 190 - barHeight;
+                const barHeight = maxDeptRevenue > 0 ? (item.rev / maxDeptRevenue) * 165 : 0;
+                const y = 190 - Math.max(4, barHeight);
 
                 return (
                   <g key={item.name} className="group cursor-pointer">
@@ -723,17 +938,18 @@ export const HospitalDashboard: React.FC = () => {
                       x={x}
                       y={y}
                       width={barWidth}
-                      height={barHeight}
+                      height={Math.max(4, barHeight)}
                       rx="6"
                       fill="#2563EB"
                       className="transition-all group-hover:fill-blue-700"
                     />
+                    <title>{`${item.name}: ₹${item.rev.toLocaleString('en-IN')}`}</title>
                   </g>
                 );
               })}
             </svg>
 
-            {/* X Axis Department Labels (slanted for readability) */}
+            {/* X Axis Department Labels */}
             <div className="flex justify-between pl-10 pr-2 pt-2 text-[10.5px] font-bold text-slate-500 overflow-x-auto">
               {deptRevenue.map(item => (
                 <span key={item.name} className="truncate w-16 text-center -rotate-12 transform origin-top-left">
@@ -742,10 +958,10 @@ export const HospitalDashboard: React.FC = () => {
               ))}
             </div>
 
-            {/* Legend (matching image 31) */}
+            {/* Legend */}
             <div className="flex items-center justify-center gap-2 mt-8 text-xs font-bold text-slate-600">
               <span className="w-3 h-3 rounded-xs bg-blue-600 inline-block" />
-              <span>Revenue</span>
+              <span>Earned Revenue</span>
             </div>
           </div>
         </div>
