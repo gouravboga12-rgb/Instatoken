@@ -2800,17 +2800,18 @@ app.get('/api/admin/revenue', async (req, res) => {
 
   const store = await getUnifiedStore();
   const currentFeePercent = store.settings?.platformFeePercent !== undefined ? Number(store.settings.platformFeePercent) : 5;
-  const totalGrossRevenue = transactions.reduce((sum, t) => sum + (Number(t.totalFee) || (Number(t.fee) || 0) + (Number(t.platformFee) || 25)), 0);
-  const totalPlatformFees = transactions.reduce((sum, t) => sum + (Number(t.platformFee) || Math.max(10, Math.round((Number(t.fee) || 500) * (currentFeePercent / 100)))), 0);
   const totalDoctorFees = transactions.reduce((sum, t) => sum + (Number(t.fee) || 0), 0);
+  const totalPlatformFees = transactions.reduce((sum, t) => sum + (Number(t.platformFee) || Math.max(10, Math.round((Number(t.fee) || 500) * (currentFeePercent / 100)))), 0);
+  const totalGrossRevenue = totalDoctorFees + totalPlatformFees;
 
   res.json({
     success: true,
     summary: {
       totalTransactions: transactions.length,
-      totalGrossRevenue,
+      totalTokenRevenue: totalPlatformFees,
       totalPlatformFees,
       totalDoctorFees,
+      totalGrossRevenue,
       platformFeePercent: currentFeePercent
     },
     transactions

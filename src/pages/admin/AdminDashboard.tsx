@@ -105,20 +105,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
       .catch(err => console.warn('Could not fetch appointments from AWS:', err));
   }, [revenueDateFilter]);
 
-  // Calculate gross customer revenue across mock customers & live appointments
+  // Calculate token revenue & consultation volume across mock customers & live appointments
   const safeCustomers = customers || [];
   const safeAppointments = (liveAppointments.length > 0 ? liveAppointments : appointments) || [];
   const safeHospitals = hospitals || [];
   const allCustomerBookings = safeCustomers.flatMap(c => c?.bookings || []);
-  const customerRevenueSum = allCustomerBookings.reduce((sum, b) => sum + (b?.fee || 0), 0);
-  const apptRevenueSum = safeAppointments.reduce((sum, a) => sum + (a?.fee || 500), 0);
-  const totalRevenueGenerated = liveRevenueData?.summary?.totalGrossRevenue ?? (customerRevenueSum + apptRevenueSum);
+
+  // Token revenue: the actual platform booking fees collected online from tokens
+  const tokenRevenueSum = safeAppointments.reduce((sum, a) => sum + (Number(a?.platformFee) || Math.max(10, Math.round((Number(a?.fee) || 500) * (platformFeePercent / 100)))), 0);
+  const totalTokenRevenue = liveRevenueData?.summary?.totalTokenRevenue 
+    ?? liveRevenueData?.summary?.totalPlatformFees 
+    ?? tokenRevenueSum;
+
+  // Doctor consultation fees (payable directly at the hospital)
+  const doctorConsultationSum = safeAppointments.reduce((sum, a) => sum + (Number(a?.fee) || 500), 0);
+  const totalDoctorConsultationVolume = liveRevenueData?.summary?.totalDoctorFees 
+    ?? (liveRevenueData?.summary?.totalGrossRevenue ? (liveRevenueData.summary.totalGrossRevenue - totalTokenRevenue) : doctorConsultationSum);
+
   const activeHospitalsCount = safeHospitals.filter(h => h?.status !== 'disabled').length;
   const disabledHospitalsCount = safeHospitals.filter(h => h?.status === 'disabled').length;
 
   // Customer aggregates
   const totalCustomerTokens = liveRevenueData?.summary?.totalTransactions ?? (allCustomerBookings.length + safeAppointments.length);
-  const avgRevenuePerCustomer = safeCustomers.length > 0 ? Math.round(totalRevenueGenerated / safeCustomers.length) : 0;
+  const avgRevenuePerCustomer = safeCustomers.length > 0 ? Math.round(totalTokenRevenue / safeCustomers.length) : 0;
 
   const handleCreateHospital = (e: React.FormEvent) => {
     e.preventDefault();
@@ -429,9 +438,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
             {/* Grid Metrics Row */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <Card className="p-4 border-none shadow-xs text-center flex flex-col justify-between bg-white hover:shadow-md transition-shadow">
-                <span className="text-[10px] text-slate-400 font-black uppercase tracking-wider block">Total Customer Revenue</span>
-                <span className="text-3xl font-black text-blue-600 font-heading block mt-1">₹{totalRevenueGenerated.toLocaleString()}</span>
-                <span className="text-[9px] text-slate-400 font-semibold block mt-1">From token booking fees</span>
+                <span className="text-[10px] text-slate-400 font-black uppercase tracking-wider block">Total Token Revenue</span>
+                <span className="text-3xl font-black text-blue-600 font-heading block mt-1">₹{totalTokenRevenue.toLocaleString('en-IN')}</span>
+                <span className="text-[9px] text-slate-400 font-semibold block mt-1">Net revenue from online token booking fees</span>
               </Card>
 
               <Card className="p-4 border-none shadow-xs text-center flex flex-col justify-between bg-white hover:shadow-md transition-shadow">
@@ -1003,20 +1012,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                 </div>
               </div>
 
-              {/* Total Platform Fee Revenue */}
+              {/* Total Token Revenue */}
               <div className="bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-2xl p-5 shadow-lg shadow-blue-500/20 space-y-2 lg:col-span-1">
-                <p className="text-xs font-bold text-blue-200 uppercase tracking-wider">Platform Fee Revenue ({platformFeePercent}%)</p>
+                <p className="text-xs font-bold text-blue-200 uppercase tracking-wider">Total Token Revenue</p>
                 <div className="text-3xl font-black font-heading">
-                  ₹{Math.round(totalRevenueGenerated * (platformFeePercent / 100)).toLocaleString('en-IN')}
+                  ₹{totalTokenRevenue.toLocaleString('en-IN')}
                 </div>
-                <p className="text-[10px] text-blue-200">Net platform revenue collected across all hospitals</p>
+                <p className="text-[10px] text-blue-200">Net revenue collected from online token booking fees</p>
               </div>
 
-              {/* Gross Patient Booking Spend */}
+              {/* Gross Doctor Consultation Volume */}
               <div className="bg-gradient-to-br from-emerald-600 to-teal-700 text-white rounded-2xl p-5 shadow-lg shadow-emerald-500/20 space-y-2 lg:col-span-1">
-                <p className="text-xs font-bold text-emerald-200 uppercase tracking-wider">Gross Consultation Volume</p>
-                <div className="text-3xl font-black font-heading">₹{totalRevenueGenerated.toLocaleString('en-IN')}</div>
-                <p className="text-[10px] text-emerald-200">Total doctor fees booked through Insta Token</p>
+                <p className="text-xs font-bold text-emerald-200 uppercase tracking-wider">Doctor Consultation Volume</p>
+                <div className="text-3xl font-black font-heading">₹{totalDoctorConsultationVolume.toLocaleString('en-IN')}</div>
+                <p className="text-[10px] text-emerald-200">Doctor fees booked (Payable at hospital OPD)</p>
               </div>
 
               {/* Total Tokens Count */}
@@ -1067,7 +1076,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                       safeAppointments.map((appt) => {
                         const fee = appt.fee || 500;
                         const platFee = appt.platformFee || Math.max(10, Math.round(fee * (platformFeePercent / 100)));
-                        const total = fee + platFee;
 
                         const istDate = new Intl.DateTimeFormat('en-IN', {
                           timeZone: 'Asia/Kolkata',
@@ -1109,12 +1117,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                               <p className="text-[10px] text-slate-500 font-semibold">{appt.phone}</p>
                             </td>
 
-                            {/* Fee Breakdown */}
+                            {/* Token Fee & Doctor Fee Breakdown */}
                             <td className="py-3 px-3">
                               <div className="space-y-0.5">
-                                <p className="font-black text-slate-900">Total: ₹{total}</p>
-                                <p className="text-[10px] text-slate-500 font-semibold">
-                                  Doctor: ₹{fee} + <span className="text-blue-600 font-bold">Platform: ₹{platFee}</span>
+                                <p className="font-black text-blue-700 flex items-center gap-1">
+                                  <span>Token Fee:</span> ₹{platFee}
+                                  <span className="text-[9px] font-bold bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">Paid Online</span>
+                                </p>
+                                <p className="text-[10px] text-slate-500 font-medium">
+                                  Doctor Fee: ₹{fee} <span className="text-slate-400">(Pay at Hospital)</span>
                                 </p>
                               </div>
                             </td>
