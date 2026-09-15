@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useHospital } from '../../context/HospitalContext';
 import { useApp } from '../../context/AppContext';
-import { broadcastGlobalSync } from '../../utils/syncBus';
+import { broadcastGlobalSync, onGlobalSync } from '../../utils/syncBus';
 import { INDIAN_STATES, GEO_HIERARCHY } from '../../utils/geoHierarchy';
 import {
   Megaphone,
@@ -113,6 +113,30 @@ export const AdsPromotion: React.FC = () => {
 
   useEffect(() => {
     loadInquiries();
+
+    // Listen to real-time events from Super Admin (approvals, rejections, deletions)
+    const unsub = onGlobalSync((event: any) => {
+      if (
+        event?.type === 'ADS_INQUIRY_DELETED' ||
+        event?.type === 'ADS_INQUIRY_CREATED' ||
+        event?.type === 'BANNER_DELETED' ||
+        event?.type === 'BANNERS_UPDATED'
+      ) {
+        if (event?.type === 'ADS_INQUIRY_DELETED' && event?.data?.id) {
+          try {
+            const saved = localStorage.getItem('insta_ads_inquiries');
+            if (saved) {
+              const list = JSON.parse(saved);
+              const updated = list.filter((i: any) => i.id !== event.data.id && !(event.data.title && i.title === event.data.title));
+              localStorage.setItem('insta_ads_inquiries', JSON.stringify(updated));
+            }
+          } catch (e) {}
+        }
+        loadInquiries();
+      }
+    });
+
+    return unsub;
   }, [selectedHospitalId, hospitalProfile?.id]);
 
   // Handle local image file upload

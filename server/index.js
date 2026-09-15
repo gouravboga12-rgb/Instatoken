@@ -3286,14 +3286,88 @@ app.delete('/api/banners/:id', async (req, res) => {
   const { id } = req.params;
   const store = await getUnifiedStore();
 
+  const deletedBanner = (store.locationBanners || []).find(b => b.id === id);
   store.locationBanners = (store.locationBanners || []).filter(b => b.id !== id);
+
+  // Also clean up any associated inquiry from adsInquiries so it doesn't show as orphan live ad
+  if (store.adsInquiries && Array.isArray(store.adsInquiries)) {
+    store.adsInquiries = store.adsInquiries.filter(i => {
+      if (i.bannerId && i.bannerId === id) return false;
+      if (deletedBanner && i.title && deletedBanner.title && i.title.trim().toLowerCase() === deletedBanner.title.trim().toLowerCase()) {
+        if (!deletedBanner.hospitalId || i.hospitalId === deletedBanner.hospitalId) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }
+
   store.lastUpdated = Date.now();
   await saveUnifiedStore(store);
 
-  res.json({ success: true, message: 'Banner deleted successfully', deletedId: id });
+  res.json({ success: true, message: 'Banner and associated inquiries deleted successfully', deletedId: id });
 });
 
 // ─── Ads Inquiries API (Hospital Ad / Promotion Requests) ───────────────────
+// DELETE /api/ads-inquiries/:id - Delete inquiry and its associated banner if any
+app.delete('/api/ads-inquiries/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const store = await getUnifiedStore();
+    store.adsInquiries = store.adsInquiries || [];
+    store.locationBanners = store.locationBanners || [];
+
+    // Find the target inquiry
+    let targetIndex = store.adsInquiries.findIndex(i => i.id === id);
+    if (targetIndex === -1 && id) {
+      targetIndex = store.adsInquiries.findIndex(i => i.id && (i.id.startsWith(id.substring(0, 14)) || id.startsWith(i.id.substring(0, 14))));
+    }
+
+    if (targetIndex === -1) {
+      return res.status(404).json({ success: false, message: 'Inquiry not found' });
+    }
+
+    const targetInquiry = store.adsInquiries[targetIndex];
+
+    // Remove associated banner if it exists in store.locationBanners
+    let deletedBannerId = null;
+    if (targetInquiry.bannerId) {
+      const bannerIdx = store.locationBanners.findIndex(b => b.id === targetInquiry.bannerId);
+      if (bannerIdx !== -1) {
+        deletedBannerId = targetInquiry.bannerId;
+        store.locationBanners.splice(bannerIdx, 1);
+      }
+    }
+
+    // Also check if any banner matches the inquiry's title and hospital
+    if (!deletedBannerId && targetInquiry.title) {
+      const bannerIdx = store.locationBanners.findIndex(b =>
+        b.title && b.title.trim().toLowerCase() === targetInquiry.title.trim().toLowerCase() &&
+        (!targetInquiry.hospitalId || b.hospitalId === targetInquiry.hospitalId)
+      );
+      if (bannerIdx !== -1) {
+        deletedBannerId = store.locationBanners[bannerIdx].id;
+        store.locationBanners.splice(bannerIdx, 1);
+      }
+    }
+
+    // Remove the inquiry
+    store.adsInquiries.splice(targetIndex, 1);
+
+    store.lastUpdated = Date.now();
+    await saveUnifiedStore(store);
+
+    res.json({
+      success: true,
+      message: 'Inquiry and associated banner deleted successfully',
+      deletedId: id,
+      deletedBannerId
+    });
+  } catch (err) {
+    console.error('Error deleting ad inquiry:', err);
+    res.status(500).json({ success: false, message: err.message || 'Failed to delete inquiry' });
+  }
+});
 // POST /api/ads-inquiries - Hospital submits an ad inquiry
 app.post('/api/ads-inquiries', async (req, res) => {
   const store = await getUnifiedStore();

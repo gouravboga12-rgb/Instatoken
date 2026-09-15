@@ -14,7 +14,8 @@ import {
   Eye,
   RefreshCw,
   ShieldCheck,
-  Building2
+  Building2,
+  Trash2
 } from 'lucide-react';
 
 interface AdInquiry {
@@ -52,6 +53,7 @@ export const AdsInquiries: React.FC = () => {
   const [rejectModalInquiry, setRejectModalInquiry] = useState<AdInquiry | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Fetch inquiries from server
   const loadInquiries = async () => {
@@ -81,9 +83,24 @@ export const AdsInquiries: React.FC = () => {
   useEffect(() => {
     loadInquiries();
 
-    // Listen to real-time submission from hospitals
+    // Listen to real-time events across admin, hospital panel and customer view
     const unsub = onGlobalSync((event: any) => {
-      if (event?.type === 'ADS_INQUIRY_CREATED') {
+      if (
+        event?.type === 'ADS_INQUIRY_CREATED' ||
+        event?.type === 'ADS_INQUIRY_DELETED' ||
+        event?.type === 'BANNER_DELETED' ||
+        event?.type === 'BANNERS_UPDATED'
+      ) {
+        if (event?.type === 'BANNER_DELETED' && event?.data?.id) {
+          try {
+            const saved = localStorage.getItem('insta_ads_inquiries');
+            if (saved) {
+              const list = JSON.parse(saved);
+              const updated = list.filter((i: any) => i.bannerId !== event.data.id);
+              localStorage.setItem('insta_ads_inquiries', JSON.stringify(updated));
+            }
+          } catch (e) {}
+        }
         loadInquiries();
       }
     });
@@ -223,6 +240,55 @@ export const AdsInquiries: React.FC = () => {
       setRejectReason('');
     } catch (e) {
       alert('Failed to reject inquiry.');
+    }
+  };
+
+  // Delete Inquiry (permanently clears inquiry, linked banner, and notifies hospital panel)
+  const handleDeleteInquiry = async (inq: AdInquiry) => {
+    const confirmMsg = inq.status === 'approved'
+      ? `Delete ad inquiry "${inq.title}" from ${inq.hospitalName}?\n\nThis will remove the inquiry, remove the banner from live customer display, and clear it from the hospital panel.`
+      : `Delete ad inquiry "${inq.title}" from ${inq.hospitalName}? This will permanently remove it from both admin and hospital panels.`;
+
+    if (!window.confirm(confirmMsg)) {
+      return;
+    }
+
+    setDeletingId(inq.id);
+    try {
+      const res = await fetch(`/api/ads-inquiries/${encodeURIComponent(inq.id)}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json().catch(() => ({ success: res.ok }));
+
+      // Update local state
+      setInquiries(prev => prev.filter(i => i.id !== inq.id && !(i.title === inq.title && i.hospitalName === inq.hospitalName)));
+
+      // Update localStorage fallback
+      try {
+        const saved = localStorage.getItem('insta_ads_inquiries');
+        if (saved) {
+          const list = JSON.parse(saved);
+          const updated = list.filter((i: any) => i.id !== inq.id && !(i.title === inq.title && i.hospitalName === inq.hospitalName));
+          localStorage.setItem('insta_ads_inquiries', JSON.stringify(updated));
+        }
+      } catch (e) {}
+
+      // Broadcast sync events to notify Location Banners, Hospital Panel & Customer Home
+      broadcastGlobalSync('ADS_INQUIRY_DELETED', {
+        id: inq.id,
+        bannerId: inq.bannerId || data?.deletedBannerId,
+        hospitalId: inq.hospitalId,
+        title: inq.title
+      });
+
+      if (inq.bannerId || data?.deletedBannerId) {
+        broadcastGlobalSync('BANNER_DELETED', { id: inq.bannerId || data?.deletedBannerId });
+      }
+    } catch (err) {
+      console.error('Error deleting ad inquiry:', err);
+      alert('Failed to delete inquiry. Please check network connection.');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -476,6 +542,17 @@ export const AdsInquiries: React.FC = () => {
                       Reject
                     </button>
                   )}
+
+                  {/* Delete Inquiry Button */}
+                  <button
+                    onClick={() => handleDeleteInquiry(inq)}
+                    disabled={deletingId === inq.id}
+                    title="Delete inquiry and remove banner"
+                    className="p-1.5 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-xl border border-transparent hover:border-rose-200 transition-colors cursor-pointer flex items-center gap-1 text-xs font-bold"
+                  >
+                    <Trash2 size={14} className={deletingId === inq.id ? 'animate-spin' : ''} />
+                    <span className="hidden sm:inline">Delete</span>
+                  </button>
                 </div>
               </div>
             </div>
