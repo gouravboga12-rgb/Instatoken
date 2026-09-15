@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useHospital } from '../../context/HospitalContext';
 import { useApp } from '../../context/AppContext';
 import { broadcastGlobalSync, onGlobalSync } from '../../utils/syncBus';
-import { INDIAN_STATES, GEO_HIERARCHY } from '../../utils/geoHierarchy';
+import { INDIAN_STATES, getDistricts } from '../../utils/geoHierarchy';
 import {
   Megaphone,
   Mail,
@@ -14,7 +14,10 @@ import {
   Globe,
   MapPin,
   Sparkles,
-  Info
+  Info,
+  Search,
+  ChevronDown,
+  X
 } from 'lucide-react';
 
 interface AdInquiry {
@@ -56,8 +59,13 @@ export const AdsPromotion: React.FC = () => {
   const [hospitalLink, setHospitalLink] = useState('');
   const [targetLevel, setTargetLevel] = useState<'country' | 'state' | 'district' | 'mandal'>('state');
   const [selectedState, setSelectedState] = useState(hospitalProfile?.state || 'Telangana');
-  const [selectedDistrict, setSelectedDistrict] = useState(hospitalProfile?.city || hospitalProfile?.area || '');
+  const [selectedDistrict, setSelectedDistrict] = useState(hospitalProfile?.city || hospitalProfile?.area || 'Hyderabad');
+  const [mandal, setMandal] = useState('');
   const [pincode, setPincode] = useState(hospitalProfile?.pinCode || '');
+  const [stateSearchQ, setStateSearchQ] = useState('');
+  const [districtSearchQ, setDistrictSearchQ] = useState('');
+  const [stateDropOpen, setStateDropOpen] = useState(false);
+  const [districtDropOpen, setDistrictDropOpen] = useState(false);
   const [ctaText, setCtaText] = useState('Book OPD Token');
   const [durationDays, setDurationDays] = useState(30);
   const [notes, setNotes] = useState('');
@@ -189,8 +197,9 @@ export const AdsPromotion: React.FC = () => {
       link: hospitalLink.trim() || `/hospitals/${selectedHospitalId}`,
       imageUrl: bannerImage,
       targetLevel,
-      state: selectedState,
-      district: selectedDistrict,
+      state: targetLevel !== 'country' ? selectedState : '',
+      district: (targetLevel === 'district' || targetLevel === 'mandal') ? selectedDistrict : '',
+      mandal: mandal.trim(),
       pincode: pincode.trim(),
       ctaText: ctaText.trim() || 'Book Token',
       durationDays: Number(durationDays) || 30,
@@ -244,10 +253,7 @@ export const AdsPromotion: React.FC = () => {
     }
   };
 
-  // Available districts for selected state
-  const availableDistricts = selectedState && GEO_HIERARCHY[selectedState]
-    ? Object.keys(GEO_HIERARCHY[selectedState])
-    : [];
+
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
@@ -428,72 +434,306 @@ export const AdsPromotion: React.FC = () => {
               />
             </div>
 
-            {/* Target Location */}
-            <div className="p-4 bg-slate-50/70 border border-slate-100 rounded-2xl space-y-4">
+            {/* Target Location Hierarchy (Matched to Admin Panel Banner Location Format) */}
+            <div className="p-5 bg-white border border-slate-200/90 rounded-2xl shadow-xs space-y-4">
               <div className="flex items-center gap-2">
-                <MapPin size={15} className="text-blue-600" />
-                <h4 className="text-xs font-extrabold text-slate-800 uppercase tracking-wide">Target Location Hierarchy</h4>
+                <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg">
+                  <MapPin size={16} />
+                </div>
+                <div>
+                  <h4 className="text-xs font-black text-slate-900 uppercase tracking-wide">
+                    Target Location (Where to show this banner)
+                  </h4>
+                  <p className="text-[11px] text-slate-500 font-medium">
+                    Select geographic reach for customer devices & regional feeds
+                  </p>
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-600 mb-1">Target Level</label>
-                  <select
-                    value={targetLevel}
-                    onChange={e => setTargetLevel(e.target.value as any)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-blue-500 bg-white"
-                  >
-                    <option value="country">All India (National)</option>
-                    <option value="state">State Level</option>
-                    <option value="district">District / City Level</option>
-                    <option value="mandal">Mandal / Local Level</option>
-                  </select>
-                </div>
+              {/* 3 Clear Option Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTargetLevel('country');
+                    setStateDropOpen(false);
+                    setDistrictDropOpen(false);
+                  }}
+                  className={`p-3.5 rounded-2xl border text-left cursor-pointer transition-all ${
+                    targetLevel === 'country'
+                      ? 'border-blue-600 bg-blue-50/50 shadow-xs ring-2 ring-blue-500/20'
+                      : 'border-slate-200 hover:border-slate-300 bg-white'
+                  }`}
+                >
+                  <div className="text-xl mb-1.5">🌍</div>
+                  <h5 className="text-xs font-black text-slate-900">All India (Global)</h5>
+                  <p className="text-[10px] text-slate-500 font-medium mt-0.5">Visible across entire website</p>
+                </button>
 
-                {targetLevel !== 'country' && (
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Target State</label>
-                    <select
-                      value={selectedState}
-                      onChange={e => {
-                        setSelectedState(e.target.value);
-                        setSelectedDistrict('');
-                      }}
-                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-blue-500 bg-white"
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTargetLevel('state');
+                    if (!selectedState) setSelectedState(hospitalProfile?.state || 'Telangana');
+                    setDistrictDropOpen(false);
+                  }}
+                  className={`p-3.5 rounded-2xl border text-left cursor-pointer transition-all ${
+                    targetLevel === 'state'
+                      ? 'border-blue-600 bg-blue-50/50 shadow-xs ring-2 ring-blue-500/20'
+                      : 'border-slate-200 hover:border-slate-300 bg-white'
+                  }`}
+                >
+                  <div className="text-xl mb-1.5">🏛️</div>
+                  <h5 className="text-xs font-black text-slate-900">Specific State</h5>
+                  <p className="text-[10px] text-slate-500 font-medium mt-0.5">e.g. Telangana</p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTargetLevel('district');
+                    if (!selectedState) setSelectedState(hospitalProfile?.state || 'Telangana');
+                    if (!selectedDistrict) setSelectedDistrict(hospitalProfile?.city || hospitalProfile?.area || 'Hyderabad');
+                  }}
+                  className={`p-3.5 rounded-2xl border text-left cursor-pointer transition-all ${
+                    targetLevel === 'district' || targetLevel === 'mandal'
+                      ? 'border-blue-600 bg-blue-50/50 shadow-xs ring-2 ring-blue-500/20'
+                      : 'border-slate-200 hover:border-slate-300 bg-white'
+                  }`}
+                >
+                  <div className="text-xl mb-1.5">🏙️</div>
+                  <h5 className="text-xs font-black text-slate-900">City / District</h5>
+                  <p className="text-[10px] text-slate-500 font-medium mt-0.5">e.g. Hyderabad</p>
+                </button>
+              </div>
+
+              {/* Conditional State Dropdown */}
+              {targetLevel === 'state' && (
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2 animate-fadeIn">
+                  <label className="block text-xs font-extrabold text-slate-700">Select State *</label>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => { setStateDropOpen(o => !o); setStateSearchQ(''); }}
+                      className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-extrabold text-slate-800 hover:border-blue-400 transition-colors cursor-pointer"
                     >
-                      {INDIAN_STATES.map(st => (
-                        <option key={st} value={st}>{st}</option>
-                      ))}
-                    </select>
+                      <span>{selectedState || 'Select state…'}</span>
+                      <ChevronDown size={14} className={`text-slate-400 transition-transform ${stateDropOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                    {stateDropOpen && (
+                      <div className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden">
+                        <div className="p-2 border-b border-slate-100">
+                          <div className="flex items-center gap-1.5 px-2 py-1.5 bg-slate-50 rounded-xl border border-slate-200">
+                            <Search size={12} className="text-slate-400 shrink-0" />
+                            <input
+                              autoFocus
+                              type="text"
+                              value={stateSearchQ}
+                              onChange={e => setStateSearchQ(e.target.value)}
+                              placeholder="Search state…"
+                              className="flex-1 bg-transparent text-xs font-semibold text-slate-700 outline-none placeholder-slate-400"
+                            />
+                            {stateSearchQ && (
+                              <button type="button" onClick={() => setStateSearchQ('')} className="border-none bg-transparent cursor-pointer">
+                                <X size={11} className="text-slate-400" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        <ul className="max-h-52 overflow-y-auto py-1">
+                          {INDIAN_STATES.filter(s => s.toLowerCase().includes(stateSearchQ.toLowerCase())).map(s => (
+                            <li
+                              key={s}
+                              onClick={() => {
+                                setSelectedState(s);
+                                const dists = getDistricts('India', s);
+                                setSelectedDistrict(dists[0] || '');
+                                setStateDropOpen(false);
+                                setStateSearchQ('');
+                              }}
+                              className={`px-3.5 py-2 text-xs font-semibold cursor-pointer transition-colors ${
+                                selectedState === s ? 'bg-blue-50 text-blue-700 font-extrabold' : 'text-slate-700 hover:bg-slate-50'
+                              }`}
+                            >
+                              {s}
+                            </li>
+                          ))}
+                          {INDIAN_STATES.filter(s => s.toLowerCase().includes(stateSearchQ.toLowerCase())).length === 0 && (
+                            <li className="px-3.5 py-3 text-xs text-slate-400 text-center">No states found</li>
+                          )}
+                        </ul>
+                      </div>
+                    )}
                   </div>
-                )}
-
-                {(targetLevel === 'district' || targetLevel === 'mandal') && (
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Target District</label>
-                    <select
-                      value={selectedDistrict}
-                      onChange={e => setSelectedDistrict(e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-blue-500 bg-white"
-                    >
-                      <option value="">All Districts in {selectedState}</option>
-                      {availableDistricts.map(d => (
-                        <option key={d} value={d}>{d}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-600 mb-1">Target Pin Code (Optional)</label>
-                  <input
-                    type="text"
-                    value={pincode}
-                    onChange={e => setPincode(e.target.value)}
-                    placeholder="e.g. 500034"
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-blue-500 bg-white"
-                  />
                 </div>
+              )}
+
+              {/* Conditional City / District Dropdown */}
+              {(targetLevel === 'district' || targetLevel === 'mandal') && (
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3 animate-fadeIn">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* Searchable State Combobox */}
+                    <div>
+                      <label className="block text-xs font-extrabold text-slate-700 mb-1">State *</label>
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => { setStateDropOpen(o => !o); setDistrictDropOpen(false); setStateSearchQ(''); }}
+                          className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-extrabold text-slate-800 hover:border-blue-400 transition-colors cursor-pointer"
+                        >
+                          <span>{selectedState || 'Select state…'}</span>
+                          <ChevronDown size={14} className={`text-slate-400 transition-transform ${stateDropOpen ? 'rotate-180' : ''}`} />
+                        </button>
+                        {stateDropOpen && (
+                          <div className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden">
+                            <div className="p-2 border-b border-slate-100">
+                              <div className="flex items-center gap-1.5 px-2 py-1.5 bg-slate-50 rounded-xl border border-slate-200">
+                                <Search size={12} className="text-slate-400 shrink-0" />
+                                <input
+                                  autoFocus
+                                  type="text"
+                                  value={stateSearchQ}
+                                  onChange={e => setStateSearchQ(e.target.value)}
+                                  placeholder="Search state…"
+                                  className="flex-1 bg-transparent text-xs font-semibold text-slate-700 outline-none placeholder-slate-400"
+                                />
+                                {stateSearchQ && (
+                                  <button type="button" onClick={() => setStateSearchQ('')} className="border-none bg-transparent cursor-pointer">
+                                    <X size={11} className="text-slate-400" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                            <ul className="max-h-52 overflow-y-auto py-1">
+                              {INDIAN_STATES.filter(s => s.toLowerCase().includes(stateSearchQ.toLowerCase())).map(s => (
+                                <li
+                                  key={s}
+                                  onClick={() => {
+                                    setSelectedState(s);
+                                    const dists = getDistricts('India', s);
+                                    setSelectedDistrict(dists[0] || '');
+                                    setStateDropOpen(false);
+                                    setStateSearchQ('');
+                                    setDistrictSearchQ('');
+                                  }}
+                                  className={`px-3.5 py-2 text-xs font-semibold cursor-pointer transition-colors ${
+                                    selectedState === s ? 'bg-blue-50 text-blue-700 font-extrabold' : 'text-slate-700 hover:bg-slate-50'
+                                  }`}
+                                >
+                                  {s}
+                                </li>
+                              ))}
+                              {INDIAN_STATES.filter(s => s.toLowerCase().includes(stateSearchQ.toLowerCase())).length === 0 && (
+                                <li className="px-3.5 py-3 text-xs text-slate-400 text-center">No states found</li>
+                              )}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Searchable City/District Combobox */}
+                    <div>
+                      <label className="block text-xs font-extrabold text-slate-700 mb-1">City / District *</label>
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => { setDistrictDropOpen(o => !o); setStateDropOpen(false); setDistrictSearchQ(''); }}
+                          className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-extrabold text-slate-800 hover:border-blue-400 transition-colors cursor-pointer"
+                        >
+                          <span>{selectedDistrict || 'Select city…'}</span>
+                          <ChevronDown size={14} className={`text-slate-400 transition-transform ${districtDropOpen ? 'rotate-180' : ''}`} />
+                        </button>
+                        {districtDropOpen && (
+                          <div className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden">
+                            <div className="p-2 border-b border-slate-100">
+                              <div className="flex items-center gap-1.5 px-2 py-1.5 bg-slate-50 rounded-xl border border-slate-200">
+                                <Search size={12} className="text-slate-400 shrink-0" />
+                                <input
+                                  autoFocus
+                                  type="text"
+                                  value={districtSearchQ}
+                                  onChange={e => setDistrictSearchQ(e.target.value)}
+                                  placeholder="Search city / district…"
+                                  className="flex-1 bg-transparent text-xs font-semibold text-slate-700 outline-none placeholder-slate-400"
+                                />
+                                {districtSearchQ && (
+                                  <button type="button" onClick={() => setDistrictSearchQ('')} className="border-none bg-transparent cursor-pointer">
+                                    <X size={11} className="text-slate-400" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                            <ul className="max-h-52 overflow-y-auto py-1">
+                              {getDistricts('India', selectedState)
+                                .filter(d => d.toLowerCase().includes(districtSearchQ.toLowerCase()))
+                                .map(d => (
+                                  <li
+                                    key={d}
+                                    onClick={() => {
+                                      setSelectedDistrict(d);
+                                      setDistrictDropOpen(false);
+                                      setDistrictSearchQ('');
+                                    }}
+                                    className={`px-3.5 py-2 text-xs font-semibold cursor-pointer transition-colors ${
+                                      selectedDistrict === d ? 'bg-blue-50 text-blue-700 font-extrabold' : 'text-slate-700 hover:bg-slate-50'
+                                    }`}
+                                  >
+                                    {d}
+                                  </li>
+                                ))}
+                              {getDistricts('India', selectedState).filter(d => d.toLowerCase().includes(districtSearchQ.toLowerCase())).length === 0 && (
+                                <li className="px-3.5 py-3 text-xs text-slate-400 text-center">No cities found</li>
+                              )}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                        Optional Locality / Area
+                      </label>
+                      <input
+                        type="text"
+                        value={mandal}
+                        onChange={e => setMandal(e.target.value)}
+                        placeholder="e.g. Banjara Hills, Koramangala"
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-800 focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                        Target Pin Code (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        value={pincode}
+                        onChange={e => setPincode(e.target.value)}
+                        placeholder="e.g. 500034"
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-800 focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Target Audience Summary Confirmation (Matches Admin Banner Preview) */}
+              <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-bold flex items-center gap-2">
+                <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                <span>
+                  Audience: Visible to users in{' '}
+                  <strong className="underline">
+                    {targetLevel === 'country'
+                      ? '🌍 All India (Global — visible to every user across entire website)'
+                      : targetLevel === 'state'
+                      ? `India → ${selectedState || 'All State'}`
+                      : `India → ${selectedState || 'State'} → ${selectedDistrict || 'All Cities'}${mandal ? ' (' + mandal + ')' : ''}${pincode ? ' [Pin: ' + pincode + ']' : ''}`}
+                  </strong>
+                </span>
               </div>
             </div>
 
