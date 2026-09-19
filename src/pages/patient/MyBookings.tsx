@@ -9,7 +9,7 @@ import { ArrowLeft, Clock, Calendar, CheckCircle2, XCircle, AlertCircle, Trash2,
 import { subscribeGlobalSync } from '../../utils/syncBus';
 
 export const MyBookings: React.FC = () => {
-  const { appointments, cancelAppointment, deleteAppointment, clearPastHistory, refreshAppointments } = useApp();
+  const { user, appointments, cancelAppointment, deleteAppointment, clearPastHistory, refreshAppointments } = useApp();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = React.useState<'active' | 'history'>('active');
 
@@ -79,49 +79,32 @@ export const MyBookings: React.FC = () => {
     setIsPulling(false);
   };
 
-  // De-duplicate appointments by id and normalize status with cross-panel token checks
+  // De-duplicate appointments by id and resolve effective status cleanly from RDS/server
   const dedupedAppts = React.useMemo(() => {
-    // Read local hospital tokens to cross-check real-time visited status
-    let localHospitalTokens: any[] = [];
-    try {
-      const savedToks = localStorage.getItem('insta_hospital_tokens');
-      if (savedToks) localHospitalTokens = JSON.parse(savedToks);
-    } catch (e) {}
-
     const map = new Map<string, Appointment>();
     (appointments || []).forEach(a => {
       if (!a || !a.id) return;
       if (a.id === 'tok-1001' || a.patientName === 'Guest Patient') return;
 
-      // Check if hospital marked this token visited/completed locally
-      const matchedTok = localHospitalTokens.find((t: any) =>
-        t.id === a.id ||
-        (t.doctorId === a.doctorId &&
-         (Number(t.tokenNo) === Number(a.tokenNumber) || Number(t.tokenNumber) === Number(a.tokenNumber)) &&
-         (!a.date || !t.bookingDate || a.date === t.bookingDate))
-      );
-
-      let effectiveStatus = (a.status || 'booked') as Appointment['status'];
-      if (matchedTok) {
-        if (matchedTok.status === 'completed') {
-          effectiveStatus = 'completed';
-        } else if (['cancelled', 'not-visited', 'skipped'].includes(matchedTok.status)) {
-          effectiveStatus = 'cancelled';
+      // When patient is logged in, filter to show only this user's appointments
+      if (user) {
+        const uPhone = (user.phone || '').replace(/\D/g, '').slice(-10);
+        const aPhone = (a.phone || '').replace(/\D/g, '').slice(-10);
+        const uEmail = (user.email || '').trim().toLowerCase();
+        const aEmail = (a.email || '').trim().toLowerCase();
+        const hasPhoneMatch = Boolean(uPhone && aPhone && uPhone === aPhone);
+        const hasEmailMatch = Boolean(uEmail && aEmail && uEmail === aEmail);
+        if (uPhone && aPhone && !hasPhoneMatch && (!uEmail || !hasEmailMatch)) {
+          return;
         }
       }
 
-      // Normalize status
-      const normAppt: Appointment = {
-        ...a,
-        status: effectiveStatus
-      };
-      // Keep newer or completed version
-      if (!map.has(a.id) || normAppt.status === 'completed' || normAppt.status === 'cancelled') {
-        map.set(a.id, normAppt);
+      if (!map.has(a.id) || a.status === 'completed' || a.status === 'cancelled') {
+        map.set(a.id, a);
       }
     });
     return Array.from(map.values());
-  }, [appointments]);
+  }, [appointments, user]);
 
   const activeAppts = dedupedAppts.filter(a => a.status === 'booked' || a.status === 'checked-in' || a.status === 'in-cabin');
   const pastAppts = dedupedAppts.filter(a => a.status === 'completed' || a.status === 'cancelled');
@@ -157,6 +140,23 @@ export const MyBookings: React.FC = () => {
               </Badge>
               <h4 className="font-extrabold text-slate-800 text-sm tracking-tight">{appt.hospitalName}</h4>
               <p className="text-[10px] text-slate-500 font-semibold mt-0.5">{appt.doctorName} • {appt.departmentName}</p>
+              <div className="flex items-center gap-1.5 mt-1.5 text-[10px] font-bold text-slate-600 flex-wrap">
+                <span>{appt.patientName}</span>
+                <span>•</span>
+                <span>{appt.ageDisplay || (appt.age ? `${appt.age} Yrs` : '')}</span>
+                <span>•</span>
+                <span>{appt.gender}</span>
+                {appt.isExisting && (
+                  <span className="text-[9px] font-black text-purple-700 bg-purple-50 border border-purple-200 px-1.5 py-0.2 rounded">
+                    ★ Existing
+                  </span>
+                )}
+                {appt.rmpReference && appt.rmpReference.name && (
+                  <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.2 rounded">
+                    RMP: {appt.rmpReference.name}
+                  </span>
+                )}
+              </div>
             </div>
             <div className="text-right">
               <span className="text-[9px] text-slate-400 font-bold block uppercase tracking-wider">Token Number</span>

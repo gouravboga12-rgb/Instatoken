@@ -40,10 +40,26 @@ if (!fs.existsSync(DATA_DIR)) {
 let isDbConnected = false;
 
 // Attempt initial DB connection test
-testConnection().then((connected) => {
+testConnection().then(async (connected) => {
   isDbConnected = connected;
   if (connected) {
     console.log('⚡ Active Data Layer: AWS RDS PostgreSQL');
+    try {
+      await query(`
+        CREATE TABLE IF NOT EXISTS customers (
+          id VARCHAR(100) PRIMARY KEY,
+          name VARCHAR(255),
+          phone VARCHAR(50),
+          email VARCHAR(255),
+          location VARCHAR(255),
+          data JSONB,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+    } catch (e) {
+      console.warn('Could not auto-create customers table in RDS:', e.message);
+    }
   } else {
     console.log('📁 Active Data Layer: Local File Store (Fallback)');
   }
@@ -2711,7 +2727,13 @@ app.get('/api/appointments/:id', async (req, res) => {
 app.get('/api/appointments', async (req, res) => {
   if (isDbConnected) {
     try {
-      const dbRes = await query(`SELECT id, status, data FROM appointments ORDER BY created_at DESC LIMIT 200`);
+      const dbRes = await query(`
+        SELECT a.id, COALESCE(t.status, a.status) as effective_status, a.data 
+        FROM appointments a 
+        LEFT JOIN tokens t ON a.id = t.id 
+        ORDER BY a.created_at DESC 
+        LIMIT 200
+      `);
       if (dbRes.rows.length > 0) {
         const appts = dbRes.rows.map(r => {
           if (!r.data) return null;
@@ -2719,7 +2741,7 @@ app.get('/api/appointments', async (req, res) => {
           return {
             ...dataObj,
             id: r.id || dataObj.id,
-            status: r.status || dataObj.status || 'booked'
+            status: r.effective_status || dataObj.status || 'booked'
           };
         }).filter(Boolean);
         return res.json({ success: true, appointments: appts });
@@ -2731,6 +2753,150 @@ app.get('/api/appointments', async (req, res) => {
 
   const store = await getUnifiedStore();
   res.json({ success: true, appointments: store.appointments || [] });
+});
+
+// ─── Customer Account Profile & Persistence ──────────────────────────────────
+app.post('/api/customers/profile', async (req, res) => {
+  try {
+    const { name, phone, email, location, lat, lng, familyMembers, savedDoctors, savedHospitals, subscription, oldPhone, oldEmail } = req.body;
+    const store = await getUnifiedStore();
+    store.customers = store.customers || [];
+
+    const cleanPhone = (phone || oldPhone || '').replace(/\D/g, '').slice(-10);
+    const cleanEmail = (email || oldEmail || '').trim().toLowerCase();
+
+    let custIdx = store.customers.findIndex(c => {
+      const cPhone = (c.phone || '').replace(/\D/g, '').slice(-10);
+      const cEmail = (c.email || '').trim().toLowerCase();
+      return (cleanPhone && cPhone === cleanPhone) || (cleanEmail && cEmail === cleanEmail) || (c.name && c.name === name);
+    });
+
+    const updatedCust = {
+      id: custIdx !== -1 ? store.customers[custIdx].id : `cust-${Date.now()}`,
+      name: name || (custIdx !== -1 ? store.customers[custIdx].name : 'Patient'),
+      phone: phone || (custIdx !== -1 ? store.customers[custIdx].phone : ''),
+      email: email || (custIdx !== -1 ? store.customers[custIdx].email : ''),
+      location: location || (custIdx !== -1 ? store.customers[custIdx].location : ''),
+      lat: lat ?? (custIdx !== -1 ? store.customers[custIdx].lat : null),
+      lng: lng ?? (custIdx !== -1 ? store.customers[custIdx].lng : null),
+      familyMembers: familyMembers || (custIdx !== -1 ? store.customers[custIdx].familyMembers : []),
+      savedDoctors: savedDoctors || (custIdx !== -1 ? store.customers[custIdx].savedDoctors : []),
+      savedHospitals: savedHospitals || (custIdx !== -1 ? store.customers[custIdx].savedHospitals : []),
+      subscription: subscription || (custIdx !== -1 ? store.customers[custIdx].subscription : null),
+      status: 'active',
+      updatedAt: new Date().toISOString()
+    };
+
+    if (custIdx !== -1) {
+      store.customers[custIdx] = { ...store.customers[custIdx], ...updatedCust };
+    } else {
+      store.customers.push(updatedCust);
+    }
+
+    if (isDbConnected) {
+      try {
+        await query(`
+          INSERT INTO customers (id, name, phone, email, location, data, created_at, updated_at)
+          VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+          ON CONFLICT (id) DO UPDATE 
+          SET name = $2, phone = $3, email = $4, location = $5, data = $6, updated_at = NOW()
+        `, [
+          updatedCust.id,
+          updatedCust.name,
+          updatedCust.phone,
+          updatedCust.email,
+          updatedCust.location,
+          JSON.stringify(updatedCust)
+        ]);
+      } catch (dbErr) {
+        console.warn('Error saving customer profile in RDS:', dbErr.message);
+      }
+    }
+
+    await saveUnifiedStore(store);
+    res.json({ success: true, customer: updatedCust });
+  } catch (err) {
+    console.error('Error in /api/customers/profile:', err.message);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ─── Customer Login & Lookup ─────────────────────────────────────────────────
+app.post('/api/customers/login', async (req, res) => {
+  try {
+    const { emailOrPhone, name } = req.body;
+    const cleanInput = (emailOrPhone || '').trim();
+    const cleanPhone = cleanInput.replace(/\D/g, '').slice(-10);
+    const cleanEmail = cleanInput.toLowerCase();
+
+    const store = await getUnifiedStore();
+    store.customers = store.customers || [];
+
+    let foundCustomer = null;
+    if (isDbConnected) {
+      try {
+        const dbRes = await query(`
+          SELECT id, name, phone, email, location, data 
+          FROM customers 
+          WHERE (phone = $1 OR email = $2 OR (phone != '' AND RIGHT(phone, 10) = $3))
+          LIMIT 1
+        `, [cleanInput, cleanEmail, cleanPhone || '___none___']);
+        if (dbRes.rows.length > 0) {
+          const raw = dbRes.rows[0].data;
+          foundCustomer = typeof raw === 'string' ? JSON.parse(raw) : (raw || dbRes.rows[0]);
+        }
+      } catch (dbErr) {
+        console.warn('Error querying customer in RDS:', dbErr.message);
+      }
+    }
+
+    if (!foundCustomer) {
+      foundCustomer = store.customers.find(c => {
+        const cPhone = (c.phone || '').replace(/\D/g, '').slice(-10);
+        const cEmail = (c.email || '').trim().toLowerCase();
+        return (cleanPhone && cPhone === cleanPhone) || (cleanEmail && cEmail === cleanEmail);
+      });
+    }
+
+    if (foundCustomer) {
+      if (name && (!foundCustomer.name || foundCustomer.name === 'Guest' || foundCustomer.name === 'Patient')) {
+        foundCustomer.name = name;
+      }
+      return res.json({ success: true, customer: foundCustomer });
+    }
+
+    // Auto-create customer profile on first-time login
+    const newCustomer = {
+      id: `cust-${Date.now()}`,
+      name: name || (cleanInput.includes('@') ? cleanInput.split('@')[0] : 'Patient'),
+      email: cleanInput.includes('@') ? cleanEmail : '',
+      phone: cleanInput.includes('@') ? '' : cleanInput,
+      location: 'Koramangala, Bengaluru',
+      joinedDate: new Date().toISOString().split('T')[0],
+      status: 'active',
+      bookings: [],
+      savedHospitals: [],
+      savedDoctors: [],
+      familyMembers: []
+    };
+
+    store.customers.push(newCustomer);
+    if (isDbConnected) {
+      try {
+        await query(`
+          INSERT INTO customers (id, name, phone, email, location, data, created_at, updated_at)
+          VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+          ON CONFLICT (id) DO UPDATE SET updated_at = NOW()
+        `, [newCustomer.id, newCustomer.name, newCustomer.phone, newCustomer.email, newCustomer.location, JSON.stringify(newCustomer)]);
+      } catch (e) {}
+    }
+    await saveUnifiedStore(store);
+
+    res.json({ success: true, customer: newCustomer });
+  } catch (err) {
+    console.error('Error in /api/customers/login:', err.message);
+    res.status(500).json({ success: false, message: err.message });
+  }
 });
 
 
@@ -2956,7 +3122,7 @@ async function resolveBannerImage(imageSource) {
   if (trimmed.startsWith('data:image/') || trimmed.startsWith('data:video/')) {
     const isVideo = trimmed.startsWith('data:video/');
     try {
-      const matches = trimmed.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+      const matches = trimmed.match(/^data:([A-Za-z-+/]+);base64,(.+)$/);
       if (matches && matches.length === 3) {
         const mime = matches[1];
         const buffer = Buffer.from(matches[2], 'base64');
@@ -3619,7 +3785,7 @@ const transporter = nodemailer.createTransport({
 });
 
 // Verify transporter on startup
-transporter.verify((error, success) => {
+transporter.verify((error, _success) => {
   if (error) {
     console.error('❌ SMTP Connection Error:', error);
   } else {

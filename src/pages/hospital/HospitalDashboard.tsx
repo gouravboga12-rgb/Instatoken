@@ -272,6 +272,12 @@ export const HospitalDashboard: React.FC = () => {
         rawId: t.id,
         tokenNo: t.tokenNo,
         patientName: t.patientName || 'Patient',
+        patientPhone: t.patientPhone,
+        patientAge: t.patientAge,
+        patientAgeDisplay: t.patientAgeDisplay || (t.patientAge ? `${t.patientAge}y` : ''),
+        type: t.type,
+        isExisting: Boolean(t.isExisting || t.isRevisit),
+        rmpReference: t.rmpReference,
         dept: t.departmentName || 'General Medicine',
         doctor: t.doctorName || 'Consultant Doctor',
         waitTime,
@@ -758,12 +764,33 @@ export const HospitalDashboard: React.FC = () => {
                       {item.id}
                     </div>
                     <div className="min-w-0">
-                      <h4 className="font-extrabold text-xs sm:text-sm text-slate-800 truncate">
-                        {item.patientName}
-                      </h4>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <h4 className="font-extrabold text-xs sm:text-sm text-slate-800 truncate">
+                          {item.patientName}
+                        </h4>
+                        {item.type === 'online' ? (
+                          <span className="text-[9px] font-black text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.2 rounded">
+                            Online
+                          </span>
+                        ) : (
+                          <span className="text-[9px] font-black text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded">
+                            Offline
+                          </span>
+                        )}
+                        {item.isExisting && (
+                          <span className="text-[9px] font-black text-purple-700 bg-purple-100 border border-purple-200 px-1.5 py-0.2 rounded">
+                            ★ Existing
+                          </span>
+                        )}
+                      </div>
                       <p className="text-[11px] font-semibold text-slate-400 truncate mt-0.5">
-                        {item.dept} · {item.doctor}
+                        {item.dept} · {item.doctor} {item.patientAgeDisplay ? `· ${item.patientAgeDisplay}` : ''}
                       </p>
+                      {item.rmpReference && item.rmpReference.name && (
+                        <p className="text-[10px] font-bold text-indigo-700 truncate mt-0.5">
+                          RMP Ref: Dr. {item.rmpReference.name} {item.rmpReference.phone ? `(${item.rmpReference.phone})` : ''}
+                        </p>
+                      )}
                     </div>
                   </div>
 

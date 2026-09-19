@@ -12,7 +12,18 @@ export const Payment: React.FC = () => {
   const { bookToken, purchaseSubscription } = useApp();
 
   const state = location.state as {
-    patientDetails: { name: string; age: number; gender: string; phone: string; email: string; address: string; isExisting: boolean } | null;
+    patientDetails: {
+      name: string;
+      age: number;
+      ageUnit?: string;
+      ageDisplay?: string;
+      gender: string;
+      phone: string;
+      email: string;
+      address: string;
+      isExisting: boolean;
+      rmpReference?: { name: string; phone: string } | null;
+    } | null;
     hospitalId: string;
     doctorId: string;
     date: string;

@@ -59,6 +59,8 @@ export interface Appointment {
   estimatedWaitTime: number; // in minutes
   isExisting?: boolean;
   rmpReference?: { name: string; phone: string } | null;
+  ageDisplay?: string;
+  ageUnit?: string;
   createdAt: string;
 }
 
@@ -110,6 +112,8 @@ interface AppContextType {
       address: string;
       isExisting?: boolean;
       rmpReference?: { name: string; phone: string } | null;
+      ageDisplay?: string;
+      ageUnit?: string;
     },
     hospitalId: string,
     doctorId: string,
@@ -1240,6 +1244,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       address: string;
       isExisting?: boolean;
       rmpReference?: { name: string; phone: string } | null;
+      ageDisplay?: string;
+      ageUnit?: string;
     },
     hospitalId: string,
     doctorId: string,
@@ -1294,6 +1300,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       estimatedWaitTime: computedWaitTime,
       isExisting: Boolean(patientDetails.isExisting),
       rmpReference: patientDetails.rmpReference || null,
+      ageDisplay: patientDetails.ageDisplay || (patientDetails.age ? `${patientDetails.age} Yrs` : '28 Yrs'),
+      ageUnit: patientDetails.ageUnit || 'Years',
       createdAt: new Date().toISOString()
     };
 
@@ -1306,6 +1314,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       patientName: newAppt.patientName,
       patientPhone: newAppt.phone,
       patientAge: newAppt.age,
+      patientAgeDisplay: patientDetails.ageDisplay || (patientDetails.age ? `${patientDetails.age} Yrs` : '28 Yrs'),
+      patientAgeUnit: patientDetails.ageUnit || 'Years',
       patientGender: newAppt.gender,
       doctorId: newAppt.doctorId,
       doctorName: newAppt.doctorName,

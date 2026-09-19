@@ -343,7 +343,14 @@ export const TokenConfirmation: React.FC = () => {
 
               {/* Patient Details */}
               <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-1">
-                <span className="text-[9px] font-black text-blue-700 uppercase tracking-wider block">REGISTERED PATIENT</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-[9px] font-black text-blue-700 uppercase tracking-wider block">REGISTERED PATIENT</span>
+                  {appointment.isExisting && (
+                    <span className="text-[9px] font-black text-purple-700 bg-purple-100 border border-purple-200 px-2 py-0.5 rounded-full">
+                      ★ Existing Patient
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center gap-2.5 pt-0.5">
                   <div className="w-8 h-8 bg-purple-100 text-purple-700 rounded-xl flex items-center justify-center font-bold text-xs shrink-0">
                     <User size={15} />
@@ -351,9 +358,14 @@ export const TokenConfirmation: React.FC = () => {
                   <div className="min-w-0">
                     <h5 className="text-xs font-black text-slate-900 truncate">{appointment.patientName}</h5>
                     <p className="text-[10px] text-slate-500 font-semibold truncate">
-                      {appointment.gender || 'Patient'} • {appointment.age || 28} yrs
+                      {appointment.gender || 'Patient'} • {appointment.ageDisplay || (appointment.age ? `${appointment.age} yrs` : '28 yrs')}
                       {appointment.phone ? ` • 📞 ${appointment.phone}` : ''}
                     </p>
+                    {appointment.rmpReference && appointment.rmpReference.name && (
+                      <p className="text-[9.5px] font-bold text-indigo-700 mt-0.5">
+                        RMP Reference: Dr. {appointment.rmpReference.name} {appointment.rmpReference.phone ? `(${appointment.rmpReference.phone})` : ''}
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>

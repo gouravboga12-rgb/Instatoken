@@ -6,8 +6,8 @@ import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { 
   MapPin, Bell, User, Search, Star, 
-  ChevronRight, ChevronLeft, Heart, Activity, Baby, 
-  Smile, ShieldAlert, Award, Loader2, FileText,
+  ChevronRight, ChevronLeft,
+  ShieldAlert, Award, Loader2, FileText,
   Menu, BellRing, ShieldCheck, 
   Zap, ChevronDown, Building2, Share2,
   Users, ArrowRight, Navigation,
@@ -628,37 +628,52 @@ export const Home: React.FC<HomeProps> = ({
         {/* 3. Featured Hospitals / Location-Based Banners Hero Carousel Banner */}
         {displayBanners.length > 0 && (() => {
           const currentBanner = displayBanners[currentSlide] || displayBanners[0];
+          const isUploadedFlyer = currentBanner.isLocationTargeted || /\.(png|jpe?g|webp|gif)(\?.*)?$/i.test(currentBanner.image || '');
+
           return (
             <div 
-              className="relative rounded-3xl overflow-hidden shadow-xl text-white min-h-[220px] md:min-h-[290px] p-4 md:p-8 flex flex-col justify-between transition-all duration-700 group cursor-pointer border border-slate-800/40"
+              className="relative rounded-3xl overflow-hidden shadow-xl text-white aspect-[16/9] sm:aspect-[16/7] md:aspect-[21/8] min-h-[230px] max-h-[440px] p-4 sm:p-6 md:p-8 flex flex-col justify-between transition-all duration-700 group cursor-pointer border border-slate-800/40 w-full"
               onClick={() => handleBannerClick(currentBanner)}
             >
-              {/* Full background photo or video with smooth scale animation */}
-              {currentBanner.mediaType === 'video' || /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(currentBanner.image || '') ? (
-                <video
-                  key={currentBanner.id}
-                  src={currentBanner.image}
-                  autoPlay
-                  loop
-                  muted
-                  playsInline
-                  className="absolute inset-0 w-full h-full object-cover"
-                />
-              ) : (
-                <img 
-                  key={currentBanner.id}
-                  src={currentBanner.image} 
-                  alt={currentBanner.title}
-                  className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000 ease-out"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = getHospitalSVGImage(currentBanner.title);
-                  }}
-                />
-              )}
+              {/* Responsive Background Media: Blurred backdrop + crisp foreground image/video */}
+              <div className="absolute inset-0 bg-slate-950 overflow-hidden">
+                {currentBanner.mediaType === 'video' || /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(currentBanner.image || '') ? (
+                  <video
+                    key={currentBanner.id}
+                    src={currentBanner.image}
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <>
+                    <img 
+                      src={currentBanner.image} 
+                      alt="" 
+                      aria-hidden="true"
+                      className="absolute inset-0 w-full h-full object-cover blur-lg opacity-40 scale-110 pointer-events-none" 
+                    />
+                    <img 
+                      key={currentBanner.id}
+                      src={currentBanner.image} 
+                      alt={currentBanner.title}
+                      className="relative w-full h-full object-cover md:object-cover sm:object-contain object-center group-hover:scale-102 transition-transform duration-700 ease-out"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = getHospitalSVGImage(currentBanner.title);
+                      }}
+                    />
+                  </>
+                )}
+              </div>
 
-              {/* Dark Gradient Overlay for optimal legibility */}
-              <div className="absolute inset-0 bg-gradient-to-r from-slate-950/95 via-slate-950/80 to-slate-950/30 md:to-transparent z-10" />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent to-black/40 z-10" />
+              {/* Gradient Overlay: soft bottom vignette allowing flyer contents to remain clearly visible */}
+              <div className={`absolute inset-0 z-10 ${
+                isUploadedFlyer 
+                  ? 'bg-gradient-to-t from-slate-950/90 via-slate-950/30 to-black/20' 
+                  : 'bg-gradient-to-r from-slate-950/90 via-slate-950/70 to-transparent md:bg-gradient-to-t md:from-slate-950/90 md:via-transparent'
+              }`} />
 
               {/* Left Arrow Navigation Button */}
               {displayBanners.length > 1 && (
@@ -667,7 +682,7 @@ export const Home: React.FC<HomeProps> = ({
                     e.stopPropagation();
                     setCurrentSlide((prev) => (prev - 1 + displayBanners.length) % displayBanners.length);
                   }}
-                  className="absolute left-2 md:left-4 top-1/2 -translate-y-1/2 z-30 w-8 h-8 md:w-10 md:h-10 rounded-full bg-slate-950/50 hover:bg-slate-950/80 backdrop-blur-md border border-white/20 text-white flex items-center justify-center transition-all cursor-pointer hover:scale-110 shadow-lg"
+                  className="absolute left-2 md:left-4 top-1/2 -translate-y-1/2 z-30 w-8 h-8 md:w-10 md:h-10 rounded-full bg-slate-950/60 hover:bg-slate-950/90 backdrop-blur-md border border-white/20 text-white flex items-center justify-center transition-all cursor-pointer hover:scale-110 shadow-lg"
                   aria-label="Previous Banner"
                 >
                   <ChevronLeft size={18} />
@@ -681,7 +696,7 @@ export const Home: React.FC<HomeProps> = ({
                     e.stopPropagation();
                     setCurrentSlide((prev) => (prev + 1) % displayBanners.length);
                   }}
-                  className="absolute right-2 md:right-4 top-1/2 -translate-y-1/2 z-30 w-8 h-8 md:w-10 md:h-10 rounded-full bg-slate-950/50 hover:bg-slate-950/80 backdrop-blur-md border border-white/20 text-white flex items-center justify-center transition-all cursor-pointer hover:scale-110 shadow-lg"
+                  className="absolute right-2 md:right-4 top-1/2 -translate-y-1/2 z-30 w-8 h-8 md:w-10 md:h-10 rounded-full bg-slate-950/60 hover:bg-slate-950/90 backdrop-blur-md border border-white/20 text-white flex items-center justify-center transition-all cursor-pointer hover:scale-110 shadow-lg"
                   aria-label="Next Banner"
                 >
                   <ChevronRight size={18} />
@@ -689,7 +704,7 @@ export const Home: React.FC<HomeProps> = ({
               )}
 
               {/* Top Badges Header */}
-              <div className="relative z-20 flex items-center justify-between gap-2 px-7 md:px-14">
+              <div className="relative z-20 flex items-center justify-between gap-2 px-3 sm:px-6 md:px-10">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="bg-blue-600/90 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg border border-blue-400/30 shadow-md">
                     {currentBanner.badge}
@@ -711,62 +726,58 @@ export const Home: React.FC<HomeProps> = ({
                   </span>
                 </div>
 
-                <div className="hidden md:flex bg-slate-900/80 backdrop-blur-md px-3 py-1 rounded-full border border-white/20 text-[10px] font-extrabold items-center gap-1.5 shadow-sm">
+                <div className="hidden sm:flex bg-slate-900/80 backdrop-blur-md px-3 py-1 rounded-full border border-white/20 text-[10px] font-extrabold items-center gap-1.5 shadow-sm">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
                   <span className="text-emerald-300">Live OPD Active</span>
                 </div>
               </div>
 
-              {/* Middle Main Info Content */}
-              <div className="relative z-20 space-y-1.5 md:space-y-2.5 my-2 md:my-4 max-w-lg px-7 md:px-14">
-                <h2 className="text-xl md:text-3xl font-black font-heading leading-tight tracking-tight drop-shadow-md text-white">
-                  {currentBanner.title}
-                </h2>
+              {/* Bottom Main Content */}
+              <div className="relative z-20 flex flex-col sm:flex-row sm:items-end justify-between gap-3 px-3 sm:px-6 md:px-10 pt-2">
+                <div className="max-w-xl space-y-1">
+                  <h2 className="text-lg sm:text-2xl md:text-3xl font-black font-heading leading-tight tracking-tight drop-shadow-md text-white">
+                    {currentBanner.title}
+                  </h2>
 
-                <p className="text-slate-200 text-[11px] md:text-sm font-semibold flex items-center gap-1.5 leading-relaxed drop-shadow-sm">
-                  <MapPin size={13} className="shrink-0 text-blue-400" />
-                  <span className="truncate">{currentBanner.location}</span>
-                </p>
-
-                {currentBanner.description && (
-                  <p className="text-slate-300 text-[11px] md:text-xs line-clamp-2 leading-relaxed drop-shadow-xs">
-                    {currentBanner.description}
+                  <p className="text-slate-200 text-[11px] sm:text-xs font-semibold flex items-center gap-1.5 drop-shadow-sm">
+                    <MapPin size={12} className="shrink-0 text-blue-400" />
+                    <span className="truncate">{currentBanner.location}</span>
                   </p>
-                )}
+
+                  {currentBanner.description && (
+                    <p className="text-slate-300 text-[10px] sm:text-xs line-clamp-1 leading-relaxed drop-shadow-xs max-w-md">
+                      {currentBanner.description}
+                    </p>
+                  )}
+                </div>
 
                 {/* Banner CTA Button */}
-                <div className="pt-1">
+                <div className="shrink-0">
                   <Button 
                     variant="secondary" 
-                    size="sm" 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleBannerClick(currentBanner);
-                    }}
-                    className="bg-white text-blue-600 hover:bg-blue-50 py-2.5 px-5 rounded-xl font-black text-xs sm:text-sm flex items-center gap-2 cursor-pointer border-none shadow-lg shadow-black/30 hover:scale-105 transition-all"
+                    size="sm"
+                    className="bg-white text-blue-600 hover:bg-blue-50 font-black text-xs py-2 px-4 rounded-xl shadow-lg border-none flex items-center gap-1.5 cursor-pointer"
                   >
-                    <span>{currentBanner.cta}</span>
-                    <ArrowRight size={14} />
+                    <span>{currentBanner.cta || 'Book OPD Token'}</span>
+                    <ArrowRight size={13} />
                   </Button>
                 </div>
               </div>
 
-              {/* Bottom Carousel Dots */}
+              {/* Slider Dots */}
               {displayBanners.length > 1 && (
-                <div className="relative z-20 flex justify-center items-center gap-2 pt-1">
-                  {displayBanners.map((banner, idx) => (
+                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5">
+                  {displayBanners.map((_, i) => (
                     <button
-                      key={banner.id}
+                      key={i}
                       onClick={(e) => {
                         e.stopPropagation();
-                        setCurrentSlide(idx);
+                        setCurrentSlide(i);
                       }}
-                      className={`transition-all cursor-pointer rounded-full ${
-                        currentSlide === idx 
-                          ? 'w-7 h-2 bg-blue-500 shadow-md shadow-blue-500/50' 
-                          : 'w-2 h-2 bg-white/40 hover:bg-white/80'
+                      className={`h-1.5 rounded-full transition-all cursor-pointer ${
+                        i === currentSlide ? 'w-5 bg-blue-500' : 'w-1.5 bg-white/50 hover:bg-white/80'
                       }`}
-                      aria-label={`Go to ${banner.title}`}
+                      aria-label={`Go to slide ${i + 1}`}
                     />
                   ))}
                 </div>
@@ -775,79 +786,99 @@ export const Home: React.FC<HomeProps> = ({
           );
         })()}
 
-        {/* 4. 4 Quick Action Items Grid */}
-        <div className="grid grid-cols-4 gap-3">
-          {[
-            { title: "Nearby", sub: "Hospitals", icon: <MapPin className="text-blue-600" size={20} />, bg: "bg-blue-50", filter: "nearby" },
-            { title: "Top Rated", sub: "Hospitals", icon: <Star className="text-amber-500 fill-amber-500" size={20} />, bg: "bg-amber-50", filter: "top-rated" },
-            { title: "My Tokens", sub: "View Bookings", icon: <Award className="text-blue-600" size={20} />, bg: "bg-blue-50", action: () => navigate('/bookings') },
-            { title: "Health Records", sub: "Medical History", icon: <FileText className="text-teal-600" size={20} />, bg: "bg-teal-50", action: () => navigate('/profile', { state: { openRecords: true } }) }
-          ].map((item, idx) => (
-            <button
-              key={idx}
-              onClick={() => item.action ? item.action() : onSearchSelect(item.filter)}
-              className="bg-white border border-slate-100 rounded-2xl p-3 flex flex-col items-center text-center shadow-2xs hover:border-blue-200 transition-all cursor-pointer group"
-            >
-              <div className={`p-2.5 ${item.bg} rounded-2xl mb-1.5 group-hover:scale-110 transition-transform`}>
-                {item.icon}
-              </div>
-              <span className="text-[10px] font-extrabold text-slate-800 leading-none">{item.title}</span>
-              <span className="text-[9px] text-slate-400 font-semibold mt-0.5">{item.sub}</span>
-            </button>
-          ))}
-        </div>
-
-        {/* 5. Popular Specialties Section (Image 5 style) */}
+        {/* 4. Quick Action Categories (Image 5 style) */}
         <div>
-          <div className="flex justify-between items-center mb-3">
-            <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">Popular Specialties</h3>
-            <button 
-              onClick={() => onSearchSelect()} 
-              className="text-xs text-blue-600 font-extrabold hover:underline flex items-center gap-0.5 cursor-pointer"
-            >
-              <span>View All</span>
-              <ChevronRight size={14} />
-            </button>
-          </div>
-
-          <div className="flex gap-3 overflow-x-auto no-scrollbar py-1">
+          <div className="grid grid-cols-4 gap-2.5">
             {[
-              { name: "Pediatrics", icon: <Baby size={22} className="text-sky-600" />, bg: "bg-sky-50" },
-              { name: "Cardiology", icon: <Heart size={22} className="text-rose-500 fill-rose-500" />, bg: "bg-rose-50" },
-              { name: "Orthopedics", icon: <Activity size={22} className="text-amber-600" />, bg: "bg-amber-50" },
-              { name: "Dermatology", icon: <User size={22} className="text-purple-600" />, bg: "bg-purple-50" },
-              { name: "Dentistry", icon: <Smile size={22} className="text-emerald-600" />, bg: "bg-emerald-50" }
-            ].map((spec) => (
+              { title: "Nearby", sub: "Hospitals", icon: <MapPin className="text-blue-600" size={20} />, bg: "bg-blue-50", filter: "nearby" },
+              { title: "Top Rated", sub: "Hospitals", icon: <Star className="text-amber-500 fill-amber-500" size={20} />, bg: "bg-amber-50", filter: "top-rated" },
+              { title: "My Tokens", sub: "View Bookings", icon: <Award className="text-blue-600" size={20} />, bg: "bg-blue-50", nav: "/bookings" },
+              { title: "Health Records", sub: "Medical History", icon: <FileText className="text-emerald-600" size={20} />, bg: "bg-emerald-50", nav: "/profile?tab=records" }
+            ].map((cat, idx) => (
               <button
-                key={spec.name}
-                onClick={() => navigate(`/search?specialty=${encodeURIComponent(spec.name)}`)}
-                className="bg-white border border-slate-100 rounded-2xl p-3 min-w-[100px] flex flex-col items-center text-center shadow-2xs hover:border-blue-200 transition-all shrink-0 cursor-pointer"
+                key={idx}
+                onClick={() => {
+                  if (cat.nav) {
+                    navigate(cat.nav);
+                  } else {
+                    onSearchSelect(cat.filter);
+                  }
+                }}
+                className="bg-white border border-slate-100 rounded-2xl p-2.5 flex flex-col items-center text-center shadow-3xs hover:border-blue-200 transition-all cursor-pointer group"
               >
-                <div className={`p-3 ${spec.bg} rounded-2xl mb-2`}>
-                  {spec.icon}
+                <div className={`w-10 h-10 ${cat.bg} rounded-xl flex items-center justify-center mb-1.5 group-hover:scale-105 transition-transform`}>
+                  {cat.icon}
                 </div>
-                <span className="text-xs font-extrabold text-slate-800">{spec.name}</span>
+                <span className="text-[10.5px] font-extrabold text-slate-800 leading-tight">{cat.title}</span>
+                <span className="text-[9px] text-slate-400 font-bold">{cat.sub}</span>
               </button>
             ))}
           </div>
         </div>
 
-        {/* 6. Nearby Hospitals Section (Image 5 style) */}
+        {/* 5. Popular Specialties Horizontal Scroller */}
+        <div>
+          <div className="flex justify-between items-center mb-2.5">
+            <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">Popular Specialties</h3>
+            <button 
+              onClick={() => onSearchSelect()} 
+              className="text-[11px] font-extrabold text-blue-600 hover:underline cursor-pointer"
+            >
+              View All &gt;
+            </button>
+          </div>
+
+          <div className="flex gap-2.5 overflow-x-auto no-scrollbar py-1">
+            {[
+              { id: "dept-cardio", name: "Cardiology", icon: "❤️", bg: "bg-red-50 text-red-600" },
+              { id: "dept-neuro", name: "Neurology", icon: "🧠", bg: "bg-purple-50 text-purple-600" },
+              { id: "dept-ortho", name: "Orthopedics", icon: "🦴", bg: "bg-amber-50 text-amber-600" },
+              { id: "dept-pedia", name: "Pediatrics", icon: "👶", bg: "bg-pink-50 text-pink-600" },
+              { id: "dept-gynaec", name: "Gynecology", icon: "🌸", bg: "bg-rose-50 text-rose-600" },
+              { id: "dept-general", name: "General Medicine", icon: "🩺", bg: "bg-blue-50 text-blue-600" },
+              { id: "dept-eye", name: "Ophthalmology", icon: "👁️", bg: "bg-emerald-50 text-emerald-600" },
+              { id: "dept-dental", name: "Dental", icon: "🦷", bg: "bg-cyan-50 text-cyan-600" }
+            ].map((spec) => (
+              <button
+                key={spec.id}
+                onClick={() => onSearchSelect(spec.name)}
+                className="bg-white border border-slate-100 px-3.5 py-2.5 rounded-2xl flex items-center gap-2 text-xs font-bold text-slate-700 shrink-0 shadow-3xs hover:border-blue-200 transition-all cursor-pointer"
+              >
+                <span className="text-sm">{spec.icon}</span>
+                <span>{spec.name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 6. Nearby Hospitals Section (Location-Based Filter within 50 km) */}
         <div>
           <div className="flex justify-between items-center mb-3">
-            <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">Nearby Hospitals</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">Nearby Hospitals</h3>
+              <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">
+                Within 50 km
+              </span>
+            </div>
+            <button 
+              onClick={() => onSearchSelect()} 
+              className="text-[11px] font-extrabold text-blue-600 hover:underline cursor-pointer"
+            >
+              Explore All &gt;
+            </button>
           </div>
 
           <div className="space-y-4">
-            {hospitals.map(h => {
-              let dynamicDistance = h.distance;
-              if (userCoords && h.lat && h.lng) {
-                dynamicDistance = calculateDistanceKm(userCoords.lat, userCoords.lng, h.lat, h.lng);
-              }
-              return { ...h, distance: dynamicDistance };
-            })
-            .sort((a, b) => a.distance - b.distance)
-            .slice(0, 3).map((hosp) => {
+            {hospitals
+              .map((h) => {
+                let dynamicDistance = h.distance;
+                if (userCoords && h.lat && h.lng) {
+                  dynamicDistance = calculateDistanceKm(userCoords.lat, userCoords.lng, h.lat, h.lng);
+                }
+                return { ...h, distance: dynamicDistance };
+              })
+              .sort((a, b) => a.distance - b.distance)
+              .slice(0, 3).map((hosp) => {
               const minFee = hosp.doctors.length > 0 ? Math.min(...hosp.doctors.map(d => d.consultationFee)) : 0;
 
               return (

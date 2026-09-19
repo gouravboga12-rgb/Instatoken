@@ -315,10 +315,31 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
                     #{inConsultation.tokenNo}
                   </span>
                   <div>
-                    <h2 className="text-2xl font-black text-white">{inConsultation.patientName}</h2>
-                    <p className="text-xs text-blue-200 font-semibold">
-                      {inConsultation.patientAge} Yrs · {inConsultation.patientGender} · Phone: {inConsultation.patientPhone}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h2 className="text-2xl font-black text-white">{inConsultation.patientName}</h2>
+                      {inConsultation.isExisting && (
+                        <span className="bg-purple-500/30 text-purple-200 border border-purple-400 text-[10px] font-black px-2 py-0.5 rounded-md">
+                          ★ Existing Patient
+                        </span>
+                      )}
+                      {inConsultation.type === 'online' ? (
+                        <span className="bg-blue-500/30 text-blue-200 border border-blue-400 text-[10px] font-black px-2 py-0.5 rounded-md">
+                          Online Token
+                        </span>
+                      ) : (
+                        <span className="bg-amber-500/30 text-amber-200 border border-amber-400 text-[10px] font-black px-2 py-0.5 rounded-md">
+                          Offline Token
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-blue-200 font-semibold mt-1">
+                      {inConsultation.patientAgeDisplay || `${inConsultation.patientAge} Yrs`} · {inConsultation.patientGender} · Phone: {inConsultation.patientPhone}
                     </p>
+                    {inConsultation.rmpReference && inConsultation.rmpReference.name && (
+                      <p className="text-xs text-indigo-200 font-bold mt-0.5">
+                        RMP Reference: Dr. {inConsultation.rmpReference.name} {inConsultation.rmpReference.phone ? `(${inConsultation.rmpReference.phone})` : ''}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -522,12 +543,24 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
                       </td>
 
                       <td className="py-3.5 px-4">
-                        <div className="font-extrabold text-slate-800">{tok.patientName}</div>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-extrabold text-slate-800">{tok.patientName}</span>
+                          {tok.isExisting && (
+                            <span className="text-[9px] font-black text-purple-700 bg-purple-100 border border-purple-200 px-1.5 py-0.2 rounded">
+                              ★ Existing
+                            </span>
+                          )}
+                        </div>
                         <div className="text-[10px] text-slate-400 font-medium flex items-center gap-2 mt-0.5">
-                          <span>{tok.patientAge}y, {tok.patientGender}</span>
+                          <span>{tok.patientAgeDisplay || `${tok.patientAge}y`}, {tok.patientGender}</span>
                           <span>·</span>
                           <span className="flex items-center gap-1"><Phone size={10} /> {tok.patientPhone}</span>
                         </div>
+                        {tok.rmpReference && tok.rmpReference.name && (
+                          <div className="text-[9.5px] font-bold text-indigo-700 mt-0.5">
+                            RMP: Dr. {tok.rmpReference.name} {tok.rmpReference.phone ? `(${tok.rmpReference.phone})` : ''}
+                          </div>
+                        )}
                       </td>
 
                       <td className="py-3.5 px-4">
@@ -537,12 +570,12 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
 
                       <td className="py-3.5 px-4">
                         {tok.type === 'online' ? (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">
-                            <Wifi size={10} /> Online
+                          <span className="inline-flex items-center gap-1 text-[10px] font-black text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md">
+                            <Wifi size={10} /> Online (App/Web)
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-black text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
-                            <WifiOff size={10} /> Walk-in
+                          <span className="inline-flex items-center gap-1 text-[10px] font-black text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
+                            <WifiOff size={10} /> Offline (Reception)
                           </span>
                         )}
                       </td>

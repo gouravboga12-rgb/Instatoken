@@ -271,9 +271,10 @@ const CreateCustomerModal: React.FC<{
 const WalkInGenerator: React.FC<{
   initialDoctorId?: string;
   initialDepartmentId?: string;
+  initialPatient?: { name: string; phone: string; age?: number; gender?: string; address?: string; uhid?: string };
   onCreated?: (token: TokenRecord) => void;
   onRequestCreateAccount?: () => void;
-}> = ({ initialDoctorId, initialDepartmentId, onCreated, onRequestCreateAccount }) => {
+}> = ({ initialDoctorId, initialDepartmentId, initialPatient, onCreated, onRequestCreateAccount }) => {
   const navigate = useNavigate();
   const { generateWalkInToken, doctors, departments, scheduleConfig, patients, hospitalProfile } = useHospital();
   const { user, customers, appointments } = useApp();
@@ -303,17 +304,39 @@ const WalkInGenerator: React.FC<{
   const { docId: resolvedDocId, deptId: resolvedDeptId } = getInitialDoctorAndDept();
 
   const [form, setForm] = useState({
-    patientName: '',
-    patientPhone: '',
-    patientAge: '',
-    patientGender: 'Male',
-    address: '',
+    patientName: initialPatient?.name || '',
+    patientPhone: initialPatient?.phone ? initialPatient.phone.replace(/\D/g, '').slice(-10) : '',
+    patientAge: initialPatient?.age ? String(initialPatient.age) : '',
+    patientGender: initialPatient?.gender || 'Male',
+    address: initialPatient?.address || '',
     departmentId: resolvedDeptId,
     doctorId: resolvedDocId,
     session: 'morning' as 'morning' | 'afternoon' | 'evening',
-    isRevisit: false,
-    selectedPatientUhid: ''
+    isRevisit: Boolean(initialPatient),
+    selectedPatientUhid: initialPatient?.uhid || ''
   });
+
+  const [patientAgeUnit, setPatientAgeUnit] = useState<'Years' | 'Months' | 'Days'>('Years');
+  const [isExisting, setIsExisting] = useState(Boolean(initialPatient));
+  const [showRmpFields, setShowRmpFields] = useState(false);
+  const [rmpName, setRmpName] = useState('');
+  const [rmpPhone, setRmpPhone] = useState('');
+
+  useEffect(() => {
+    if (initialPatient) {
+      setForm(prev => ({
+        ...prev,
+        patientName: initialPatient.name || prev.patientName,
+        patientPhone: initialPatient.phone ? initialPatient.phone.replace(/\D/g, '').slice(-10) : prev.patientPhone,
+        patientAge: initialPatient.age ? String(initialPatient.age) : prev.patientAge,
+        patientGender: initialPatient.gender || prev.patientGender,
+        address: initialPatient.address || prev.address,
+        selectedPatientUhid: initialPatient.uhid || prev.selectedPatientUhid,
+        isRevisit: true
+      }));
+      setIsExisting(true);
+    }
+  }, [initialPatient]);
 
   useEffect(() => {
     if (initialDoctorId || initialDepartmentId) {
@@ -461,6 +484,7 @@ const WalkInGenerator: React.FC<{
       address: p.address || '',
       selectedPatientUhid: p.uhid || `APS${Math.floor(100000 + Math.random() * 900000)}`
     }));
+    setIsExisting(true);
     setPatientSearchQuery('');
     setShowSearchResults(false);
     setSuccessToast(`Auto-filled details for ${p.name} (${rawPhone})`);
@@ -477,6 +501,7 @@ const WalkInGenerator: React.FC<{
       address: '',
       selectedPatientUhid: ''
     }));
+    setIsExisting(false);
   };
 
   const activeDepts = departments.filter(d => (d.active !== false) || d.id === form.departmentId);
@@ -503,15 +528,22 @@ const WalkInGenerator: React.FC<{
       setError('Please fill in all mandatory fields.');
       return;
     }
+    const ageNum = parseInt(form.patientAge, 10) || 0;
+    const computedAgeDisplay = form.patientAge ? `${form.patientAge} ${patientAgeUnit}` : '25 Years';
     const token = generateWalkInToken({
       patientName: form.patientName.trim(),
       patientPhone: form.patientPhone.trim(),
-      patientAge: parseInt(form.patientAge, 10) || 25,
+      patientAge: ageNum,
+      patientAgeUnit,
+      patientAgeDisplay: computedAgeDisplay,
       patientGender: form.patientGender,
       address: form.address.trim(),
       departmentId: form.departmentId,
       doctorId: form.doctorId,
-      session: form.session
+      session: form.session,
+      isRevisit: Boolean(isExisting || form.isRevisit),
+      isExisting: Boolean(isExisting || form.isRevisit),
+      rmpReference: showRmpFields && rmpName.trim() ? { name: rmpName.trim(), phone: rmpPhone.trim() } : null
     });
     setGenerated(token);
     setError('');
@@ -675,17 +707,33 @@ const WalkInGenerator: React.FC<{
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1.5">Age (Years) *</label>
-                <input
-                  type="number"
-                  required
-                  min={1}
-                  max={120}
-                  value={form.patientAge}
-                  onChange={e => setForm(p => ({ ...p, patientAge: e.target.value }))}
-                  placeholder="35"
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-medium"
-                />
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-bold text-slate-700 block">Age *</label>
+                  <span className="text-[10px] font-extrabold text-blue-600">Unit: {patientAgeUnit}</span>
+                </div>
+                <div className="relative flex items-center">
+                  <input
+                    type="number"
+                    required
+                    min={1}
+                    max={patientAgeUnit === 'Days' ? 365 : 120}
+                    value={form.patientAge}
+                    onChange={e => setForm(p => ({ ...p, patientAge: e.target.value }))}
+                    placeholder={patientAgeUnit === 'Days' ? "e.g. 15" : patientAgeUnit === 'Months' ? "e.g. 6" : "e.g. 35"}
+                    className="w-full pl-3.5 pr-20 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-medium"
+                  />
+                  <div className="absolute right-1 top-1/2 -translate-y-1/2">
+                    <select
+                      value={patientAgeUnit}
+                      onChange={e => setPatientAgeUnit(e.target.value as 'Years' | 'Months' | 'Days')}
+                      className="text-[10px] font-extrabold text-blue-700 bg-white border border-slate-200 rounded-lg py-1 px-1.5 focus:outline-none cursor-pointer shadow-2xs"
+                    >
+                      <option value="Years">Years</option>
+                      <option value="Months">Months</option>
+                      <option value="Days">Days</option>
+                    </select>
+                  </div>
+                </div>
               </div>
               <div>
                 <label className="text-xs font-bold text-slate-700 block mb-1.5">Gender *</label>
@@ -758,29 +806,85 @@ const WalkInGenerator: React.FC<{
             <div className="sm:col-span-2">
               <label className="text-xs font-bold text-slate-700 block mb-1.5">OPD Session Time *</label>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {activeSessions.map((s: any) => {
-                  const sKey = s.name.toLowerCase();
-                  const isSelected = form.session === sKey || form.session === s.name;
+                {activeSessions.map(s => {
+                  const isSel = form.session === (s.name.toLowerCase() as any);
                   return (
-                    <button
-                      type="button"
+                    <div
                       key={s.id}
-                      onClick={() => setForm(p => ({ ...p, session: sKey as any }))}
-                      className={`p-3 rounded-2xl text-xs font-bold cursor-pointer border transition-all text-left flex flex-col justify-between ${
-                        isSelected
-                          ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-xs'
-                          : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                      onClick={() => setForm(p => ({ ...p, session: s.name.toLowerCase() as any }))}
+                      className={`p-3 rounded-2xl border cursor-pointer transition-all flex items-center justify-between ${
+                        isSel ? 'border-blue-500 bg-blue-50/60 shadow-xs' : 'border-slate-200 bg-white hover:border-slate-300'
                       }`}
                     >
-                      <div className="flex items-center justify-between">
-                        <span className="font-extrabold text-sm">{s.name}</span>
-                        <span>{s.name.toLowerCase().includes('morn') ? '🌅' : s.name.toLowerCase().includes('after') ? '☀️' : '🌙'}</span>
+                      <div>
+                        <div className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                          <span>{s.name}</span>
+                          <span className="text-xs">{s.name.toLowerCase().includes('morn') ? '🌅' : s.name.toLowerCase().includes('even') ? '🌙' : '☀️'}</span>
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-bold mt-0.5">{s.startTime} – {s.endTime}</div>
                       </div>
-                      <span className="text-[10px] text-slate-400 font-semibold mt-1">{s.startTime} – {s.endTime}</span>
-                    </button>
+                      <div className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center ${isSel ? 'border-blue-600 bg-blue-600' : 'border-slate-300'}`}>
+                        {isSel && <div className="w-1 h-1 bg-white rounded-full" />}
+                      </div>
+                    </div>
                   );
                 })}
               </div>
+            </div>
+
+            {/* Existing Patient & RMP Reference Checkboxes */}
+            <div className="sm:col-span-2 space-y-3 pt-3 border-t border-slate-100">
+              <div className="flex items-center gap-6 flex-wrap">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={isExisting}
+                    onChange={e => setIsExisting(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
+                  />
+                  <span className="text-xs font-bold text-slate-700">
+                    Existing Patient? <span className="text-[10px] font-medium text-slate-400">(Visited this hospital before)</span>
+                  </span>
+                </label>
+
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={showRmpFields}
+                    onChange={e => setShowRmpFields(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
+                  />
+                  <span className="text-xs font-bold text-slate-700">
+                    + Add RMP Reference
+                  </span>
+                </label>
+              </div>
+
+              {showRmpFields && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 p-3.5 rounded-2xl border border-slate-200 animate-fadeIn">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-600 block mb-1 uppercase tracking-wider">RMP Doctor Name *</label>
+                    <input
+                      type="text"
+                      required={showRmpFields}
+                      value={rmpName}
+                      onChange={e => setRmpName(e.target.value)}
+                      placeholder="Dr. RMP Name"
+                      className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-medium"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-600 block mb-1 uppercase tracking-wider">RMP Mobile Number</label>
+                    <input
+                      type="tel"
+                      value={rmpPhone}
+                      onChange={e => setRmpPhone(e.target.value.replace(/\D/g, ''))}
+                      placeholder="10-digit mobile"
+                      className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-medium"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1180,18 +1284,24 @@ const TokenTable: React.FC<{
   title: string;
   subtitle: string;
   onAddClick: () => void;
+  defaultDateFilter?: string;
+  isRevisitView?: boolean;
+  onIssueFollowUp?: (pat: any) => void;
 }> = ({
   tokens: toks,
   title,
   subtitle,
-  onAddClick
+  onAddClick,
+  defaultDateFilter,
+  isRevisitView,
+  onIssueFollowUp
 }) => {
-  const { updateTokenStatus, cancelToken, departments, doctors, hospitalProfile } = useHospital();
+  const { updateTokenStatus, cancelToken, departments, doctors, hospitalProfile, patients } = useHospital();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [deptFilter, setDeptFilter] = useState('all');
   const [docFilter, setDocFilter] = useState('all');
-  const [dateFilter, setDateFilter] = useState(() => new Date().toISOString().split('T')[0]);
+  const [dateFilter, setDateFilter] = useState(() => defaultDateFilter !== undefined ? defaultDateFilter : new Date().toISOString().split('T')[0]);
 
   // Modal states
   const [callConfirmToken, setCallConfirmToken] = useState<TokenRecord | null>(null);
@@ -1415,12 +1525,12 @@ const TokenTable: React.FC<{
                   </td>
                   <td className="py-3 px-4">
                     {t.type === 'online' ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">
-                        <Wifi size={10} /> Online
+                      <span className="inline-flex items-center gap-1 text-[10px] font-black text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-md">
+                        <Wifi size={11} /> Online (App/Web)
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
-                        <WifiOff size={10} /> Walk-in
+                      <span className="inline-flex items-center gap-1 text-[10px] font-black text-amber-800 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-md">
+                        <WifiOff size={11} /> Offline (Reception)
                       </span>
                     )}
                   </td>
@@ -1438,24 +1548,24 @@ const TokenTable: React.FC<{
                             <Eye size={12} className="text-blue-500 opacity-60" />
                           </button>
                           {t.isExisting ? (
-                            <span className="text-[9px] font-extrabold text-purple-700 bg-purple-50 px-1.5 py-0.2 rounded border border-purple-200">
-                              Existing
+                            <span className="text-[9px] font-black text-purple-700 bg-purple-100 px-2 py-0.5 rounded border border-purple-300 inline-flex items-center gap-0.5">
+                              ★ Existing Patient
                             </span>
                           ) : (
-                            <span className="text-[9px] font-extrabold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
-                              New
+                            <span className="text-[9px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200">
+                              New Patient
                             </span>
                           )}
                         </div>
                         <p className="text-[10px] text-slate-400 font-medium mt-0.5">
-                          {t.patientPhone} · {t.patientAge}y, {t.patientGender}
+                          {t.patientPhone} · {t.patientAgeDisplay || (t.patientAge ? `${t.patientAge}y` : '')}, {t.patientGender}
                         </p>
                         {t.rmpReference && t.rmpReference.name && (
-                          <div className="mt-0.5">
-                            <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded border border-indigo-200 inline-flex items-center gap-1">
-                              <span>RMP:</span>
-                              <strong>{t.rmpReference.name}</strong>
-                              {t.rmpReference.phone && <span className="text-[8.5px] text-indigo-500">({t.rmpReference.phone})</span>}
+                          <div className="mt-1">
+                            <span className="text-[9.5px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200 inline-flex items-center gap-1">
+                              <span>RMP Ref:</span>
+                              <strong>Dr. {t.rmpReference.name}</strong>
+                              {t.rmpReference.phone && <span className="text-[8.5px] text-indigo-500 font-medium">({t.rmpReference.phone})</span>}
                             </span>
                           </div>
                         )}
@@ -1668,6 +1778,98 @@ const TokenTable: React.FC<{
         />
       )}
 
+      {/* ── Repeat Visiting Patients Directory (Revisit View) ────────────────── */}
+      {isRevisitView && (
+        <div className="p-5 border-t border-slate-200 bg-slate-50/50 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="text-sm font-black text-slate-800 flex items-center gap-2">
+                <span>🏥 Repeat Visiting Patients Directory</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full border border-purple-200">
+                  {((patients || []).filter(p => (p.totalVisits || 1) >= 1).length || toks.length)} Returning Records
+                </span>
+              </h4>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Directory of patients who previously visited this hospital. Issue quick follow-up tokens or contact for reminders.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+            {((patients && patients.length > 0) ? patients : toks.map((t, idx) => ({
+              id: t.id,
+              uhid: `APS${String(1001 + idx).padStart(6, '0')}`,
+              name: t.patientName,
+              phone: t.patientPhone,
+              age: t.patientAge,
+              gender: t.patientGender,
+              address: '',
+              totalVisits: 2,
+              lastVisit: t.bookingDate,
+              doctorVisits: [{ doctorName: t.doctorName }]
+            }))).slice(0, 12).map((pat: any) => (
+              <div key={pat.id || pat.uhid} className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs space-y-3 hover:border-blue-300 transition-colors">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h5 className="font-extrabold text-xs text-slate-800 flex items-center gap-1.5">
+                      <span>{pat.name}</span>
+                      <span className="text-[9px] font-bold bg-blue-50 text-blue-600 px-1.5 py-0.2 rounded">
+                        {pat.uhid || 'UHID'}
+                      </span>
+                    </h5>
+                    <p className="text-[11px] text-slate-500 font-semibold mt-0.5">
+                      📞 {pat.phone} · {pat.age ? `${pat.age}y` : ''} {pat.gender}
+                    </p>
+                    {pat.lastVisit && (
+                      <p className="text-[10px] text-slate-400 font-medium mt-0.5">
+                        Last Visit: {pat.lastVisit} {pat.doctorVisits?.[0]?.doctorName ? `· Dr. ${pat.doctorVisits[0].doctorName}` : ''}
+                      </p>
+                    )}
+                  </div>
+                  <span className="text-[10px] font-black text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-full shrink-0">
+                    {pat.totalVisits || 1} {pat.totalVisits === 1 ? 'Visit' : 'Visits'}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2 pt-2.5 border-t border-slate-100">
+                  {pat.phone && (
+                    <a
+                      href={`tel:${pat.phone}`}
+                      className="p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg text-xs cursor-pointer inline-flex items-center justify-center transition-colors"
+                      title="Call Patient"
+                    >
+                      <Phone size={13} />
+                    </a>
+                  )}
+                  {pat.phone && (
+                    <a
+                      href={`https://wa.me/${pat.phone.replace(/\D/g, '').length === 10 ? '91' + pat.phone.replace(/\D/g, '') : pat.phone.replace(/\D/g, '')}?text=${encodeURIComponent(`Hello ${pat.name}, this is from ${hospitalProfile?.name || 'the hospital'}. You are due for your follow-up consultation. Please let us know if you would like to book a token.`)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-1.5 text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-lg text-xs cursor-pointer inline-flex items-center justify-center transition-colors"
+                      title="WhatsApp Follow-up Message"
+                    >
+                      <MessageSquare size={13} />
+                    </a>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onIssueFollowUp) {
+                        onIssueFollowUp(pat);
+                      }
+                    }}
+                    className="flex-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[11px] font-black cursor-pointer border-none shadow-2xs inline-flex items-center justify-center gap-1 transition-colors"
+                  >
+                    <Plus size={12} /> Issue Follow-up Token
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Patient Dossier / File Modal */}
       {selectedPatientToken && (
         <PatientFileModal
@@ -1681,7 +1883,7 @@ const TokenTable: React.FC<{
 };
 
 // ─── Walk-In Modal Wrapper ────────────────────────────────────────────────
-const WalkInModal: React.FC<{ onClose: () => void; onRequestCreateAccount: () => void }> = ({ onClose, onRequestCreateAccount }) => {
+const WalkInModal: React.FC<{ initialPatient?: any; onClose: () => void; onRequestCreateAccount: () => void }> = ({ initialPatient, onClose, onRequestCreateAccount }) => {
   const navigate = useNavigate();
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
@@ -1693,6 +1895,7 @@ const WalkInModal: React.FC<{ onClose: () => void; onRequestCreateAccount: () =>
           <X size={18} />
         </button>
         <WalkInGenerator
+          initialPatient={initialPatient}
           onCreated={(tok) => {
             onClose();
             navigate(`/confirmation/${tok.id}`);
@@ -1710,6 +1913,7 @@ export const TokenManagement: React.FC = () => {
   const [searchParams] = useSearchParams();
   const { tokens } = useHospital();
   const [showWalkInModal, setShowWalkInModal] = useState(false);
+  const [followUpPatient, setFollowUpPatient] = useState<any>(null);
   const [showCreateCustomerModal, setShowCreateCustomerModal] = useState(false);
 
   const initialDoctorId = searchParams.get('doctorId') || (location.state as any)?.doctorId || '';
@@ -1721,14 +1925,18 @@ export const TokenManagement: React.FC = () => {
       return {
         title: 'Online Booked Tokens',
         subtitle: 'Tokens scheduled via mobile customer app & web portal',
-        toks: tokens.filter(t => t.type === 'online')
+        toks: tokens.filter(t => t.type === 'online'),
+        defaultDateFilter: undefined,
+        isRevisitView: false
       };
     }
     if (path.includes('offline')) {
       return {
         title: 'Hospital Counter Walk-in Tokens',
         subtitle: 'Tokens registered at hospital desk counter',
-        toks: tokens.filter(t => t.type === 'offline')
+        toks: tokens.filter(t => t.type === 'offline'),
+        defaultDateFilter: undefined,
+        isRevisitView: false
       };
     }
     if (path.includes('today')) {
@@ -1736,28 +1944,36 @@ export const TokenManagement: React.FC = () => {
       return {
         title: "Today's Live Tokens",
         subtitle: `Tokens booked for today (${today})`,
-        toks: tokens.filter(t => t.bookingDate === today || !t.bookingDate)
+        toks: tokens.filter(t => t.bookingDate === today || !t.bookingDate),
+        defaultDateFilter: today,
+        isRevisitView: false
       };
     }
     if (path.includes('completed')) {
       return {
         title: 'Completed Tokens',
         subtitle: 'Consultations finished and discharged by hospital doctors',
-        toks: tokens.filter(t => t.status === 'completed')
+        toks: tokens.filter(t => t.status === 'completed'),
+        defaultDateFilter: undefined,
+        isRevisitView: false
       };
     }
     if (path.includes('cancelled')) {
       return {
         title: 'Cancelled Tokens',
         subtitle: 'Appointments cancelled or refunded',
-        toks: tokens.filter(t => t.status === 'cancelled')
+        toks: tokens.filter(t => t.status === 'cancelled'),
+        defaultDateFilter: undefined,
+        isRevisitView: false
       };
     }
     if (path.includes('revisit')) {
       return {
-        title: 'Revisit Tokens',
-        subtitle: 'Follow-up consultations and valid revisit tokens',
-        toks: tokens.filter(t => Boolean(t.isRevisit))
+        title: 'Repeat Visiting Patients & Revisit Tokens',
+        subtitle: 'Directory of returning patients, follow-up consultations, and valid revisit records',
+        toks: tokens.filter(t => Boolean(t.isRevisit || t.isExisting)),
+        defaultDateFilter: '',
+        isRevisitView: true
       };
     }
     if (path.includes('add')) {
@@ -1766,7 +1982,9 @@ export const TokenManagement: React.FC = () => {
     return {
       title: 'All Tokens',
       subtitle: 'Unified repository of all online and walk-in patient tokens',
-      toks: tokens
+      toks: tokens,
+      defaultDateFilter: undefined,
+      isRevisitView: false
     };
   };
 
@@ -1826,7 +2044,10 @@ export const TokenManagement: React.FC = () => {
             <UserPlus size={14} className="text-blue-600" /> Create Customer Account
           </button>
           <button
-            onClick={() => setShowWalkInModal(true)}
+            onClick={() => {
+              setFollowUpPatient(null);
+              setShowWalkInModal(true);
+            }}
             className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2.5 rounded-xl cursor-pointer border-none flex items-center gap-2 text-xs shadow-md shadow-blue-500/20 self-start sm:self-auto"
           >
             <Plus size={14} /> Add Walk-in Token
@@ -1838,12 +2059,25 @@ export const TokenManagement: React.FC = () => {
         tokens={tokenSet.toks}
         title={tokenSet.title}
         subtitle={tokenSet.subtitle}
-        onAddClick={() => setShowWalkInModal(true)}
+        defaultDateFilter={tokenSet.defaultDateFilter}
+        isRevisitView={tokenSet.isRevisitView}
+        onIssueFollowUp={(pat) => {
+          setFollowUpPatient(pat);
+          setShowWalkInModal(true);
+        }}
+        onAddClick={() => {
+          setFollowUpPatient(null);
+          setShowWalkInModal(true);
+        }}
       />
 
       {showWalkInModal && (
         <WalkInModal
-          onClose={() => setShowWalkInModal(false)}
+          initialPatient={followUpPatient}
+          onClose={() => {
+            setShowWalkInModal(false);
+            setFollowUpPatient(null);
+          }}
           onRequestCreateAccount={() => {
             setShowWalkInModal(false);
             setShowCreateCustomerModal(true);

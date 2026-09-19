@@ -279,15 +279,13 @@ const TopHeader: React.FC<{ onMenuToggle: () => void }> = ({ onMenuToggle }) => 
         <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xs font-black shrink-0">
           {hospitalUser?.name?.charAt(0) || 'H'}
         </div>
-        {!false && (
-          <div className="hidden lg:block">
-            <p className="text-xs font-bold text-slate-800 leading-none">{hospitalUser?.name?.split(' ').slice(-1)[0]}</p>
-            <div className="flex items-center gap-1 mt-0.5">
-              <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
-              <span className="text-[9px] font-semibold text-slate-400">Online</span>
-            </div>
+        <div className="hidden lg:block">
+          <p className="text-xs font-bold text-slate-800 leading-none">{hospitalUser?.name?.split(' ').slice(-1)[0]}</p>
+          <div className="flex items-center gap-1 mt-0.5">
+            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
+            <span className="text-[9px] font-semibold text-slate-400">Online</span>
           </div>
-        )}
+        </div>
         <button
           onClick={handleLogout}
           className="p-1.5 rounded-xl hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors cursor-pointer ml-1"

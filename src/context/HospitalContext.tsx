@@ -78,9 +78,11 @@ export interface TokenRecord {
   revisitValidUpto?: string;
   notes?: string;
   hospitalId?: string;
-  hospitalName?: string;
   isExisting?: boolean;
   rmpReference?: { name: string; phone: string } | null;
+  patientAgeDisplay?: string;
+  patientAgeUnit?: string;
+  hospitalName?: string;
 }
 
 export interface DoctorVisitSummary {
@@ -245,12 +247,16 @@ interface HospitalContextType {
     patientName: string;
     patientPhone: string;
     patientAge: number;
+    patientAgeUnit?: string;
+    patientAgeDisplay?: string;
     patientGender: string;
     address?: string;
     departmentId: string;
     doctorId: string;
     session: 'morning' | 'afternoon' | 'evening';
     isRevisit?: boolean;
+    isExisting?: boolean;
+    rmpReference?: { name: string; phone: string } | null;
     notes?: string;
   }) => TokenRecord;
   updateTokenStatus: (id: string, status: TokenRecord['status']) => void;
@@ -1466,12 +1472,16 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     patientName: string;
     patientPhone: string;
     patientAge: number;
+    patientAgeUnit?: string;
+    patientAgeDisplay?: string;
     patientGender: string;
     address?: string;
     departmentId: string;
     doctorId: string;
     session: 'morning' | 'afternoon' | 'evening';
     isRevisit?: boolean;
+    isExisting?: boolean;
+    rmpReference?: { name: string; phone: string } | null;
     notes?: string;
   }): TokenRecord => {
     const maxToken = tokens.length > 0 ? Math.max(...tokens.map(t => t.tokenNo || 0)) : 0;
@@ -1490,6 +1500,8 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       patientName: form.patientName,
       patientPhone: form.patientPhone,
       patientAge: form.patientAge,
+      patientAgeDisplay: form.patientAgeDisplay || (form.patientAge ? `${form.patientAge} Yrs` : '28 Yrs'),
+      patientAgeUnit: form.patientAgeUnit || 'Years',
       patientGender: form.patientGender,
       doctorId: form.doctorId,
       doctorName: doctor?.name || '',
@@ -1504,7 +1516,9 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       consultationFee: doctor?.consultationFee || 0,
       paymentStatus: 'pending',
       paymentMethod: 'Cash',
-      isRevisit: false,
+      isRevisit: Boolean(form.isRevisit || form.isExisting),
+      isExisting: Boolean(form.isExisting || form.isRevisit),
+      rmpReference: form.rmpReference || null,
       hospitalId: targetHospId,
       hospitalName: resolvedHospitalName
     };
@@ -1538,6 +1552,8 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         tokenNumber: newToken.tokenNo,
         patientName: newToken.patientName,
         age: newToken.patientAge,
+        ageDisplay: newToken.patientAgeDisplay || `${newToken.patientAge} Yrs`,
+        ageUnit: newToken.patientAgeUnit || 'Years',
         gender: newToken.patientGender,
         phone: newToken.patientPhone,
         email: '',
@@ -1554,6 +1570,8 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         paymentId: `OFFLINE-${newToken.tokenNo}`,
         paymentMethod: 'Counter / Walk-in Cash',
         estimatedWaitTime: newToken.estimatedWait,
+        isExisting: Boolean(newToken.isExisting),
+        rmpReference: newToken.rmpReference || null,
         createdAt: new Date().toISOString()
       };
       localStorage.setItem('insta_appointments', JSON.stringify([newAppt, ...curAppts]));

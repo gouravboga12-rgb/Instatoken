@@ -214,6 +214,7 @@ export const BookToken: React.FC = () => {
   // Patient details form
   const [name, setName] = useState(user?.name || '');
   const [age, setAge] = useState<string>('');
+  const [ageUnit, setAgeUnit] = useState<'Years' | 'Months' | 'Days'>('Years');
   const [gender, setGender] = useState<string>('Male');
   const [phone, setPhone] = useState(user?.phone || '');
   const [place, setPlace] = useState('');
@@ -337,9 +338,14 @@ export const BookToken: React.FC = () => {
       return;
     }
 
+    const ageVal = parseInt(age) || 0;
+    const computedAgeDisplay = age ? `${age} ${ageUnit}` : '28 Years';
+
     const patientDetails = {
       name,
-      age: parseInt(age) || 28,
+      age: ageVal,
+      ageUnit,
+      ageDisplay: computedAgeDisplay,
       gender,
       phone,
       email: user?.email || 'patient@example.com',
@@ -659,16 +665,32 @@ export const BookToken: React.FC = () => {
               {/* Age & Gender 2-Column Row */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-extrabold text-slate-700 uppercase tracking-wide">Age</label>
-                  <div className="relative">
-                    <CalendarIcon size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-blue-600" />
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-extrabold text-slate-700 uppercase tracking-wide">Age</label>
+                    <span className="text-[9px] font-bold text-blue-600">Unit: {ageUnit}</span>
+                  </div>
+                  <div className="relative flex items-center">
+                    <CalendarIcon size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-blue-600 pointer-events-none" />
                     <input 
                       type="number" 
+                      min="1"
+                      max={ageUnit === 'Days' ? 365 : ageUnit === 'Months' ? 120 : 120}
                       value={age}
                       onChange={(e) => setAge(e.target.value)}
-                      placeholder="Enter age"
-                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:bg-white focus:border-blue-600 focus:outline-none transition-all"
+                      placeholder={ageUnit === 'Days' ? "e.g. 15" : ageUnit === 'Months' ? "e.g. 6" : "e.g. 28"}
+                      className="w-full pl-10 pr-22 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:bg-white focus:border-blue-600 focus:outline-none transition-all"
                     />
+                    <div className="absolute right-1 top-1/2 -translate-y-1/2">
+                      <select
+                        value={ageUnit}
+                        onChange={(e) => setAgeUnit(e.target.value as 'Years' | 'Months' | 'Days')}
+                        className="text-[10px] font-extrabold text-blue-700 bg-white border border-slate-200 rounded-lg py-1 px-1.5 focus:outline-none cursor-pointer shadow-2xs"
+                      >
+                        <option value="Years">Years</option>
+                        <option value="Months">Months</option>
+                        <option value="Days">Days</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
 
