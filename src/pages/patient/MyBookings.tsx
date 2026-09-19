@@ -5,20 +5,79 @@ import type { Appointment } from '../../context/AppContext';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
-import { ArrowLeft, Clock, Calendar, CheckCircle2, XCircle, AlertCircle, Trash2 } from 'lucide-react';
+import { ArrowLeft, Clock, Calendar, CheckCircle2, XCircle, AlertCircle, Trash2, RotateCw } from 'lucide-react';
+import { subscribeGlobalSync } from '../../utils/syncBus';
 
 export const MyBookings: React.FC = () => {
   const { appointments, cancelAppointment, deleteAppointment, clearPastHistory, refreshAppointments } = useApp();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = React.useState<'active' | 'history'>('active');
 
-  // Auto-refresh appointments from backend on mount and window focus
+  // Manual Refresh & Pull-to-Refresh State
+  const [isRefreshing, setIsRefreshing] = React.useState(false);
+  const [pullY, setPullY] = React.useState(0);
+  const [isPulling, setIsPulling] = React.useState(false);
+  const touchStartY = React.useRef(0);
+
+  const handleManualRefresh = React.useCallback(async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    try {
+      await refreshAppointments();
+    } finally {
+      setTimeout(() => {
+        setIsRefreshing(false);
+        setPullY(0);
+      }, 500);
+    }
+  }, [isRefreshing, refreshAppointments]);
+
+  // Initial load on mount and listen to local cross-tab broadcast events (0 network polling)
   React.useEffect(() => {
     refreshAppointments();
-    const handleFocus = () => refreshAppointments();
-    window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
-  }, []);
+
+    const unsubscribe = subscribeGlobalSync((event) => {
+      if (
+        event?.type === 'APPOINTMENT_STATUS_UPDATED' ||
+        event?.type === 'HOSPITAL_TOKENS_UPDATED' ||
+        event?.type === 'TOKEN_CREATED' ||
+        event?.type === 'DATA_MUTATED'
+      ) {
+        refreshAppointments();
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [refreshAppointments]);
+
+  // Mobile Pull-to-Refresh Gesture Handlers
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (window.scrollY <= 5) {
+      touchStartY.current = e.touches[0].clientY;
+      setIsPulling(true);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isPulling || window.scrollY > 10) return;
+    const currentY = e.touches[0].clientY;
+    const diff = currentY - touchStartY.current;
+    if (diff > 0) {
+      // Gentle resistance curve
+      setPullY(Math.min(diff * 0.45, 80));
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (pullY >= 50) {
+      handleManualRefresh();
+    } else {
+      setPullY(0);
+    }
+    setIsPulling(false);
+  };
 
   // De-duplicate appointments by id and normalize status with cross-panel token checks
   const dedupedAppts = React.useMemo(() => {
@@ -173,20 +232,54 @@ export const MyBookings: React.FC = () => {
   };
 
   return (
-    <div className="pb-24 bg-slate-50 min-h-screen md:min-h-0 md:bg-transparent md:pb-6 w-full">
-      
-      {/* Header */}
-      <div className="sticky top-0 bg-white/95 backdrop-blur-md px-5 py-4 border-b border-slate-100 z-30 flex items-center gap-3 md:rounded-2xl md:mb-6">
-        <button 
-          onClick={() => navigate('/')}
-          className="p-2.5 rounded-xl hover:bg-slate-200 text-slate-600 transition-colors bg-white shadow-xs cursor-pointer"
+    <div 
+      className="pb-24 bg-slate-50 min-h-screen md:min-h-0 md:bg-transparent md:pb-6 w-full touch-pan-y"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
+      {/* Mobile Pull to Refresh Indicator */}
+      {(pullY > 0 || isRefreshing) && (
+        <div 
+          className="flex items-center justify-center transition-all duration-150 overflow-hidden text-slate-600 font-bold text-xs sticky top-0 z-40 bg-slate-100/90 backdrop-blur-xs"
+          style={{ height: `${Math.max(pullY, isRefreshing ? 44 : 0)}px` }}
         >
-          <ArrowLeft size={16} />
-        </button>
-        <div>
-          <h2 className="text-base font-black text-slate-800 tracking-tight font-heading">My Booking Tokens</h2>
-          <p className="text-[10px] text-slate-400 font-bold hidden md:block">Manage your active OPD appointments and history</p>
+          <div className="flex items-center gap-2 bg-white px-4 py-1.5 rounded-full shadow-xs border border-slate-200">
+            <RotateCw 
+              size={14} 
+              className={`text-blue-600 ${isRefreshing ? 'animate-spin' : ''}`} 
+              style={{ transform: isRefreshing ? undefined : `rotate(${pullY * 5}deg)` }} 
+            />
+            <span>{isRefreshing ? 'Refreshing bookings...' : pullY >= 50 ? 'Release to refresh' : 'Pull down to refresh'}</span>
+          </div>
         </div>
+      )}
+
+      {/* Header */}
+      <div className="sticky top-0 bg-white/95 backdrop-blur-md px-5 py-4 border-b border-slate-100 z-30 flex items-center justify-between md:rounded-2xl md:mb-6">
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={() => navigate('/')}
+            className="p-2.5 rounded-xl hover:bg-slate-200 text-slate-600 transition-colors bg-white shadow-xs cursor-pointer"
+          >
+            <ArrowLeft size={16} />
+          </button>
+          <div>
+            <h2 className="text-base font-black text-slate-800 tracking-tight font-heading">My Booking Tokens</h2>
+            <p className="text-[10px] text-slate-400 font-bold hidden md:block">Manage your active OPD appointments and history</p>
+          </div>
+        </div>
+
+        {/* Manual Refresh Button */}
+        <button
+          onClick={handleManualRefresh}
+          disabled={isRefreshing}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-600 rounded-xl text-xs font-bold transition-all shadow-xs border border-slate-200/80 cursor-pointer disabled:opacity-50"
+          title="Refresh bookings"
+        >
+          <RotateCw size={13} className={`text-blue-600 ${isRefreshing ? 'animate-spin' : ''}`} />
+          <span className="text-[11px] font-bold">{isRefreshing ? 'Syncing...' : 'Refresh'}</span>
+        </button>
       </div>
 
       <div className="px-5 mt-4 space-y-6">

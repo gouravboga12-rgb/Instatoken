@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useLocation, useSearchParams, useNavigate } from 'react-router-dom';
 import { useHospital } from '../../context/HospitalContext';
 import { useApp } from '../../context/AppContext';
@@ -278,7 +278,7 @@ const WalkInGenerator: React.FC<{
   const { generateWalkInToken, doctors, departments, scheduleConfig, patients, hospitalProfile } = useHospital();
   const { user, customers, appointments } = useApp();
 
-  const getInitialDoctorAndDept = () => {
+  const getInitialDoctorAndDept = useCallback(() => {
     let docId = initialDoctorId || '';
     let deptId = initialDepartmentId || '';
 
@@ -298,7 +298,7 @@ const WalkInGenerator: React.FC<{
       }
     }
     return { docId, deptId };
-  };
+  }, [initialDoctorId, initialDepartmentId, doctors, departments]);
 
   const { docId: resolvedDocId, deptId: resolvedDeptId } = getInitialDoctorAndDept();
 
@@ -326,7 +326,7 @@ const WalkInGenerator: React.FC<{
         }));
       }
     }
-  }, [initialDoctorId, initialDepartmentId, doctors, departments]);
+  }, [initialDoctorId, initialDepartmentId, getInitialDoctorAndDept]);
 
   const [generated, setGenerated] = useState<TokenRecord | null>(null);
   const [error, setError] = useState('');

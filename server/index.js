@@ -520,6 +520,8 @@ async function getUnifiedStore() {
           console.warn('Error merging tokens from RDS:', tokErr.message);
         }
 
+
+
         // Merge live appointments from PostgreSQL appointments table into store.appointments
         try {
           const apptRows = await query(`SELECT data FROM appointments ORDER BY created_at DESC LIMIT 300`);
@@ -2471,14 +2473,14 @@ app.patch('/api/hospitals/:hospitalId/tokens/:tokenId/status', requireHospitalAu
         );
       } else {
         await query(
-          `UPDATE tokens SET status = $1, data = (COALESCE(data, '{}'::jsonb) || jsonb_build_object('status', $1::text)), updated_at = NOW() WHERE id = $2`,
+          `UPDATE tokens SET status = $1::varchar, data = (COALESCE(data, '{}'::jsonb) || jsonb_build_object('status', $1::varchar)), updated_at = NOW() WHERE id = $2`,
           [status, tokenId]
         );
       }
 
       // Update matching appointment in PostgreSQL
       await query(
-        `UPDATE appointments SET status = $1, data = (COALESCE(data, '{}'::jsonb) || jsonb_build_object('status', $1::text)), updated_at = NOW() WHERE id = $2`,
+        `UPDATE appointments SET status = $1::varchar, data = (COALESCE(data, '{}'::jsonb) || jsonb_build_object('status', $1::varchar)), updated_at = NOW() WHERE id = $2`,
         [apptStatus, tokenId]
       );
 
@@ -2486,7 +2488,7 @@ app.patch('/api/hospitals/:hospitalId/tokens/:tokenId/status', requireHospitalAu
       if (targetToken && (targetToken.tokenNo || targetToken.tokenNumber)) {
         const tokNum = (targetToken.tokenNo || targetToken.tokenNumber).toString();
         await query(
-          `UPDATE appointments SET status = $1, data = (COALESCE(data, '{}'::jsonb) || jsonb_build_object('status', $1::text)), updated_at = NOW() 
+          `UPDATE appointments SET status = $1::varchar, data = (COALESCE(data, '{}'::jsonb) || jsonb_build_object('status', $1::varchar)), updated_at = NOW() 
            WHERE hospital_id = $2 AND doctor_id = $3 AND (data->>'tokenNumber' = $4 OR data->>'tokenNo' = $4)`,
           [apptStatus, hospitalId, targetToken.doctorId, tokNum]
         );
@@ -2517,7 +2519,7 @@ app.patch('/api/appointments/:id/status', async (req, res) => {
   if (isDbConnected) {
     try {
       await query(
-        `UPDATE appointments SET status = $1, data = (COALESCE(data, '{}'::jsonb) || jsonb_build_object('status', $1::text)), updated_at = NOW() WHERE id = $2`,
+        `UPDATE appointments SET status = $1::varchar, data = (COALESCE(data, '{}'::jsonb) || jsonb_build_object('status', $1::varchar)), updated_at = NOW() WHERE id = $2`,
         [status, id]
       );
     } catch (e) {
@@ -2660,7 +2662,6 @@ app.get('/api/appointments/:id', async (req, res) => {
         const rawTok = tokRes.rows[0].data;
         const tok = typeof rawTok === 'string' ? JSON.parse(rawTok) : (rawTok || {});
         const effectiveStatus = tokRes.rows[0].status || tok.status || 'booked';
-        const apptStatus = effectiveStatus === 'completed' ? 'completed' : ['cancelled', 'not-visited', 'skipped'].includes(effectiveStatus) ? 'cancelled' : 'booked';
         const apptFromTok = {
           id: tok.id,
           tokenNumber: tok.tokenNo || tok.tokenNumber || 1,
@@ -2680,7 +2681,7 @@ app.get('/api/appointments/:id', async (req, res) => {
           fee: tok.consultationFee || 500,
           platformFee: tok.platformFee || 25,
           totalFee: tok.totalFee || tok.platformFee || 25,
-          status: apptStatus,
+          status: effectiveStatus,
           paymentId: tok.paymentId || `PAY-${tok.id}`,
           paymentMethod: tok.paymentMethod || 'Online',
           estimatedWaitTime: tok.estimatedWait || 15,
@@ -2710,7 +2711,7 @@ app.get('/api/appointments/:id', async (req, res) => {
 app.get('/api/appointments', async (req, res) => {
   if (isDbConnected) {
     try {
-      const dbRes = await query(`SELECT id, status, data FROM appointments ORDER BY created_at DESC`);
+      const dbRes = await query(`SELECT id, status, data FROM appointments ORDER BY created_at DESC LIMIT 200`);
       if (dbRes.rows.length > 0) {
         const appts = dbRes.rows.map(r => {
           if (!r.data) return null;
@@ -2731,6 +2732,8 @@ app.get('/api/appointments', async (req, res) => {
   const store = await getUnifiedStore();
   res.json({ success: true, appointments: store.appointments || [] });
 });
+
+
 
 // GET Super Admin Revenue Tracking
 app.get('/api/admin/revenue', async (req, res) => {

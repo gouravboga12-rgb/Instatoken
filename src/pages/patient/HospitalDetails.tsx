@@ -120,19 +120,6 @@ export const HospitalDetails: React.FC<HospitalDetailsProps> = ({ onDoctorSelect
     return () => clearInterval(interval);
   }, [mediaList.length, isHovered]);
 
-  if (!hospital) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-6 bg-white max-w-md mx-auto">
-        <div className="text-center">
-          <p className="text-sm font-bold text-slate-500 mb-4">Hospital not found</p>
-          <Button onClick={() => navigate('/')}>Go Home</Button>
-        </div>
-      </div>
-    );
-  }
-
-  const isSaved = user?.savedHospitals.includes(hospital.id) || false;
-
   const [liveProfile, setLiveProfile] = useState<any>(null);
 
   useEffect(() => {
@@ -197,17 +184,32 @@ export const HospitalDetails: React.FC<HospitalDetailsProps> = ({ onDoctorSelect
     });
   }, [hospital]);
 
-  const filteredDoctors = selectedDeptId === 'All' 
-    ? (hospital.doctors || [])
-    : (hospital.doctors || []).filter(d => {
-        if (d.departmentId === selectedDeptId) return true;
-        const matchingDept = (hospital.departments || []).find(dp => dp.id === selectedDeptId);
-        if (matchingDept && matchingDept.name) {
-          return d.specialty?.toLowerCase() === matchingDept.name.toLowerCase() ||
-                 (d as any).department?.toLowerCase() === matchingDept.name.toLowerCase();
-        }
-        return false;
-      });
+  const isSaved = (hospital && user?.savedHospitals?.includes(hospital.id)) || false;
+
+  const filteredDoctors = useMemo(() => {
+    if (!hospital) return [];
+    if (selectedDeptId === 'All') return hospital.doctors || [];
+    return (hospital.doctors || []).filter(d => {
+      if (d.departmentId === selectedDeptId) return true;
+      const matchingDept = (hospital.departments || []).find(dp => dp.id === selectedDeptId);
+      if (matchingDept && matchingDept.name) {
+        return d.specialty?.toLowerCase() === matchingDept.name.toLowerCase() ||
+               (d as any).department?.toLowerCase() === matchingDept.name.toLowerCase();
+      }
+      return false;
+    });
+  }, [hospital, selectedDeptId]);
+
+  if (!hospital) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6 bg-white max-w-md mx-auto">
+        <div className="text-center">
+          <p className="text-sm font-bold text-slate-500 mb-4">Hospital not found</p>
+          <Button onClick={() => navigate('/')}>Go Home</Button>
+        </div>
+      </div>
+    );
+  }
 
   const handleShare = () => {
     if (navigator.share) {
