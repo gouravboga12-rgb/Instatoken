@@ -80,6 +80,35 @@ async function sanitize() {
     console.log('tokens table check:', e.message);
   }
 
+  // 5.5 Update sync_store table in RDS (CRITICAL)
+  try {
+    const sRes = await query("SELECT key, data FROM sync_store");
+    for (const row of sRes.rows) {
+      let sStr = typeof row.data === 'string' ? row.data : JSON.stringify(row.data);
+      const beforeCount = (sStr.match(/apollo/gi) || []).length;
+      console.log(`sync_store key=${row.key} matches before: ${beforeCount}`);
+
+      sStr = sStr
+        .replace(/Apollo Spectra Hospital/g, 'City Care Multi-Specialty Hospital')
+        .replace(/Apollo Hospital Jubilee Hills/g, 'City Care Hospital Jubilee Hills')
+        .replace(/Apollo Hospital/g, 'City Care Hospital')
+        .replace(/Apollo Spectra/g, 'City Care Hospital')
+        .replace(/admin@apollo\.com/g, 'admin@instatoken.in')
+        .replace(/info@apollospectra\.com/g, 'info@instatoken.in')
+        .replace(/admin@apollospectra\.com/g, 'admin@instatoken.in')
+        .replace(/www\.apollospectra\.com/g, 'https://testcodtech.shop')
+        .replace(/apollo-hospitals-jubilee-hills-hyderabad\.jpg/g, 'hospital-building.jpg')
+        .replace(/doc-apollo-1/g, 'doc-citycare-1');
+
+      await query("UPDATE sync_store SET data = $1::jsonb WHERE key = $2", [sStr, row.key]);
+      const afterMatches = sStr.match(/.{0,30}apollo.{0,30}/gi) || [];
+      console.log(`✅ Sanitized sync_store key=${row.key} (remaining matches: ${afterMatches.length})`);
+      console.log('Sample remaining matches:', afterMatches.slice(0, 10));
+    }
+  } catch (e) {
+    console.log('sync_store sanitization error:', e.message);
+  }
+
   // 6. Check any remaining Apollo in hospitals and hospital_profiles
   const checkH = await query("SELECT id, name FROM hospitals WHERE name ILIKE '%apollo%'");
   console.log('Remaining Apollo in hospitals name:', checkH.rows.length);
