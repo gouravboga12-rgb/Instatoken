@@ -380,7 +380,7 @@ const AppContent: React.FC = () => {
       {/* Demonstration & Staging Environment Notice Bar */}
       <div className="bg-slate-900 text-amber-300 border-b border-slate-800 py-1.5 px-4 text-center text-[11px] sm:text-xs font-semibold flex items-center justify-center gap-2 z-50">
         <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
-        <span>InstaToken OPD Queue Management System – Demonstration &amp; Staging Environment</span>
+        <span>InstaToken OPD Queue Management System - Demonstration &amp; Staging Environment</span>
       </div>
 
       {/* Desktop Navigation Header */}
