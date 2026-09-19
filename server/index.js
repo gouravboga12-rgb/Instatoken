@@ -124,16 +124,16 @@ const INITIAL_DOCTORS = [
 ];
 
 const INITIAL_PROFILE = {
-  id: 'hosp-apollo', name: 'Apollo Spectra Hospital', logo: '', coverImage: '',
+  id: 'hosp-apollo', name: 'City Care Multi-Specialty Hospital', logo: '', coverImage: '',
   registrationNumber: 'KA/HOS/2009/04521', accreditation: 'NABH Accredited',
   gstNumber: '29AABCA1234K1Z5', licenseNumber: 'KA-MED-2009-1234',
   type: 'Multi Speciality', ownershipType: 'Private',
   phone: '+91 80 4668 8888', whatsapp: '+91 98765 43210',
-  email: 'info@apollospectra.com', website: 'www.apollospectra.com', emergencyNumber: '+91 80 4668 9999',
+  email: 'info@instatoken.in', website: 'https://testcodtech.shop', emergencyNumber: '+91 80 4668 9999',
   country: 'India', state: 'Telangana', city: 'Hyderabad', area: 'Kothapet Pratap Nagar',
   address: '15-57/2, RAMkrishna Raju Residency, Pratap Nagar, Kothapet, Hyderabad, Telangana 500060, India', pinCode: '500060',
   lat: 17.37336200634615, lng: 78.53855589118986,
-  about: 'Apollo Spectra is a state-of-the-art multi-specialty hospital committed to delivering world-class healthcare.',
+  about: 'City Care Multi-Specialty Hospital is a state-of-the-art multi-specialty hospital committed to delivering world-class healthcare.',
   mission: 'To provide accessible, affordable, and high-quality healthcare to every patient.',
   vision: 'To be the most trusted and patient-centric hospital network in India.',
   facilities: ['24/7 Emergency', 'ICU', 'Pharmacy', 'Ambulance', 'Lab Testing', 'Cafeteria', 'Dialysis', 'Blood Bank'],
@@ -182,9 +182,9 @@ function ensureDefaultDepartments(existingDepts) {
 const INITIAL_HOSPITALS = [
   {
     id: "hosp-apollo",
-    name: "Apollo Spectra Hospital",
+    name: "City Care Multi-Specialty Hospital",
     category: "Multi Speciality",
-    email: "info@apollospectra.com",
+    email: "info@instatoken.in",
     phone: "+91 80 4668 8888",
     rating: 4.8,
     reviewsCount: 1240,
@@ -192,7 +192,7 @@ const INITIAL_HOSPITALS = [
     baseWaitingTime: 20,
     address: "15-57/2, RAMkrishna Raju Residency, Pratap Nagar, Kothapet, Hyderabad, Telangana 500060, India",
     image: "https://images.unsplash.com/photo-1587351021759-3e566b6af7cc?w=800&auto=format&fit=crop&q=80",
-    about: "Apollo Spectra is a state-of-the-art multi-specialty hospital committed to bringing you the best clinical outcomes in a simplified, service-oriented environment.",
+    about: "City Care Multi-Specialty Hospital is a state-of-the-art multi-specialty hospital committed to bringing you the best clinical outcomes in a simplified, service-oriented environment.",
     facilities: ["24/7 Emergency", "ICU", "Pharmacy", "Ambulance", "Lab Testing", "Cafeteria"],
     contact: "+91 80 4668 8888",
     lat: 17.37336200634615,
@@ -579,7 +579,7 @@ async function getUnifiedStore() {
                 ...(r.data || {}),
                 id: r.id,
                 name: r.name || r.data?.name,
-                email: r.email || r.data?.email || (r.id === 'hosp-apollo' ? 'info@apollospectra.com' : ''),
+                email: r.email || r.data?.email || (r.id === 'hosp-apollo' ? 'info@instatoken.in' : ''),
                 phone: r.phone || r.data?.phone || r.data?.contact || (r.id === 'hosp-apollo' ? '+91 80 4668 8888' : ''),
                 contact: r.phone || r.data?.contact || r.data?.phone || (r.id === 'hosp-apollo' ? '+91 80 4668 8888' : ''),
                 city: r.city || r.data?.city || '',
@@ -869,7 +869,7 @@ app.post('/api/sync', async (req, res) => {
 // ─── Hospital Auth & Access Control (Phase 22) ───────────────────────────────
 
 const DEFAULT_HOSPITAL_CREDENTIALS = [
-  { hospitalId: 'hosp-apollo', email: 'admin@apollo.com', password: 'password', role: 'owner', name: 'Dr. Rajesh Kumar', hospitalName: 'Apollo Spectra Hospital' }
+  { hospitalId: 'hosp-apollo', email: 'admin@instatoken.in', password: 'password', role: 'owner', name: 'Dr. Rajesh Kumar', hospitalName: 'City Care Multi-Specialty Hospital' }
 ];
 
 const ACTIVE_SESSIONS = new Map();
@@ -992,7 +992,7 @@ app.post('/api/auth/hospital-login', async (req, res) => {
     return res.status(401).json({ success: false, message: 'Invalid hospital credentials.' });
   }
 
-  const isPasswordMatch = activeCred.password === password || (cleanEmail === 'admin@apollo.com' && password === 'password');
+  const isPasswordMatch = activeCred.password === password || ((cleanEmail === 'admin@instatoken.in' || cleanEmail === 'admin@apollo.com') && password === 'password');
 
   if (!isPasswordMatch) {
     return res.status(401).json({ success: false, message: 'Incorrect password. Please try again.' });
