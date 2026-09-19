@@ -117,6 +117,9 @@ export const Footer: React.FC = () => {
       <div className="border-t border-slate-800/80 py-6 px-6 md:px-10 text-xs text-slate-500 text-center md:text-left">
         <div className="w-full max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           <p>© 2026 InstaToken Healthcare Solutions Inc. All rights reserved.</p>
+          <div className="bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[11px] font-bold px-3 py-1 rounded-full">
+            InstaToken OPD Queue Management System – Demonstration & Staging Environment
+          </div>
         </div>
       </div>
     </footer>

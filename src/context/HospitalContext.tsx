@@ -297,27 +297,27 @@ interface HospitalContextType {
 // ─── Mock credentials (Single Official Reference Demo Hospital) ───────────────
 
 const MOCK_CREDENTIALS = [
-  { email: 'admin@apollo.com', password: 'password', userId: 'huser-apollo' }
+  { email: 'admin@instatoken.in', password: 'password', userId: 'huser-apollo' }
 ];
 
 const MOCK_USERS: HospitalUser[] = [
-  { id: 'huser-apollo', name: 'Dr. Rajesh Kumar', email: 'admin@apollo.com', role: 'owner', hospitalId: 'hosp-apollo', hospitalName: 'Apollo Spectra Hospital', avatar: '', isOnline: true }
+  { id: 'huser-apollo', name: 'Dr. Rajesh Kumar', email: 'admin@instatoken.in', role: 'owner', hospitalId: 'hosp-apollo', hospitalName: 'City Care Multi-Specialty Hospital', avatar: '', isOnline: true }
 ];
 
 
 // ─── Initial Mock Data ────────────────────────────────────────────────────────
 
 const INITIAL_PROFILE: HospitalProfile = {
-  id: 'hosp-apollo', name: 'Apollo Spectra Hospital', logo: '', coverImage: '',
+  id: 'hosp-apollo', name: 'City Care Multi-Specialty Hospital', logo: '', coverImage: '',
   registrationNumber: 'KA/HOS/2009/04521', accreditation: 'NABH Accredited',
   gstNumber: '29AABCA1234K1Z5', licenseNumber: 'KA-MED-2009-1234',
   type: 'Multi Speciality', ownershipType: 'Private',
   phone: '+91 80 4668 8888', whatsapp: '+91 98765 43210',
-  email: 'info@apollospectra.com', website: 'www.apollospectra.com', emergencyNumber: '+91 80 4668 9999',
+  email: 'info@instatoken.in', website: 'https://testcodtech.shop', emergencyNumber: '+91 80 4668 9999',
   country: 'India', state: 'Telangana', city: 'Hyderabad', area: 'Kothapet Pratap Nagar',
   address: '15-57/2, RAMkrishna Raju Residency, Pratap Nagar, Kothapet, Hyderabad, Telangana 500060, India', pinCode: '500060',
   lat: 17.37336200634615, lng: 78.53855589118986,
-  about: 'Apollo Spectra is a state-of-the-art multi-specialty hospital committed to delivering world-class healthcare.',
+  about: 'City Care Multi-Specialty Hospital is a state-of-the-art multi-specialty hospital committed to delivering world-class healthcare.',
   mission: 'To provide accessible, affordable, and high-quality healthcare to every patient.',
   vision: 'To be the most trusted and patient-centric hospital network in India.',
   facilities: ['24/7 Emergency', 'ICU', 'Pharmacy', 'Ambulance', 'Lab Testing', 'Cafeteria', 'Dialysis', 'Blood Bank'],
@@ -462,7 +462,7 @@ const INITIAL_STAFF: HospitalStaffMember[] = [
     name: 'Pooja Verma',
     photo: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&auto=format&fit=crop&q=80',
     phone: '+91 98450 12345',
-    email: 'pooja.verma@apollospectra.com',
+    email: 'pooja.verma@instatoken.in',
     departmentId: 'dept-general',
     departmentName: 'General OPD',
     designation: 'Senior OPD Receptionist',
@@ -481,7 +481,7 @@ const INITIAL_STAFF: HospitalStaffMember[] = [
     name: 'Sunita Deshmukh',
     photo: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=400&auto=format&fit=crop&q=80',
     phone: '+91 98450 67890',
-    email: 'sunita.d@apollospectra.com',
+    email: 'sunita.d@instatoken.in',
     departmentId: 'dept-cardio',
     departmentName: 'Cardiology',
     designation: 'Lead OPD Nurse',
@@ -500,7 +500,7 @@ const INITIAL_STAFF: HospitalStaffMember[] = [
     name: 'Kiran Rao',
     photo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80',
     phone: '+91 98450 99887',
-    email: 'kiran.rao@apollospectra.com',
+    email: 'kiran.rao@instatoken.in',
     departmentId: 'dept-ortho',
     departmentName: 'Orthopedics',
     designation: 'Patient Queue Coordinator',
@@ -663,7 +663,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         }
       } catch (e) {}
     }
-    // Only Apollo Spectra Hospital has default reference doctors
+    // Only City Care Multi-Specialty Hospital has default reference doctors
     if (curHospId === 'hosp-apollo') {
       return INITIAL_DOCTORS;
     }
@@ -1086,7 +1086,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (!cred) {
       return { success: false, message: 'Invalid email or password.' };
     }
-    const isMatch = String(cred.password) === cleanPassword || (cleanEmail === 'admin@apollo.com' && cleanPassword === 'password');
+    const isMatch = String(cred.password) === cleanPassword || (cleanEmail === 'admin@instatoken.in' && cleanPassword === 'password');
     if (!isMatch) {
       return { success: false, message: 'Incorrect password. Please enter the correct password.' };
     }

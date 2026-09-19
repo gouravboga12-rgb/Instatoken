@@ -619,9 +619,9 @@ export const Profile: React.FC = () => {
 
           <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-1">
             {[
-              { id: "rec-1", name: "General Medicine Prescription", date: "20 Jul 2026", doctor: "Dr. Anil Kumar", hosp: "Apollo Spectra", fileType: "PDF", size: "245 KB" },
-              { id: "rec-2", name: "Cardiology Screening Report", date: "15 Jul 2026", doctor: "Dr. Sarah D'Souza", hosp: "Fortis Hospital", fileType: "PDF", size: "1.2 MB" },
-              { id: "rec-3", name: "Blood Test - Complete Count (CBC)", date: "10 Jun 2026", doctor: "Diagnostic Lab", hosp: "Rainbow Children's Hospital", fileType: "PDF", size: "512 KB" }
+              { id: "rec-1", name: "General Medicine Prescription", date: "20 Jul 2026", doctor: "Dr. Anil Kumar", hosp: "City Care Hospital", fileType: "PDF", size: "245 KB" },
+              { id: "rec-2", name: "Cardiology Screening Report", date: "15 Jul 2026", doctor: "Dr. Sarah D'Souza", hosp: "Metro Wellness Hospital", fileType: "PDF", size: "1.2 MB" },
+              { id: "rec-3", name: "Blood Test - Complete Count (CBC)", date: "10 Jun 2026", doctor: "Diagnostic Lab", hosp: "Sunrise Children's Clinic", fileType: "PDF", size: "512 KB" }
             ].map((rec) => (
               <div key={rec.id} className="bg-white border border-slate-150 p-3 rounded-2xl flex items-center justify-between gap-3 shadow-3xs hover:border-blue-200 transition-all">
                 <div className="flex items-center gap-3 min-w-0">

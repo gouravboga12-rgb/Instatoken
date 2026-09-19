@@ -714,7 +714,7 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
                 🏥
               </div>
               <div>
-                <h1 className="text-2xl font-black text-white">{hospitalProfile?.name || 'Apollo Spectra Hospital'}</h1>
+                <h1 className="text-2xl font-black text-white">{hospitalProfile?.name || 'City Care Multi-Specialty Hospital'}</h1>
                 <p className="text-sm text-blue-300 font-bold">OPD Cabin Monitor · {doctor.name} ({doctor.specialization})</p>
               </div>
             </div>

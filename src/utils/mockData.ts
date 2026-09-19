@@ -179,14 +179,14 @@ export const DEPARTMENTS: Department[] = [
 export const HOSPITALS: Hospital[] = [
   {
     id: "hosp-apollo",
-    name: "Apollo Spectra Hospital",
+    name: "City Care Multi-Specialty Hospital",
     category: "Multi Speciality",
     rating: 4.8,
     reviewsCount: 1240,
     distance: 1.8,
     baseWaitingTime: 20,
     address: "15-57/2, RAMkrishna Raju Residency, Pratap Nagar, Kothapet, Hyderabad, Telangana 500060, India",
-    email: "info@apollospectra.com",
+    email: "info@instatoken.in",
     phone: "+91 80 4668 8888",
     image: "https://images.unsplash.com/photo-1587351021759-3e566b6af7cc?w=800&auto=format&fit=crop&q=80",
     gallery: [
@@ -194,7 +194,7 @@ export const HOSPITALS: Hospital[] = [
       "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=800&auto=format&fit=crop&q=80",
       "https://images.unsplash.com/photo-1516549655169-df83a0774514?w=800&auto=format&fit=crop&q=80"
     ],
-    about: "Apollo Spectra is a state-of-the-art multi-specialty hospital committed to bringing you the best clinical outcomes in a simplified, service-oriented environment. Equipped with advanced diagnostic infrastructure and led by top healthcare specialists.",
+    about: "City Care Multi-Specialty Hospital is a state-of-the-art multi-specialty hospital committed to bringing you the best clinical outcomes in a simplified, service-oriented environment. Equipped with advanced diagnostic infrastructure and led by top healthcare specialists.",
     facilities: ["24/7 Emergency", "ICU", "Pharmacy", "Ambulance", "Lab Testing", "Cafeteria"],
     departments: DEPARTMENTS,
     timings: "Open 24 Hours (OPD: 09:00 AM - 05:00 PM)",

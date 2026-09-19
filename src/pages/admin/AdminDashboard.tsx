@@ -527,7 +527,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                       <>
                         <div className="p-3 bg-blue-50/50 border border-blue-100 rounded-xl text-xs space-y-0.5">
                           <div className="flex justify-between items-center font-extrabold text-blue-800">
-                            <span>Apollo Spectra Hospital Active</span>
+                            <span>City Care Multi-Specialty Hospital Active</span>
                             <span className="text-[8px] text-slate-400 font-semibold">Just Now</span>
                           </div>
                           <p className="text-slate-500 text-[10px]">101 tokens issued today across 5 departments.</p>
@@ -634,7 +634,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                       })
                       .map((hosp) => {
                         const isDisabled = hosp.status === 'disabled';
-                        const hospEmail = hosp.email || (hosp as any).data?.email || (hosp.id === 'hosp-apollo' ? 'info@apollospectra.com' : 'contact@hospital.com');
+                        const hospEmail = hosp.email || (hosp as any).data?.email || (hosp.id === 'hosp-apollo' ? 'info@instatoken.in' : 'contact@hospital.com');
                         const hospPhone = hosp.phone || hosp.contact || (hosp as any).data?.phone || '+91 80 4668 8888';
 
                         return (

@@ -41,7 +41,7 @@ export const HospitalSettings: React.FC = () => {
   const isApollo = hospitalProfile?.id === 'hosp-apollo';
 
   const [form, setForm] = useState({
-    name: hospitalProfile?.name || (isApollo ? 'Apollo Spectra Hospital' : ''),
+    name: hospitalProfile?.name || (isApollo ? 'City Care Multi-Specialty Hospital' : ''),
     logo: hospitalProfile?.logo || '',
     coverImage: hospitalProfile?.coverImage || '',
     gallery: (hospitalProfile?.gallery as any[]) || [],
@@ -53,7 +53,7 @@ export const HospitalSettings: React.FC = () => {
     ownershipType: hospitalProfile?.ownershipType || 'Private Corporate',
     phone: hospitalProfile?.phone || (isApollo ? '+91 80 4668 8888' : ''),
     whatsapp: hospitalProfile?.whatsapp || '',
-    email: hospitalProfile?.email || (isApollo ? 'admin@apollospectra.com' : ''),
+    email: hospitalProfile?.email || (isApollo ? 'admin@instatoken.in' : ''),
     website: hospitalProfile?.website || '',
     emergencyNumber: hospitalProfile?.emergencyNumber || '',
     country: hospitalProfile?.country || 'India',
@@ -385,7 +385,7 @@ export const HospitalSettings: React.FC = () => {
         </div>
         <div className="flex items-center gap-2.5 bg-blue-50/80 border border-blue-100 px-4 py-2.5 rounded-2xl">
           <span className="text-xs font-bold text-slate-500 whitespace-nowrap">Active Hospital:</span>
-          <span className="text-xs font-black text-blue-700">{hospitalProfile?.name || 'Apollo Spectra Hospital'}</span>
+          <span className="text-xs font-black text-blue-700">{hospitalProfile?.name || 'City Care Multi-Specialty Hospital'}</span>
         </div>
       </div>
 

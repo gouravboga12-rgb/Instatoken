@@ -98,7 +98,7 @@ export const Home: React.FC<HomeProps> = ({
     const bannersList = hospitals.length > 0 ? hospitals : [
       {
         id: 'hosp-apollo',
-        name: 'Apollo Spectra Hospital',
+        name: 'City Care Multi-Specialty Hospital',
         address: 'Koramangala 5th Block, Bengaluru',
         baseWaitingTime: 20,
         rating: 4.8,
