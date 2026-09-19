@@ -60,22 +60,34 @@ async function sanitize() {
 
   // 4. Update appointments table
   try {
-    const aRes = await query("SELECT * FROM information_schema.tables WHERE table_name = 'appointments'");
-    if (aRes.rows.length > 0) {
-      await query("UPDATE appointments SET hospital_name = 'City Care Multi-Specialty Hospital' WHERE hospital_name ILIKE '%apollo%'");
-      console.log('✅ Sanitized appointments table');
+    const aRes = await query("SELECT id, data FROM appointments WHERE data::text ILIKE '%apollo%'");
+    for (const row of aRes.rows) {
+      let aStr = typeof row.data === 'string' ? row.data : JSON.stringify(row.data);
+      aStr = aStr
+        .replace(/Apollo Spectra Hospital/g, 'City Care Multi-Specialty Hospital')
+        .replace(/Apollo Hospital Jubilee Hills/g, 'City Care Hospital Jubilee Hills')
+        .replace(/Apollo Hospital/g, 'City Care Hospital')
+        .replace(/Apollo Spectra/g, 'City Care Hospital');
+      await query("UPDATE appointments SET data = $1::jsonb WHERE id = $2", [aStr, row.id]);
     }
+    console.log(`✅ Sanitized appointments table (${aRes.rows.length} rows updated)`);
   } catch (e) {
     console.log('appointments table check:', e.message);
   }
 
   // 5. Update tokens table
   try {
-    const tRes = await query("SELECT * FROM information_schema.tables WHERE table_name = 'tokens'");
-    if (tRes.rows.length > 0) {
-      await query("UPDATE tokens SET data = REPLACE(data::text, 'Apollo Spectra Hospital', 'City Care Multi-Specialty Hospital')::jsonb WHERE data::text ILIKE '%apollo%'");
-      console.log('✅ Sanitized tokens table');
+    const tRes = await query("SELECT id, data FROM tokens WHERE data::text ILIKE '%apollo%'");
+    for (const row of tRes.rows) {
+      let tStr = typeof row.data === 'string' ? row.data : JSON.stringify(row.data);
+      tStr = tStr
+        .replace(/Apollo Spectra Hospital/g, 'City Care Multi-Specialty Hospital')
+        .replace(/Apollo Hospital Jubilee Hills/g, 'City Care Hospital Jubilee Hills')
+        .replace(/Apollo Hospital/g, 'City Care Hospital')
+        .replace(/Apollo Spectra/g, 'City Care Hospital');
+      await query("UPDATE tokens SET data = $1::jsonb WHERE id = $2", [tStr, row.id]);
     }
+    console.log(`✅ Sanitized tokens table (${tRes.rows.length} rows updated)`);
   } catch (e) {
     console.log('tokens table check:', e.message);
   }
