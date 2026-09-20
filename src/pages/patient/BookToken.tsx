@@ -7,7 +7,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { 
   ArrowLeft, Calendar as CalendarIcon, Clock, User, Phone, 
   MapPin, ShieldCheck, Sun, Moon, Ticket, ArrowRight, Zap, Users,
-  ChevronDown, Heart, Stethoscope
+  ChevronDown, Heart, Stethoscope, UserX
 } from 'lucide-react';
 
 const monthsList = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -207,6 +207,29 @@ export const BookToken: React.FC = () => {
     return doctorWorkingDays.includes(dayName);
   };
 
+  // Check if this particular doctor is marked as unavailable or app bookings disabled
+  const isDoctorOnlineAvailable = useMemo(() => {
+    if (!doctor) return true;
+    if (typeof window !== 'undefined' && hospitalId && doctor?.id) {
+      try {
+        const savedDocs = localStorage.getItem(`insta_hospital_doctors_${hospitalId}`) || localStorage.getItem('insta_hospital_doctors');
+        if (savedDocs) {
+          const parsed = JSON.parse(savedDocs);
+          const found = parsed.find((d: any) => d.id === doctor.id);
+          if (found) {
+            if (found.active === false || found.onlineConsult === false) {
+              return false;
+            }
+          }
+        }
+      } catch (e) {}
+    }
+    if (doctor.active === false || doctor.onlineConsult === false) {
+      return false;
+    }
+    return true;
+  }, [doctor, hospitalId, syncVersion]);
+
   // States
   const [selectedDate, setSelectedDate] = useState<string>(getTodayDateStr());
   const [selectedSession, setSelectedSession] = useState<string>(activeSessionsList[0]?.name || 'Morning');
@@ -318,6 +341,11 @@ export const BookToken: React.FC = () => {
   const handleProceedToBooking = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (!isDoctorOnlineAvailable) {
+      setError(`Dr. ${doctor?.name || 'Doctor'} is currently unavailable for online token booking at this hospital.`);
+      return;
+    }
 
     if (!name.trim()) {
       setError('Please enter patient name');
@@ -477,12 +505,23 @@ export const BookToken: React.FC = () => {
         {/* Right Column: Slot & Patient Form */}
         <div className="md:col-span-7 space-y-5">
 
+        {!isDoctorOnlineAvailable && (
+          <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-rose-800 text-xs font-bold flex items-start gap-2.5 shadow-2xs">
+            <UserX size={18} className="text-rose-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-black text-rose-900">Dr. {doctor?.name || 'Doctor'} is Currently Unavailable</p>
+              <p className="text-[11px] text-rose-700 mt-0.5 font-medium">
+                The hospital has temporarily marked this doctor off-duty or closed app bookings. Tokens cannot be generated for this doctor right now.
+              </p>
+            </div>
+          </div>
+        )}
+
         {error && (
           <div className="p-3 bg-red-50 border border-red-100 rounded-xl text-red-600 text-xs font-bold">
             {error}
           </div>
         )}
-
 
         <form onSubmit={handleProceedToBooking} className="space-y-5">
           
@@ -840,24 +879,40 @@ export const BookToken: React.FC = () => {
             );
           })()}
 
-          {/* Giant Full-Width Pill CTA Button matching Image 3 */}
+          {/* Giant Full-Width Pill CTA Button */}
           <button 
             type="submit"
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-full p-2.5 flex items-center justify-between shadow-xl shadow-blue-500/25 transition-all cursor-pointer transform hover:scale-[1.01]"
+            disabled={!isDoctorOnlineAvailable}
+            className={`w-full rounded-full p-2.5 flex items-center justify-between shadow-xl transition-all ${
+              !isDoctorOnlineAvailable
+                ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none'
+                : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/25 cursor-pointer transform hover:scale-[1.01]'
+            }`}
           >
             {/* Left Ticket Circle */}
-            <div className="w-11 h-11 bg-white text-blue-600 rounded-full flex items-center justify-center shrink-0 shadow-inner">
+            <div className={`w-11 h-11 rounded-full flex items-center justify-center shrink-0 shadow-inner ${
+              !isDoctorOnlineAvailable ? 'bg-slate-200 text-slate-400' : 'bg-white text-blue-600'
+            }`}>
               <Ticket size={22} />
             </div>
 
             {/* Center Text */}
             <div className="text-center px-2">
-              <h4 className="text-base font-black tracking-tight leading-tight">Book Token • Pay ₹{Math.max(10, Math.round((doctor.consultationFee || 500) * ((platformFeePercent || 5) / 100)))}</h4>
-              <p className="text-[10px] text-blue-100 font-medium">OPD spot confirmed • Doctor fee payable at hospital</p>
+              <h4 className="text-base font-black tracking-tight leading-tight">
+                {!isDoctorOnlineAvailable 
+                  ? 'Doctor Unavailable for Booking' 
+                  : `Book Token • Pay ₹${Math.max(10, Math.round((doctor.consultationFee || 500) * ((platformFeePercent || 5) / 100)))}`
+                }
+              </h4>
+              <p className={`text-[10px] font-medium ${!isDoctorOnlineAvailable ? 'text-slate-500' : 'text-blue-100'}`}>
+                {!isDoctorOnlineAvailable ? 'Consultations suspended by clinic' : 'OPD spot confirmed • Doctor fee payable at hospital'}
+              </p>
             </div>
 
             {/* Right Arrow Circle */}
-            <div className="w-11 h-11 bg-white text-blue-600 rounded-full flex items-center justify-center shrink-0 shadow-inner">
+            <div className={`w-11 h-11 rounded-full flex items-center justify-center shrink-0 shadow-inner ${
+              !isDoctorOnlineAvailable ? 'bg-slate-200 text-slate-400' : 'bg-white text-blue-600'
+            }`}>
               <ArrowRight size={22} />
             </div>
           </button>

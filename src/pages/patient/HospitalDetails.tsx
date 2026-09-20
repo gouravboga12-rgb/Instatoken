@@ -448,22 +448,37 @@ export const HospitalDetails: React.FC<HospitalDetailsProps> = ({ onDoctorSelect
                 const ahead = Math.max(0, doc.nextAvailableToken - doc.currentQueue - 1);
                 const docWaitTime = ahead * doc.estimatedWaitPerPatient;
                 const isDocSaved = user?.savedDoctors?.includes(doc.id) || false;
+                const isDocUnavailable = doc.active === false || doc.onlineConsult === false;
+                const isHospitalDisabled = hospital.status === 'disabled';
+                const cannotBook = isHospitalDisabled || isDocUnavailable;
 
                 return (
-                  <Card key={doc.id} padding="none" className="p-4 bg-white border border-slate-150 rounded-3xl shadow-2xs">
+                  <Card key={doc.id} padding="none" className={`p-4 bg-white border rounded-3xl shadow-2xs transition-all ${isDocUnavailable ? 'border-rose-150 bg-rose-50/10' : 'border-slate-150'}`}>
                     <div className="flex gap-3.5 items-center">
-                      <div className="w-16 h-16 rounded-2xl overflow-hidden shrink-0 border border-slate-150 bg-slate-50">
+                      <div className="w-16 h-16 rounded-2xl overflow-hidden shrink-0 border border-slate-150 bg-slate-50 relative">
                         <img 
                           src={doc.image} 
                           alt={doc.name} 
-                          className="w-full h-full object-cover"
+                          className={`w-full h-full object-cover ${isDocUnavailable ? 'grayscale-50 opacity-80' : ''}`}
                           onError={(e) => { (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=400&auto=format&fit=crop&q=80"; }}
                         />
+                        {isDocUnavailable && (
+                          <div className="absolute inset-0 bg-slate-900/20 flex items-center justify-center">
+                            <span className="text-[9px] font-black bg-rose-600 text-white px-1 py-0.5 rounded">OFF</span>
+                          </div>
+                        )}
                       </div>
                       
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
-                          <h4 className="font-extrabold text-slate-900 text-sm">{doc.name}</h4>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <h4 className="font-extrabold text-slate-900 text-sm">{doc.name}</h4>
+                            {isDocUnavailable && (
+                              <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
+                                ⛔ Unavailable
+                              </span>
+                            )}
+                          </div>
                           <button 
                             onClick={() => toggleSaveDoctor(doc.id)}
                             className="p-1 rounded-xl hover:bg-red-50 text-slate-400 transition-colors cursor-pointer"
@@ -489,23 +504,23 @@ export const HospitalDetails: React.FC<HospitalDetailsProps> = ({ onDoctorSelect
 
                       <div>
                         <span className="text-[9px] text-slate-400 font-bold uppercase block">Live Queue Wait</span>
-                        <span className="text-xs font-black text-emerald-600 flex items-center gap-1">
-                          <Clock size={12} /> {docWaitTime} mins
+                        <span className={`text-xs font-black flex items-center gap-1 ${isDocUnavailable ? 'text-slate-400' : 'text-emerald-600'}`}>
+                          <Clock size={12} /> {isDocUnavailable ? 'Unavailable' : `${docWaitTime} mins`}
                         </span>
                       </div>
 
                       <Button 
                         variant="primary" 
                         size="sm"
-                        disabled={hospital.status === 'disabled'}
-                        onClick={() => onDoctorSelect(hospital.id, doc.id)}
-                        className={`py-2 px-4 rounded-xl text-xs font-extrabold cursor-pointer ${
-                          hospital.status === 'disabled' 
-                            ? 'bg-slate-300 text-slate-500 cursor-not-allowed' 
-                            : 'bg-blue-600 hover:bg-blue-700 text-white'
+                        disabled={cannotBook}
+                        onClick={() => !cannotBook && onDoctorSelect(hospital.id, doc.id)}
+                        className={`py-2 px-4 rounded-xl text-xs font-extrabold ${
+                          cannotBook 
+                            ? 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300 shadow-none' 
+                            : 'bg-blue-600 hover:bg-blue-700 text-white cursor-pointer'
                         }`}
                       >
-                        {hospital.status === 'disabled' ? 'Account Disabled' : 'Book Token'}
+                        {isHospitalDisabled ? 'Account Disabled' : isDocUnavailable ? 'Doctor Unavailable' : 'Book Token'}
                       </Button>
                     </div>
                   </Card>

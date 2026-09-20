@@ -28,6 +28,8 @@ export interface Doctor {
   }>;
   opdDays?: string[];
   active?: boolean;
+  onlineConsult?: boolean;
+  offlineConsult?: boolean;
 }
 
 export interface Department {

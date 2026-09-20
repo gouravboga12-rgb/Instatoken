@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useHospital } from '../../context/HospitalContext';
 import type { SessionConfig, HospitalDoctor } from '../../context/HospitalContext';
 import {
   Clock, Plus, Trash2, Edit3, Save,
   Sliders, Zap, Stethoscope, Calendar, CheckCircle,
-  ToggleLeft, ToggleRight
+  ToggleLeft, ToggleRight, UserX
 } from 'lucide-react';
 
 const DAYS_OF_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -27,6 +27,17 @@ export const TokenManage: React.FC = () => {
   const [opdDays, setOpdDays] = useState<string[]>(selectedDoctor?.opdDays || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']);
   const [onlineConsult, setOnlineConsult] = useState<boolean>(selectedDoctor?.onlineConsult ?? true);
   const [offlineConsult, setOfflineConsult] = useState<boolean>(selectedDoctor?.offlineConsult ?? true);
+  const [isDoctorAvailable, setIsDoctorAvailable] = useState<boolean>(selectedDoctor?.active !== false);
+
+  // Keep state in sync whenever selectedDoctor changes
+  useEffect(() => {
+    if (selectedDoctor) {
+      setOpdDays(selectedDoctor.opdDays || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']);
+      setOnlineConsult(selectedDoctor.onlineConsult ?? true);
+      setOfflineConsult(selectedDoctor.offlineConsult ?? true);
+      setIsDoctorAvailable(selectedDoctor.active !== false);
+    }
+  }, [selectedDoctor?.id, selectedDoctor?.active, selectedDoctor?.onlineConsult, selectedDoctor?.offlineConsult]);
 
   // Sync state when switching doctor
   const handleSelectDoctor = (doc: HospitalDoctor) => {
@@ -34,7 +45,16 @@ export const TokenManage: React.FC = () => {
     setOpdDays(doc.opdDays || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']);
     setOnlineConsult(doc.onlineConsult ?? true);
     setOfflineConsult(doc.offlineConsult ?? true);
+    setIsDoctorAvailable(doc.active !== false);
     setEditingSessionId(null);
+  };
+
+  const handleDoctorAvailabilityToggle = () => {
+    if (!selectedDoctor) return;
+    const nextActive = !isDoctorAvailable;
+    setIsDoctorAvailable(nextActive);
+    updateDoctor(selectedDoctor.id, { active: nextActive });
+    showSuccessNotice(`Dr. ${selectedDoctor.name} marked as ${nextActive ? 'Available' : 'Unavailable (Off-Duty)'}!`);
   };
 
   const handleDayToggle = (day: string) => {
@@ -250,8 +270,12 @@ export const TokenManage: React.FC = () => {
             <span>Select Doctor ({doctors.length} Doctors Registered)</span>
           </span>
           {selectedDoctor && (
-            <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-full">
-              {currentSessions.filter(s => s.active).length} Active Sessions · {selectedDoctor.departmentName}
+            <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
+              selectedDoctor.active === false
+                ? 'text-rose-700 bg-rose-50 border border-rose-200 font-extrabold'
+                : 'text-blue-600 bg-blue-50'
+            }`}>
+              {selectedDoctor.active === false ? '⛔ Doctor Unavailable (Off-Duty)' : `${currentSessions.filter(s => s.active).length} Active Sessions · ${selectedDoctor.departmentName}`}
             </span>
           )}
         </div>
@@ -259,6 +283,7 @@ export const TokenManage: React.FC = () => {
         <div className="flex items-center gap-2.5 overflow-x-auto pb-1">
           {doctors.map(doc => {
             const isSelected = selectedDoctor?.id === doc.id;
+            const isDocAvail = doc.active !== false;
             return (
               <button
                 key={doc.id}
@@ -266,20 +291,31 @@ export const TokenManage: React.FC = () => {
                 onClick={() => handleSelectDoctor(doc)}
                 className={`px-3.5 py-2 rounded-2xl text-xs font-black flex items-center gap-2.5 shrink-0 cursor-pointer border transition-all ${
                   isSelected
-                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-500/20'
-                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                    ? isDocAvail
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-500/20'
+                      : 'bg-rose-700 text-white border-rose-700 shadow-sm shadow-rose-500/20'
+                    : isDocAvail
+                      ? 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                      : 'bg-rose-50/70 text-rose-800 border-rose-200 hover:bg-rose-100/70'
                 }`}
               >
-                <img
-                  src={doc.photo || 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&auto=format&fit=crop&q=80'}
-                  alt={doc.name}
-                  className="w-5 h-5 rounded-full object-cover border border-white/40"
-                />
+                <div className="relative shrink-0">
+                  <img
+                    src={doc.photo || 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&auto=format&fit=crop&q=80'}
+                    alt={doc.name}
+                    className="w-5 h-5 rounded-full object-cover border border-white/40"
+                  />
+                  {!isDocAvail && (
+                    <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-rose-500 border border-white" />
+                  )}
+                </div>
                 <span>{doc.name}</span>
                 <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                  isSelected ? 'bg-blue-800 text-white' : 'bg-slate-200 text-slate-600'
+                  isSelected 
+                    ? isDocAvail ? 'bg-blue-800 text-white' : 'bg-rose-900 text-white' 
+                    : !isDocAvail ? 'bg-rose-200 text-rose-900 font-extrabold' : 'bg-slate-200 text-slate-600'
                 }`}>
-                  {doc.specialization}
+                  {!isDocAvail ? 'Unavailable' : doc.specialization}
                 </span>
               </button>
             );
@@ -290,42 +326,119 @@ export const TokenManage: React.FC = () => {
       {/* ── Section 1: Weekly Working Days & Consultation Modes ─────────────── */}
       {selectedDoctor && (
         <div className="bg-white rounded-3xl border border-slate-100 p-6 shadow-xs space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-3">
             <div className="flex items-center gap-2">
-              <Calendar size={16} className="text-blue-600" />
+              <Calendar size={16} className="text-blue-600 shrink-0" />
               <div>
-                <h2 className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                  Weekly Working Days for {selectedDoctor.name}
-                </h2>
-                <p className="text-[10px] text-slate-400 font-semibold">Select the days this doctor is available at the clinic</p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                    Weekly Working Days for {selectedDoctor.name}
+                  </h2>
+                  <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+                    isDoctorAvailable
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                      : 'bg-rose-50 text-rose-700 border border-rose-200'
+                  }`}>
+                    {isDoctorAvailable ? '● Available' : '⛔ Unavailable'}
+                  </span>
+                </div>
+                <p className="text-[10px] text-slate-400 font-semibold">
+                  {isDoctorAvailable
+                    ? 'Select the days this doctor is available at the clinic'
+                    : 'Doctor is currently marked as unavailable for booking'}
+                </p>
               </div>
             </div>
 
-            {/* Online / Walk-in Consultation Switches */}
-            <div className="flex items-center gap-3">
+            {/* Doctor Availability Master Switch & Consultation Modes */}
+            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+              {/* Doctor Availability Option per Doctor */}
               <button
                 type="button"
-                onClick={() => handleConsultTypeToggle('online')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer border transition-colors ${
-                  onlineConsult ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-slate-50 border-slate-200 text-slate-400'
+                onClick={handleDoctorAvailabilityToggle}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer border transition-all shadow-2xs ${
+                  isDoctorAvailable
+                    ? 'bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-100'
+                    : 'bg-rose-50 border-rose-300 text-rose-700 hover:bg-rose-100'
                 }`}
+                title={isDoctorAvailable ? 'Click to mark doctor as unavailable' : 'Click to mark doctor as available'}
               >
-                {onlineConsult ? <ToggleRight size={16} className="text-blue-600" /> : <ToggleLeft size={16} />}
+                {isDoctorAvailable ? (
+                  <>
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>Doctor Available</span>
+                    <ToggleRight size={16} className="text-emerald-600 ml-0.5" />
+                  </>
+                ) : (
+                  <>
+                    <span className="w-2 h-2 rounded-full bg-rose-500" />
+                    <span>Doctor Unavailable</span>
+                    <ToggleLeft size={16} className="text-rose-500 ml-0.5" />
+                  </>
+                )}
+              </button>
+
+              <div className="h-4 w-px bg-slate-200 hidden sm:block" />
+
+              {/* Online Consultation Switch */}
+              <button
+                type="button"
+                disabled={!isDoctorAvailable}
+                onClick={() => handleConsultTypeToggle('online')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-colors ${
+                  !isDoctorAvailable
+                    ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60'
+                    : onlineConsult 
+                      ? 'bg-blue-50 border-blue-200 text-blue-700 cursor-pointer' 
+                      : 'bg-slate-50 border-slate-200 text-slate-400 cursor-pointer'
+                }`}
+                title={!isDoctorAvailable ? 'Disabled while doctor is unavailable' : 'Toggle customer app booking availability'}
+              >
+                {onlineConsult && isDoctorAvailable ? <ToggleRight size={16} className="text-blue-600" /> : <ToggleLeft size={16} />}
                 <span>App Bookings</span>
               </button>
 
+              {/* Walk-in Consultation Switch */}
               <button
                 type="button"
+                disabled={!isDoctorAvailable}
                 onClick={() => handleConsultTypeToggle('offline')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer border transition-colors ${
-                  offlineConsult ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-slate-50 border-slate-200 text-slate-400'
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-colors ${
+                  !isDoctorAvailable
+                    ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60'
+                    : offlineConsult 
+                      ? 'bg-emerald-50 border-emerald-200 text-emerald-700 cursor-pointer' 
+                      : 'bg-slate-50 border-slate-200 text-slate-400 cursor-pointer'
                 }`}
+                title={!isDoctorAvailable ? 'Disabled while doctor is unavailable' : 'Toggle hospital walk-in counter availability'}
               >
-                {offlineConsult ? <ToggleRight size={16} className="text-emerald-600" /> : <ToggleLeft size={16} />}
+                {offlineConsult && isDoctorAvailable ? <ToggleRight size={16} className="text-emerald-600" /> : <ToggleLeft size={16} />}
                 <span>Walk-in Counter</span>
               </button>
             </div>
           </div>
+
+          {/* Prominent Warning Banner when Doctor is Unavailable */}
+          {!isDoctorAvailable && (
+            <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fadeIn">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                  <UserX size={18} />
+                </div>
+                <div>
+                  <h4 className="text-xs font-black text-rose-900">Dr. {selectedDoctor.name} is Marked as Unavailable</h4>
+                  <p className="text-[11px] text-rose-700 font-medium">Customer app bookings and walk-in counter are paused for this doctor only. Other doctors in the hospital are unaffected.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleDoctorAvailabilityToggle}
+                className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-xl cursor-pointer border-none self-start sm:self-auto transition-colors shadow-xs"
+              >
+                Mark as Available
+              </button>
+            </div>
+          )}
 
           <div className="flex items-center gap-2 flex-wrap">
             {DAYS_OF_WEEK.map(day => {

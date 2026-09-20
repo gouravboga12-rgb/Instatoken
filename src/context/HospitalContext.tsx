@@ -1136,7 +1136,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       console.warn('Could not cache doctors to localStorage:', e);
     }
 
-    const patientDocs: Doctor[] = updatedDocs.filter(d => d.active !== false).map(d => {
+    const patientDocs: Doctor[] = updatedDocs.map(d => {
       const docSessions = (d.sessions && d.sessions.length > 0)
         ? d.sessions
         : [
@@ -1163,6 +1163,9 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         currentQueue: 0,
         nextAvailableToken: 1,
         estimatedWaitPerPatient: Number(d.consultationDuration) || 15,
+        active: d.active !== false,
+        onlineConsult: d.onlineConsult !== false,
+        offlineConsult: d.offlineConsult !== false,
         sessions: docSessions.map(s => ({
           id: s.id,
           name: s.name,

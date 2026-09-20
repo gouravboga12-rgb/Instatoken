@@ -505,10 +505,11 @@ const WalkInGenerator: React.FC<{
 
   const activeDepts = departments.filter(d => (d.active !== false) || d.id === form.departmentId);
   const availDoctors = form.departmentId
-    ? doctors.filter(d => d.departmentId === form.departmentId && ((d.active !== false) || d.id === form.doctorId))
-    : doctors.filter(d => (d.active !== false) || d.id === form.doctorId);
+    ? doctors.filter(d => d.departmentId === form.departmentId)
+    : doctors;
 
   const selectedDoctor = doctors.find(d => d.id === form.doctorId);
+  const isSelectedDoctorWalkInUnavailable = selectedDoctor ? (selectedDoctor.active === false || selectedDoctor.offlineConsult === false) : false;
 
   const activeSessions = useMemo(() => {
     if (selectedDoctor?.sessions && selectedDoctor.sessions.length > 0) {
@@ -525,6 +526,11 @@ const WalkInGenerator: React.FC<{
     e.preventDefault();
     if (!form.patientName.trim() || !form.patientPhone.trim() || !form.patientAge || !form.departmentId || !form.doctorId) {
       setError('Please fill in all mandatory fields.');
+      return;
+    }
+    const selDoc = doctors.find(d => d.id === form.doctorId);
+    if (selDoc && (selDoc.active === false || selDoc.offlineConsult === false)) {
+      setError(`Dr. ${selDoc.name} is currently marked as unavailable for walk-in counter bookings.`);
       return;
     }
     const ageNum = parseInt(form.patientAge, 10) || 0;
@@ -794,9 +800,14 @@ const WalkInGenerator: React.FC<{
                 className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 bg-white font-medium"
               >
                 <option value="">Select Doctor</option>
-                {availDoctors.map(d => (
-                  <option key={d.id} value={d.id}>{d.name} · ₹{d.consultationFee}</option>
-                ))}
+                {availDoctors.map(d => {
+                  const isDocAvail = d.active !== false && d.offlineConsult !== false;
+                  return (
+                    <option key={d.id} value={d.id} disabled={!isDocAvail}>
+                      {d.name} · ₹{d.consultationFee} {!isDocAvail ? '(Unavailable - Walk-in Closed)' : ''}
+                    </option>
+                  );
+                })}
               </select>
             </div>
 
@@ -886,9 +897,20 @@ const WalkInGenerator: React.FC<{
           </div>
 
           {selectedDoctor && (
-            <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 flex items-center justify-between">
+            <div className={`rounded-2xl p-4 flex items-center justify-between border transition-all ${
+              isSelectedDoctorWalkInUnavailable 
+                ? 'bg-rose-50/80 border-rose-200' 
+                : 'bg-slate-50 border-slate-100'
+            }`}>
               <div>
-                <p className="text-xs font-bold text-slate-800">{selectedDoctor.name}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs font-bold text-slate-800">{selectedDoctor.name}</p>
+                  {isSelectedDoctorWalkInUnavailable && (
+                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-300">
+                      ⛔ Walk-in Closed / Doctor Unavailable
+                    </span>
+                  )}
+                </div>
                 <p className="text-[10px] text-slate-400 font-semibold">{selectedDoctor.specialization} · Est. Duration: {selectedDoctor.consultationDuration || 15} mins</p>
               </div>
               <div className="text-right">
@@ -901,9 +923,14 @@ const WalkInGenerator: React.FC<{
           <div className="pt-2">
             <button
               type="submit"
-              className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-2xl cursor-pointer border-none shadow-md shadow-blue-500/20 transition-all flex items-center justify-center gap-2"
+              disabled={isSelectedDoctorWalkInUnavailable}
+              className={`w-full py-3.5 font-extrabold text-xs rounded-2xl border-none shadow-md transition-all flex items-center justify-center gap-2 ${
+                isSelectedDoctorWalkInUnavailable
+                  ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none'
+                  : 'bg-blue-600 hover:bg-blue-700 text-white cursor-pointer shadow-blue-500/20'
+              }`}
             >
-              <Plus size={16} /> Generate & Assign Token
+              <Plus size={16} /> {isSelectedDoctorWalkInUnavailable ? 'Doctor Unavailable for Walk-in' : 'Generate & Assign Token'}
             </button>
           </div>
         </form>
