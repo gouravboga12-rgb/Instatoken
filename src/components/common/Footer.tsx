@@ -117,6 +117,17 @@ export const Footer: React.FC = () => {
       <div className="border-t border-slate-800/80 py-6 px-6 md:px-10 text-xs text-slate-500 text-center md:text-left">
         <div className="w-full max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           <p>© 2026 InstaToken Healthcare Solutions Inc. All rights reserved.</p>
+          <a
+            href="https://www.codtechitsolutions.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[11px] font-semibold text-slate-400 hover:text-white transition-colors cursor-pointer"
+          >
+            Developed by{' '}
+            <span className="text-blue-400 font-bold hover:text-blue-300 transition-colors">
+              CODTECH IT SOLUTIONS
+            </span>
+          </a>
         </div>
       </div>
     </footer>
