@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { HOSPITALS, DEPARTMENTS, HEALTH_ARTICLES, MOCK_CUSTOMERS } from '../utils/mockData';
 import type { Hospital, Doctor, HealthArticle, CustomerAccount } from '../utils/mockData';
-import { broadcastGlobalSync, subscribeGlobalSync, formatTimeSlot } from '../utils/syncBus';
+import { broadcastGlobalSync, subscribeGlobalSync, formatTimeSlot, fetchCloudSync } from '../utils/syncBus';
 import { geocodeLocation, reverseGeocode, reverseGeocodeAddressDetails } from '../utils/googleMaps';
 import type { GeoLocationDetails, BannerRecord } from '../utils/geoHierarchy';
 
@@ -860,10 +860,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
 
       } else if (event.type === 'HOSPITAL_COMMUNICATION_BROADCAST') {
-        const { message, hospitalName, type } = event.data || {};
+        const { id, message, hospitalName, type, sentAt } = event.data || {};
         if (message) {
-          const notifTitle = type === 'push' ? `Push Alert: ${hospitalName || 'Hospital'}` : `Hospital Alert: ${hospitalName || 'Hospital'}`;
-          addNotification(notifTitle, message, 'info');
+          const notifId = id || `notif-${Date.now()}`;
+          const notifTitle = type === 'push' ? `Push Alert • ${hospitalName || 'Hospital'}` : `Hospital Alert • ${hospitalName || 'Hospital'}`;
+          const newNotif: AppNotification = {
+            id: notifId,
+            title: notifTitle,
+            message,
+            type: 'info',
+            timestamp: sentAt ? new Date(sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            read: false
+          };
+          setNotifications(prev => {
+            const filtered = prev.filter(n => n.id !== notifId);
+            const updated = [newNotif, ...filtered];
+            try {
+              localStorage.setItem('insta_notifications', JSON.stringify(updated));
+            } catch (e) {}
+            return updated;
+          });
 
           // Trigger native browser/device notification if permission is granted
           if (type === 'push' && typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
@@ -881,9 +897,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } else if (event.type === 'CLOUD_SYNC_UPDATED') {
         // Backend poller found newer data — re-hydrate from updated localStorage
         setHospitals(getHydratedHospitals());
+        const savedNotifs = localStorage.getItem('insta_notifications');
+        if (savedNotifs) {
+          try { setNotifications(JSON.parse(savedNotifs)); } catch (e) {}
+        }
 
       } else {
-        // Generic sync: reload appointments and customers
+        // Generic sync: reload appointments, customers, and notifications
         const savedAppts = localStorage.getItem('insta_appointments');
         if (savedAppts) {
           try { setAppointments(JSON.parse(savedAppts)); } catch (e) {}
@@ -892,8 +912,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (savedCusts) {
           try { setCustomers(JSON.parse(savedCusts)); } catch (e) {}
         }
+        const savedNotifs = localStorage.getItem('insta_notifications');
+        if (savedNotifs) {
+          try { setNotifications(JSON.parse(savedNotifs)); } catch (e) {}
+        }
       }
     });
+
+    // On initial mount, pull any active broadcast notifications from AWS cloud
+    fetchCloudSync().then(serverData => {
+      if (serverData?.broadcastNotifications && Array.isArray(serverData.broadcastNotifications) && serverData.broadcastNotifications.length > 0) {
+        setNotifications(prev => {
+          const readIds = new Set(prev.filter(n => n.read).map(n => n.id));
+          const mappedBroadcasts: AppNotification[] = serverData.broadcastNotifications.map((b: any) => ({
+            id: b.id,
+            title: b.type === 'push' ? `Push Alert • ${b.hospitalName || 'Hospital'}` : `Hospital Alert • ${b.hospitalName || 'Hospital'}`,
+            message: b.message,
+            type: 'info' as const,
+            timestamp: b.sentAt ? new Date(b.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            read: readIds.has(b.id)
+          }));
+          const existingNonBroadcast = prev.filter(n => !serverData.broadcastNotifications.some((b: any) => b.id === n.id));
+          const merged = [...mappedBroadcasts, ...existingNonBroadcast];
+          try {
+            localStorage.setItem('insta_notifications', JSON.stringify(merged));
+          } catch (e) {}
+          return merged;
+        });
+      }
+    }).catch(() => {});
 
     return unsubscribe;
   }, []);
@@ -1766,7 +1813,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       read: false
     };
-    setNotifications(prev => [newNotif, ...prev]);
+    setNotifications(prev => {
+      const updated = [newNotif, ...prev.filter(n => n.id !== newNotif.id)];
+      try {
+        localStorage.setItem('insta_notifications', JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
   };
 
   const clearNotifications = () => {

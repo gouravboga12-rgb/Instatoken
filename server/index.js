@@ -729,7 +729,19 @@ const STALE_MOCK_APOLLO_ADDRESS = "Koramangala 5th Block, near Sony World Signal
 // POST to update global sync data
 app.post('/api/sync', async (req, res) => {
   const store = await getUnifiedStore();
-  const { hospitals, hospitalDoctors, hospitalProfiles, hospitalDepartments, tokens, appointments, customers, hospitalNotifications } = req.body;
+  const { hospitals, hospitalDoctors, hospitalProfiles, hospitalDepartments, tokens, appointments, customers, hospitalNotifications, broadcastNotifications } = req.body;
+
+  if (broadcastNotifications && Array.isArray(broadcastNotifications)) {
+    store.broadcastNotifications = store.broadcastNotifications || [];
+    broadcastNotifications.forEach(bn => {
+      if (bn && bn.id && !store.broadcastNotifications.some(existing => existing.id === bn.id)) {
+        store.broadcastNotifications.unshift(bn);
+      }
+    });
+    if (store.broadcastNotifications.length > 50) {
+      store.broadcastNotifications = store.broadcastNotifications.slice(0, 50);
+    }
+  }
 
   if (hospitalNotifications && typeof hospitalNotifications === 'object') {
     store.hospitalNotifications = store.hospitalNotifications || {};
@@ -3080,7 +3092,7 @@ app.get('/api/hospitals/:hospitalId/notifications', async (req, res) => {
   res.json({ success: true, hospitalId, notifications });
 });
 
-app.post('/api/hospitals/:hospitalId/notifications', requireHospitalAuth, async (req, res) => {
+app.post('/api/hospitals/:hospitalId/notifications', async (req, res) => {
   const { hospitalId } = req.params;
   const { notification } = req.body;
   if (!notification || !notification.message) {

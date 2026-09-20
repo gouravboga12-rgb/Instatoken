@@ -181,6 +181,50 @@ export const runCloudSyncOnce = async (force: boolean = false): Promise<boolean>
         }
       }
 
+      // Sync active broadcast notifications into patient notifications store
+      if (serverData.broadcastNotifications && Array.isArray(serverData.broadcastNotifications)) {
+        try {
+          const currentNotifsRaw = localStorage.getItem('insta_notifications');
+          const currentNotifs = currentNotifsRaw ? JSON.parse(currentNotifsRaw) : [];
+          const readIds = new Set(currentNotifs.filter((n: any) => n.read).map((n: any) => n.id));
+
+          const mappedBroadcasts = serverData.broadcastNotifications.map((b: any) => ({
+            id: b.id,
+            title: b.type === 'push' ? `Push Alert • ${b.hospitalName || 'Hospital'}` : `Hospital Alert • ${b.hospitalName || 'Hospital'}`,
+            message: b.message,
+            type: 'info' as const,
+            timestamp: b.sentAt ? new Date(b.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            read: readIds.has(b.id)
+          }));
+
+          const nonBroadcastNotifs = currentNotifs.filter((n: any) => !serverData.broadcastNotifications.some((b: any) => b.id === n.id));
+          const mergedNotifs = [...mappedBroadcasts, ...nonBroadcastNotifs];
+
+          if (force || JSON.stringify(mergedNotifs) !== currentNotifsRaw) {
+            localStorage.setItem('insta_notifications', JSON.stringify(mergedNotifs));
+            hasChanged = true;
+          }
+        } catch (e) {
+          console.warn('Error syncing broadcast notifications in runCloudSyncOnce:', e);
+        }
+      }
+
+      // Sync hospital notifications per hospital
+      if (serverData.hospitalNotifications && typeof serverData.hospitalNotifications === 'object') {
+        try {
+          Object.entries(serverData.hospitalNotifications).forEach(([hId, notifs]) => {
+            if (Array.isArray(notifs)) {
+              const key = `insta_hospital_notifications_${hId}`;
+              const cur = localStorage.getItem(key);
+              if (force || JSON.stringify(notifs) !== cur) {
+                localStorage.setItem(key, JSON.stringify(notifs));
+                hasChanged = true;
+              }
+            }
+          });
+        } catch (e) {}
+      }
+
       if (hasChanged || force) {
         const eventPayload = { type: 'CLOUD_SYNC_UPDATED', data: serverData };
         subscribers.forEach(cb => {
