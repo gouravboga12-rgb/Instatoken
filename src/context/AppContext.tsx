@@ -318,7 +318,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [notifications, setNotifications] = useState<AppNotification[]>(() => {
     const saved = localStorage.getItem('insta_notifications');
-    return saved ? JSON.parse(saved) : [
+    if (saved !== null) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return [
       {
         id: "notif-1",
         title: "Welcome to InstaToken!",
@@ -857,11 +862,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } else if (event.type === 'HOSPITAL_COMMUNICATION_BROADCAST') {
         const { message, hospitalName, type } = event.data || {};
         if (message) {
-          addNotification(
-            type === 'push' ? `Push Alert: ${hospitalName || 'Hospital'}` : `Hospital Alert: ${hospitalName || 'Hospital'}`,
-            message,
-            'info'
-          );
+          const notifTitle = type === 'push' ? `Push Alert: ${hospitalName || 'Hospital'}` : `Hospital Alert: ${hospitalName || 'Hospital'}`;
+          addNotification(notifTitle, message, 'info');
+
+          // Trigger native browser/device notification if permission is granted
+          if (type === 'push' && typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+            try {
+              new Notification(`InstaToken • ${hospitalName || 'Hospital Alert'}`, {
+                body: message,
+                icon: '/favicon.png'
+              });
+            } catch (e) {
+              console.warn('Native browser notification dispatch failed:', e);
+            }
+          }
         }
 
       } else if (event.type === 'CLOUD_SYNC_UPDATED') {
@@ -1757,10 +1771,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const clearNotifications = () => {
     setNotifications([]);
+    try {
+      localStorage.setItem('insta_notifications', JSON.stringify([]));
+    } catch (e) {}
   };
 
   const markNotificationsAsRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    setNotifications(prev => {
+      const updated = prev.map(n => ({ ...n, read: true }));
+      try {
+        localStorage.setItem('insta_notifications', JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
   };
 
   const deleteAppointment = (id: string) => {

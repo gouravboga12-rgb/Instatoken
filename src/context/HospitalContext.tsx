@@ -275,6 +275,7 @@ interface HospitalContextType {
 
   // Notifications
   sendNotification: (msg: Omit<NotificationMessage, 'id' | 'sentAt' | 'status'>) => void;
+  clearHospitalNotifications: () => void;
 
   // Staff & Employees
   staff: HospitalStaffMember[];
@@ -720,7 +721,16 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return saved ? JSON.parse(saved) : INITIAL_SCHEDULE;
   });
 
-  const [notifications, setNotifications] = useState<NotificationMessage[]>([]);
+  const [notifications, setNotifications] = useState<NotificationMessage[]>(() => {
+    const curHospId = targetHospId || localStorage.getItem('insta_current_hospital_id') || 'hosp-apollo';
+    const saved = localStorage.getItem(`insta_hospital_notifications_${curHospId}`);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return [];
+  });
   const [activeSection, setActiveSection] = useState('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
@@ -849,6 +859,22 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         }
       })
       .catch(err => console.warn('Could not fetch schedules from AWS RDS:', err));
+
+    // 5. Fetch broadcast notification history
+    fetch(`/api/hospitals/${targetHospId}/notifications`, {
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+        'x-hospital-token': authToken
+      }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.notifications)) {
+          setNotifications(data.notifications);
+          localStorage.setItem(`insta_hospital_notifications_${targetHospId}`, JSON.stringify(data.notifications));
+        }
+      })
+      .catch(() => {});
   }, [targetHospId, authToken, hospitalUser]);
 
   // ─── Cross-tab & Real-time Global Sync ─────────────────────────────────────
@@ -1837,14 +1863,54 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   // Notifications
   const sendNotification = (msg: Omit<NotificationMessage, 'id' | 'sentAt' | 'status'>) => {
+    const hospId = targetHospId || hospitalUser?.hospitalId || localStorage.getItem('insta_current_hospital_id') || 'hosp-apollo';
     const newNotif: NotificationMessage = { ...msg, id: `notif-${Date.now()}`, sentAt: new Date().toISOString(), status: 'sent' };
-    setNotifications(prev => [newNotif, ...prev]);
+    
+    setNotifications(prev => {
+      const updated = [newNotif, ...prev];
+      try {
+        localStorage.setItem(`insta_hospital_notifications_${hospId}`, JSON.stringify(updated.slice(0, 50)));
+      } catch (e) {}
+      return updated;
+    });
 
-    // Broadcast live to patient app & website
+    // 1. Post to AWS server so other devices and web users receive broadcast
+    const token = authToken || localStorage.getItem('insta_hospital_auth_token') || `htok_${hospId}_default`;
+    fetch(`/api/hospitals/${hospId}/notifications`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ notification: newNotif })
+    }).catch(e => console.warn('Failed to sync notification to server:', e));
+
+    // 2. Broadcast live to open tabs and patient app
     broadcastGlobalSync('HOSPITAL_COMMUNICATION_BROADCAST', {
       ...newNotif,
+      hospitalId: hospId,
       hospitalName: hospitalProfile?.name || 'Hospital'
     });
+
+    // 3. If external push notification, trigger native browser notification if permitted
+    if (msg.type === 'push' && typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+      try {
+        new Notification(`InstaToken Push • ${hospitalProfile?.name || 'Hospital'}`, {
+          body: msg.message,
+          icon: hospitalProfile?.logo || '/favicon.png'
+        });
+      } catch (e) {
+        console.warn('Native notification failed:', e);
+      }
+    }
+  };
+
+  const clearHospitalNotifications = () => {
+    const hospId = targetHospId || hospitalUser?.hospitalId || localStorage.getItem('insta_current_hospital_id') || 'hosp-apollo';
+    setNotifications([]);
+    try {
+      localStorage.setItem(`insta_hospital_notifications_${hospId}`, JSON.stringify([]));
+    } catch (e) {}
   };
 
   const availableHospitals = (hospitals || []).map(h => ({ id: h.id, name: h.name, category: h.category }));
@@ -2155,7 +2221,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       generateWalkInToken, updateTokenStatus, cancelToken, deleteToken,
       addPatient, updatePatient, searchPatients, validateToken,
       updateScheduleConfig, updateSession,
-      sendNotification,
+      sendNotification, clearHospitalNotifications,
       updateHospitalProfile,
       switchHospital,
       availableHospitals,

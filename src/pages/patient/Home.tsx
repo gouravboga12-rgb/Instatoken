@@ -588,9 +588,11 @@ export const Home: React.FC<HomeProps> = ({
             className="relative p-2 text-slate-700 hover:text-blue-600 transition-colors cursor-pointer"
           >
             <Bell size={20} />
-            <span className="absolute top-1 right-1 h-4 w-4 bg-red-500 rounded-full text-[9px] font-black text-white flex items-center justify-center">
-              8
-            </span>
+            {unreadNotifs > 0 && (
+              <span className="absolute top-1 right-1 h-4 w-4 bg-red-500 rounded-full text-[9px] font-black text-white flex items-center justify-center animate-pulse">
+                {unreadNotifs}
+              </span>
+            )}
           </button>
         </div>
       </div>

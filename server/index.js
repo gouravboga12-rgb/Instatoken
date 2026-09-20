@@ -665,10 +665,14 @@ app.get('/api/sync', async (req, res) => {
       hospitalPatients: { [hospId]: store.hospitalPatients?.[hospId] || [] },
       hospitalStaff: { [hospId]: store.hospitalStaff?.[hospId] || [] },
       hospitalSchedules: { [hospId]: store.hospitalSchedules?.[hospId] || null },
+      hospitalNotifications: { [hospId]: store.hospitalNotifications?.[hospId] || [] },
+      broadcastNotifications: store.broadcastNotifications || []
     };
     return res.json(isolatedStore);
   }
 
+  store.hospitalNotifications = store.hospitalNotifications || {};
+  store.broadcastNotifications = store.broadcastNotifications || [];
   res.json(store);
 });
 
@@ -725,7 +729,16 @@ const STALE_MOCK_APOLLO_ADDRESS = "Koramangala 5th Block, near Sony World Signal
 // POST to update global sync data
 app.post('/api/sync', async (req, res) => {
   const store = await getUnifiedStore();
-  const { hospitals, hospitalDoctors, hospitalProfiles, hospitalDepartments, tokens, appointments, customers } = req.body;
+  const { hospitals, hospitalDoctors, hospitalProfiles, hospitalDepartments, tokens, appointments, customers, hospitalNotifications } = req.body;
+
+  if (hospitalNotifications && typeof hospitalNotifications === 'object') {
+    store.hospitalNotifications = store.hospitalNotifications || {};
+    Object.entries(hospitalNotifications).forEach(([hId, notifs]) => {
+      if (Array.isArray(notifs)) {
+        store.hospitalNotifications[hId] = notifs.slice(0, 50);
+      }
+    });
+  }
 
   // Protect hospitalProfiles from stale mock data overwrites
   if (hospitalProfiles && typeof hospitalProfiles === 'object') {
@@ -3057,6 +3070,55 @@ app.post('/api/hospitals/:hospitalId/staff', requireHospitalAuth, async (req, re
 
   await saveUnifiedStore(store);
   res.json({ success: true, hospitalId, staff });
+});
+
+// ─── Hospital Broadcast Notifications ─────────────────────────────────────────
+app.get('/api/hospitals/:hospitalId/notifications', async (req, res) => {
+  const { hospitalId } = req.params;
+  const store = await getUnifiedStore();
+  const notifications = store.hospitalNotifications?.[hospitalId] || [];
+  res.json({ success: true, hospitalId, notifications });
+});
+
+app.post('/api/hospitals/:hospitalId/notifications', requireHospitalAuth, async (req, res) => {
+  const { hospitalId } = req.params;
+  const { notification } = req.body;
+  if (!notification || !notification.message) {
+    return res.status(400).json({ success: false, message: 'Invalid notification data' });
+  }
+
+  const store = await getUnifiedStore();
+  store.hospitalNotifications = store.hospitalNotifications || {};
+  store.hospitalNotifications[hospitalId] = store.hospitalNotifications[hospitalId] || [];
+
+  const newRecord = {
+    id: notification.id || `notif-${Date.now()}`,
+    type: notification.type || 'inapp',
+    recipient: notification.recipient || 'all',
+    message: notification.message,
+    sentAt: notification.sentAt || new Date().toISOString(),
+    status: 'sent'
+  };
+
+  store.hospitalNotifications[hospitalId].unshift(newRecord);
+  if (store.hospitalNotifications[hospitalId].length > 50) {
+    store.hospitalNotifications[hospitalId] = store.hospitalNotifications[hospitalId].slice(0, 50);
+  }
+
+  // Maintain active broadcasts for client devices
+  store.broadcastNotifications = store.broadcastNotifications || [];
+  const hospName = store.hospitalProfiles?.[hospitalId]?.name || store.hospitals?.find(h => h.id === hospitalId)?.name || 'Hospital';
+  store.broadcastNotifications.unshift({
+    ...newRecord,
+    hospitalId,
+    hospitalName: hospName
+  });
+  if (store.broadcastNotifications.length > 50) {
+    store.broadcastNotifications = store.broadcastNotifications.slice(0, 50);
+  }
+
+  await saveUnifiedStore(store);
+  res.json({ success: true, hospitalId, notification: newRecord });
 });
 
 // ─── Direct Media Upload Endpoint (S3 with Base64 fallback) ───────────────────

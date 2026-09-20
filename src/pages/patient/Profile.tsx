@@ -14,6 +14,7 @@ export const Profile: React.FC = () => {
   const { 
     user, 
     hospitals, 
+    notifications,
     logout, 
     addFamilyMember, 
     removeFamilyMember, 
@@ -24,6 +25,7 @@ export const Profile: React.FC = () => {
     updateUserProfile,
     updateUserLocation
   } = useApp();
+  const unreadNotifs = (notifications || []).filter(n => !n.read).length;
   const navigate = useNavigate();
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
@@ -146,7 +148,11 @@ export const Profile: React.FC = () => {
               className="p-2 rounded-full bg-white/15 hover:bg-white/25 transition-all text-white cursor-pointer relative"
             >
               <Bell size={18} />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-400 rounded-full animate-ping" />
+              {unreadNotifs > 0 && (
+                <span className="absolute top-1 right-1 h-3.5 w-3.5 bg-red-400 rounded-full text-[8px] font-bold text-white flex items-center justify-center animate-pulse">
+                  {unreadNotifs}
+                </span>
+              )}
             </button>
             <button 
               onClick={() => setIsEditProfileOpen(true)}
