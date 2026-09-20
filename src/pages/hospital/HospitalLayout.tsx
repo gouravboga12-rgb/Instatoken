@@ -178,12 +178,14 @@ const Sidebar: React.FC<{ collapsed: boolean; onToggle: () => void }> = ({ colla
 
 // ─── Top Header ───────────────────────────────────────────────────────────────
 const TopHeader: React.FC<{ onMenuToggle: () => void }> = ({ onMenuToggle }) => {
-  const { hospitalUser, hospitalLogout, tokens, hospitalProfile } = useHospital();
+  const { hospitalUser, hospitalLogout, tokens, hospitalProfile, notifications } = useHospital();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const todayStr = new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
   const todayTokens = tokens.filter(t => ['booked','waiting','checked-in'].includes(t.status)).length;
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
+  const notifsCount = (notifications || []).length;
 
   const handleManualRefresh = async () => {
     if (isRefreshing) return;
@@ -268,11 +270,73 @@ const TopHeader: React.FC<{ onMenuToggle: () => void }> = ({ onMenuToggle }) => 
         <span className="text-[11px] hidden sm:inline">{isRefreshing ? 'Syncing...' : 'Sync'}</span>
       </button>
 
-      {/* Notification */}
-      <button className="relative p-2 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer">
-        <Bell size={18} className="text-slate-500" />
-        <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 rounded-full text-[9px] text-white font-bold flex items-center justify-center">3</span>
-      </button>
+      {/* Notification Bell & Dropdown */}
+      <div className="relative">
+        <button 
+          type="button"
+          onClick={() => setShowNotificationsDropdown(prev => !prev)}
+          className="relative p-2 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer"
+          title="Hospital Broadcasts & Notifications"
+        >
+          <Bell size={18} className="text-slate-500" />
+          {notifsCount > 0 && (
+            <span className="absolute top-1 right-1 w-4 h-4 bg-blue-600 rounded-full text-[9px] text-white font-bold flex items-center justify-center animate-pulse">
+              {notifsCount > 9 ? '9+' : notifsCount}
+            </span>
+          )}
+        </button>
+
+        {showNotificationsDropdown && (
+          <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-slate-100 p-3 z-50 space-y-2">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100 px-1">
+              <span className="text-xs font-black text-slate-800">Hospital Broadcasts</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowNotificationsDropdown(false);
+                  navigate('/hospital/communication');
+                }}
+                className="text-[10px] font-bold text-blue-600 hover:underline cursor-pointer border-none bg-transparent"
+              >
+                Open Push Center
+              </button>
+            </div>
+            
+            <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
+              {notifications.length > 0 ? (
+                notifications.slice(0, 5).map(n => (
+                  <div key={n.id} className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className={`font-extrabold text-[10px] capitalize ${n.type === 'push' ? 'text-purple-600' : 'text-blue-600'}`}>
+                        {n.type === 'push' ? 'Device Push' : 'In-App Alert'}
+                      </span>
+                      <span className="text-[9px] text-slate-400">
+                        {new Date(n.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 mt-1 line-clamp-2">{n.message}</p>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-6 text-[11px] text-slate-400 font-bold">
+                  No broadcast messages yet.
+                </div>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setShowNotificationsDropdown(false);
+                navigate('/hospital/communication');
+              }}
+              className="w-full py-2 bg-blue-50 hover:bg-blue-100 text-blue-600 font-bold text-xs rounded-xl cursor-pointer transition-colors text-center block border-none"
+            >
+              + Send New Notification
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* Profile */}
       <div className="flex items-center gap-2">
