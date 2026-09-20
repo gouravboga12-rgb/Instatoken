@@ -188,7 +188,16 @@ export const runCloudSyncOnce = async (force: boolean = false): Promise<boolean>
           const currentNotifs = currentNotifsRaw ? JSON.parse(currentNotifsRaw) : [];
           const readIds = new Set(currentNotifs.filter((n: any) => n.read).map((n: any) => n.id));
 
-          const mappedBroadcasts = serverData.broadcastNotifications.map((b: any) => ({
+          // Respect user's "Clear All" — never re-inject cleared broadcast IDs
+          let clearedIds: Set<string>;
+          try {
+            clearedIds = new Set(JSON.parse(localStorage.getItem('insta_notifications_cleared_ids') || '[]') as string[]);
+          } catch (_e) {
+            clearedIds = new Set();
+          }
+
+          const filteredBroadcasts = serverData.broadcastNotifications.filter((b: any) => !clearedIds.has(b.id));
+          const mappedBroadcasts = filteredBroadcasts.map((b: any) => ({
             id: b.id,
             title: b.type === 'push' ? `Push Alert • ${b.hospitalName || 'Hospital'}` : `Hospital Alert • ${b.hospitalName || 'Hospital'}`,
             message: b.message,

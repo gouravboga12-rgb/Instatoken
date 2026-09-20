@@ -923,8 +923,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     fetchCloudSync().then(serverData => {
       if (serverData?.broadcastNotifications && Array.isArray(serverData.broadcastNotifications) && serverData.broadcastNotifications.length > 0) {
         setNotifications(prev => {
+          // Skip any broadcast IDs that the user has explicitly cleared
+          let clearedIds: Set<string>;
+          try {
+            clearedIds = new Set(JSON.parse(localStorage.getItem('insta_notifications_cleared_ids') || '[]') as string[]);
+          } catch (e) {
+            clearedIds = new Set();
+          }
           const readIds = new Set(prev.filter(n => n.read).map(n => n.id));
-          const mappedBroadcasts: AppNotification[] = serverData.broadcastNotifications.map((b: any) => ({
+          const filteredBroadcasts = serverData.broadcastNotifications.filter((b: any) => !clearedIds.has(b.id));
+          if (filteredBroadcasts.length === 0) return prev;
+          const mappedBroadcasts: AppNotification[] = filteredBroadcasts.map((b: any) => ({
             id: b.id,
             title: b.type === 'push' ? `Push Alert • ${b.hospitalName || 'Hospital'}` : `Hospital Alert • ${b.hospitalName || 'Hospital'}`,
             message: b.message,
@@ -1823,10 +1832,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const clearNotifications = () => {
-    setNotifications([]);
-    try {
-      localStorage.setItem('insta_notifications', JSON.stringify([]));
-    } catch (e) {}
+    // Remember which broadcast IDs were cleared so cloud sync doesn't re-inject them
+    setNotifications(prev => {
+      try {
+        const existingCleared = JSON.parse(localStorage.getItem('insta_notifications_cleared_ids') || '[]') as string[];
+        const newCleared = [...new Set([...existingCleared, ...prev.map(n => n.id)])];
+        localStorage.setItem('insta_notifications_cleared_ids', JSON.stringify(newCleared));
+        localStorage.setItem('insta_notifications', JSON.stringify([]));
+      } catch (e) {}
+      return [];
+    });
   };
 
   const markNotificationsAsRead = () => {
