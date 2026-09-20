@@ -663,51 +663,57 @@ export const BookToken: React.FC = () => {
               </div>
 
               {/* Age & Gender 2-Column Row */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3 items-start">
+                {/* Age Input with Unit Selector */}
                 <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[10px] font-extrabold text-slate-700 uppercase tracking-wide">Age</label>
-                    <span className="text-[9px] font-bold text-blue-600">Unit: {ageUnit}</span>
-                  </div>
-                  <div className="relative flex items-center">
-                    <CalendarIcon size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-blue-600 pointer-events-none" />
+                  <label className="text-[10px] font-extrabold text-slate-700 uppercase tracking-wide block">
+                    Age
+                  </label>
+                  <div className="flex items-center h-[42px] bg-slate-50 border border-slate-200 rounded-xl focus-within:bg-white focus-within:border-blue-600 focus-within:ring-1 focus-within:ring-blue-600 transition-all overflow-hidden">
                     <input 
                       type="number" 
+                      inputMode="numeric"
                       min="1"
-                      max={ageUnit === 'Days' ? 365 : ageUnit === 'Months' ? 120 : 120}
+                      max={ageUnit === 'Days' ? 365 : 120}
                       value={age}
                       onChange={(e) => setAge(e.target.value)}
                       placeholder={ageUnit === 'Days' ? "e.g. 15" : ageUnit === 'Months' ? "e.g. 6" : "e.g. 28"}
-                      className="w-full pl-10 pr-22 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:bg-white focus:border-blue-600 focus:outline-none transition-all"
+                      className="w-full min-w-0 pl-3.5 pr-1.5 py-2.5 bg-transparent text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
-                    <div className="absolute right-1 top-1/2 -translate-y-1/2">
+                    <div className="h-4.5 w-px bg-slate-200 shrink-0" />
+                    <div className="relative shrink-0 flex items-center">
                       <select
                         value={ageUnit}
                         onChange={(e) => setAgeUnit(e.target.value as 'Years' | 'Months' | 'Days')}
-                        className="text-[10px] font-extrabold text-blue-700 bg-white border border-slate-200 rounded-lg py-1 px-1.5 focus:outline-none cursor-pointer shadow-2xs"
+                        aria-label="Age unit"
+                        className="text-xs font-bold text-blue-600 bg-transparent py-2.5 pl-2 pr-6 focus:outline-none cursor-pointer appearance-none"
                       >
                         <option value="Years">Years</option>
                         <option value="Months">Months</option>
                         <option value="Days">Days</option>
                       </select>
+                      <ChevronDown size={12} className="absolute right-2 text-blue-600 pointer-events-none stroke-[2.5]" />
                     </div>
                   </div>
                 </div>
 
+                {/* Gender Selector */}
                 <div className="space-y-1">
-                  <label className="text-[10px] font-extrabold text-slate-700 uppercase tracking-wide">Gender</label>
-                  <div className="relative">
-                    <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-blue-600" />
+                  <label className="text-[10px] font-extrabold text-slate-700 uppercase tracking-wide block">
+                    Gender
+                  </label>
+                  <div className="relative flex items-center h-[42px] bg-slate-50 border border-slate-200 rounded-xl focus-within:bg-white focus-within:border-blue-600 focus-within:ring-1 focus-within:ring-blue-600 transition-all">
+                    <User size={16} className="absolute left-3.5 text-blue-600 pointer-events-none shrink-0" />
                     <select 
                       value={gender}
                       onChange={(e) => setGender(e.target.value)}
-                      className="w-full pl-10 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:bg-white focus:border-blue-600 focus:outline-none transition-all appearance-none cursor-pointer"
+                      className="w-full h-full pl-10 pr-8 bg-transparent text-xs font-semibold text-slate-800 focus:outline-none appearance-none cursor-pointer"
                     >
                       <option value="Male">Male</option>
                       <option value="Female">Female</option>
                       <option value="Other">Other</option>
                     </select>
-                    <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    <ChevronDown size={14} className="absolute right-3 text-slate-400 pointer-events-none" />
                   </div>
                 </div>
               </div>
