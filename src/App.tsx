@@ -337,8 +337,11 @@ const AppContent: React.FC = () => {
     localStorage.setItem('insta_onboarded', String(onboarded));
   }, [onboarded]);
 
+  const isConfirmationRoute = location.pathname.startsWith('/confirmation/');
+  const isPublicRoute = isManagementRoute || isConfirmationRoute;
+
   // Always show Splash Screen first only for customer account routes (400ms ultra-short)
-  if (showSplash && !isManagementRoute) {
+  if (showSplash && !isManagementRoute && !isConfirmationRoute) {
     return (
       <SplashScreen 
         duration={400} 
@@ -350,11 +353,11 @@ const AppContent: React.FC = () => {
     );
   }
 
-  if (!onboarded && !isManagementRoute) {
+  if (!onboarded && !isManagementRoute && !isConfirmationRoute) {
     return <Onboarding onComplete={() => setOnboarded(true)} />;
   }
 
-  if (!user && !isManagementRoute) {
+  if (!user && !isPublicRoute) {
     return (
       <Login 
         onSuccess={() => {
