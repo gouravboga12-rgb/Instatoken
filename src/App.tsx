@@ -15,6 +15,7 @@ import { MyBookings } from './pages/patient/MyBookings';
 import { Profile } from './pages/patient/Profile';
 import { Notifications } from './pages/patient/Notifications';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
+import { AdminLogin } from './pages/admin/AdminLogin';
 import { HospitalProvider } from './context/HospitalContext';
 import { HospitalLogin } from './pages/hospital/HospitalLogin';
 import { HospitalSignup } from './pages/hospital/HospitalSignup';
@@ -434,6 +435,8 @@ const AppContent: React.FC = () => {
           
           {/* Admin routes */}
           <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/admin/login" element={<AdminLogin />} />
+          <Route path="/admin-login" element={<AdminLogin />} />
           <Route path="/admin/banners" element={<AdminDashboard initialTab="banners" />} />
           <Route path="/admin/ads-inquiries" element={<AdminDashboard initialTab="ads-inquiries" />} />
 

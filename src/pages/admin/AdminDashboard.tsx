@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { LocationBanners } from './LocationBanners';
 import { AdsInquiries } from './AdsInquiries';
+import { AdminLogin } from './AdminLogin';
 
 interface AdminDashboardProps {
   initialTab?: 'stats' | 'hospitals' | 'customers' | 'financials' | 'add-hospital' | 'add-doctor' | 'banners' | 'ads-inquiries';
@@ -24,10 +25,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
   const navigate = useNavigate();
   const location = useLocation();
   const { 
+    user,
     hospitals, appointments, customers, addHospital, addDoctor, 
     toggleDisableHospital, deleteHospital, toggleCustomerStatus, notifications, addNotification,
     platformFeePercent, setPlatformFeePercent, logout
   } = useApp();
+
+  if (user?.role !== 'admin') {
+    return <AdminLogin onSuccess={() => {}} />;
+  }
 
   const [hospitalToDelete, setHospitalToDelete] = useState<any | null>(null);
   const [isDeletingHosp, setIsDeletingHosp] = useState(false);
@@ -360,7 +366,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
           
           <Button 
             variant="outline" 
-            onClick={() => { logout(); navigate('/'); }}
+            onClick={() => { logout(); navigate('/admin'); }}
             className="w-full py-2 bg-red-900/40 border-red-800/60 hover:bg-red-800/60 text-red-300 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
           >
             <LogOut size={13} /> Logout

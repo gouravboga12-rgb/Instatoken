@@ -1027,13 +1027,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     isGoogleAuth?: boolean,
     googleProfile?: any
   ): Promise<boolean> => {
+    const cleanInput = emailOrPhone.trim();
+    const cleanPassword = passwordOrOtp.trim();
+    const cleanInputLower = cleanInput.toLowerCase();
+
     // Super Admin login — fully independent, strict credential check
-    const ADMIN_EMAIL = 'anilajay1999@gmail.com';
-    const ADMIN_PASSWORD = 'anilajay@1999';
-    if (emailOrPhone.trim() === ADMIN_EMAIL && passwordOrOtp === ADMIN_PASSWORD) {
+    const isSuperAdminId = cleanInputLower === 'anilajay1999@gmail.com' || cleanInputLower === 'admin';
+    const isSuperAdminPass = cleanPassword === 'anilajay@1999' || cleanPassword === 'anilajay1999';
+
+    if (isSuperAdminId && isSuperAdminPass) {
       setUser({
         name: "Super Admin",
-        email: ADMIN_EMAIL,
+        email: "anilajay1999@gmail.com",
         phone: "+91 9999999999",
         role: "admin",
         savedHospitals: [],
@@ -1045,8 +1050,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return true;
     }
 
-    const cleanInput = emailOrPhone.trim();
-    const cleanPassword = passwordOrOtp.trim();
     const isGoogle = isGoogleAuth || cleanPassword === 'google';
 
     // 1. First attempt live authentication from backend
