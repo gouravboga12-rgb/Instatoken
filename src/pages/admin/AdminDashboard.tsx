@@ -15,7 +15,6 @@ import {
 } from 'lucide-react';
 import { LocationBanners } from './LocationBanners';
 import { AdsInquiries } from './AdsInquiries';
-import { AdminLogin } from './AdminLogin';
 
 interface AdminDashboardProps {
   initialTab?: 'stats' | 'hospitals' | 'customers' | 'financials' | 'add-hospital' | 'add-doctor' | 'banners' | 'ads-inquiries';
@@ -25,15 +24,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
   const navigate = useNavigate();
   const location = useLocation();
   const { 
-    user,
     hospitals, appointments, customers, addHospital, addDoctor, 
     toggleDisableHospital, deleteHospital, toggleCustomerStatus, notifications, addNotification,
     platformFeePercent, setPlatformFeePercent, logout
   } = useApp();
-
-  if (user?.role !== 'admin') {
-    return <AdminLogin onSuccess={() => {}} />;
-  }
 
   const [hospitalToDelete, setHospitalToDelete] = useState<any | null>(null);
   const [isDeletingHosp, setIsDeletingHosp] = useState(false);

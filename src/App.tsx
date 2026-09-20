@@ -288,6 +288,14 @@ const TopNavbar: React.FC = () => {
   );
 };
 
+const AdminGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user } = useApp();
+  if (user?.role !== 'admin') {
+    return <AdminLogin />;
+  }
+  return <>{children}</>;
+};
+
 const AppContent: React.FC = () => {
   const { user } = useApp();
   const navigate = useNavigate();
@@ -434,11 +442,11 @@ const AppContent: React.FC = () => {
           <Route path="/notifications" element={<Notifications />} />
           
           {/* Admin routes */}
-          <Route path="/admin" element={<AdminDashboard />} />
-          <Route path="/admin/login" element={<AdminLogin />} />
-          <Route path="/admin-login" element={<AdminLogin />} />
-          <Route path="/admin/banners" element={<AdminDashboard initialTab="banners" />} />
-          <Route path="/admin/ads-inquiries" element={<AdminDashboard initialTab="ads-inquiries" />} />
+          <Route path="/admin" element={<AdminGuard><AdminDashboard /></AdminGuard>} />
+          <Route path="/admin/login" element={<AdminGuard><Navigate to="/admin" replace /></AdminGuard>} />
+          <Route path="/admin-login" element={<AdminGuard><Navigate to="/admin" replace /></AdminGuard>} />
+          <Route path="/admin/banners" element={<AdminGuard><AdminDashboard initialTab="banners" /></AdminGuard>} />
+          <Route path="/admin/ads-inquiries" element={<AdminGuard><AdminDashboard initialTab="ads-inquiries" /></AdminGuard>} />
 
           {/* Hospital Panel routes */}
           <Route path="/hospital-login" element={<HospitalLogin />} />
