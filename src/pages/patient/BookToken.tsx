@@ -662,14 +662,15 @@ export const BookToken: React.FC = () => {
                 </div>
               </div>
 
-              {/* Age & Gender 2-Column Row */}
-              <div className="grid grid-cols-2 gap-3 items-start">
+              {/* Age & Gender Row - 1 col on mobile, 2 cols on desktop */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 items-start">
                 {/* Age Input with Unit Selector */}
                 <div className="space-y-1">
                   <label className="text-[10px] font-extrabold text-slate-700 uppercase tracking-wide block">
                     Age
                   </label>
-                  <div className="flex items-center h-[42px] bg-slate-50 border border-slate-200 rounded-xl focus-within:bg-white focus-within:border-blue-600 focus-within:ring-1 focus-within:ring-blue-600 transition-all overflow-hidden">
+                  <div className="relative flex items-center h-[42px] bg-slate-50 border border-slate-200 rounded-xl focus-within:bg-white focus-within:border-blue-600 focus-within:ring-1 focus-within:ring-blue-600 transition-all overflow-hidden">
+                    <CalendarIcon size={16} className="absolute left-3.5 text-blue-600 pointer-events-none shrink-0" />
                     <input 
                       type="number" 
                       inputMode="numeric"
@@ -678,7 +679,7 @@ export const BookToken: React.FC = () => {
                       value={age}
                       onChange={(e) => setAge(e.target.value)}
                       placeholder={ageUnit === 'Days' ? "e.g. 15" : ageUnit === 'Months' ? "e.g. 6" : "e.g. 28"}
-                      className="w-full min-w-0 pl-3.5 pr-1.5 py-2.5 bg-transparent text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      className="w-full min-w-0 pl-10 pr-1.5 py-2.5 bg-transparent text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
                     <div className="h-4.5 w-px bg-slate-200 shrink-0" />
                     <div className="relative shrink-0 flex items-center">
