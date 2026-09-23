@@ -795,7 +795,7 @@ export const Home: React.FC<HomeProps> = ({
               { title: "Nearby", sub: "Hospitals", icon: <MapPin className="text-blue-600" size={15} />, bg: "bg-blue-50", filter: "nearby" },
               { title: "Top Rated", sub: "Hospitals", icon: <Star className="text-amber-500 fill-amber-500" size={15} />, bg: "bg-amber-50", filter: "top-rated" },
               { title: "My Tokens", sub: "", icon: <Award className="text-blue-600" size={15} />, bg: "bg-blue-50", nav: "/bookings" },
-              { title: "Health Records", sub: "", icon: <FileText className="text-emerald-600" size={15} />, bg: "bg-emerald-50", nav: "/profile?tab=records" }
+              { title: "Health Records", sub: "", icon: <FileText className="text-emerald-600" size={15} />, bg: "bg-emerald-50", nav: "/records" }
             ].map((cat, idx) => (
               <button
                 key={idx}

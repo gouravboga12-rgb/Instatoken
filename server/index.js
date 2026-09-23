@@ -2162,7 +2162,7 @@ app.post('/api/customers/reset-password', async (req, res) => {
 // POST /api/customers/profile - Update / Save customer profile in AWS RDS
 app.post('/api/customers/profile', async (req, res) => {
   try {
-    const { id, name, phone, email, location, lat, lng, familyMembers, savedDoctors, savedHospitals, subscription, oldPhone, oldEmail } = req.body;
+    const { id, name, phone, email, location, lat, lng, familyMembers, savedDoctors, savedHospitals, subscription, medicalRecords, oldPhone, oldEmail } = req.body;
     const store = await getUnifiedStore();
     store.customers = store.customers || [];
 
@@ -2203,6 +2203,7 @@ app.post('/api/customers/profile', async (req, res) => {
         expiresAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
         price: 10
       }),
+      medicalRecords: medicalRecords !== undefined ? medicalRecords : (existing?.medicalRecords || []),
       bookings: existing?.bookings || []
     };
 
@@ -2217,6 +2218,114 @@ app.post('/api/customers/profile', async (req, res) => {
     res.json({ success: true, customer: updatedCustomer, message: 'Customer profile saved to AWS RDS' });
   } catch (err) {
     console.error('Error saving customer profile in AWS RDS:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ─── Customer Medical Records Endpoints ──────────────────────────────────────────
+// GET /api/customers/:customerId/records
+app.get('/api/customers/:customerId/records', async (req, res) => {
+  try {
+    const { customerId } = req.params;
+    const store = await getUnifiedStore();
+    store.customers = store.customers || [];
+    const customer = store.customers.find(c => c.id === customerId || c.email === customerId || c.phone === customerId);
+    if (!customer) {
+      return res.json({ success: true, records: [] });
+    }
+    return res.json({ success: true, records: customer.medicalRecords || [] });
+  } catch (err) {
+    console.error('Error fetching medical records:', err);
+    res.status(500).json({ success: false, message: err.message, records: [] });
+  }
+});
+
+// POST /api/customers/:customerId/records
+app.post('/api/customers/:customerId/records', async (req, res) => {
+  try {
+    const { customerId } = req.params;
+    const record = req.body;
+    const store = await getUnifiedStore();
+    store.customers = store.customers || [];
+    let customer = store.customers.find(c => c.id === customerId || c.email === customerId || c.phone === customerId);
+    if (!customer) {
+      customer = {
+        id: customerId.startsWith('cust-') ? customerId : `cust-${Date.now()}`,
+        name: 'Patient',
+        phone: customerId.match(/^\d+$/) ? customerId : '',
+        email: customerId.includes('@') ? customerId : '',
+        location: 'Hyderabad, Telangana',
+        medicalRecords: []
+      };
+      store.customers.push(customer);
+    }
+    customer.medicalRecords = customer.medicalRecords || [];
+    const newRecord = {
+      id: record.id || `rec-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      name: record.name || 'Medical Document',
+      category: record.category || 'Other',
+      doctor: record.doctor || '',
+      hospital: record.hospital || '',
+      date: record.date || new Date().toISOString().split('T')[0],
+      fileType: record.fileType || 'PDF',
+      fileName: record.fileName || 'document.pdf',
+      fileSize: record.fileSize || '100 KB',
+      fileUrl: record.fileUrl || '',
+      notes: record.notes || '',
+      uploadedAt: record.uploadedAt || new Date().toISOString()
+    };
+    customer.medicalRecords.unshift(newRecord);
+    await saveUnifiedStore(store);
+    return res.json({ success: true, record: newRecord, records: customer.medicalRecords });
+  } catch (err) {
+    console.error('Error adding medical record:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// PUT /api/customers/:customerId/records/:recordId
+app.put('/api/customers/:customerId/records/:recordId', async (req, res) => {
+  try {
+    const { customerId, recordId } = req.params;
+    const updates = req.body;
+    const store = await getUnifiedStore();
+    store.customers = store.customers || [];
+    const customer = store.customers.find(c => c.id === customerId || c.email === customerId || c.phone === customerId);
+    if (!customer || !customer.medicalRecords) {
+      return res.status(404).json({ success: false, message: 'Record or customer not found' });
+    }
+    const idx = customer.medicalRecords.findIndex(r => r.id === recordId);
+    if (idx === -1) {
+      return res.status(404).json({ success: false, message: 'Record not found' });
+    }
+    customer.medicalRecords[idx] = {
+      ...customer.medicalRecords[idx],
+      ...updates,
+      id: recordId
+    };
+    await saveUnifiedStore(store);
+    return res.json({ success: true, record: customer.medicalRecords[idx], records: customer.medicalRecords });
+  } catch (err) {
+    console.error('Error updating medical record:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// DELETE /api/customers/:customerId/records/:recordId
+app.delete('/api/customers/:customerId/records/:recordId', async (req, res) => {
+  try {
+    const { customerId, recordId } = req.params;
+    const store = await getUnifiedStore();
+    store.customers = store.customers || [];
+    const customer = store.customers.find(c => c.id === customerId || c.email === customerId || c.phone === customerId);
+    if (!customer || !customer.medicalRecords) {
+      return res.status(404).json({ success: false, message: 'Record or customer not found' });
+    }
+    customer.medicalRecords = customer.medicalRecords.filter(r => r.id !== recordId);
+    await saveUnifiedStore(store);
+    return res.json({ success: true, message: 'Record deleted successfully', records: customer.medicalRecords });
+  } catch (err) {
+    console.error('Error deleting medical record:', err);
     res.status(500).json({ success: false, message: err.message });
   }
 });
@@ -3162,7 +3271,65 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
 const uploadsDir = path.join(__dirname, 'uploads');
 fs.mkdirSync(path.join(uploadsDir, 'banner-videos'), { recursive: true });
 fs.mkdirSync(path.join(uploadsDir, 'banners'), { recursive: true });
+fs.mkdirSync(path.join(uploadsDir, 'records'), { recursive: true });
 app.use('/uploads', express.static(uploadsDir));
+
+// ─── Medical Records Document & Image Upload Endpoint ─────────────────────────
+app.post('/api/records/upload', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file uploaded' });
+    }
+    const ext = path.extname(req.file.originalname) || '.pdf';
+    const cleanExt = ext.toLowerCase();
+    const safeBase = path.basename(req.file.originalname, ext).replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 30);
+    const filename = `record-${Date.now()}-${safeBase}${cleanExt}`;
+    const key = `records/${filename}`;
+    
+    let fileType = 'PDF';
+    if (req.file.mimetype && req.file.mimetype.startsWith('image/')) {
+      fileType = 'IMAGE';
+    } else if (cleanExt.includes('doc') || cleanExt.includes('txt')) {
+      fileType = 'DOC';
+    }
+
+    // Format file size
+    const sizeBytes = req.file.size;
+    let sizeStr = `${(sizeBytes / 1024).toFixed(1)} KB`;
+    if (sizeBytes > 1024 * 1024) {
+      sizeStr = `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`;
+    }
+
+    try {
+      const publicUrl = await uploadFile(key, req.file.buffer, req.file.mimetype || 'application/pdf');
+      console.log('✅ Uploaded medical record to S3:', publicUrl);
+      return res.json({
+        success: true,
+        url: publicUrl,
+        fileName: req.file.originalname,
+        fileType,
+        fileSize: sizeStr,
+        source: 's3'
+      });
+    } catch (s3Err) {
+      console.warn('⚠️ S3 upload failed, saving to local records upload directory:', s3Err.message);
+      const localPath = path.join(uploadsDir, 'records', filename);
+      fs.writeFileSync(localPath, req.file.buffer);
+      const localUrl = `/uploads/records/${filename}`;
+      return res.json({
+        success: true,
+        url: localUrl,
+        fileName: req.file.originalname,
+        fileType,
+        fileSize: sizeStr,
+        source: 'local'
+      });
+    }
+  } catch (err) {
+    console.error('Record upload endpoint error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
 
 // ─── Dedicated Video Upload Endpoint ──────────────────────────────────────────
 app.post('/api/upload/video', uploadVideo.single('file'), async (req, res) => {

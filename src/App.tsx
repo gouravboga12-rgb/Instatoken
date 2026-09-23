@@ -13,6 +13,7 @@ import { TokenConfirmation } from './pages/patient/TokenConfirmation';
 
 import { MyBookings } from './pages/patient/MyBookings';
 import { Profile } from './pages/patient/Profile';
+import { HealthRecords } from './pages/patient/HealthRecords';
 import { Notifications } from './pages/patient/Notifications';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { AdminLogin } from './pages/admin/AdminLogin';
@@ -103,6 +104,12 @@ const TopNavbar: React.FC = () => {
             className={`transition-colors cursor-pointer ${location.pathname === '/bookings' ? 'text-blue-600 font-black' : 'text-slate-500 hover:text-slate-800'}`}
           >
             My Bookings
+          </button>
+          <button 
+            onClick={() => navigate('/records')}
+            className={`transition-colors cursor-pointer ${location.pathname === '/records' || location.pathname === '/health-records' ? 'text-blue-600 font-black' : 'text-slate-500 hover:text-slate-800'}`}
+          >
+            Health Records
           </button>
           {user?.role === 'admin' && (
             <button 
@@ -438,6 +445,8 @@ const AppContent: React.FC = () => {
           <Route path="/confirmation/:appointmentId" element={<TokenConfirmation />} />
 
           <Route path="/bookings" element={<MyBookings />} />
+          <Route path="/records" element={<HealthRecords />} />
+          <Route path="/health-records" element={<HealthRecords />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/notifications" element={<Notifications />} />
           

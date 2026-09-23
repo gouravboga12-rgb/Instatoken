@@ -81,6 +81,67 @@ export interface CustomerBooking {
   paymentMethod: string;
 }
 
+export interface MedicalRecord {
+  id: string;
+  customerId?: string;
+  name: string;
+  category: 'Prescription' | 'Lab Test' | 'Consultation' | 'Scan & X-Ray' | 'Discharge Summary' | 'Other';
+  doctor: string;
+  hospital: string;
+  date: string;
+  fileType: 'PDF' | 'IMAGE' | 'DOC';
+  fileName: string;
+  fileSize: string;
+  fileUrl: string;
+  notes?: string;
+  uploadedAt: string;
+}
+
+export const DEFAULT_MEDICAL_RECORDS: MedicalRecord[] = [
+  {
+    id: "rec-1",
+    name: "General Medicine Prescription",
+    category: "Prescription",
+    date: "20 Jul 2026",
+    doctor: "Dr. Anil Kumar",
+    hospital: "City Care Hospital",
+    fileType: "PDF",
+    fileName: "General_Medicine_Prescription.pdf",
+    fileSize: "245 KB",
+    fileUrl: "/sample-records/prescription.pdf",
+    notes: "Follow-up consultation after 15 days. Take prescribed medications with meals.",
+    uploadedAt: "2026-07-20T10:30:00.000Z"
+  },
+  {
+    id: "rec-2",
+    name: "Cardiology Screening Report",
+    category: "Consultation",
+    date: "15 Jul 2026",
+    doctor: "Dr. Sarah D'Souza",
+    hospital: "Metro Wellness Hospital",
+    fileType: "PDF",
+    fileName: "Cardiology_Screening_Report.pdf",
+    fileSize: "1.2 MB",
+    fileUrl: "/sample-records/cardiology.pdf",
+    notes: "ECG and Echo normal. Blood pressure stable at 120/80 mmHg.",
+    uploadedAt: "2026-07-15T14:15:00.000Z"
+  },
+  {
+    id: "rec-3",
+    name: "Blood Test - Complete Count (CBC)",
+    category: "Lab Test",
+    date: "10 Jun 2026",
+    doctor: "Diagnostic Lab",
+    hospital: "Sunrise Children's Clinic",
+    fileType: "PDF",
+    fileName: "CBC_Blood_Test_Report.pdf",
+    fileSize: "512 KB",
+    fileUrl: "/sample-records/cbc_report.pdf",
+    notes: "Hemoglobin 14.2 g/dL. Platelet count and WBC counts within normal reference ranges.",
+    uploadedAt: "2026-06-10T09:00:00.000Z"
+  }
+];
+
 export interface CustomerAccount {
   id: string;
   name: string;
@@ -92,6 +153,7 @@ export interface CustomerAccount {
   joinedDate: string;
   status: 'active' | 'suspended';
   avatar?: string;
+  medicalRecords?: MedicalRecord[];
   bookings: CustomerBooking[];
 }
 

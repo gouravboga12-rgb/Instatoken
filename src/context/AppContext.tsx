@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { HOSPITALS, DEPARTMENTS, HEALTH_ARTICLES, MOCK_CUSTOMERS } from '../utils/mockData';
-import type { Hospital, Doctor, HealthArticle, CustomerAccount } from '../utils/mockData';
+import { HOSPITALS, DEPARTMENTS, HEALTH_ARTICLES, MOCK_CUSTOMERS, DEFAULT_MEDICAL_RECORDS } from '../utils/mockData';
+import type { Hospital, Doctor, HealthArticle, CustomerAccount, MedicalRecord } from '../utils/mockData';
 import { broadcastGlobalSync, subscribeGlobalSync, formatTimeSlot, fetchCloudSync } from '../utils/syncBus';
 import { geocodeLocation, reverseGeocode, reverseGeocodeAddressDetails } from '../utils/googleMaps';
 import type { GeoLocationDetails, BannerRecord } from '../utils/geoHierarchy';
@@ -28,6 +28,7 @@ export interface UserProfile {
   savedDoctors: string[];
   familyMembers: FamilyMember[];
   subscription: Subscription | null;
+  medicalRecords?: MedicalRecord[];
   location?: string;
   lat?: number;
   lng?: number;
@@ -140,6 +141,11 @@ interface AppContextType {
   activeBanners: BannerRecord[];
   fetchActiveBanners: (geo?: GeoLocationDetails) => Promise<BannerRecord[]>;
   refreshAppointments: () => Promise<Appointment[]>;
+  medicalRecords: MedicalRecord[];
+  uploadMedicalRecord: (record: Omit<MedicalRecord, 'id' | 'uploadedAt'>, file?: File) => Promise<MedicalRecord>;
+  updateMedicalRecord: (id: string, updates: Partial<MedicalRecord>, file?: File) => Promise<void>;
+  deleteMedicalRecord: (id: string) => Promise<void>;
+  downloadMedicalRecord: (record: MedicalRecord) => void;
 }
 
 export const getHydratedHospitals = (): Hospital[] => {
@@ -2164,6 +2170,223 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return appointments;
   };
 
+  // ─── Customer Medical Records Vault State & Methods ────────────────────────────
+  const getUserRecordsStorageKey = (currentUser: UserProfile | null) => {
+    if (!currentUser) return 'insta_records_guest';
+    const key = (currentUser.email || currentUser.phone || currentUser.name || 'default').trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
+    return `insta_records_${key}`;
+  };
+
+  const [medicalRecords, setMedicalRecords] = useState<MedicalRecord[]>(() => {
+    try {
+      const savedUser = localStorage.getItem('insta_user');
+      const currentUser = savedUser ? JSON.parse(savedUser) : null;
+      const key = getUserRecordsStorageKey(currentUser);
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return DEFAULT_MEDICAL_RECORDS;
+  });
+
+  // When user changes, reload their records from localStorage and backend
+  useEffect(() => {
+    if (!user) {
+      setMedicalRecords(DEFAULT_MEDICAL_RECORDS);
+      return;
+    }
+    const key = getUserRecordsStorageKey(user);
+    try {
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setMedicalRecords(parsed);
+        }
+      }
+    } catch (e) {}
+
+    const customerId = user.email || user.phone || 'patient';
+    fetch(`/api/customers/${encodeURIComponent(customerId)}/records`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.records) && data.records.length > 0) {
+          setMedicalRecords(data.records);
+          localStorage.setItem(key, JSON.stringify(data.records));
+        } else {
+          setMedicalRecords(prev => {
+            const list = prev.length > 0 ? prev : DEFAULT_MEDICAL_RECORDS;
+            localStorage.setItem(key, JSON.stringify(list));
+            return list;
+          });
+        }
+      })
+      .catch(() => {});
+  }, [user?.email, user?.phone]);
+
+  // Sync to localStorage whenever medicalRecords changes
+  useEffect(() => {
+    const key = getUserRecordsStorageKey(user);
+    try {
+      localStorage.setItem(key, JSON.stringify(medicalRecords));
+    } catch (e) {}
+  }, [medicalRecords, user]);
+
+  const uploadMedicalRecord = async (
+    recordData: Omit<MedicalRecord, 'id' | 'uploadedAt'>,
+    file?: File
+  ): Promise<MedicalRecord> => {
+    let fileUrl = recordData.fileUrl || '';
+    let fileName = recordData.fileName || (file ? file.name : 'document.pdf');
+    let fileSize = recordData.fileSize || (file ? `${(file.size / 1024).toFixed(1)} KB` : '100 KB');
+    let fileType = recordData.fileType || 'PDF';
+
+    if (file) {
+      const formData = new FormData();
+      formData.append('file', file);
+      try {
+        const res = await fetch('/api/records/upload', {
+          method: 'POST',
+          body: formData
+        });
+        const uploadResult = await res.json();
+        if (uploadResult.success && uploadResult.url) {
+          fileUrl = uploadResult.url;
+          fileName = uploadResult.fileName || file.name;
+          fileSize = uploadResult.fileSize || fileSize;
+          fileType = (uploadResult.fileType || fileType) as MedicalRecord['fileType'];
+        }
+      } catch (err) {
+        console.warn('Backend upload failed, converting to object/data URL:', err);
+      }
+
+      if (!fileUrl) {
+        fileUrl = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.readAsDataURL(file);
+        });
+      }
+    }
+
+    const newRecord: MedicalRecord = {
+      ...recordData,
+      id: `rec-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      fileUrl,
+      fileName,
+      fileSize,
+      fileType,
+      uploadedAt: new Date().toISOString()
+    };
+
+    setMedicalRecords(prev => [newRecord, ...prev]);
+
+    if (user) {
+      const customerId = user.email || user.phone || 'patient';
+      fetch(`/api/customers/${encodeURIComponent(customerId)}/records`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newRecord)
+      }).catch(() => {});
+    }
+
+    addNotification("Report Uploaded Successfully", `"${newRecord.name}" has been secured in your Health Vault.`, "success");
+    return newRecord;
+  };
+
+  const updateMedicalRecord = async (
+    id: string,
+    updates: Partial<MedicalRecord>,
+    file?: File
+  ): Promise<void> => {
+    let fileUrl = updates.fileUrl;
+    let fileName = updates.fileName;
+    let fileSize = updates.fileSize;
+    let fileType = updates.fileType;
+
+    if (file) {
+      const formData = new FormData();
+      formData.append('file', file);
+      try {
+        const res = await fetch('/api/records/upload', {
+          method: 'POST',
+          body: formData
+        });
+        const uploadResult = await res.json();
+        if (uploadResult.success && uploadResult.url) {
+          fileUrl = uploadResult.url;
+          fileName = uploadResult.fileName || file.name;
+          fileSize = uploadResult.fileSize || fileSize;
+          fileType = (uploadResult.fileType || fileType) as MedicalRecord['fileType'];
+        }
+      } catch (err) {
+        console.warn('File upload on update failed, fallback to Data URL', err);
+      }
+
+      if (!fileUrl) {
+        fileUrl = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.readAsDataURL(file);
+        });
+      }
+    }
+
+    const mergedUpdates: Partial<MedicalRecord> = {
+      ...updates,
+      ...(fileUrl ? { fileUrl } : {}),
+      ...(fileName ? { fileName } : {}),
+      ...(fileSize ? { fileSize } : {}),
+      ...(fileType ? { fileType } : {})
+    };
+
+    setMedicalRecords(prev => prev.map(rec => rec.id === id ? { ...rec, ...mergedUpdates } : rec));
+
+    if (user) {
+      const customerId = user.email || user.phone || 'patient';
+      fetch(`/api/customers/${encodeURIComponent(customerId)}/records/${encodeURIComponent(id)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(mergedUpdates)
+      }).catch(() => {});
+    }
+
+    addNotification("Record Updated", "Your medical document details were successfully updated.", "info");
+  };
+
+  const deleteMedicalRecord = async (id: string): Promise<void> => {
+    const target = medicalRecords.find(r => r.id === id);
+    setMedicalRecords(prev => prev.filter(rec => rec.id !== id));
+
+    if (user) {
+      const customerId = user.email || user.phone || 'patient';
+      fetch(`/api/customers/${encodeURIComponent(customerId)}/records/${encodeURIComponent(id)}`, {
+        method: 'DELETE'
+      }).catch(() => {});
+    }
+
+    addNotification("Record Deleted", `"${target?.name || 'Document'}" was removed from your Health Vault.`, "info");
+  };
+
+  const downloadMedicalRecord = (record: MedicalRecord) => {
+    if (!record.fileUrl) {
+      addNotification("Download Failed", "No file attachment found for this record.", "warning");
+      return;
+    }
+
+    const link = document.createElement('a');
+    link.href = record.fileUrl;
+    link.download = record.fileName || `${record.name.replace(/\s+/g, '_')}.pdf`;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    addNotification("Downloading File", `Starting download for "${record.fileName || record.name}"...`, "success");
+  };
+
   return (
     <AppContext.Provider value={{
       user,
@@ -2213,7 +2436,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setUserGeoHierarchy,
       activeBanners,
       fetchActiveBanners,
-      refreshAppointments
+      refreshAppointments,
+      medicalRecords,
+      uploadMedicalRecord,
+      updateMedicalRecord,
+      deleteMedicalRecord,
+      downloadMedicalRecord
     }}>
       {children}
     </AppContext.Provider>
