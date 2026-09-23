@@ -790,12 +790,12 @@ export const Home: React.FC<HomeProps> = ({
 
         {/* 4. Quick Action Categories (Image 5 style) */}
         <div>
-          <div className="grid grid-cols-4 gap-2.5">
+          <div className="grid grid-cols-4 gap-2">
             {[
-              { title: "Nearby", sub: "Hospitals", icon: <MapPin className="text-blue-600" size={20} />, bg: "bg-blue-50", filter: "nearby" },
-              { title: "Top Rated", sub: "Hospitals", icon: <Star className="text-amber-500 fill-amber-500" size={20} />, bg: "bg-amber-50", filter: "top-rated" },
-              { title: "My Tokens", sub: "View Bookings", icon: <Award className="text-blue-600" size={20} />, bg: "bg-blue-50", nav: "/bookings" },
-              { title: "Health Records", sub: "Medical History", icon: <FileText className="text-emerald-600" size={20} />, bg: "bg-emerald-50", nav: "/profile?tab=records" }
+              { title: "Nearby", sub: "Hospitals", icon: <MapPin className="text-blue-600" size={15} />, bg: "bg-blue-50", filter: "nearby" },
+              { title: "Top Rated", sub: "Hospitals", icon: <Star className="text-amber-500 fill-amber-500" size={15} />, bg: "bg-amber-50", filter: "top-rated" },
+              { title: "My Tokens", sub: "", icon: <Award className="text-blue-600" size={15} />, bg: "bg-blue-50", nav: "/bookings" },
+              { title: "Health Records", sub: "", icon: <FileText className="text-emerald-600" size={15} />, bg: "bg-emerald-50", nav: "/profile?tab=records" }
             ].map((cat, idx) => (
               <button
                 key={idx}
@@ -806,13 +806,15 @@ export const Home: React.FC<HomeProps> = ({
                     onSearchSelect(cat.filter);
                   }
                 }}
-                className="bg-white border border-slate-100 rounded-2xl p-2.5 flex flex-col items-center text-center shadow-3xs hover:border-blue-200 transition-all cursor-pointer group"
+                className="bg-white border border-slate-100 rounded-xl py-2 px-1 flex flex-col items-center justify-center text-center shadow-3xs hover:border-blue-200 transition-all cursor-pointer group min-h-[56px]"
               >
-                <div className={`w-10 h-10 ${cat.bg} rounded-xl flex items-center justify-center mb-1.5 group-hover:scale-105 transition-transform`}>
+                <div className={`w-7 h-7 ${cat.bg} rounded-lg flex items-center justify-center mb-1 group-hover:scale-105 transition-transform`}>
                   {cat.icon}
                 </div>
-                <span className="text-[10.5px] font-extrabold text-slate-800 leading-tight">{cat.title}</span>
-                <span className="text-[9px] text-slate-400 font-bold">{cat.sub}</span>
+                <span className="text-[10px] font-extrabold text-slate-800 leading-tight">{cat.title}</span>
+                {cat.sub ? (
+                  <span className="text-[8.5px] text-slate-400 font-bold leading-tight">{cat.sub}</span>
+                ) : null}
               </button>
             ))}
           </div>
@@ -881,8 +883,6 @@ export const Home: React.FC<HomeProps> = ({
               })
               .sort((a, b) => a.distance - b.distance)
               .slice(0, 3).map((hosp) => {
-              const minFee = hosp.doctors.length > 0 ? Math.min(...hosp.doctors.map(d => d.consultationFee)) : 0;
-
               return (
                 <Card 
                   key={hosp.id} 
@@ -928,39 +928,16 @@ export const Home: React.FC<HomeProps> = ({
                     </div>
 
                     {/* Body Info */}
-                    <div className="p-4 space-y-3">
-                      {/* Category & Fee Row */}
+                    <div className="p-3.5">
+                      {/* Category & Distance Row */}
                       <div className="flex items-center justify-between gap-2">
                         <span className="bg-blue-50/90 text-blue-700 font-black text-[11.5px] sm:text-xs px-3 py-1 rounded-xl border border-blue-200/80 shadow-2xs">
                           {hosp.category}
                         </span>
-                        {minFee > 0 && (
-                          <span className="text-slate-800 font-extrabold text-xs sm:text-sm">
-                            ₹{minFee}+ Fee
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Distance Badges & Navigation Action */}
-                      <div className="flex items-center justify-between gap-2 flex-wrap">
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50/90 text-blue-700 border border-blue-200/80 text-[11px] font-extrabold shadow-2xs">
                           <MapPin size={13} className="text-blue-600 shrink-0" />
                           <span>{hosp.distance} km away</span>
                         </span>
-
-                        <a 
-                          href={hosp.lat && hosp.lng 
-                            ? `https://www.google.com/maps/dir/?api=1&destination=${hosp.lat},${hosp.lng}`
-                            : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(hosp.name + ' ' + hosp.address)}`
-                          } 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          className="text-[11px] font-extrabold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100/80 px-2.5 py-1 rounded-lg border border-blue-200 flex items-center gap-1 transition-all cursor-pointer"
-                        >
-                          <Navigation size={11} className="text-blue-600 fill-blue-600" />
-                          <span>Navigate</span>
-                        </a>
                       </div>
                     </div>
                   </div>

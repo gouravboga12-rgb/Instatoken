@@ -3,7 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { getHospitalSVGImage } from '../../utils/mockData';
 import { calculateDistanceKm } from '../../utils/googleMaps';
 import { Card } from '../../components/ui/Card';
-import { Search, MapPin, Star, ArrowLeft, Compass, Navigation } from 'lucide-react';
+import { Search, MapPin, Star, ArrowLeft, Compass, Navigation, Bell } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 interface SearchHospitalsProps {
@@ -15,7 +15,8 @@ export const SearchHospitals: React.FC<SearchHospitalsProps> = ({
   onHospitalSelect, 
   defaultFilter = '' 
 }) => {
-  const { hospitals, searchRadiusKm, setSearchRadiusKm, userCoords } = useApp();
+  const { hospitals, searchRadiusKm, setSearchRadiusKm, userCoords, currentLocation, addNotification } = useApp();
+  const [notified, setNotified] = useState(false);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -297,11 +298,8 @@ export const SearchHospitals: React.FC<SearchHospitalsProps> = ({
           {/* Hospital Cards Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {filteredHospitals.length > 0 ? (
-              filteredHospitals.map((hosp) => {
-                const minFee = hosp.doctors.length > 0 ? Math.min(...hosp.doctors.map(d => d.consultationFee)) : 0;
-
-                return (
-                  <Card 
+              filteredHospitals.map((hosp) => (
+                <Card 
                     key={hosp.id} 
                     hoverable 
                     padding="none" 
@@ -344,40 +342,16 @@ export const SearchHospitals: React.FC<SearchHospitalsProps> = ({
                     </div>
 
                     {/* Bottom Details area */}
-                    <div className="p-3.5 flex-1 flex flex-col justify-between space-y-3">
-                      
-                      {/* Category & Fee badge row */}
-                      <div className="flex items-center justify-between gap-1 flex-wrap">
+                    <div className="p-3.5 flex-1 flex flex-col justify-between">
+                      {/* Category & Distance row */}
+                      <div className="flex items-center justify-between gap-2">
                         <span className="bg-blue-50/90 text-blue-700 font-black text-[11.5px] sm:text-xs px-3 py-1 rounded-xl border border-blue-200/80 shadow-2xs">
                           {hosp.category}
                         </span>
-                        {minFee > 0 && (
-                          <span className="text-slate-700 font-extrabold text-xs">
-                            ₹{minFee}+ Fee
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Map Pins and location metrics */}
-                      <div className="flex items-center justify-between gap-2 border-t border-slate-50 pt-2.5 flex-wrap">
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50/90 text-blue-700 border border-blue-200/80 text-[11px] font-extrabold shadow-2xs">
                           <MapPin size={13} className="text-blue-600 shrink-0" />
                           <span>{hosp.distance} km away</span>
                         </span>
-
-                        <a 
-                          href={hosp.lat && hosp.lng 
-                            ? `https://www.google.com/maps/dir/?api=1&destination=${hosp.lat},${hosp.lng}`
-                            : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(hosp.name + ' ' + hosp.address)}`
-                          } 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          className="text-[11px] font-extrabold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100/80 px-2.5 py-1 rounded-lg border border-blue-200 flex items-center gap-1 transition-all cursor-pointer"
-                        >
-                          <Navigation size={11} className="text-blue-600 fill-blue-600" />
-                          <span>Navigate</span>
-                        </a>
                       </div>
                     </div>
 
@@ -413,17 +387,55 @@ export const SearchHospitals: React.FC<SearchHospitalsProps> = ({
                       </div>
                     </div>
                   </Card>
-                );
-              })
+              ))
             ) : (
-              <div className="col-span-2 text-center py-12 bg-white rounded-3xl border border-slate-100 shadow-xs">
-                <p className="text-sm font-bold text-slate-400">No hospitals match your search criteria</p>
-                <button 
-                  onClick={() => { setQuery(''); setSelectedSpecialty('All'); setActiveFilter('all'); }}
-                  className="mt-3 text-xs text-blue-600 font-bold hover:underline cursor-pointer"
-                >
-                  Reset All Filters
-                </button>
+              <div className="col-span-2 bg-white rounded-3xl border border-slate-150 p-6 sm:p-8 flex flex-col items-center text-center shadow-sm">
+                <div className="w-full max-w-sm mb-4">
+                  <img 
+                    src="/coming-soon-hospital.png" 
+                    alt="We're Coming Soon" 
+                    className="w-full h-auto object-contain mx-auto"
+                  />
+                </div>
+
+                <h3 className="text-2xl font-black text-slate-900 tracking-tight font-heading">
+                  We're <span className="text-blue-600">Coming Soon!</span>
+                </h3>
+
+                <p className="text-slate-500 text-xs sm:text-sm leading-relaxed max-w-md mt-2 font-medium">
+                  InstaToken is currently available in selected cities.<br className="hidden sm:inline" />
+                  We are expanding rapidly across India.<br className="hidden sm:inline" />
+                  We haven't partnered with hospitals in <strong>{currentLocation || 'this city'}</strong> yet.<br />
+                  Be the first to know when we launch.
+                </p>
+
+                <div className="w-full max-w-xs space-y-2.5 mt-6">
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      setNotified(true);
+                      addNotification("Notification Registered!", `We will alert you as soon as InstaToken launches in ${currentLocation || 'your area'}.`, "success");
+                    }}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-3 px-4 text-xs rounded-2xl flex items-center justify-center gap-2 shadow-md shadow-blue-500/20 cursor-pointer transition-all active:scale-95"
+                  >
+                    <Bell size={16} />
+                    <span>{notified ? "You'll be notified! ✓" : "Notify Me"}</span>
+                  </button>
+
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      setQuery('');
+                      setSelectedSpecialty('All');
+                      setActiveFilter('all');
+                      navigate('/');
+                    }}
+                    className="w-full bg-white border-2 border-blue-600 text-blue-600 hover:bg-blue-50 font-extrabold py-3 px-4 text-xs rounded-2xl flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-95"
+                  >
+                    <MapPin size={16} />
+                    <span>Change Location</span>
+                  </button>
+                </div>
               </div>
             )}
           </div>

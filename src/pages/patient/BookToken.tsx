@@ -289,6 +289,18 @@ export const BookToken: React.FC = () => {
     return pills;
   }, [maxBookingDays, doctorWorkingDays, selectedDate, maxAllowedDateStr]);
 
+  // 3-day compact date pills matching Image 48
+  const displayDateOptions = useMemo(() => {
+    const first3 = dateOptions.slice(0, 3);
+    if (selectedDate && !first3.some(p => p.dateStr === selectedDate)) {
+      const match = dateOptions.find(p => p.dateStr === selectedDate);
+      if (match) {
+        return [...first3.slice(0, 2), match];
+      }
+    }
+    return first3;
+  }, [dateOptions, selectedDate]);
+
   // Auto-switch away from doctor's off-day or dates exceeding the booking window
   useEffect(() => {
     if (!selectedDate) {
@@ -404,147 +416,114 @@ export const BookToken: React.FC = () => {
   };
 
   return (
-    <div className="pb-24 bg-slate-50 min-h-screen md:min-h-0 md:pb-6 w-full">
+    <div className="pb-24 bg-slate-50 min-h-screen md:min-h-0 md:pb-8 w-full">
       
-      {/* Top Header Bar matching Image 3 */}
-      <div className="sticky top-0 bg-white/95 backdrop-blur-md px-5 py-3 border-b border-slate-100 z-30 flex items-center justify-between shadow-2xs md:rounded-2xl md:mb-6">
-        <div className="flex items-center gap-3">
+      {/* Top Header Bar matching Image 48 */}
+      <div className="sticky top-0 bg-white/95 backdrop-blur-md px-4 sm:px-6 py-3 border-b border-slate-100 z-30 flex items-center justify-between shadow-2xs">
+        <div className="flex items-center gap-2.5">
           <button 
+            type="button"
             onClick={() => navigate(-1)}
-            className="w-9 h-9 rounded-full border border-slate-200 flex items-center justify-center text-blue-600 hover:bg-slate-50 transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-full border border-slate-200 flex items-center justify-center text-blue-600 hover:bg-slate-50 transition-colors cursor-pointer"
           >
-            <ArrowLeft size={18} />
+            <ArrowLeft size={16} />
           </button>
           <div>
-            <h2 className="text-base font-black text-slate-900 tracking-tight font-heading">Book Doctor OPD Token</h2>
-            <p className="text-[10px] text-slate-400 font-bold">Quick • Easy • Secure</p>
+            <h2 className="text-sm sm:text-base font-black text-slate-900 tracking-tight font-heading leading-tight">Book Doctor OPD Token</h2>
+            <p className="text-[9.5px] text-slate-400 font-bold leading-none">Quick • Easy • Secure</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-1 text-blue-600 bg-blue-50 border border-blue-100 px-2.5 py-1 rounded-full text-[10px] font-extrabold">
-          <ShieldCheck size={14} />
+        <div className="flex items-center gap-1 text-blue-600 bg-blue-50 border border-blue-100 px-2.5 py-1 rounded-full text-[9.5px] font-extrabold shrink-0">
+          <ShieldCheck size={13} />
           <span>100% Guaranteed Spot</span>
         </div>
       </div>
 
-      <div className="px-5 mt-4 md:grid md:grid-cols-12 md:gap-8 items-start">
+      <div className="max-w-md sm:max-w-lg lg:max-w-xl mx-auto px-4 mt-3 space-y-3.5">
         
-        {/* Left Column (Desktop Only): Doctor Summary Card & Queue Preview */}
-        <div className="md:col-span-5 space-y-4 md:sticky md:top-24 mb-5 md:mb-0">
-          {/* Doctor Summary Card matching Image 3 */}
-          <div className="bg-white border border-slate-150 rounded-3xl p-5 shadow-2xs flex flex-col justify-between space-y-4">
-            <div className="flex items-center gap-3.5">
-              {/* Doctor Avatar Circle */}
-              <div className="w-16 h-16 rounded-full overflow-hidden shrink-0 border-2 border-blue-100 bg-blue-50">
-                <img 
-                  src={doctor.image} 
-                  alt={doctor.name} 
-                  className="w-full h-full object-cover" 
-                  onError={(e) => { (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(doctor.name)}&background=EFF6FF&color=2563EB&size=100&bold=true`; }}
-                />
-              </div>
-              
-              <div className="flex-1 space-y-0.5">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-extrabold text-sm text-slate-900 leading-snug">{doctor.name}</h3>
-                  <button 
-                    onClick={() => toggleSaveDoctor(doctor.id)}
-                    className="p-1 rounded-xl hover:bg-red-50 text-slate-400 transition-colors cursor-pointer"
-                    title={user?.savedDoctors?.includes(doctor.id) ? "Remove from Favourite Doctors" : "Add to Favourite Doctors"}
-                  >
-                    <Heart size={16} className={user?.savedDoctors?.includes(doctor.id) ? "text-red-500 fill-red-500" : "text-slate-400 hover:text-red-400"} />
-                  </button>
-                </div>
-                <p className="text-[11px] text-blue-600 font-extrabold">{doctor.specialty}</p>
-                <p className="text-[10px] text-slate-400 font-medium">{hospital.name}</p>
-
-                {/* Rating & Distance Badges */}
-                <div className="flex items-center gap-2 mt-1.5">
-                  <span className="bg-amber-50 text-amber-700 font-bold text-[9px] px-2 py-0.5 rounded-full flex items-center gap-0.5 border border-amber-100">
-                    ★ {doctor.rating} ({doctor.reviewsCount})
-                  </span>
-                  <span className="bg-blue-50 text-blue-700 font-bold text-[9px] px-2 py-0.5 rounded-full flex items-center gap-0.5 border border-blue-100">
-                    <MapPin size={10} /> {(userCoords && hospital?.lat && hospital?.lng) ? calculateDistanceKm(userCoords.lat, userCoords.lng, hospital.lat, hospital.lng) : (hospital?.distance || 2.5)} km away
-                  </span>
-                </div>
-              </div>
+        {/* Doctor Summary Card matching Image 48 */}
+        <div className="bg-white border border-slate-200/90 rounded-2xl p-3.5 shadow-2xs">
+          <div className="flex items-center gap-3">
+            {/* Doctor Avatar Circle */}
+            <div className="w-13 h-13 rounded-full overflow-hidden shrink-0 border-2 border-blue-100 bg-blue-50">
+              <img 
+                src={doctor.image} 
+                alt={doctor.name} 
+                className="w-full h-full object-cover" 
+                onError={(e) => { (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(doctor.name)}&background=EFF6FF&color=2563EB&size=100&bold=true`; }}
+              />
             </div>
-
-            {/* Consultation Fee Breakdown */}
-            <div className="flex justify-between items-center border-t border-slate-100 pt-3">
-              <div>
-                <span className="text-[9px] text-slate-400 font-bold uppercase block">OPD Consultation Fee</span>
-                <span className="text-[9.5px] text-slate-500 font-semibold">Payable at clinic cabin</span>
+            
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between">
+                <h3 className="font-extrabold text-sm text-slate-900 leading-tight truncate">{doctor.name}</h3>
+                <button 
+                  type="button"
+                  onClick={() => toggleSaveDoctor(doctor.id)}
+                  className="p-1 rounded-lg hover:bg-red-50 text-slate-400 transition-colors cursor-pointer shrink-0 ml-1"
+                  title={user?.savedDoctors?.includes(doctor.id) ? "Remove from Favourite Doctors" : "Add to Favourite Doctors"}
+                >
+                  <Heart size={15} className={user?.savedDoctors?.includes(doctor.id) ? "text-red-500 fill-red-500" : "text-slate-400 hover:text-red-400"} />
+                </button>
               </div>
-              <div className="text-right">
-                <span className="text-lg font-black text-slate-900 block">₹{doctor.consultationFee}</span>
+              <p className="text-[11px] text-blue-600 font-extrabold truncate">{doctor.specialty}</p>
+              <p className="text-[10px] text-slate-400 font-medium truncate">{hospital.name}</p>
+
+              {/* Rating & Distance Badges */}
+              <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                <span className="bg-amber-50 text-amber-700 font-bold text-[9px] px-2 py-0.5 rounded-full flex items-center gap-0.5 border border-amber-100">
+                  ★ {doctor.rating} ({doctor.reviewsCount})
+                </span>
+                <span className="bg-blue-50 text-blue-700 font-bold text-[9px] px-2 py-0.5 rounded-full flex items-center gap-0.5 border border-blue-100">
+                  <MapPin size={10} /> {(userCoords && hospital?.lat && hospital?.lng) ? calculateDistanceKm(userCoords.lat, userCoords.lng, hospital.lat, hospital.lng) : (hospital?.distance || 2.5)} km away
+                </span>
               </div>
             </div>
           </div>
 
-          {/* Additional Desktop Banner Card */}
-          <div className="hidden md:block bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl p-5 text-white shadow-md">
-            <h4 className="font-extrabold text-xs tracking-wide uppercase mb-1">Instant OPD Token Features</h4>
-            <ul className="text-[11px] space-y-2 text-blue-50 font-medium mt-3">
-              <li className="flex items-center gap-2">
-                <ShieldCheck size={14} className="text-emerald-300 shrink-0" />
-                <span>Live queue tracking from mobile or desktop</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <ShieldCheck size={14} className="text-emerald-300 shrink-0" />
-                <span>Zero waiting inside crowded hospital halls</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <ShieldCheck size={14} className="text-emerald-300 shrink-0" />
-                <span>Automated SMS & WhatsApp alerts</span>
-              </li>
-            </ul>
+          {/* Consultation Fee Breakdown row */}
+          <div className="flex justify-between items-center border-t border-slate-100 pt-2.5 mt-2.5 text-xs">
+            <span className="text-[11px] text-slate-600 font-medium">Consultation Fee (Pay at hospital)</span>
+            <span className="text-base font-black text-slate-900">₹{doctor.consultationFee}</span>
           </div>
         </div>
 
-        {/* Right Column: Slot & Patient Form */}
-        <div className="md:col-span-7 space-y-5">
-
         {!isDoctorOnlineAvailable && (
-          <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-rose-800 text-xs font-bold flex items-start gap-2.5 shadow-2xs">
-            <UserX size={18} className="text-rose-600 shrink-0 mt-0.5" />
+          <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl text-rose-800 text-xs font-bold flex items-start gap-2.5 shadow-2xs">
+            <UserX size={16} className="text-rose-600 shrink-0 mt-0.5" />
             <div>
               <p className="font-black text-rose-900">Dr. {doctor?.name || 'Doctor'} is Currently Unavailable</p>
-              <p className="text-[11px] text-rose-700 mt-0.5 font-medium">
-                The hospital has temporarily marked this doctor off-duty or closed app bookings. Tokens cannot be generated for this doctor right now.
+              <p className="text-[10.5px] text-rose-700 mt-0.5 font-medium leading-tight">
+                The hospital has temporarily marked this doctor off-duty or closed app bookings.
               </p>
             </div>
           </div>
         )}
 
         {error && (
-          <div className="p-3 bg-red-50 border border-red-100 rounded-xl text-red-600 text-xs font-bold">
+          <div className="p-2.5 bg-red-50 border border-red-100 rounded-xl text-red-600 text-xs font-bold">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleProceedToBooking} className="space-y-5">
+        <form onSubmit={handleProceedToBooking} className="space-y-3.5">
           
-          {/* Section 1: Select Date constrained by hospital rules and doctor opdDays */}
+          {/* Select Date matching Image 48 */}
           <div>
-            <div className="flex justify-between items-center mb-2.5">
-              <div>
-                <h4 className="text-xs font-extrabold text-slate-900 flex items-center gap-1.5">
-                  <CalendarIcon size={16} className="text-blue-600" />
-                  <span>1. Select Date</span>
-                </h4>
-                <span className="text-[10px] font-semibold text-slate-400">
-                  Advance booking open: {maxBookingDays} days
-                </span>
-              </div>
+            <div className="flex justify-between items-center mb-1.5">
+              <h4 className="text-xs font-extrabold text-slate-900 flex items-center gap-1.5">
+                <CalendarIcon size={14} className="text-blue-600" />
+                <span>Select Date</span>
+              </h4>
               <div className="relative">
                 <button 
                   type="button" 
                   onClick={handleOpenCalendar}
-                  className="text-xs text-blue-600 font-extrabold hover:underline flex items-center gap-1 cursor-pointer"
+                  className="text-[11px] text-blue-600 font-extrabold hover:underline flex items-center gap-1 cursor-pointer"
                 >
                   <span>View Calendar</span>
-                  <CalendarIcon size={12} />
+                  <CalendarIcon size={11} />
                 </button>
                 <input 
                   ref={dateInputRef}
@@ -577,9 +556,9 @@ export const BookToken: React.FC = () => {
               </div>
             </div>
 
-            {/* Horizontal Date Selector Pills */}
-            <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-5 gap-2">
-              {dateOptions.map((dt) => {
+            {/* 3-day pills matching Image 48 */}
+            <div className="grid grid-cols-3 gap-2">
+              {displayDateOptions.map((dt) => {
                 const isActive = selectedDate === dt.dateStr;
                 const isWorking = dt.isWorking;
 
@@ -596,22 +575,21 @@ export const BookToken: React.FC = () => {
                       setSelectedDate(dt.dateStr);
                       setError('');
                     }}
-                    title={!isWorking ? `Dr. ${doctor.name} is off on ${dt.weekdayName}s` : undefined}
-                    className={`py-3 px-2 rounded-2xl flex flex-col items-center justify-center border transition-all relative ${
+                    className={`py-2 px-1 rounded-2xl flex flex-col items-center justify-center border transition-all ${
                       !isWorking
                         ? 'bg-slate-50/70 border-slate-200 text-slate-400 cursor-not-allowed opacity-60'
                         : isActive 
-                          ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-500/20 scale-105 cursor-pointer' 
+                          ? 'bg-blue-600 border-blue-600 text-white shadow-sm shadow-blue-500/25 scale-[1.02] cursor-pointer' 
                           : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300 cursor-pointer'
                     }`}
                   >
                     <span className={`text-[10px] font-bold ${isActive ? 'text-white' : !isWorking ? 'text-slate-400' : 'text-slate-500'}`}>
                       {dt.label}
                     </span>
-                    <span className={`text-lg font-black mt-0.5 ${!isWorking ? 'text-slate-400 line-through decoration-slate-300' : ''}`}>
+                    <span className={`text-base font-black leading-tight mt-0.5 ${!isWorking ? 'text-slate-400 line-through decoration-slate-300' : ''}`}>
                       {dt.dayNum}
                     </span>
-                    <span className={`text-[9.5px] font-extrabold ${isActive ? 'text-white' : !isWorking ? 'text-rose-500' : 'text-slate-400'}`}>
+                    <span className={`text-[9.5px] font-extrabold ${isActive ? 'text-blue-100' : !isWorking ? 'text-rose-500' : 'text-slate-400'}`}>
                       {!isWorking ? 'Off' : dt.month}
                     </span>
                   </button>
@@ -620,38 +598,38 @@ export const BookToken: React.FC = () => {
             </div>
           </div>
 
-          {/* Section 2: Select Session matching Image 3 */}
+          {/* Select Session matching Image 48 */}
           <div>
-            <h4 className="text-xs font-extrabold text-slate-900 flex items-center gap-1.5 mb-2.5">
-              <Clock size={16} className="text-blue-600" />
-              <span>2. Select Session</span>
+            <h4 className="text-xs font-extrabold text-slate-900 flex items-center gap-1.5 mb-1.5">
+              <Clock size={14} className="text-blue-600" />
+              <span>Select Session</span>
             </h4>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-2">
               {sessionOptions.map((s) => {
                 const isActive = selectedSession === s.id;
                 return (
                   <div 
                     key={s.id}
                     onClick={() => setSelectedSession(s.id as any)}
-                    className={`p-3.5 rounded-2xl border-2 transition-all cursor-pointer flex items-center justify-between ${
+                    className={`p-2.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
                       isActive 
-                        ? s.activeClass + ' shadow-xs' 
+                        ? 'bg-amber-50/60 border-amber-400 shadow-2xs' 
                         : 'bg-white border-slate-200 hover:border-slate-300'
                     }`}
                   >
-                    <div className="flex items-center gap-2.5">
-                      <div className={`w-9 h-9 ${s.iconBg} rounded-xl flex items-center justify-center shrink-0`}>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className={`w-8 h-8 ${s.iconBg} rounded-xl flex items-center justify-center shrink-0`}>
                         {s.icon}
                       </div>
-                      <div>
-                        <h5 className="text-xs font-extrabold text-slate-900">{s.title}</h5>
-                        <p className="text-[9.5px] text-slate-500 font-semibold mt-0.5">{s.timing}</p>
+                      <div className="min-w-0">
+                        <h5 className="text-xs font-extrabold text-slate-900 truncate">{s.title}</h5>
+                        <p className="text-[9px] text-slate-500 font-semibold truncate">{s.timing}</p>
                       </div>
                     </div>
 
                     {/* Radio Circle */}
-                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ml-1 ${
                       isActive ? 'border-blue-600 bg-blue-600' : 'border-slate-300'
                     }`}>
                       {isActive && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
@@ -662,194 +640,166 @@ export const BookToken: React.FC = () => {
             </div>
           </div>
 
-          {/* Section 3: Patient Details Form Fields matching Image 3 */}
-          <div className="scroll-mt-24">
-            <h4 className="text-xs font-extrabold text-slate-900 flex items-center gap-1.5 mb-2.5">
-              <User size={16} className="text-blue-600" />
-              <span>3. Patient Details</span>
+          {/* Patient Details Section matching Image 48 */}
+          <div>
+            <h4 className="text-xs font-extrabold text-slate-900 flex items-center gap-1.5 mb-1.5">
+              <User size={14} className="text-blue-600" />
+              <span>Patient Details</span>
             </h4>
 
-            <div className="bg-white border border-slate-150 rounded-3xl p-5 shadow-2xs space-y-3.5">
-              
+            <div className="bg-white border border-slate-200/90 rounded-2xl p-3.5 shadow-2xs space-y-2.5">
               {/* Full Name */}
-              <div className="space-y-1">
-                <label className="text-[10px] font-extrabold text-slate-700 uppercase tracking-wide">Full Name</label>
-                <div className="relative">
-                  <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-blue-600" />
-                  <input 
-                    type="text" 
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Enter patient name"
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:bg-white focus:border-blue-600 focus:outline-none transition-all"
-                  />
-                </div>
+              <div className="relative">
+                <User size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                <input 
+                  type="text" 
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Full Name"
+                  className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:border-blue-600 focus:outline-none transition-all placeholder:text-slate-400"
+                />
               </div>
 
-              {/* Mobile Number */}
-              <div className="space-y-1">
-                <label className="text-[10px] font-extrabold text-slate-700 uppercase tracking-wide">Mobile Number</label>
+              {/* Mobile Number & Age in 2 columns */}
+              <div className="grid grid-cols-2 gap-2">
                 <div className="relative">
-                  <Phone size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-blue-600" />
+                  <Phone size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                   <input 
                     type="tel" 
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    placeholder="Enter 10 digit mobile number"
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:bg-white focus:border-blue-600 focus:outline-none transition-all"
+                    placeholder="Mobile Number *"
+                    className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:border-blue-600 focus:outline-none transition-all placeholder:text-slate-400"
                   />
                 </div>
-              </div>
 
-              {/* Age & Gender Row - 1 col on mobile, 2 cols on desktop */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 items-start">
-                {/* Age Input with Unit Selector */}
-                <div className="space-y-1">
-                  <label className="text-[10px] font-extrabold text-slate-700 uppercase tracking-wide block">
-                    Age
-                  </label>
-                  <div className="relative flex items-center h-[42px] bg-slate-50 border border-slate-200 rounded-xl focus-within:bg-white focus-within:border-blue-600 focus-within:ring-1 focus-within:ring-blue-600 transition-all overflow-hidden">
-                    <CalendarIcon size={16} className="absolute left-3.5 text-blue-600 pointer-events-none shrink-0" />
-                    <input 
-                      type="number" 
-                      inputMode="numeric"
-                      min="1"
-                      max={ageUnit === 'Days' ? 365 : 120}
-                      value={age}
-                      onChange={(e) => setAge(e.target.value)}
-                      placeholder={ageUnit === 'Days' ? "e.g. 15" : ageUnit === 'Months' ? "e.g. 6" : "e.g. 28"}
-                      className="w-full min-w-0 pl-10 pr-1.5 py-2.5 bg-transparent text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                    />
-                    <div className="h-4.5 w-px bg-slate-200 shrink-0" />
-                    <div className="relative shrink-0 flex items-center">
-                      <select
-                        value={ageUnit}
-                        onChange={(e) => setAgeUnit(e.target.value as 'Years' | 'Months' | 'Days')}
-                        aria-label="Age unit"
-                        className="text-xs font-bold text-blue-600 bg-transparent py-2.5 pl-2 pr-6 focus:outline-none cursor-pointer appearance-none"
-                      >
-                        <option value="Years">Years</option>
-                        <option value="Months">Months</option>
-                        <option value="Days">Days</option>
-                      </select>
-                      <ChevronDown size={12} className="absolute right-2 text-blue-600 pointer-events-none stroke-[2.5]" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Gender Selector */}
-                <div className="space-y-1">
-                  <label className="text-[10px] font-extrabold text-slate-700 uppercase tracking-wide block">
-                    Gender
-                  </label>
-                  <div className="relative flex items-center h-[42px] bg-slate-50 border border-slate-200 rounded-xl focus-within:bg-white focus-within:border-blue-600 focus-within:ring-1 focus-within:ring-blue-600 transition-all">
-                    <User size={16} className="absolute left-3.5 text-blue-600 pointer-events-none shrink-0" />
-                    <select 
-                      value={gender}
-                      onChange={(e) => setGender(e.target.value)}
-                      className="w-full h-full pl-10 pr-8 bg-transparent text-xs font-semibold text-slate-800 focus:outline-none appearance-none cursor-pointer"
+                {/* Age with Years dropdown */}
+                <div className="relative flex items-center bg-white border border-slate-200 rounded-xl overflow-hidden focus-within:border-blue-600 transition-all">
+                  <CalendarIcon size={14} className="absolute left-3 text-slate-400 pointer-events-none" />
+                  <input 
+                    type="number" 
+                    inputMode="numeric"
+                    min="1"
+                    max={ageUnit === 'Days' ? 365 : 120}
+                    value={age}
+                    onChange={(e) => setAge(e.target.value)}
+                    placeholder="Age"
+                    className="w-full min-w-0 pl-8 pr-1 py-2 text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                  <div className="relative shrink-0 flex items-center pr-1.5">
+                    <select
+                      value={ageUnit}
+                      onChange={(e) => setAgeUnit(e.target.value as any)}
+                      className="text-[11px] font-bold text-blue-600 bg-transparent pr-4 focus:outline-none cursor-pointer appearance-none"
                     >
-                      <option value="Male">Male</option>
-                      <option value="Female">Female</option>
-                      <option value="Other">Other</option>
+                      <option value="Years">Years</option>
+                      <option value="Months">Months</option>
+                      <option value="Days">Days</option>
                     </select>
-                    <ChevronDown size={14} className="absolute right-3 text-slate-400 pointer-events-none" />
+                    <ChevronDown size={11} className="absolute right-1 text-blue-600 pointer-events-none" />
                   </div>
                 </div>
               </div>
 
-              {/* Place */}
-              <div className="space-y-1">
-                <label className="text-[10px] font-extrabold text-slate-700 uppercase tracking-wide">Place</label>
+              {/* Gender & Place in 2 columns */}
+              <div className="grid grid-cols-2 gap-2">
+                <div className="relative flex items-center bg-white border border-slate-200 rounded-xl overflow-hidden">
+                  <User size={14} className="absolute left-3 text-slate-400 pointer-events-none" />
+                  <select 
+                    value={gender}
+                    onChange={(e) => setGender(e.target.value)}
+                    className="w-full pl-8 pr-6 py-2 text-xs font-semibold text-slate-800 bg-transparent focus:outline-none appearance-none cursor-pointer"
+                  >
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                  </select>
+                  <ChevronDown size={12} className="absolute right-2 text-slate-400 pointer-events-none" />
+                </div>
+
                 <div className="relative">
-                  <MapPin size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-blue-600" />
+                  <MapPin size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                   <input 
                     type="text" 
                     value={place}
                     onChange={(e) => setPlace(e.target.value)}
                     placeholder="Enter your place"
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:bg-white focus:border-blue-600 focus:outline-none transition-all"
+                    className="w-full pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:border-blue-600 focus:outline-none transition-all placeholder:text-slate-400"
                   />
                 </div>
               </div>
 
-              {/* Existing Patient & RMP Reference */}
-              <div className="flex flex-col gap-3 pt-2 border-t border-slate-100">
-                <div className="flex items-center gap-4 flex-wrap">
-                  <div className="flex items-center gap-2">
-                    <input 
-                      type="checkbox" 
-                      id="existingPatient"
-                      checked={isExisting}
-                      onChange={(e) => setIsExisting(e.target.checked)}
-                      className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
-                    />
-                    <label htmlFor="existingPatient" className="text-xs font-bold text-slate-700 cursor-pointer">
-                      Existing Patient? <span className="text-[10px] font-medium text-slate-400">(Visited this hospital before)</span>
-                    </label>
-                  </div>
+              {/* Checkboxes */}
+              <div className="flex flex-col gap-2 pt-1 border-t border-slate-100">
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="checkbox" 
+                    id="existingPatient"
+                    checked={isExisting}
+                    onChange={(e) => setIsExisting(e.target.checked)}
+                    className="w-3.5 h-3.5 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
+                  />
+                  <label htmlFor="existingPatient" className="text-[11px] font-bold text-slate-700 cursor-pointer">
+                    Existing Patient <span className="text-[10px] font-medium text-slate-400">(Visited this hospital before)</span>
+                  </label>
+                </div>
 
-                  <div className="flex items-center gap-2">
-                    <input 
-                      type="checkbox" 
-                      id="addRmpReference"
-                      checked={showRmpFields}
-                      onChange={(e) => setShowRmpFields(e.target.checked)}
-                      className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
-                    />
-                    <label htmlFor="addRmpReference" className="text-xs font-bold text-slate-700 cursor-pointer">
-                      + Add RMP Reference
-                    </label>
-                  </div>
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="checkbox" 
+                    id="addRmpReference"
+                    checked={showRmpFields}
+                    onChange={(e) => setShowRmpFields(e.target.checked)}
+                    className="w-3.5 h-3.5 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
+                  />
+                  <label htmlFor="addRmpReference" className="text-[11px] font-bold text-slate-700 cursor-pointer">
+                    + Add RMP Reference (Optional)
+                  </label>
                 </div>
 
                 {showRmpFields && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 p-3.5 rounded-2xl border border-slate-150 animate-in fade-in slide-in-from-top-2 duration-200">
+                  <div className="grid grid-cols-2 gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200 animate-in fade-in duration-150">
                     <div>
-                      <label className="text-[10px] font-bold text-slate-500 block mb-1 uppercase tracking-wider">RMP Name</label>
+                      <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">RMP Name</label>
                       <input 
                         type="text" 
                         value={rmpName} 
                         onChange={(e) => setRmpName(e.target.value)}
-                        placeholder="Enter doctor/RMP name"
-                        className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-600 focus:bg-white"
-                        required={showRmpFields}
+                        placeholder="Doctor/RMP name"
+                        className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold focus:border-blue-600 outline-none"
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] font-bold text-slate-500 block mb-1 uppercase tracking-wider">RMP Phone Number</label>
+                      <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">RMP Phone</label>
                       <input 
                         type="tel" 
                         value={rmpPhone} 
                         onChange={(e) => setRmpPhone(e.target.value)}
-                        placeholder="Enter phone number"
-                        className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-600 focus:bg-white"
-                        required={showRmpFields}
+                        placeholder="Phone number"
+                        className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold focus:border-blue-600 outline-none"
                       />
                     </div>
                   </div>
                 )}
               </div>
-
             </div>
           </div>
 
-          {/* Platform Charge Info Note (Dynamic Platform Fee Breakdown) */}
+          {/* Clear fee breakdown matching Image 48 */}
           {(() => {
             const docFee = doctor.consultationFee || 500;
             const platFee = Math.max(10, Math.round(docFee * ((platformFeePercent || 5) / 100)));
-            const totalPayable = platFee;
 
             return (
-              <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl space-y-2.5 text-xs font-bold text-slate-800">
+              <div className="p-3.5 bg-gradient-to-r from-blue-50/70 to-indigo-50/70 border border-blue-100 rounded-2xl space-y-2 text-xs font-bold text-slate-800">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5 text-slate-600">
-                    <Stethoscope size={14} className="text-blue-600" />
-                    <span>Doctor Consultation Fee</span>
+                    <Stethoscope size={13} className="text-blue-600" />
+                    <span className="text-[11px]">Doctor Consultation Fee</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="font-extrabold text-slate-900">₹{docFee}</span>
-                    <span className="text-[10px] font-extrabold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
+                    <span className="font-extrabold text-slate-900 text-xs">₹{docFee}</span>
+                    <span className="text-[9px] font-extrabold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
                       Pay at Hospital
                     </span>
                   </div>
@@ -857,90 +807,88 @@ export const BookToken: React.FC = () => {
 
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5 text-blue-700">
-                    <Zap size={14} className="text-blue-600" />
-                    <span>Platform Booking Fee ({platformFeePercent || 5}%)</span>
+                    <Zap size={13} className="text-blue-600" />
+                    <span className="text-[11px]">Platform Booking Fee ({platformFeePercent || 5}%)</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="font-extrabold text-blue-700">₹{platFee}</span>
-                    <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
+                    <span className="font-extrabold text-blue-700 text-xs">₹{platFee}</span>
+                    <span className="text-[9px] font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
                       Pay Online Now
                     </span>
                   </div>
                 </div>
 
-                <div className="pt-2 border-t border-blue-200/60 flex items-center justify-between text-sm">
+                <div className="pt-2 border-t border-blue-200/60 flex items-center justify-between text-xs">
                   <div>
-                    <span className="font-black text-slate-900 block">Total Payable Now</span>
-                    <span className="text-[10px] text-slate-500 font-medium">Token fee only • Consultation fee of ₹{docFee} payable at hospital</span>
+                    <span className="font-black text-slate-900 block text-xs">Total Payable Now</span>
+                    <span className="text-[9px] text-slate-500 font-medium">Token fee only • Consultation fee of ₹{docFee} payable at hospital</span>
                   </div>
-                  <span className="font-black text-blue-700 text-base">₹{totalPayable}</span>
+                  <span className="font-black text-blue-700 text-base">₹{platFee}</span>
                 </div>
               </div>
             );
           })()}
 
-          {/* Giant Full-Width Pill CTA Button */}
+          {/* Big prominent Book button matching Image 48 */}
           <button 
             type="submit"
             disabled={!isDoctorOnlineAvailable}
-            className={`w-full rounded-full p-2.5 flex items-center justify-between shadow-xl transition-all ${
+            className={`w-full rounded-full p-2 flex items-center justify-between shadow-lg transition-all ${
               !isDoctorOnlineAvailable
                 ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none'
-                : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/25 cursor-pointer transform hover:scale-[1.01]'
+                : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/25 cursor-pointer transform hover:scale-[1.01] active:scale-[0.99]'
             }`}
           >
             {/* Left Ticket Circle */}
-            <div className={`w-11 h-11 rounded-full flex items-center justify-center shrink-0 shadow-inner ${
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 shadow-inner ${
               !isDoctorOnlineAvailable ? 'bg-slate-200 text-slate-400' : 'bg-white text-blue-600'
             }`}>
-              <Ticket size={22} />
+              <Ticket size={20} />
             </div>
 
             {/* Center Text */}
             <div className="text-center px-2">
-              <h4 className="text-base font-black tracking-tight leading-tight">
+              <h4 className="text-sm font-black tracking-tight leading-tight">
                 {!isDoctorOnlineAvailable 
                   ? 'Doctor Unavailable for Booking' 
                   : `Book Token • Pay ₹${Math.max(10, Math.round((doctor.consultationFee || 500) * ((platformFeePercent || 5) / 100)))}`
                 }
               </h4>
-              <p className={`text-[10px] font-medium ${!isDoctorOnlineAvailable ? 'text-slate-500' : 'text-blue-100'}`}>
+              <p className={`text-[9.5px] font-medium ${!isDoctorOnlineAvailable ? 'text-slate-500' : 'text-blue-100'}`}>
                 {!isDoctorOnlineAvailable ? 'Consultations suspended by clinic' : 'OPD spot confirmed • Doctor fee payable at hospital'}
               </p>
             </div>
 
             {/* Right Arrow Circle */}
-            <div className={`w-11 h-11 rounded-full flex items-center justify-center shrink-0 shadow-inner ${
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 shadow-inner ${
               !isDoctorOnlineAvailable ? 'bg-slate-200 text-slate-400' : 'bg-white text-blue-600'
             }`}>
-              <ArrowRight size={22} />
+              <ArrowRight size={20} />
             </div>
           </button>
 
-          {/* Bottom Trust Indicators matching Image 3 */}
+          {/* Bottom Trust Indicators */}
           <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-200/60 text-center">
             <div className="flex flex-col items-center">
-              <ShieldCheck size={18} className="text-blue-600 mb-1" />
-              <span className="text-[10px] font-extrabold text-slate-800">100% Secure</span>
+              <ShieldCheck size={16} className="text-blue-600 mb-0.5" />
+              <span className="text-[9.5px] font-extrabold text-slate-800">100% Secure</span>
               <span className="text-[8px] text-slate-400 font-medium">Your data is safe</span>
             </div>
 
             <div className="flex flex-col items-center border-x border-slate-200">
-              <Zap size={18} className="text-blue-600 mb-1" />
-              <span className="text-[10px] font-extrabold text-slate-800">Ultra Fast</span>
+              <Zap size={16} className="text-blue-600 mb-0.5" />
+              <span className="text-[9.5px] font-extrabold text-slate-800">Ultra Fast</span>
               <span className="text-[8px] text-slate-400 font-medium">Book in 30 seconds</span>
             </div>
 
             <div className="flex flex-col items-center">
-              <Users size={18} className="text-blue-600 mb-1" />
-              <span className="text-[10px] font-extrabold text-slate-800">Trusted by 1M+</span>
+              <Users size={16} className="text-blue-600 mb-0.5" />
+              <span className="text-[9.5px] font-extrabold text-slate-800">Trusted by 1M+</span>
               <span className="text-[8px] text-slate-400 font-medium">Happy patients</span>
             </div>
           </div>
 
         </form>
-        </div>
-
       </div>
     </div>
   );

@@ -7,7 +7,7 @@ import {
   Calendar, Download, Share2, CheckCircle2, 
   Phone, Compass, Building2, User, CreditCard,
   AlertCircle, ArrowLeft, Loader2, ExternalLink,
-  Clock, QrCode, ChevronDown, ChevronUp, MapPin, ShieldCheck
+  Clock, MapPin, ShieldCheck
 } from 'lucide-react';
 
 const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -49,7 +49,6 @@ export const TokenConfirmation: React.FC = () => {
 
   const [fetchedAppointment, setFetchedAppointment] = useState<any>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [showQr, setShowQr] = useState(false);
 
   // Check local appointment cache first for instant synchronous resolution
   const savedLocalAppointment = React.useMemo(() => {
@@ -306,22 +305,36 @@ export const TokenConfirmation: React.FC = () => {
           {/* Ticket Body Content */}
           <div className="p-5 space-y-4">
             
-            {/* 1. Large High-Visibility Token Number & Consultation Time */}
-            <div className="bg-gradient-to-br from-blue-50 via-slate-50 to-indigo-50/50 border border-blue-100 rounded-3xl p-5 text-center shadow-2xs relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-full blur-xl pointer-events-none" />
-              <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">
-                YOUR CONFIRMED OPD TOKEN NUMBER
-              </span>
-              
-              <div className="text-6xl sm:text-7xl font-black text-blue-700 tracking-tight my-1 font-heading">
-                #{appointment.tokenNumber || 1}
+            {/* 1. Large High-Visibility Token Number & Inline QR Code matching Image 57 */}
+            <div className="bg-gradient-to-br from-blue-50 via-slate-50 to-indigo-50/50 border border-blue-100 rounded-3xl p-4 sm:p-5 shadow-2xs relative overflow-hidden flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="text-center sm:text-left flex-1 min-w-0">
+                <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest block">
+                  YOUR TOKEN NUMBER
+                </span>
+                
+                <div className="text-5xl sm:text-6xl font-black text-blue-700 tracking-tight my-0.5 font-heading">
+                  #{appointment.tokenNumber || 1}
+                </div>
+
+                <div className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 mt-1">
+                  <Clock size={13} className="text-blue-600 shrink-0" />
+                  <span>{appointment.time || 'Morning OPD'}</span>
+                </div>
+                <div className="text-[10px] font-semibold text-slate-400 mt-0.5">
+                  {formattedDate} ({dayOfWeek})
+                </div>
               </div>
 
-              <div className="inline-flex items-center gap-2 bg-white px-3.5 py-1.5 rounded-full border border-blue-200/80 shadow-2xs text-xs font-bold text-slate-800 mt-1">
-                <Clock size={13} className="text-blue-600 shrink-0" />
-                <span>OPD Slot: <strong>{appointment.time || '10:00 AM'}</strong></span>
-                <span className="text-slate-300">•</span>
-                <span className="text-slate-500">{formattedDate} ({dayOfWeek})</span>
+              {/* Inline QR Code matching Image 57 */}
+              <div className="flex flex-col items-center shrink-0 bg-white p-2.5 rounded-2xl border border-slate-200 shadow-2xs">
+                <QRCodeSVG 
+                  value={qrPayload}
+                  size={95}
+                  level="M"
+                />
+                <span className="text-[8.5px] font-bold text-slate-400 mt-1.5">
+                  Show this QR at Hospital
+                </span>
               </div>
             </div>
 
@@ -423,35 +436,6 @@ export const TokenConfirmation: React.FC = () => {
               </span>
             </div>
 
-            {/* 5. Collapsible Front-Desk Check-In QR Code */}
-            <div className="border border-slate-200 rounded-2xl p-3 bg-white">
-              <button
-                type="button"
-                onClick={() => setShowQr(!showQr)}
-                className="w-full flex items-center justify-between text-xs font-black text-slate-700 hover:text-blue-600 cursor-pointer transition-colors"
-              >
-                <span className="flex items-center gap-1.5">
-                  <QrCode size={14} className="text-blue-600" />
-                  <span>{showQr ? 'Hide Hospital Scanner QR Code' : 'Show Hospital Scanner QR Code (Optional)'}</span>
-                </span>
-                {showQr ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-              </button>
-
-              {showQr && (
-                <div className="mt-3 pt-3 border-t border-slate-100 flex flex-col items-center text-center animate-in fade-in duration-200">
-                  <div className="p-3 bg-white border border-slate-200 rounded-2xl shadow-xs">
-                    <QRCodeSVG 
-                      value={qrPayload}
-                      size={130}
-                      level="M"
-                    />
-                  </div>
-                  <span className="text-[10px] font-bold text-slate-400 mt-2">
-                    Show at hospital front desk for instant OPD barcode scanning
-                  </span>
-                </div>
-              )}
-            </div>
 
           </div>
         </div>
@@ -557,7 +541,7 @@ export const TokenConfirmation: React.FC = () => {
             className="bg-blue-600 hover:bg-blue-700 py-2.5 text-xs font-extrabold flex items-center justify-center gap-1.5 rounded-xl cursor-pointer"
           >
             <Download size={14} />
-            <span>Download Ticket (PDF)</span>
+            <span>Download Token (PDF)</span>
           </Button>
 
           <Button 
@@ -567,7 +551,27 @@ export const TokenConfirmation: React.FC = () => {
             className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 py-2.5 text-xs font-extrabold flex items-center justify-center gap-1.5 rounded-xl cursor-pointer"
           >
             <Share2 size={14} />
-            <span>Share Ticket</span>
+            <span>Share Token</span>
+          </Button>
+        </div>
+
+        {/* Navigation CTAs matching Image 57 */}
+        <div className="space-y-2 pt-2">
+          <Button
+            variant="primary"
+            fullWidth
+            onClick={() => navigate('/bookings')}
+            className="py-3 rounded-2xl text-xs font-extrabold shadow-md shadow-blue-500/20 cursor-pointer"
+          >
+            View My Bookings
+          </Button>
+          <Button
+            variant="outline"
+            fullWidth
+            onClick={() => navigate('/')}
+            className="py-2.5 rounded-2xl text-xs font-bold bg-blue-50/50 border-blue-200 text-blue-700 hover:bg-blue-100/50 cursor-pointer"
+          >
+            Book Another Token
           </Button>
         </div>
 

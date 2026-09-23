@@ -6,6 +6,7 @@ import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { ArrowLeft, Clock, Calendar, CheckCircle2, XCircle, AlertCircle, Trash2, RotateCw } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { subscribeGlobalSync } from '../../utils/syncBus';
 
 export const MyBookings: React.FC = () => {
@@ -118,112 +119,139 @@ export const MyBookings: React.FC = () => {
   const renderCard = (appt: Appointment) => {
     const currentStatus = appt.status || 'booked';
     const isActive = currentStatus === 'booked' || currentStatus === 'checked-in' || currentStatus === 'in-cabin';
+    const bookingIdDisplay = appt.id.startsWith('apt-') ? `ITK${appt.id.replace('apt-', '').slice(0, 6).toUpperCase()}` : appt.id.toUpperCase();
+
+    const qrPayload = JSON.stringify({
+      id: appt.id,
+      token: appt.tokenNumber,
+      doctor: appt.doctorName,
+      hospital: appt.hospitalName
+    });
 
     return (
       <Card
         key={appt.id}
         padding="none"
-        className={`flex flex-col justify-between mb-4 border border-slate-100 overflow-hidden ${isActive ? 'cursor-pointer hover:border-blue-200 hover:shadow-md transition-all' : ''}`}
+        className={`flex flex-col justify-between mb-4 border border-slate-150 rounded-2xl overflow-hidden shadow-2xs ${isActive ? 'cursor-pointer hover:border-blue-200 hover:shadow-md transition-all' : ''}`}
         onClick={isActive ? () => navigate(`/confirmation/${appt.id}`) : undefined}
       >
         {/* Active token: blue top accent bar */}
         {isActive && <div className="h-1 w-full bg-gradient-to-r from-blue-500 to-indigo-500" />}
 
         <div className="p-4">
-          <div className="flex justify-between items-start">
-            <div>
-              <Badge 
-                variant={currentStatus === 'completed' ? 'green' : currentStatus === 'cancelled' ? 'red' : currentStatus === 'in-cabin' || currentStatus === 'checked-in' ? 'orange' : 'blue'} 
-                className="text-[9px] px-2 py-0.5 rounded-md mb-2 uppercase"
-              >
-                {currentStatus === 'in-cabin' ? 'In Consultation' : currentStatus === 'checked-in' ? 'Checked In' : currentStatus.toUpperCase()}
-              </Badge>
-              <h4 className="font-extrabold text-slate-800 text-sm tracking-tight">{appt.hospitalName}</h4>
-              <p className="text-[10px] text-slate-500 font-semibold mt-0.5">{appt.doctorName} • {appt.departmentName}</p>
-              <div className="flex items-center gap-1.5 mt-1.5 text-[10px] font-bold text-slate-600 flex-wrap">
-                <span>{appt.patientName}</span>
-                <span>•</span>
-                <span>{appt.ageDisplay || (appt.age ? `${appt.age} Yrs` : '')}</span>
-                <span>•</span>
-                <span>{appt.gender}</span>
-                {appt.isExisting && (
-                  <span className="text-[9px] font-black text-purple-700 bg-purple-50 border border-purple-200 px-1.5 py-0.2 rounded">
-                    ★ Existing
-                  </span>
-                )}
-                {appt.rmpReference && appt.rmpReference.name && (
-                  <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.2 rounded">
-                    RMP: {appt.rmpReference.name}
-                  </span>
-                )}
-              </div>
-            </div>
-            <div className="text-right">
-              <span className="text-[9px] text-slate-400 font-bold block uppercase tracking-wider">Token Number</span>
-              <span className="text-2xl font-black text-slate-800 font-heading block leading-none mt-1">#{appt.tokenNumber}</span>
+          {/* Card Top: Status & Booking ID */}
+          <div className="flex justify-between items-center mb-2.5 pb-2 border-b border-slate-100">
+            <Badge 
+              variant={currentStatus === 'completed' ? 'green' : currentStatus === 'cancelled' ? 'red' : currentStatus === 'in-cabin' || currentStatus === 'checked-in' ? 'orange' : 'green'} 
+              className="text-[9.5px] px-2.5 py-0.5 rounded-full uppercase font-black"
+            >
+              {currentStatus === 'in-cabin' ? 'In Consultation' : currentStatus === 'checked-in' ? 'Checked In' : currentStatus === 'booked' ? 'Confirmed' : currentStatus.toUpperCase()}
+            </Badge>
+
+            <span className="text-[10px] font-bold text-slate-400 tracking-wide">
+              Booking ID: <strong className="text-slate-600 font-extrabold">{bookingIdDisplay}</strong>
+            </span>
+          </div>
+
+          {/* Hospital & Doctor Details */}
+          <div>
+            <h4 className="font-extrabold text-slate-900 text-sm tracking-tight">{appt.hospitalName}</h4>
+            <p className="text-[11px] text-blue-600 font-extrabold mt-0.5">{appt.doctorName} • <span className="text-slate-500 font-medium">{appt.departmentName || 'General OPD'}</span></p>
+            <div className="flex items-center gap-1.5 mt-1.5 text-[10px] font-bold text-slate-600 flex-wrap">
+              <span>{appt.patientName}</span>
+              <span>•</span>
+              <span>{appt.ageDisplay || (appt.age ? `${appt.age} Yrs` : '')}</span>
+              <span>•</span>
+              <span>{appt.gender}</span>
+              {appt.isExisting && (
+                <span className="text-[9px] font-black text-purple-700 bg-purple-50 border border-purple-200 px-1.5 py-0.2 rounded">
+                  ★ Existing
+                </span>
+              )}
+              {appt.rmpReference && appt.rmpReference.name && (
+                <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.2 rounded">
+                  RMP: {appt.rmpReference.name}
+                </span>
+              )}
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3.5 border-t border-slate-50 pt-3.5 mt-3.5 text-[10px] text-slate-500">
-            <div className="flex items-center gap-1.5 font-medium">
-              <Calendar size={13} className="text-blue-500" />
+          {/* Date & Time Slot */}
+          <div className="grid grid-cols-2 gap-2 border-t border-slate-50 pt-2.5 mt-2.5 text-[10.5px] text-slate-600 font-semibold">
+            <div className="flex items-center gap-1.5">
+              <Calendar size={13} className="text-blue-600" />
               <span>{appt.date}</span>
             </div>
-            <div className="flex items-center gap-1.5 font-medium">
-              <Clock size={13} className="text-blue-500" />
+            <div className="flex items-center gap-1.5">
+              <Clock size={13} className="text-blue-600" />
               <span>Slot: {appt.time}</span>
             </div>
           </div>
 
+          {/* High Visibility Token Box with QR code matching Image 57 */}
+          <div className="bg-gradient-to-r from-blue-50/70 to-indigo-50/70 border border-blue-100 rounded-2xl p-3 my-3 flex items-center justify-between">
+            <div>
+              <span className="text-[9px] text-blue-600 font-extrabold uppercase tracking-wider block">Token Number</span>
+              <span className="text-3xl font-black text-blue-700 font-heading block leading-none mt-0.5">#{appt.tokenNumber}</span>
+              <span className="text-[9.5px] text-slate-500 font-semibold block mt-1.5">Consultation: ₹{appt.fee} (Pay at Cabin)</span>
+            </div>
+
+            {/* QR Code */}
+            <div className="flex flex-col items-center bg-white p-1.5 rounded-xl border border-slate-200 shadow-2xs">
+              <QRCodeSVG 
+                value={qrPayload}
+                size={58}
+                level="L"
+              />
+              <span className="text-[7.5px] font-bold text-slate-400 mt-1">Show at Hospital</span>
+            </div>
+          </div>
+
           {isActive ? (
-            <>
-              <div className="flex items-center justify-between mt-3.5 pt-3.5 border-t border-slate-50 text-[9.5px] text-slate-400 font-extrabold uppercase">
-                <span>Consultation Fee: ₹{appt.fee} (Pay at Cabin)</span>
-                <span className="text-blue-600 flex items-center gap-1">
-                  View Ticket →
-                </span>
-              </div>
+            <div className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-100" onClick={(e) => e.stopPropagation()}>
+              <button
+                type="button"
+                onClick={() => navigate(`/confirmation/${appt.id}`)}
+                className="flex-1 py-2 px-3 text-xs font-extrabold rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 transition-colors flex items-center justify-center gap-1 cursor-pointer"
+              >
+                <span>View Token →</span>
+              </button>
               
-              <div className="flex gap-2.5 mt-3" onClick={(e) => e.stopPropagation()}>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => handleCancelClick(appt.id)}
-                  className="flex-1 py-1.5 text-xs font-bold rounded-xl border-slate-200 text-slate-600 hover:bg-red-50 hover:border-red-100 hover:text-red-600 cursor-pointer"
-                >
-                  Cancel Token
-                </Button>
-              </div>
-            </>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => handleCancelClick(appt.id)}
+                className="py-1.5 px-3 text-xs font-bold rounded-xl border-slate-200 text-slate-600 hover:bg-red-50 hover:border-red-100 hover:text-red-600 cursor-pointer"
+              >
+                Cancel Token
+              </Button>
+            </div>
           ) : (
-            <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-50 text-[9.5px] text-slate-400 font-extrabold uppercase">
-              <span>Consultation Fee: ₹{appt.fee} (Pay at Cabin)</span>
-              <div className="flex items-center gap-2">
-                <span className="flex items-center gap-1 font-bold">
-                  {appt.status === 'completed' ? (
-                    <>
-                      <CheckCircle2 size={12} className="text-emerald-500" />
-                      Served
-                    </>
-                  ) : (
-                    <>
-                      <XCircle size={12} className="text-red-500" />
-                      Cancelled
-                    </>
-                  )}
-                </span>
-                <button
-                  onClick={() => {
-                    if (window.confirm("Remove this booking from your history?")) {
-                      deleteAppointment(appt.id);
-                    }
-                  }}
-                  className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
-                  title="Delete from history"
-                >
-                  <Trash2 size={13} />
-                </button>
-              </div>
+            <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-slate-100 text-[10px] text-slate-500">
+              <span className="flex items-center gap-1 font-bold">
+                {appt.status === 'completed' ? (
+                  <>
+                    <CheckCircle2 size={13} className="text-emerald-500" />
+                    <span className="text-emerald-700">Completed / Served</span>
+                  </>
+                ) : (
+                  <>
+                    <XCircle size={13} className="text-rose-500" />
+                    <span className="text-rose-700">Cancelled by you</span>
+                  </>
+                )}
+              </span>
+              <button
+                onClick={() => {
+                  if (window.confirm("Remove this booking from your history?")) {
+                    deleteAppointment(appt.id);
+                  }
+                }}
+                className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
+                title="Delete from history"
+              >
+                <Trash2 size={13} />
+              </button>
             </div>
           )}
         </div>

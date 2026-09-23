@@ -6,8 +6,8 @@ import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { 
   ArrowLeft, Star, MapPin, Clock, Heart, Share2, 
-  Phone, CheckCircle, Stethoscope, Navigation, AlertTriangle,
-  ChevronLeft, ChevronRight, Video, MessageSquare, Mail, Globe
+  CheckCircle, Stethoscope, Navigation, AlertTriangle,
+  ChevronLeft, ChevronRight, Video
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 
@@ -133,41 +133,6 @@ export const HospitalDetails: React.FC<HospitalDetailsProps> = ({ onDoctorSelect
       })
       .catch(() => {});
   }, [id]);
-
-  const emergencyPhone = useMemo(() => {
-    if (liveProfile?.emergencyNumber) return String(liveProfile.emergencyNumber).trim();
-    if (liveProfile?.emergencyContact) return String(liveProfile.emergencyContact).trim();
-    if (hospital?.emergencyContact) return String(hospital.emergencyContact).trim();
-    if ((hospital as any)?.emergencyNumber) return String((hospital as any).emergencyNumber).trim();
-    try {
-      const cached = localStorage.getItem(`insta_hospital_profile_${id}`);
-      if (cached) {
-        const p = JSON.parse(cached);
-        if (p.emergencyNumber) return String(p.emergencyNumber).trim();
-        if (p.emergencyContact) return String(p.emergencyContact).trim();
-      }
-    } catch (e) {}
-    return '';
-  }, [liveProfile, hospital, id]);
-
-  const mainContactPhone = useMemo(() => {
-    if (liveProfile?.phone) return String(liveProfile.phone).trim();
-    if (hospital?.contact) return String(hospital.contact).trim();
-    if (hospital?.phone) return String(hospital.phone).trim();
-    return '';
-  }, [liveProfile, hospital]);
-
-  const whatsappPhone = useMemo(() => {
-    return (liveProfile?.whatsapp || hospital?.whatsapp || '').trim();
-  }, [liveProfile, hospital]);
-
-  const officialEmail = useMemo(() => {
-    return (liveProfile?.email || hospital?.email || '').trim();
-  }, [liveProfile, hospital]);
-
-  const officialWebsite = useMemo(() => {
-    return (liveProfile?.website || (hospital as any)?.website || '').trim();
-  }, [liveProfile, hospital]);
 
   const groupedTimings = useMemo(() => {
     const raw = liveProfile?.timings || (hospital as any)?.timings;
@@ -537,28 +502,6 @@ export const HospitalDetails: React.FC<HospitalDetailsProps> = ({ onDoctorSelect
         {/* Left Column (Overview & Facilities) (Mobile: SECOND, Desktop: FIRST) */}
         <div className="w-full md:col-span-5 space-y-4 md:sticky md:top-24 mb-6 md:mb-0 order-last md:order-first">
           
-          {/* 24/7 EMERGENCY HELPLINE PROMINENT BANNER */}
-          {emergencyPhone && (
-            <div className="bg-gradient-to-r from-red-600 to-rose-600 text-white rounded-3xl p-4 shadow-md flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center shrink-0">
-                  <AlertTriangle size={20} className="text-white" />
-                </div>
-                <div className="min-w-0">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-red-100 block">24/7 Emergency Helpline</span>
-                  <span className="text-sm md:text-base font-black tracking-tight truncate block">{emergencyPhone}</span>
-                </div>
-              </div>
-              <a
-                href={`tel:${emergencyPhone.replace(/\s+/g, '')}`}
-                className="bg-white text-red-700 hover:bg-red-50 text-xs font-black px-3.5 py-2 rounded-xl shrink-0 shadow-sm transition-transform active:scale-95 flex items-center gap-1.5 cursor-pointer"
-              >
-                <Phone size={13} className="fill-red-700 text-red-700" />
-                <span>Call Now</span>
-              </a>
-            </div>
-          )}
-
           {/* ABOUT HOSPITAL & FACILITIES SECTION */}
           <Card className="p-5 border-none shadow-2xs bg-white rounded-3xl space-y-4">
             <div>
@@ -585,73 +528,9 @@ export const HospitalDetails: React.FC<HospitalDetailsProps> = ({ onDoctorSelect
               </div>
             </div>
 
-            {/* CONTACT LINES */}
-            <div className="border-t border-slate-100 pt-3 space-y-2 text-xs">
-              {mainContactPhone && (
-                <div className="flex items-center justify-between py-0.5">
-                  <div className="flex items-center gap-2 text-slate-600 font-semibold">
-                    <Phone size={14} className="text-blue-600 shrink-0" />
-                    <span>Reception: <strong className="text-slate-800 font-bold">{mainContactPhone}</strong></span>
-                  </div>
-                  <a 
-                    href={`tel:${mainContactPhone.replace(/\s+/g, '')}`}
-                    className="text-[11px] font-bold text-blue-600 hover:underline cursor-pointer"
-                  >
-                    Call
-                  </a>
-                </div>
-              )}
-
-              {whatsappPhone && (
-                <div className="flex items-center justify-between py-0.5">
-                  <div className="flex items-center gap-2 text-slate-600 font-semibold">
-                    <MessageSquare size={14} className="text-emerald-600 shrink-0" />
-                    <span>WhatsApp: <strong className="text-slate-800 font-bold">{whatsappPhone}</strong></span>
-                  </div>
-                  <a 
-                    href={`https://wa.me/${whatsappPhone.replace(/\D/g, '')}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[11px] font-bold text-emerald-600 hover:underline cursor-pointer"
-                  >
-                    Chat
-                  </a>
-                </div>
-              )}
-
-              {officialEmail && (
-                <div className="flex items-center justify-between py-0.5">
-                  <div className="flex items-center gap-2 text-slate-600 font-semibold truncate pr-2">
-                    <Mail size={14} className="text-slate-400 shrink-0" />
-                    <span className="truncate">{officialEmail}</span>
-                  </div>
-                  <a 
-                    href={`mailto:${officialEmail}`}
-                    className="text-[11px] font-bold text-slate-500 hover:underline shrink-0 cursor-pointer"
-                  >
-                    Email
-                  </a>
-                </div>
-              )}
-
-              {officialWebsite && (
-                <div className="flex items-center justify-between py-0.5">
-                  <div className="flex items-center gap-2 text-slate-600 font-semibold truncate pr-2">
-                    <Globe size={14} className="text-slate-400 shrink-0" />
-                    <span className="truncate">{officialWebsite.replace(/^https?:\/\//, '')}</span>
-                  </div>
-                  <a 
-                    href={officialWebsite.startsWith('http') ? officialWebsite : `https://${officialWebsite}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[11px] font-bold text-slate-500 hover:underline shrink-0 cursor-pointer"
-                  >
-                    Visit ↗
-                  </a>
-                </div>
-              )}
-
-              <div className="flex items-center gap-2 pt-2 border-t border-slate-50">
+            {/* GOOGLE MAPS NAVIGATION */}
+            <div className="border-t border-slate-100 pt-3 text-xs">
+              <div className="flex items-center gap-2">
                 <Navigation size={14} className="text-blue-600 shrink-0" />
                 <a 
                   href={hospital.lat && hospital.lng 
@@ -660,7 +539,7 @@ export const HospitalDetails: React.FC<HospitalDetailsProps> = ({ onDoctorSelect
                   } 
                   target="_blank" 
                   rel="noopener noreferrer"
-                  className="text-blue-650 hover:underline flex items-center gap-0.5 font-bold"
+                  className="text-blue-600 hover:underline flex items-center gap-0.5 font-bold"
                 >
                   Navigate on Google Maps ↗
                 </a>

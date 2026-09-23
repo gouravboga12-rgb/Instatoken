@@ -734,42 +734,22 @@ export const HospitalSettings: React.FC = () => {
               </div>
             )}
 
-            {/* ─── CONTACTS & EMERGENCY ─── */}
+            {/* ─── CONTACTS & DIGITAL PRESENCE ─── */}
             {activeTab === 'contact' && (
-              <div className="space-y-5">
-                <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Hospital Contacts & Emergency Lines</h3>
-                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-2">
-                  <AlertCircle size={14} className="text-amber-600 mt-0.5 shrink-0" />
-                  <p className="text-xs text-amber-800 font-semibold">These contact numbers are displayed on patient-facing hospital pages and booking confirmation pages.</p>
+              <div className="space-y-4">
+                <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Hospital Digital Presence</h3>
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-start gap-2">
+                  <AlertCircle size={14} className="text-blue-600 mt-0.5 shrink-0" />
+                  <p className="text-xs text-blue-800 font-semibold">Manage your hospital official digital presence and portal links.</p>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className={labelCls}>Main Reception Phone</label>
-                    <input type="text" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} className={inputCls} placeholder="+91 80 4668 8888" />
-                  </div>
-                  <div>
-                    <label className={labelCls}>WhatsApp OPD Number</label>
-                    <input type="text" value={form.whatsapp} onChange={e => setForm({ ...form, whatsapp: e.target.value })} className={inputCls} placeholder="+91 98450 12345" />
-                  </div>
-                  <div>
                     <label className={labelCls}>Official Email Address</label>
-                    <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className={inputCls} />
+                    <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className={inputCls} placeholder="hospital@example.com" />
                   </div>
                   <div>
                     <label className={labelCls}>Official Website</label>
                     <input type="text" value={form.website} onChange={e => setForm({ ...form, website: e.target.value })} className={inputCls} placeholder="https://www.hospital.com" />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="text-xs font-extrabold text-red-700 block mb-1.5">
-                      🚨 24/7 Emergency Helpline Number <span className="text-red-400 font-semibold">(shown prominently on patient pages)</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={form.emergencyNumber}
-                      onChange={e => setForm({ ...form, emergencyNumber: e.target.value })}
-                      className="w-full px-3.5 py-3 border-2 border-red-300 bg-red-50/30 rounded-xl text-sm font-black text-red-800 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 transition-all"
-                      placeholder="e.g. 1066 / +91 80 4668 8899"
-                    />
                   </div>
                 </div>
               </div>
