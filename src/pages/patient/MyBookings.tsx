@@ -82,9 +82,14 @@ export const MyBookings: React.FC = () => {
 
   // De-duplicate appointments by id and resolve effective status cleanly from RDS/server
   const dedupedAppts = React.useMemo(() => {
+    let deletedSet = new Set<string>();
+    try {
+      deletedSet = new Set(JSON.parse(localStorage.getItem('insta_deleted_appointment_ids') || '[]'));
+    } catch (e) {}
+
     const map = new Map<string, Appointment>();
     (appointments || []).forEach(a => {
-      if (!a || !a.id) return;
+      if (!a || !a.id || deletedSet.has(a.id)) return;
       if (a.id === 'tok-1001' || a.patientName === 'Guest Patient') return;
 
       // When patient is logged in, filter to show only this user's appointments
@@ -110,9 +115,9 @@ export const MyBookings: React.FC = () => {
   const activeAppts = dedupedAppts.filter(a => a.status === 'booked' || a.status === 'checked-in' || a.status === 'in-cabin');
   const pastAppts = dedupedAppts.filter(a => a.status === 'completed' || a.status === 'cancelled');
 
-  const handleCancelClick = (id: string) => {
+  const handleCancelClick = async (id: string) => {
     if (window.confirm("Are you sure you want to cancel this OPD token? Please note: Token booking fee is NON-REFUNDABLE upon cancellation.")) {
-      cancelAppointment(id);
+      await cancelAppointment(id);
     }
   };
 
@@ -242,9 +247,11 @@ export const MyBookings: React.FC = () => {
                 )}
               </span>
               <button
-                onClick={() => {
+                type="button"
+                onClick={async (e) => {
+                  e.stopPropagation();
                   if (window.confirm("Remove this booking from your history?")) {
-                    deleteAppointment(appt.id);
+                    await deleteAppointment(appt.id);
                   }
                 }}
                 className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
@@ -377,9 +384,10 @@ export const MyBookings: React.FC = () => {
             {pastAppts.length > 0 && (
               <div className="flex justify-end mb-3">
                 <button
-                  onClick={() => {
+                  type="button"
+                  onClick={async () => {
                     if (window.confirm("Are you sure you want to clear all past booking history? This action cannot be undone.")) {
-                      clearPastHistory();
+                      await clearPastHistory();
                     }
                   }}
                   className="text-[10px] font-extrabold text-red-500 hover:text-red-650 flex items-center gap-1 cursor-pointer hover:underline bg-red-50/50 px-2.5 py-1 rounded-lg border border-red-100/50 transition-colors"

@@ -1581,19 +1581,64 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return newAppt;
   };
 
-  const cancelAppointment = (id: string) => {
-    setAppointments(prev => prev.map(appt => {
-      if (appt.id === id) {
-        // Send notification
-        addNotification(
-          "Appointment Cancelled",
-          `Token #${appt.tokenNumber} for Dr. ${appt.doctorName} was cancelled. Note: Token booking fee is non-refundable.`,
-          "warning"
-        );
-        return { ...appt, status: 'cancelled' };
+  const cancelAppointment = async (id: string) => {
+    // 1. Update local appointments state and persist to localStorage
+    setAppointments(prev => {
+      const updated = prev.map(appt => {
+        if (appt.id === id) {
+          addNotification(
+            "Appointment Cancelled",
+            `Token #${appt.tokenNumber} for Dr. ${appt.doctorName} was cancelled. Note: Token booking fee is non-refundable.`,
+            "warning"
+          );
+          return { ...appt, status: 'cancelled' as const };
+        }
+        return appt;
+      });
+      try {
+        localStorage.setItem('insta_appointments', JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+
+    // 2. Also update customer account bookings
+    setCustomers(prev => {
+      const updated = prev.map(c => ({
+        ...c,
+        bookings: (c.bookings || []).map(b => b.id === id ? { ...b, status: 'cancelled' as const } : b)
+      }));
+      try {
+        localStorage.setItem('insta_customers', JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+
+    // 3. Update hospital tokens cache if exists
+    try {
+      const savedTokens = localStorage.getItem('insta_hospital_tokens');
+      if (savedTokens) {
+        const parsed = JSON.parse(savedTokens);
+        if (Array.isArray(parsed)) {
+          const updatedToks = parsed.map(t => t.id === id ? { ...t, status: 'cancelled', paymentStatus: 'refunded' } : t);
+          localStorage.setItem('insta_hospital_tokens', JSON.stringify(updatedToks));
+        }
       }
-      return appt;
-    }));
+    } catch (e) {}
+
+    // 4. Update backend status in PostgreSQL RDS (both appointments & tokens tables)
+    try {
+      await fetch(`/api/appointments/${id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'cancelled' })
+      });
+    } catch (e) {
+      console.warn('Error syncing appointment cancellation to backend:', e);
+    }
+
+    // 5. Broadcast global cross-tab sync
+    broadcastGlobalSync('APPOINTMENT_STATUS_UPDATED', { id, status: 'cancelled' });
+    broadcastGlobalSync('DATA_MUTATED', { type: 'APPOINTMENT_CANCELLED', id });
   };
 
   // --- Admin Methods ---
@@ -1863,21 +1908,99 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
-  const deleteAppointment = (id: string) => {
+  const deleteAppointment = async (id: string) => {
+    // 1. Add to tombstone list in localStorage to prevent resurrecting
+    try {
+      const existingDeleted = JSON.parse(localStorage.getItem('insta_deleted_appointment_ids') || '[]') as string[];
+      if (!existingDeleted.includes(id)) {
+        localStorage.setItem('insta_deleted_appointment_ids', JSON.stringify([...existingDeleted, id]));
+      }
+    } catch (e) {}
+
+    // 2. Update appointments state and localStorage
     setAppointments(prev => {
       const updated = prev.filter(appt => appt.id !== id);
-      localStorage.setItem('insta_appointments', JSON.stringify(updated));
+      try {
+        localStorage.setItem('insta_appointments', JSON.stringify(updated));
+      } catch (e) {}
       return updated;
     });
+
+    // 3. Update customer bookings
+    setCustomers(prev => {
+      const updated = prev.map(c => ({
+        ...c,
+        bookings: (c.bookings || []).filter(b => b.id !== id)
+      }));
+      try {
+        localStorage.setItem('insta_customers', JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+
+    // 4. Call backend permanent deletion
+    try {
+      await fetch(`/api/appointments/${id}`, { method: 'DELETE' });
+    } catch (e) {
+      console.warn('Error deleting appointment from backend:', e);
+    }
+
+    broadcastGlobalSync('DATA_MUTATED', { type: 'APPOINTMENT_DELETED', id });
     addNotification("History Updated", "Appointment booking was removed.", "info");
   };
 
-  const clearPastHistory = () => {
+  const clearPastHistory = async () => {
+    // 1. Collect all completed and cancelled IDs
+    const pastApptIds = appointments
+      .filter(appt => appt.status === 'completed' || appt.status === 'cancelled')
+      .map(appt => appt.id);
+
+    if (pastApptIds.length === 0) {
+      addNotification("History Clean", "No past appointments to clear.", "info");
+      return;
+    }
+
+    // 2. Add to tombstone list in localStorage
+    try {
+      const existingDeleted = JSON.parse(localStorage.getItem('insta_deleted_appointment_ids') || '[]') as string[];
+      const combined = Array.from(new Set([...existingDeleted, ...pastApptIds]));
+      localStorage.setItem('insta_deleted_appointment_ids', JSON.stringify(combined));
+    } catch (e) {}
+
+    // 3. Keep all active appointments ('booked', 'checked-in', 'in-cabin')
     setAppointments(prev => {
-      const updated = prev.filter(appt => appt.status === 'booked');
-      localStorage.setItem('insta_appointments', JSON.stringify(updated));
+      const updated = prev.filter(appt => appt.status === 'booked' || appt.status === 'checked-in' || appt.status === 'in-cabin');
+      try {
+        localStorage.setItem('insta_appointments', JSON.stringify(updated));
+      } catch (e) {}
       return updated;
     });
+
+    // 4. Clean customer bookings
+    setCustomers(prev => {
+      const pastSet = new Set(pastApptIds);
+      const updated = prev.map(c => ({
+        ...c,
+        bookings: (c.bookings || []).filter(b => !pastSet.has(b.id))
+      }));
+      try {
+        localStorage.setItem('insta_customers', JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+
+    // 5. Call backend bulk deletion
+    try {
+      await fetch('/api/appointments', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: pastApptIds, clearPast: true })
+      });
+    } catch (e) {
+      console.warn('Error bulk-clearing appointments on backend:', e);
+    }
+
+    broadcastGlobalSync('DATA_MUTATED', { type: 'PAST_APPOINTMENTS_CLEARED' });
     addNotification("History Cleared", "All past booking history has been removed.", "info");
   };
 
@@ -2143,6 +2266,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const refreshAppointments = async (): Promise<Appointment[]> => {
     try {
+      // 1. Read deleted IDs tombstone from localStorage
+      let deletedIds: string[] = [];
+      try {
+        deletedIds = JSON.parse(localStorage.getItem('insta_deleted_appointment_ids') || '[]');
+      } catch (e) {}
+      const deletedSet = new Set(deletedIds);
+
       const res = await fetch('/api/appointments');
       if (res.ok) {
         const data = await res.json();
@@ -2150,6 +2280,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const map = new Map<string, Appointment>();
           data.appointments.forEach((a: any) => {
             if (!a || !a.id || a.id === 'tok-1001' || a.patientName === 'Guest Patient') return;
+            if (deletedSet.has(a.id)) return; // Exclude permanently deleted tokens
+
             const norm: Appointment = {
               ...a,
               status: (a.status || 'booked') as Appointment['status']

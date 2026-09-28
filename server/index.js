@@ -2659,12 +2659,34 @@ app.patch('/api/appointments/:id/status', async (req, res) => {
   if (!status) return res.status(400).json({ success: false, message: 'Status required' });
 
   const store = await getUnifiedStore();
+  let matchedAppt = null;
   store.appointments = (store.appointments || []).map(a => {
     if (a.id === id) {
-      return { ...a, status };
+      matchedAppt = { ...a, status };
+      return matchedAppt;
     }
     return a;
   });
+
+  // Also update corresponding token in store.tokens
+  store.tokens = (store.tokens || []).map(t => {
+    if (t.id === id || (matchedAppt && t.hospitalId === matchedAppt.hospitalId && t.doctorId === matchedAppt.doctorId && (t.tokenNo === matchedAppt.tokenNumber || t.tokenNumber === matchedAppt.tokenNumber))) {
+      return {
+        ...t,
+        status: status === 'cancelled' ? 'cancelled' : status === 'completed' ? 'completed' : status,
+        paymentStatus: status === 'cancelled' ? 'refunded' : status === 'completed' ? 'paid' : t.paymentStatus
+      };
+    }
+    return t;
+  });
+
+  // Also update in customer accounts store
+  if (store.customers && Array.isArray(store.customers)) {
+    store.customers = store.customers.map(c => ({
+      ...c,
+      bookings: (c.bookings || []).map(b => b.id === id ? { ...b, status } : b)
+    }));
+  }
 
   if (isDbConnected) {
     try {
@@ -2672,13 +2694,113 @@ app.patch('/api/appointments/:id/status', async (req, res) => {
         `UPDATE appointments SET status = $1::varchar, data = (COALESCE(data, '{}'::jsonb) || jsonb_build_object('status', $1::varchar)), updated_at = NOW() WHERE id = $2`,
         [status, id]
       );
+      // Synchronously update tokens table in RDS so COALESCE(t.status, a.status) matches
+      await query(
+        `UPDATE tokens SET status = $1::varchar, data = (COALESCE(data, '{}'::jsonb) || jsonb_build_object('status', $1::varchar)), updated_at = NOW() WHERE id = $2`,
+        [status, id]
+      );
+      if (matchedAppt && (matchedAppt.tokenNumber || matchedAppt.tokenNo)) {
+        const tokNum = String(matchedAppt.tokenNumber || matchedAppt.tokenNo);
+        await query(
+          `UPDATE tokens SET status = $1::varchar, data = (COALESCE(data, '{}'::jsonb) || jsonb_build_object('status', $1::varchar)), updated_at = NOW() 
+           WHERE hospital_id = $2 AND doctor_id = $3 AND (token_number = $4 OR data->>'tokenNumber' = $4 OR data->>'tokenNo' = $4)`,
+          [status, matchedAppt.hospitalId, matchedAppt.doctorId, tokNum]
+        );
+      }
     } catch (e) {
-      console.warn('Error updating appointment status in RDS:', e.message);
+      console.warn('Error updating appointment/token status in RDS:', e.message);
     }
   }
 
   await saveUnifiedStore(store);
   res.json({ success: true, id, status });
+});
+
+// ─── Delete Single Appointment from Customer History & RDS ─────────────────────
+app.delete('/api/appointments/:id', async (req, res) => {
+  const { id } = req.params;
+  const store = await getUnifiedStore();
+
+  const targetAppt = (store.appointments || []).find(a => a.id === id);
+  store.appointments = (store.appointments || []).filter(a => a.id !== id);
+  store.tokens = (store.tokens || []).filter(t => t.id !== id);
+
+  if (store.customers && Array.isArray(store.customers)) {
+    store.customers = store.customers.map(c => ({
+      ...c,
+      bookings: (c.bookings || []).filter(b => b.id !== id)
+    }));
+  }
+
+  if (isDbConnected) {
+    try {
+      await query(`DELETE FROM appointments WHERE id = $1`, [id]);
+      await query(`DELETE FROM tokens WHERE id = $1`, [id]);
+      if (targetAppt && (targetAppt.tokenNumber || targetAppt.tokenNo)) {
+        const tokNum = String(targetAppt.tokenNumber || targetAppt.tokenNo);
+        await query(
+          `DELETE FROM tokens WHERE hospital_id = $1 AND doctor_id = $2 AND (token_number = $3 OR data->>'tokenNumber' = $3 OR data->>'tokenNo' = $3)`,
+          [targetAppt.hospitalId, targetAppt.doctorId, tokNum]
+        );
+      }
+    } catch (e) {
+      console.warn('Error deleting appointment from RDS:', e.message);
+    }
+  }
+
+  await saveUnifiedStore(store);
+  res.json({ success: true, message: 'Appointment deleted successfully', id });
+});
+
+// ─── Bulk Clear Past Appointments / History from RDS ─────────────────────────
+app.delete('/api/appointments', async (req, res) => {
+  const { ids, phone, email, clearPast } = req.body || {};
+  const store = await getUnifiedStore();
+
+  let targetIds = Array.isArray(ids) ? ids : [];
+
+  if (clearPast && (!targetIds || targetIds.length === 0)) {
+    const cleanPhone = (phone || '').replace(/\D/g, '').slice(-10);
+    const cleanEmail = (email || '').trim().toLowerCase();
+
+    targetIds = (store.appointments || [])
+      .filter(a => {
+        const isPast = a.status === 'completed' || a.status === 'cancelled';
+        if (!isPast) return false;
+        if (cleanPhone || cleanEmail) {
+          const aPhone = (a.phone || '').replace(/\D/g, '').slice(-10);
+          const aEmail = (a.email || '').trim().toLowerCase();
+          return (cleanPhone && aPhone === cleanPhone) || (cleanEmail && aEmail === cleanEmail);
+        }
+        return true;
+      })
+      .map(a => a.id);
+  }
+
+  if (targetIds.length > 0) {
+    const idSet = new Set(targetIds);
+    store.appointments = (store.appointments || []).filter(a => !idSet.has(a.id));
+    store.tokens = (store.tokens || []).filter(t => !idSet.has(t.id));
+
+    if (store.customers && Array.isArray(store.customers)) {
+      store.customers = store.customers.map(c => ({
+        ...c,
+        bookings: (c.bookings || []).filter(b => !idSet.has(b.id))
+      }));
+    }
+
+    if (isDbConnected) {
+      try {
+        await query(`DELETE FROM appointments WHERE id = ANY($1::varchar[])`, [targetIds]);
+        await query(`DELETE FROM tokens WHERE id = ANY($1::varchar[])`, [targetIds]);
+      } catch (e) {
+        console.warn('Error bulk-clearing appointments from RDS:', e.message);
+      }
+    }
+  }
+
+  await saveUnifiedStore(store);
+  res.json({ success: true, clearedCount: targetIds.length, clearedIds: targetIds });
 });
 
 // ─── Direct Token Lookup ─────────────────────────────────────────────────────
