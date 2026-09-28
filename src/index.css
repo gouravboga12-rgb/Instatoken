@@ -9,20 +9,20 @@
   --color-accent: #22C55E;
 }
 
-/* Increased font scaling across all pages and viewports (mobile, tablet, desktop) for maximum readability */
+/* Responsive root font scaling: sleek & comfortable on mobile (15.5px), scaled for tablets and desktops */
 html {
-  font-size: 18px;
+  font-size: 15.5px;
 }
 
 @media (min-width: 640px) {
   html {
-    font-size: 18.5px;
+    font-size: 16.5px;
   }
 }
 
 @media (min-width: 1024px) {
   html {
-    font-size: 17.5px;
+    font-size: 17px;
   }
 }
 

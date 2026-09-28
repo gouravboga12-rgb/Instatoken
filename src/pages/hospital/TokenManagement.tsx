@@ -218,14 +218,14 @@ const CreateCustomerModal: React.FC<{
             </div>
 
             <div>
-              <label className="text-[11px] font-bold text-slate-700 block mb-1">Residential Address</label>
+              <label className="text-[11px] font-bold text-slate-700 block mb-1">Place / Location</label>
               <div className="relative">
                 <MapPin size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
                   value={form.address}
                   onChange={e => setForm({ ...form, address: e.target.value })}
-                  placeholder="Koramangala 4th Block"
+                  placeholder="e.g. Koramangala, Bengaluru"
                   className="w-full pl-8 pr-3 py-2 border border-slate-200 rounded-xl outline-none focus:border-blue-500 font-bold"
                 />
               </div>
@@ -753,12 +753,12 @@ const WalkInGenerator: React.FC<{
             </div>
 
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1.5">Area / Residential Address</label>
+              <label className="text-xs font-bold text-slate-700 block mb-1.5">Place / Location</label>
               <input
                 type="text"
                 value={form.address}
                 onChange={e => setForm(p => ({ ...p, address: e.target.value }))}
-                placeholder="e.g. Koramangala 4th Block"
+                placeholder="e.g. Koramangala, Bengaluru"
                 className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-medium"
               />
             </div>
@@ -840,7 +840,7 @@ const WalkInGenerator: React.FC<{
               </div>
             </div>
 
-            {/* Existing Patient & RMP Reference Checkboxes */}
+            {/* Existing Patient & Doctor Reference Checkboxes */}
             <div className="sm:col-span-2 space-y-3 pt-3 border-t border-slate-100">
               <div className="flex items-center gap-6 flex-wrap">
                 <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -863,7 +863,7 @@ const WalkInGenerator: React.FC<{
                     className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
                   />
                   <span className="text-xs font-bold text-slate-700">
-                    + Add RMP Reference
+                    + Add Doctor Reference
                   </span>
                 </label>
               </div>
@@ -871,18 +871,18 @@ const WalkInGenerator: React.FC<{
               {showRmpFields && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 p-3.5 rounded-2xl border border-slate-200 animate-fadeIn">
                   <div>
-                    <label className="text-[10px] font-bold text-slate-600 block mb-1 uppercase tracking-wider">RMP Doctor Name *</label>
+                    <label className="text-[10px] font-bold text-slate-600 block mb-1 uppercase tracking-wider">Referring Doctor Name *</label>
                     <input
                       type="text"
                       required={showRmpFields}
                       value={rmpName}
                       onChange={e => setRmpName(e.target.value)}
-                      placeholder="Dr. RMP Name"
+                      placeholder="Dr. Doctor Name"
                       className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-medium"
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-slate-600 block mb-1 uppercase tracking-wider">RMP Mobile Number</label>
+                    <label className="text-[10px] font-bold text-slate-600 block mb-1 uppercase tracking-wider">Referring Doctor Mobile Number</label>
                     <input
                       type="tel"
                       value={rmpPhone}

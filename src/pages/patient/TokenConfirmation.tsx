@@ -376,7 +376,7 @@ export const TokenConfirmation: React.FC = () => {
                     </p>
                     {appointment.rmpReference && appointment.rmpReference.name && (
                       <p className="text-[9.5px] font-bold text-indigo-700 mt-0.5">
-                        RMP Reference: Dr. {appointment.rmpReference.name} {appointment.rmpReference.phone ? `(${appointment.rmpReference.phone})` : ''}
+                        Doctor Reference: Dr. {appointment.rmpReference.name} {appointment.rmpReference.phone ? `(${appointment.rmpReference.phone})` : ''}
                       </p>
                     )}
                   </div>

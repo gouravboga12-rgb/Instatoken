@@ -860,6 +860,22 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       })
       .catch(err => console.warn('Could not fetch schedules from AWS RDS:', err));
 
+    // 5. Fetch live staff strictly for this hospital
+    fetch(`/api/hospitals/${targetHospId}/staff`, {
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+        'x-hospital-token': authToken
+      }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.staff)) {
+          setStaff(data.staff);
+          localStorage.setItem(`insta_hospital_staff_${targetHospId}`, JSON.stringify(data.staff));
+        }
+      })
+      .catch(err => console.warn('Could not fetch staff from backend:', err));
+
     // 5. Fetch broadcast notification history
     fetch(`/api/hospitals/${targetHospId}/notifications`, {
       headers: {
@@ -1430,14 +1446,20 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const newStaff: HospitalStaffMember = {
       ...member,
       id: `staff-${Date.now()}`,
-      attendance: [
-        { date: new Date().toISOString().split('T')[0], status: 'present', checkIn: '09:00 AM' }
-      ]
+      attendance: []
     };
     setStaff(prev => {
       const updated = [newStaff, ...prev];
       if (targetHospId) {
         localStorage.setItem(`insta_hospital_staff_${targetHospId}`, JSON.stringify(updated));
+        fetch(`/api/hospitals/${targetHospId}/staff`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({ staff: updated })
+        }).catch(err => console.warn('Could not persist staff to backend:', err));
       }
       return updated;
     });
@@ -1448,6 +1470,14 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const updated = prev.map(s => s.id === id ? { ...s, ...updates } : s);
       if (targetHospId) {
         localStorage.setItem(`insta_hospital_staff_${targetHospId}`, JSON.stringify(updated));
+        fetch(`/api/hospitals/${targetHospId}/staff`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({ staff: updated })
+        }).catch(err => console.warn('Could not persist staff to backend:', err));
       }
       return updated;
     });
@@ -1458,6 +1488,14 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const updated = prev.filter(s => s.id !== id);
       if (targetHospId) {
         localStorage.setItem(`insta_hospital_staff_${targetHospId}`, JSON.stringify(updated));
+        fetch(`/api/hospitals/${targetHospId}/staff`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({ staff: updated })
+        }).catch(err => console.warn('Could not persist staff deletion to backend:', err));
       }
       return updated;
     });

@@ -753,29 +753,29 @@ export const BookToken: React.FC = () => {
                     className="w-3.5 h-3.5 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
                   />
                   <label htmlFor="addRmpReference" className="text-[11px] font-bold text-slate-700 cursor-pointer">
-                    + Add RMP Reference (Optional)
+                    + Add Doctor Reference (Optional)
                   </label>
                 </div>
 
                 {showRmpFields && (
                   <div className="grid grid-cols-2 gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200 animate-in fade-in duration-150">
                     <div>
-                      <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">RMP Name</label>
+                      <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">Referring Doctor Name</label>
                       <input 
                         type="text" 
                         value={rmpName} 
                         onChange={(e) => setRmpName(e.target.value)}
-                        placeholder="Doctor/RMP name"
+                        placeholder="Dr. Doctor name"
                         className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold focus:border-blue-600 outline-none"
                       />
                     </div>
                     <div>
-                      <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">RMP Phone</label>
+                      <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">Doctor Phone Number</label>
                       <input 
                         type="tel" 
                         value={rmpPhone} 
                         onChange={(e) => setRmpPhone(e.target.value)}
-                        placeholder="Phone number"
+                        placeholder="10-digit phone"
                         className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold focus:border-blue-600 outline-none"
                       />
                     </div>

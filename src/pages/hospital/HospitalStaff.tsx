@@ -1,14 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useHospital } from '../../context/HospitalContext';
-import type { HospitalStaffMember, StaffAttendanceRecord } from '../../context/HospitalContext';
+import type { HospitalStaffMember } from '../../context/HospitalContext';
 import {
   Users, UserPlus, Search, Phone, Mail, Clock,
-  CheckCircle2, XCircle, AlertCircle, Trash2, Edit3,
-  Building2, Upload, User
+  Trash2, Edit3, Building2, Upload, User, Layers,
+  Briefcase
 } from 'lucide-react';
 
 export const HospitalStaff: React.FC = () => {
-  const { staff, departments, addStaffMember, updateStaffMember, deleteStaffMember, markStaffAttendance } = useHospital();
+  const { staff, departments, addStaffMember, updateStaffMember, deleteStaffMember } = useHospital();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDept, setSelectedDept] = useState('all');
@@ -25,7 +25,7 @@ export const HospitalStaff: React.FC = () => {
     email: '',
     departmentId: departments[0]?.id || 'dept-general',
     departmentName: departments[0]?.name || 'General Medicine',
-    designation: '',
+    designation: 'OPD Staff',
     shift: 'Morning' as 'Morning' | 'Evening' | 'Night' | 'General',
     joiningDate: new Date().toISOString().split('T')[0],
     salary: 25000,
@@ -33,32 +33,55 @@ export const HospitalStaff: React.FC = () => {
     status: 'active' as 'active' | 'on-leave' | 'inactive'
   });
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  // Department Section Mapping
+  const departmentSectionMap = useMemo(() => {
+    const map = new Map<string, number>();
+    departments.forEach((d, idx) => {
+      map.set(d.id, idx + 1);
+      map.set(d.name.toLowerCase(), idx + 1);
+    });
+    return map;
+  }, [departments]);
 
-  // Filter staff
-  const filteredStaff = staff.filter(s => {
-    const matchesSearch =
-      s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.employeeId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.phone.includes(searchQuery) ||
-      s.designation.toLowerCase().includes(searchQuery.toLowerCase());
+  // Section & Posts breakdown
+  const sectionStats = useMemo(() => {
+    return departments.map((dept, idx) => {
+      const deptStaff = staff.filter(s => s.departmentId === dept.id || s.departmentName?.toLowerCase() === dept.name.toLowerCase());
+      const distinctPosts = Array.from(new Set(deptStaff.map(s => s.designation).filter(Boolean)));
+      return {
+        sectionNo: idx + 1,
+        id: dept.id,
+        name: dept.name,
+        icon: dept.icon || '🏥',
+        count: deptStaff.length,
+        posts: distinctPosts
+      };
+    });
+  }, [departments, staff]);
 
-    const matchesDept = selectedDept === 'all' || s.departmentId === selectedDept;
-    const matchesShift = selectedShift === 'all' || s.shift === selectedShift;
+  // Unique posts / designations across hospital
+  const uniquePosts = useMemo(() => {
+    return Array.from(new Set(staff.map(s => s.designation).filter(Boolean)));
+  }, [staff]);
 
-    return matchesSearch && matchesDept && matchesShift;
-  });
+  // Filter staff records
+  const filteredStaff = useMemo(() => {
+    return staff.filter(s => {
+      const matchesSearch =
+        s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        s.employeeId.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        s.phone.includes(searchQuery) ||
+        s.designation.toLowerCase().includes(searchQuery.toLowerCase());
 
-  // Calculate Metrics
+      const matchesDept = selectedDept === 'all' || s.departmentId === selectedDept || s.departmentName?.toLowerCase() === selectedDept.toLowerCase();
+      const matchesShift = selectedShift === 'all' || s.shift === selectedShift;
+
+      return matchesSearch && matchesDept && matchesShift;
+    });
+  }, [staff, searchQuery, selectedDept, selectedShift]);
+
+  // Key Metrics
   const totalEmployees = staff.length;
-  const presentToday = staff.filter(s => {
-    const todayAtt = s.attendance?.find(a => a.date === todayStr);
-    return todayAtt?.status === 'present';
-  }).length;
-  const onLeaveToday = staff.filter(s => {
-    const todayAtt = s.attendance?.find(a => a.date === todayStr);
-    return todayAtt?.status === 'leave' || s.status === 'on-leave';
-  }).length;
   const totalMonthlyPayroll = staff.reduce((acc, s) => acc + (Number(s.salary) || 0), 0);
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -122,6 +145,10 @@ export const HospitalStaff: React.FC = () => {
       alert('Please fill out Employee Name and Phone Number.');
       return;
     }
+    if (!formData.employeeId.trim()) {
+      alert('Please provide an Employee Number / ID.');
+      return;
+    }
 
     const deptObj = departments.find(d => d.id === formData.departmentId);
     const resolvedDeptName = deptObj ? deptObj.name : formData.departmentName;
@@ -140,13 +167,6 @@ export const HospitalStaff: React.FC = () => {
     setShowAddModal(false);
   };
 
-  const handleAttendanceToggle = (staffId: string, currentStatus?: string) => {
-    const nextStatus: StaffAttendanceRecord['status'] =
-      currentStatus === 'present' ? 'absent' : currentStatus === 'absent' ? 'half-day' : currentStatus === 'half-day' ? 'leave' : 'present';
-    const nowTime = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
-    markStaffAttendance(staffId, todayStr, nextStatus, nextStatus === 'present' ? nowTime : undefined);
-  };
-
   return (
     <div className="space-y-6 animate-fadeIn pb-12">
       {/* Top Header */}
@@ -156,46 +176,112 @@ export const HospitalStaff: React.FC = () => {
             <span className="p-2 rounded-xl bg-blue-50 text-blue-600">
               <Users size={20} />
             </span>
-            <h1 className="text-xl font-black text-slate-900">Hospital Staff & Employee Directory</h1>
+            <h1 className="text-xl font-black text-slate-900">Hospital Staff &amp; Employee Directory</h1>
           </div>
           <p className="text-xs text-slate-500 font-semibold mt-1">
-            Manage hospital staff members, department allocations, duty shifts, and mark daily attendance.
+            Maintain complete hospital employee records by clinical section, designation, post, duty shifts, and payroll compensation.
           </p>
         </div>
         <button
           onClick={handleOpenAdd}
           className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-bold text-xs shadow-md shadow-blue-600/20 transition-all cursor-pointer border-none"
         >
-          <UserPlus size={16} /> Add Staff Member
+          <UserPlus size={16} /> Add Employee
         </button>
       </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-xs">
-          <p className="text-xs font-bold text-slate-500">Total Staff</p>
+          <p className="text-xs font-bold text-slate-500">Total Employees</p>
           <p className="text-2xl font-black text-slate-900 mt-1">{totalEmployees}</p>
           <p className="text-[11px] text-blue-600 font-bold mt-1">Active Hospital Team</p>
         </div>
 
         <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-xs">
-          <p className="text-xs font-bold text-slate-500">Present Today</p>
-          <p className="text-2xl font-black text-emerald-600 mt-1">{presentToday}</p>
-          <p className="text-[11px] text-emerald-600 font-bold mt-1">
-            {totalEmployees > 0 ? Math.round((presentToday / totalEmployees) * 100) : 100}% Attendance
-          </p>
+          <p className="text-xs font-bold text-slate-500">Hospital Sections</p>
+          <p className="text-2xl font-black text-emerald-600 mt-1">{departments.length}</p>
+          <p className="text-[11px] text-emerald-600 font-bold mt-1">Department Divisions</p>
         </div>
 
         <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-xs">
-          <p className="text-xs font-bold text-slate-500">On Leave / Absent</p>
-          <p className="text-2xl font-black text-amber-600 mt-1">{onLeaveToday}</p>
-          <p className="text-[11px] text-amber-600 font-bold mt-1">Shift Adjusted</p>
+          <p className="text-xs font-bold text-slate-500">Active Roles / Posts</p>
+          <p className="text-2xl font-black text-indigo-600 mt-1">{uniquePosts.length}</p>
+          <p className="text-[11px] text-indigo-600 font-bold mt-1">Staff Specializations</p>
         </div>
 
         <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-xs">
-          <p className="text-xs font-bold text-slate-500">Monthly Payroll</p>
+          <p className="text-xs font-bold text-slate-500">Monthly Compensation</p>
           <p className="text-2xl font-black text-purple-600 mt-1">₹{totalMonthlyPayroll.toLocaleString('en-IN')}</p>
-          <p className="text-[11px] text-purple-600 font-bold mt-1">Estimated Compensation</p>
+          <p className="text-[11px] text-purple-600 font-bold mt-1">Staff Payroll Estimate</p>
+        </div>
+      </div>
+
+      {/* ── Section Numbers & Department Employee Breakdown ─────────────────── */}
+      <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-xs space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Layers size={16} className="text-blue-600" />
+            <h2 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+              Hospital Sections &amp; Staff Headcount by Post
+            </h2>
+          </div>
+          <span className="text-[11px] text-slate-400 font-semibold">
+            {departments.length} Sections Configured
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {sectionStats.map(sec => {
+            const isFilterActive = selectedDept === sec.id;
+            return (
+              <div
+                key={sec.id}
+                onClick={() => setSelectedDept(isFilterActive ? 'all' : sec.id)}
+                className={`p-3.5 rounded-2xl border transition-all cursor-pointer ${
+                  isFilterActive
+                    ? 'border-blue-500 bg-blue-50/70 shadow-xs'
+                    : 'border-slate-150 bg-slate-50/60 hover:bg-slate-100/70'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-6 h-6 rounded-lg bg-blue-100 text-blue-700 font-black text-[11px] flex items-center justify-center">
+                      #{sec.sectionNo}
+                    </span>
+                    <div>
+                      <h4 className="text-xs font-extrabold text-slate-800 flex items-center gap-1">
+                        <span>{sec.icon}</span>
+                        <span>{sec.name}</span>
+                      </h4>
+                      <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
+                        Section #{sec.sectionNo}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-full bg-white text-slate-800 font-black text-xs border border-slate-200 shadow-2xs">
+                    {sec.count} {sec.count === 1 ? 'Staff' : 'Staff'}
+                  </span>
+                </div>
+
+                <div className="mt-2.5 pt-2 border-t border-slate-200/60 flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[10px] font-bold text-slate-500">Posts:</span>
+                  {sec.posts.length > 0 ? (
+                    sec.posts.map((post, pIdx) => (
+                      <span
+                        key={pIdx}
+                        className="text-[9.5px] font-extrabold px-1.5 py-0.5 bg-white text-slate-700 rounded-md border border-slate-200"
+                      >
+                        {post}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-[10px] text-slate-400 italic">No employees assigned yet</span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -207,13 +293,13 @@ export const HospitalStaff: React.FC = () => {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by ID, Name, Phone, Role..."
+            placeholder="Search by ID, Name, Phone, Role/Post..."
             className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
           />
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
-          {/* Department filter */}
+          {/* Department / Section filter */}
           <div className="flex items-center gap-1 bg-slate-50 px-2.5 py-1.5 rounded-xl border border-slate-200 text-xs">
             <Building2 size={14} className="text-slate-500" />
             <select
@@ -221,9 +307,9 @@ export const HospitalStaff: React.FC = () => {
               onChange={(e) => setSelectedDept(e.target.value)}
               className="bg-transparent border-none text-xs font-bold text-slate-700 focus:outline-hidden cursor-pointer"
             >
-              <option value="all">All Departments</option>
-              {departments.map(d => (
-                <option key={d.id} value={d.id}>{d.name}</option>
+              <option value="all">All Sections &amp; Departments</option>
+              {departments.map((d, idx) => (
+                <option key={d.id} value={d.id}>Section #{idx + 1}: {d.name}</option>
               ))}
             </select>
           </div>
@@ -243,6 +329,19 @@ export const HospitalStaff: React.FC = () => {
               <option value="General">General Shift</option>
             </select>
           </div>
+
+          {(selectedDept !== 'all' || selectedShift !== 'all' || searchQuery) && (
+            <button
+              onClick={() => {
+                setSelectedDept('all');
+                setSelectedShift('all');
+                setSearchQuery('');
+              }}
+              className="text-xs font-bold text-blue-600 hover:underline px-2 cursor-pointer bg-transparent border-none"
+            >
+              Reset Filters
+            </button>
+          )}
         </div>
       </div>
 
@@ -252,28 +351,38 @@ export const HospitalStaff: React.FC = () => {
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 uppercase tracking-wider font-bold">
               <tr>
+                <th className="py-3.5 px-4">Section &amp; ID</th>
                 <th className="py-3.5 px-4">Employee</th>
-                <th className="py-3.5 px-4">Department & Role</th>
+                <th className="py-3.5 px-4">Department &amp; Post</th>
                 <th className="py-3.5 px-4">Contact</th>
-                <th className="py-3.5 px-4">Shift & Salary</th>
-                <th className="py-3.5 px-4 text-center">Today's Attendance</th>
+                <th className="py-3.5 px-4">Shift &amp; Salary</th>
+                <th className="py-3.5 px-4">Type</th>
                 <th className="py-3.5 px-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700 font-medium">
               {filteredStaff.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-10 text-center text-slate-400 font-semibold">
-                    No staff records found matching your filters.
+                  <td colSpan={7} className="py-12 text-center text-slate-400 font-semibold">
+                    No employee records found matching your filters.
                   </td>
                 </tr>
               ) : (
                 filteredStaff.map((member) => {
-                  const todayAtt = member.attendance?.find(a => a.date === todayStr);
-                  const attStatus = todayAtt?.status || 'not-marked';
+                  const secNo = departmentSectionMap.get(member.departmentId) || departmentSectionMap.get((member.departmentName || '').toLowerCase()) || 1;
 
                   return (
                     <tr key={member.id} className="hover:bg-slate-50/70 transition-colors">
+                      {/* Section Number & Employee ID */}
+                      <td className="py-3.5 px-4">
+                        <span className="inline-block px-2 py-0.5 bg-slate-100 text-slate-700 font-black text-[10px] rounded-md mr-1.5">
+                          Sec #{secNo}
+                        </span>
+                        <span className="inline-block px-2 py-0.5 bg-blue-50 text-blue-700 font-mono text-[10.5px] font-extrabold rounded-md border border-blue-100">
+                          {member.employeeId}
+                        </span>
+                      </td>
+
                       {/* Employee Info */}
                       <td className="py-3.5 px-4">
                         <div className="flex items-center gap-3">
@@ -290,18 +399,18 @@ export const HospitalStaff: React.FC = () => {
                           )}
                           <div>
                             <p className="font-extrabold text-slate-900 text-sm leading-tight">{member.name}</p>
-                            <span className="inline-block mt-0.5 px-2 py-0.5 bg-blue-50 text-blue-700 font-mono text-[10px] font-bold rounded-md">
-                              {member.employeeId}
-                            </span>
+                            <span className="text-[10px] text-slate-400 font-semibold">Joined {member.joiningDate}</span>
                           </div>
                         </div>
                       </td>
 
-                      {/* Dept & Designation */}
+                      {/* Dept & Designation / Post */}
                       <td className="py-3.5 px-4">
-                        <p className="font-bold text-slate-800">{member.designation}</p>
-                        <p className="text-slate-500 text-[11px] font-semibold">{member.departmentName}</p>
-                        <span className="text-[10px] font-bold text-slate-400">{member.employmentType}</span>
+                        <p className="font-extrabold text-slate-800 flex items-center gap-1.5">
+                          <Briefcase size={12} className="text-blue-500" />
+                          <span>{member.designation}</span>
+                        </p>
+                        <p className="text-slate-500 text-[11px] font-semibold mt-0.5">{member.departmentName}</p>
                       </td>
 
                       {/* Contact */}
@@ -320,61 +429,42 @@ export const HospitalStaff: React.FC = () => {
 
                       {/* Shift & Salary */}
                       <td className="py-3.5 px-4">
-                        <span className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-extrabold ${
-                          member.shift === 'Morning' ? 'bg-amber-50 text-amber-700' :
-                          member.shift === 'Evening' ? 'bg-indigo-50 text-indigo-700' :
-                          member.shift === 'Night' ? 'bg-slate-900 text-white' : 'bg-emerald-50 text-emerald-700'
+                        <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${
+                          member.shift === 'Morning' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+                          member.shift === 'Evening' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' :
+                          member.shift === 'Night' ? 'bg-slate-900 text-white' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                         }`}>
                           {member.shift} Shift
                         </span>
                         <p className="text-slate-800 font-extrabold mt-1">₹{member.salary.toLocaleString('en-IN')}/mo</p>
                       </td>
 
-                      {/* Today's Attendance Tracker */}
-                      <td className="py-3.5 px-4 text-center">
-                        <button
-                          onClick={() => handleAttendanceToggle(member.id, todayAtt?.status)}
-                          title="Click to toggle: Present -> Absent -> Half-Day -> Leave"
-                          className={`px-3 py-1.5 rounded-xl font-extrabold text-[11px] cursor-pointer transition-all border inline-flex items-center gap-1.5 ${
-                            attStatus === 'present'
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
-                              : attStatus === 'absent'
-                              ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'
-                              : attStatus === 'half-day'
-                              ? 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
-                              : attStatus === 'leave'
-                              ? 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100'
-                              : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200'
-                          }`}
-                        >
-                          {attStatus === 'present' && <CheckCircle2 size={13} />}
-                          {attStatus === 'absent' && <XCircle size={13} />}
-                          {attStatus === 'half-day' && <Clock size={13} />}
-                          {attStatus === 'leave' && <AlertCircle size={13} />}
-                          <span className="capitalize">{attStatus === 'not-marked' ? 'Mark Attendance' : attStatus}</span>
-                          {todayAtt?.checkIn && (
-                            <span className="text-[9px] opacity-75">({todayAtt.checkIn})</span>
-                          )}
-                        </button>
+                      {/* Employment Type */}
+                      <td className="py-3.5 px-4">
+                        <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md font-bold text-[10.5px]">
+                          {member.employmentType}
+                        </span>
                       </td>
 
                       {/* Actions */}
                       <td className="py-3.5 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
+                        <div className="flex items-center justify-end gap-2">
                           <button
+                            type="button"
                             onClick={() => handleOpenEdit(member)}
-                            className="p-2 rounded-xl text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors border-none bg-transparent cursor-pointer"
-                            title="Edit Employee"
+                            className="px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 font-extrabold text-[11px] transition-all border border-blue-200 inline-flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                            title="Edit Employee Information"
                           >
-                            <Edit3 size={15} />
+                            <Edit3 size={13} /> Edit
                           </button>
                           <button
+                            type="button"
                             onClick={() => {
-                              if (confirm(`Remove ${member.name} from hospital records?`)) {
+                              if (confirm(`Remove ${member.name} (${member.employeeId}) from hospital records?`)) {
                                 deleteStaffMember(member.id);
                               }
                             }}
-                            className="p-2 rounded-xl text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors border-none bg-transparent cursor-pointer"
+                            className="p-1.5 rounded-xl text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors border-none bg-transparent cursor-pointer"
                             title="Delete Employee"
                           >
                             <Trash2 size={15} />
@@ -400,12 +490,13 @@ export const HospitalStaff: React.FC = () => {
                   <UserPlus size={18} />
                 </div>
                 <h3 className="font-black text-slate-900 text-lg">
-                  {editingStaff ? 'Edit Staff Member' : 'Add New Hospital Employee'}
+                  {editingStaff ? 'Edit Hospital Employee' : 'Add New Hospital Employee'}
                 </h3>
               </div>
               <button
+                type="button"
                 onClick={() => setShowAddModal(false)}
-                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-100 transition-colors border-none bg-transparent cursor-pointer"
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-100 transition-colors border-none bg-transparent cursor-pointer text-base"
               >
                 ✕
               </button>
@@ -414,10 +505,13 @@ export const HospitalStaff: React.FC = () => {
             <form onSubmit={handleSave} className="space-y-4 mt-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[11px] font-bold text-slate-700 block mb-1">Employee ID *</label>
+                  <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                    Employee Number / ID *
+                  </label>
                   <input
                     type="text"
                     required
+                    placeholder="e.g. EMP-1042"
                     value={formData.employeeId}
                     onChange={(e) => setFormData({ ...formData, employeeId: e.target.value })}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500"
@@ -464,7 +558,7 @@ export const HospitalStaff: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[11px] font-bold text-slate-700 block mb-1">Department *</label>
+                  <label className="text-[11px] font-bold text-slate-700 block mb-1">Department Section *</label>
                   <select
                     value={formData.departmentId}
                     onChange={(e) => {
@@ -475,19 +569,19 @@ export const HospitalStaff: React.FC = () => {
                         departmentName: sel ? sel.name : formData.departmentName
                       });
                     }}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500 cursor-pointer"
                   >
-                    {departments.map(d => (
-                      <option key={d.id} value={d.id}>{d.name}</option>
+                    {departments.map((d, idx) => (
+                      <option key={d.id} value={d.id}>Section #{idx + 1}: {d.name}</option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="text-[11px] font-bold text-slate-700 block mb-1">Designation *</label>
+                  <label className="text-[11px] font-bold text-slate-700 block mb-1">Post / Designation *</label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Head Receptionist"
+                    placeholder="e.g. Head Receptionist, Nurse, Lab Tech"
                     value={formData.designation}
                     onChange={(e) => setFormData({ ...formData, designation: e.target.value })}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500"
@@ -501,7 +595,7 @@ export const HospitalStaff: React.FC = () => {
                   <select
                     value={formData.shift}
                     onChange={(e: any) => setFormData({ ...formData, shift: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 cursor-pointer"
                   >
                     <option value="Morning">Morning</option>
                     <option value="Evening">Evening</option>
@@ -525,7 +619,7 @@ export const HospitalStaff: React.FC = () => {
                   <select
                     value={formData.employmentType}
                     onChange={(e: any) => setFormData({ ...formData, employmentType: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 cursor-pointer"
                   >
                     <option value="Full-time">Full-time</option>
                     <option value="Part-time">Part-time</option>
@@ -590,7 +684,7 @@ export const HospitalStaff: React.FC = () => {
                   type="submit"
                   className="px-5 py-2 rounded-xl text-xs font-extrabold text-white bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-600/20 transition-all border-none cursor-pointer"
                 >
-                  {editingStaff ? 'Update Member' : 'Save Employee'}
+                  {editingStaff ? 'Update Employee' : 'Save Employee'}
                 </button>
               </div>
             </form>

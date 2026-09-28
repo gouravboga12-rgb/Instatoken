@@ -96,13 +96,93 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
     });
   }, [doctorTokens, statusTab, dateFilter, customDate, sourceFilter, selectedSessionFilter, searchQuery, todayStr, tomorrowStr, yesterdayStr]);
 
-  // Metrics specifically for this Doctor (Revenue strictly from completed/visited tokens)
-  const activeQueue = doctorTokens.filter(t => ['booked', 'waiting', 'checked-in'].includes(t.status) && (t.bookingDate === todayStr || !t.bookingDate));
+  // Doctor OPD Sessions configuration
+  const doctorSessions = useMemo(() => {
+    if (doctor?.sessions && doctor.sessions.length > 0) {
+      return doctor.sessions.filter(s => s.active !== false);
+    }
+    return [
+      { id: 'sess-morning', name: 'Morning', startTime: '09:00 AM', endTime: '01:00 PM', active: true },
+      { id: 'sess-afternoon', name: 'Afternoon', startTime: '01:00 PM', endTime: '05:00 PM', active: true },
+      { id: 'sess-evening', name: 'Evening', startTime: '05:00 PM', endTime: '09:00 PM', active: true },
+    ];
+  }, [doctor]);
+
+  // Real-world ongoing session based on current clock time
+  const currentOngoingSession = useMemo(() => {
+    const hour = new Date().getHours();
+    if (hour < 13) return 'morning';
+    if (hour < 17) return 'afternoon';
+    return 'evening';
+  }, []);
+
+  // Live session statistics for today
+  const sessionStats = useMemo(() => {
+    const stats: Record<string, { waiting: number; inCabin: number; completed: number; total: number }> = {
+      all: { waiting: 0, inCabin: 0, completed: 0, total: 0 },
+      morning: { waiting: 0, inCabin: 0, completed: 0, total: 0 },
+      afternoon: { waiting: 0, inCabin: 0, completed: 0, total: 0 },
+      evening: { waiting: 0, inCabin: 0, completed: 0, total: 0 }
+    };
+    doctorSessions.forEach(s => {
+      const key = s.name.toLowerCase();
+      if (!stats[key]) stats[key] = { waiting: 0, inCabin: 0, completed: 0, total: 0 };
+    });
+
+    doctorTokens.forEach(t => {
+      const isToday = t.bookingDate === todayStr || !t.bookingDate;
+      if (!isToday) return;
+
+      stats.all.total++;
+      if (['booked', 'waiting'].includes(t.status)) stats.all.waiting++;
+      if (t.status === 'checked-in') stats.all.inCabin++;
+      if (t.status === 'completed') stats.all.completed++;
+
+      const sKey = (t.session || 'morning').toLowerCase();
+      if (!stats[sKey]) stats[sKey] = { waiting: 0, inCabin: 0, completed: 0, total: 0 };
+      stats[sKey].total++;
+      if (['booked', 'waiting'].includes(t.status)) stats[sKey].waiting++;
+      if (t.status === 'checked-in') stats[sKey].inCabin++;
+      if (t.status === 'completed') stats[sKey].completed++;
+    });
+    return stats;
+  }, [doctorSessions, doctorTokens, todayStr]);
+
+  // Active Queue strictly respecting Selected Session (or All)
+  const activeQueue = useMemo(() => {
+    return doctorTokens.filter(t => {
+      const isToday = t.bookingDate === todayStr || !t.bookingDate;
+      const isActive = ['booked', 'waiting', 'checked-in'].includes(t.status);
+      if (!isToday || !isActive) return false;
+      if (selectedSessionFilter !== 'all') {
+        const sKey = (t.session || 'morning').toLowerCase();
+        if (sKey !== selectedSessionFilter.toLowerCase()) return false;
+      }
+      return true;
+    });
+  }, [doctorTokens, todayStr, selectedSessionFilter]);
+
   const inConsultation = activeQueue.find(t => t.status === 'checked-in');
   const nextInLine = activeQueue.filter(t => t.id !== inConsultation?.id);
-  const completedToday = doctorTokens.filter(t => t.status === 'completed' && (t.bookingDate === todayStr || !t.bookingDate));
-  const notVisitedToday = doctorTokens.filter(t => ['not-visited', 'skipped'].includes(t.status) && (t.bookingDate === todayStr || !t.bookingDate));
-  const todayDoctorRevenue = completedToday.reduce((acc, t) => acc + (t.consultationFee || doctor?.consultationFee || 0), 0);
+  const completedToday = doctorTokens.filter(t => {
+    const isToday = t.bookingDate === todayStr || !t.bookingDate;
+    if (!isToday || t.status !== 'completed') return false;
+    if (selectedSessionFilter !== 'all') {
+      return (t.session || 'morning').toLowerCase() === selectedSessionFilter.toLowerCase();
+    }
+    return true;
+  });
+  const notVisitedToday = doctorTokens.filter(t => {
+    const isToday = t.bookingDate === todayStr || !t.bookingDate;
+    if (!isToday || !['not-visited', 'skipped'].includes(t.status)) return false;
+    if (selectedSessionFilter !== 'all') {
+      return (t.session || 'morning').toLowerCase() === selectedSessionFilter.toLowerCase();
+    }
+    return true;
+  });
+  const todayDoctorRevenue = doctorTokens
+    .filter(t => t.status === 'completed' && (t.bookingDate === todayStr || !t.bookingDate))
+    .reduce((acc, t) => acc + (t.consultationFee || doctor?.consultationFee || 0), 0);
 
   if (!doctor) {
     return (
@@ -252,6 +332,89 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
         </div>
       </div>
 
+      {/* ── Doctor OPD Shift / Session Switcher ────────────────────────────── */}
+      <div className="bg-white rounded-3xl border border-slate-100 p-4 shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+              <span>🩺 OPD Shifts &amp; Time Slots</span>
+            </span>
+            <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Live Ongoing Now: {currentOngoingSession.toUpperCase()}
+            </span>
+          </div>
+          <span className="text-[11px] text-slate-400 font-semibold">
+            Select a session to filter live queue &amp; call patients per shift
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          <button
+            type="button"
+            onClick={() => setSelectedSessionFilter('all')}
+            className={`p-3 rounded-2xl border text-left cursor-pointer transition-all flex flex-col justify-between ${
+              selectedSessionFilter === 'all'
+                ? 'bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-500/20'
+                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-black">All Shifts</span>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
+                selectedSessionFilter === 'all' ? 'bg-white/20 text-white' : 'bg-blue-50 text-blue-700'
+              }`}>
+                {sessionStats.all.total} Tokens
+              </span>
+            </div>
+            <div className={`text-[11px] font-bold mt-2 ${selectedSessionFilter === 'all' ? 'text-blue-100' : 'text-slate-400'}`}>
+              {sessionStats.all.waiting} waiting in queue
+            </div>
+          </button>
+
+          {doctorSessions.map(sess => {
+            const sKey = sess.name.toLowerCase();
+            const isSelected = selectedSessionFilter === sKey;
+            const isCurrentNow = currentOngoingSession === sKey;
+            const icon = sKey.includes('morn') ? '🌅' : sKey.includes('even') ? '🌙' : '☀️';
+            const sStat = sessionStats[sKey] || { waiting: 0, total: 0 };
+
+            return (
+              <button
+                key={sess.id}
+                type="button"
+                onClick={() => setSelectedSessionFilter(sKey)}
+                className={`p-3 rounded-2xl border text-left cursor-pointer transition-all flex flex-col justify-between relative overflow-hidden ${
+                  isSelected
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-500/20'
+                    : isCurrentNow
+                    ? 'bg-emerald-50/70 text-slate-800 border-emerald-300 hover:bg-emerald-50'
+                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <span>{icon}</span>
+                    <span className="text-xs font-black">{sess.name}</span>
+                    {isCurrentNow && !isSelected && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                    )}
+                  </div>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
+                    isSelected ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-700'
+                  }`}>
+                    {sStat.waiting} Waiting
+                  </span>
+                </div>
+                <div className={`text-[10px] font-bold mt-2 ${isSelected ? 'text-blue-100' : 'text-slate-400'}`}>
+                  {sess.startTime} – {sess.endTime} ({sStat.total} booked)
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* ── Key Metrics Cards ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-xs flex items-center gap-4">
@@ -337,7 +500,7 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
                     </p>
                     {inConsultation.rmpReference && inConsultation.rmpReference.name && (
                       <p className="text-xs text-indigo-200 font-bold mt-0.5">
-                        RMP Reference: Dr. {inConsultation.rmpReference.name} {inConsultation.rmpReference.phone ? `(${inConsultation.rmpReference.phone})` : ''}
+                        Doctor Reference: Dr. {inConsultation.rmpReference.name} {inConsultation.rmpReference.phone ? `(${inConsultation.rmpReference.phone})` : ''}
                       </p>
                     )}
                   </div>
@@ -558,14 +721,25 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
                         </div>
                         {tok.rmpReference && tok.rmpReference.name && (
                           <div className="text-[9.5px] font-bold text-indigo-700 mt-0.5">
-                            RMP: Dr. {tok.rmpReference.name} {tok.rmpReference.phone ? `(${tok.rmpReference.phone})` : ''}
+                            Doctor Ref: Dr. {tok.rmpReference.name} {tok.rmpReference.phone ? `(${tok.rmpReference.phone})` : ''}
                           </div>
                         )}
                       </td>
 
                       <td className="py-3.5 px-4">
-                        <span className="font-bold text-slate-700 capitalize">{tok.session} OPD</span>
-                        <span className="text-[10px] text-slate-400 block font-medium">{tok.time} · {tok.bookingDate}</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
+                            (tok.session || '').toLowerCase().includes('morn')
+                              ? 'bg-amber-50 text-amber-800 border-amber-200'
+                              : (tok.session || '').toLowerCase().includes('even')
+                              ? 'bg-indigo-50 text-indigo-800 border-indigo-200'
+                              : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                          }`}>
+                            {(tok.session || '').toLowerCase().includes('morn') ? '🌅 ' : (tok.session || '').toLowerCase().includes('even') ? '🌙 ' : '☀️ '}
+                            {tok.session ? tok.session.toUpperCase() : 'MORNING'}
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-slate-400 block font-medium mt-0.5">{tok.time} · {tok.bookingDate}</span>
                       </td>
 
                       <td className="py-3.5 px-4">

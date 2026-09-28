@@ -126,29 +126,29 @@ export const Profile: React.FC = () => {
   );
 
   return (
-    <div className="pb-24 bg-slate-50 min-h-screen md:min-h-0 md:pb-6 w-full">
+    <div className="pb-24 bg-slate-50 min-h-screen md:min-h-0 md:pb-6 w-full px-2.5 sm:px-0 max-w-full overflow-hidden">
       
       {/* 1. TOP PROFILE HEADER BANNER */}
-      <div className="bg-gradient-to-r from-[#0055FE] via-[#004CF6] to-[#0038CE] text-white p-6 rounded-3xl shadow-lg relative overflow-hidden">
+      <div className="bg-gradient-to-r from-[#0055FE] via-[#004CF6] to-[#0038CE] text-white p-4 sm:p-6 rounded-2xl sm:rounded-3xl shadow-lg relative overflow-hidden">
         
         {/* Top Header Icons */}
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex justify-between items-center mb-3.5">
           <div className="flex items-center gap-2">
             <button 
               onClick={() => navigate('/')}
-              className="md:hidden p-2 rounded-full bg-white/10 text-white hover:bg-white/20 transition-all cursor-pointer"
+              className="md:hidden p-1.5 rounded-full bg-white/10 text-white hover:bg-white/20 transition-all cursor-pointer"
             >
               <ArrowLeft size={16} />
             </button>
-            <h2 className="text-lg sm:text-xl font-black tracking-tight font-heading">My Profile</h2>
+            <h2 className="text-base sm:text-xl font-black tracking-tight font-heading">My Profile</h2>
           </div>
 
           <div className="flex items-center gap-2">
             <button 
               onClick={() => navigate('/notifications')}
-              className="p-2 rounded-full bg-white/15 hover:bg-white/25 transition-all text-white cursor-pointer relative"
+              className="p-1.5 sm:p-2 rounded-full bg-white/15 hover:bg-white/25 transition-all text-white cursor-pointer relative"
             >
-              <Bell size={18} />
+              <Bell size={17} />
               {unreadNotifs > 0 && (
                 <span className="absolute top-1 right-1 h-3.5 w-3.5 bg-red-400 rounded-full text-[8px] font-bold text-white flex items-center justify-center animate-pulse">
                   {unreadNotifs}
@@ -157,19 +157,19 @@ export const Profile: React.FC = () => {
             </button>
             <button 
               onClick={() => setIsEditProfileOpen(true)}
-              className="p-2 rounded-full bg-white/15 hover:bg-white/25 transition-all text-white cursor-pointer"
+              className="p-1.5 sm:p-2 rounded-full bg-white/15 hover:bg-white/25 transition-all text-white cursor-pointer"
             >
-              <Settings size={18} />
+              <Settings size={17} />
             </button>
           </div>
         </div>
 
         {/* User Info Row */}
-        <div className="flex items-center gap-4 relative z-10">
+        <div className="flex items-center gap-3.5 sm:gap-4 relative z-10">
           
           {/* Avatar with Edit Camera Badge */}
-          <div className="relative">
-            <div className="w-20 h-20 sm:w-22 sm:h-22 rounded-full border-2 border-white overflow-hidden bg-white/20 shadow-md">
+          <div className="relative shrink-0">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-2 border-white overflow-hidden bg-white/20 shadow-md">
               <img 
                 src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=300"
                 alt={user.name}
@@ -181,17 +181,17 @@ export const Profile: React.FC = () => {
             </div>
             <button 
               onClick={() => setIsEditProfileOpen(true)}
-              className="absolute bottom-0 right-0 w-6.5 h-6.5 bg-blue-600 border-2 border-white rounded-full flex items-center justify-center text-white cursor-pointer shadow-sm"
+              className="absolute bottom-0 right-0 w-6 h-6 bg-blue-600 border-2 border-white rounded-full flex items-center justify-center text-white cursor-pointer shadow-sm"
             >
-              <Camera size={12} />
+              <Camera size={11} />
             </button>
           </div>
 
           {/* User Name & Details */}
-          <div className="space-y-1">
-            <h3 className="text-xl sm:text-2xl font-black tracking-tight flex items-center gap-1.5 leading-tight">
-              <span>{user.name}</span>
-              <span className="w-4 h-4 bg-white text-blue-600 rounded-full text-[10px] font-black inline-flex items-center justify-center shadow-xs">✓</span>
+          <div className="space-y-0.5 sm:space-y-1 min-w-0">
+            <h3 className="text-base sm:text-2xl font-black tracking-tight flex items-center gap-1.5 leading-tight truncate">
+              <span className="truncate">{user.name}</span>
+              <span className="w-4 h-4 bg-white text-blue-600 rounded-full text-[10px] font-black inline-flex items-center justify-center shadow-xs shrink-0">✓</span>
             </h3>
             <p className="text-xs sm:text-sm text-blue-100 font-bold flex items-center gap-1">
               <span>📞</span>

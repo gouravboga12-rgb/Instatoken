@@ -170,7 +170,7 @@ export const MyBookings: React.FC = () => {
               )}
               {appt.rmpReference && appt.rmpReference.name && (
                 <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.2 rounded">
-                  RMP: {appt.rmpReference.name}
+                  Doctor Ref: Dr. {appt.rmpReference.name}
                 </span>
               )}
             </div>
