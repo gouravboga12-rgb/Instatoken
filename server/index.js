@@ -5,6 +5,11 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
+const crypto = require('crypto');
+
+// Razorpay Credentials
+const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || 'rzp_test_ThOMWcFfdTPNme';
+const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || 'vm2Lt528SZHDC8JqcakbpMjB';
 
 // AWS & DB Integrations
 const { query, testConnection } = require('./config/db');
@@ -2801,6 +2806,108 @@ app.delete('/api/appointments', async (req, res) => {
 
   await saveUnifiedStore(store);
   res.json({ success: true, clearedCount: targetIds.length, clearedIds: targetIds });
+});
+
+// ─── Razorpay Payment Gateway Endpoints ─────────────────────────────────────
+// 1. Get Public Razorpay Test Key ID
+app.get('/api/razorpay/key', (req, res) => {
+  res.json({ success: true, keyId: RAZORPAY_KEY_ID });
+});
+
+// 2. Create Razorpay Order
+app.post('/api/razorpay/create-order', async (req, res) => {
+  try {
+    const { amount, receipt, notes, patientName, patientPhone } = req.body || {};
+    const amtNumber = Number(amount) || 25;
+    const amountInPaise = Math.max(100, Math.round(amtNumber * 100)); // Minimum ₹1.00
+
+    const receiptId = (receipt || `rcpt_${Date.now()}_${Math.floor(Math.random() * 1000)}`).slice(0, 40);
+
+    const authHeader = 'Basic ' + Buffer.from(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`).toString('base64');
+    const razorpayResponse = await fetch('https://api.razorpay.com/v1/orders', {
+      method: 'POST',
+      headers: {
+        'Authorization': authHeader,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        amount: amountInPaise,
+        currency: 'INR',
+        receipt: receiptId,
+        notes: {
+          patientName: patientName || 'Patient',
+          patientPhone: patientPhone || '',
+          platform: 'InstaToken Web Portal',
+          ...(notes || {})
+        }
+      })
+    });
+
+    const orderData = await razorpayResponse.json();
+
+    if (!razorpayResponse.ok) {
+      console.error('Razorpay order creation failed:', orderData);
+      return res.status(razorpayResponse.status || 500).json({
+        success: false,
+        message: orderData.error?.description || 'Failed to create Razorpay order',
+        error: orderData
+      });
+    }
+
+    res.json({
+      success: true,
+      order: orderData,
+      keyId: RAZORPAY_KEY_ID
+    });
+  } catch (err) {
+    console.error('Error creating Razorpay order:', err.message);
+    res.status(500).json({
+      success: false,
+      message: err.message || 'Server error while initializing Razorpay order'
+    });
+  }
+});
+
+// 3. Verify Razorpay Payment Signature
+app.post('/api/razorpay/verify-payment', (req, res) => {
+  try {
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body || {};
+
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required Razorpay verification fields (order_id, payment_id, signature)'
+      });
+    }
+
+    const hmac = crypto.createHmac('sha256', RAZORPAY_KEY_SECRET);
+    hmac.update(`${razorpay_order_id}|${razorpay_payment_id}`);
+    const generatedSignature = hmac.digest('hex');
+
+    const isValid = generatedSignature === razorpay_signature;
+
+    if (!isValid) {
+      console.warn(`Razorpay signature mismatch: expected ${generatedSignature}, got ${razorpay_signature}`);
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid payment signature. Transaction could not be verified.'
+      });
+    }
+
+    res.json({
+      success: true,
+      verified: true,
+      paymentId: razorpay_payment_id,
+      orderId: razorpay_order_id,
+      message: 'Razorpay payment verified successfully'
+    });
+  } catch (err) {
+    console.error('Error verifying Razorpay signature:', err.message);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while verifying Razorpay payment signature'
+    });
+  }
 });
 
 // ─── Direct Token Lookup ─────────────────────────────────────────────────────

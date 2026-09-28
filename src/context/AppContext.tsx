@@ -120,7 +120,8 @@ interface AppContextType {
     doctorId: string,
     date: string,
     time: string,
-    paymentMethod: string
+    paymentMethod: string,
+    customPaymentId?: string
   ) => Promise<Appointment>;
   cancelAppointment: (id: string) => void;
   advanceQueue: (hospitalId: string, doctorId: string) => void;
@@ -1330,7 +1331,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     doctorId: string,
     date: string,
     time: string,
-    paymentMethod: string
+    paymentMethod: string,
+    customPaymentId?: string
   ): Promise<Appointment> => {
     const targetHosp = hospitals.find(h => h.id === hospitalId);
     const targetDoc = targetHosp?.doctors.find(d => d.id === doctorId);
@@ -1374,7 +1376,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       platformFee,
       totalFee,
       status: 'booked',
-      paymentId: `PAYID-${Math.floor(1000000 + Math.random() * 9000000)}`,
+      paymentId: customPaymentId || `PAYID-${Math.floor(1000000 + Math.random() * 9000000)}`,
       paymentMethod,
       estimatedWaitTime: computedWaitTime,
       isExisting: Boolean(patientDetails.isExisting),
