@@ -660,29 +660,56 @@ export const HealthRecordsVault: React.FC<HealthRecordsVaultProps> = ({ isModal 
                     />
                   </div>
                 </div>
-              ) : viewingRecord.fileUrl && viewingRecord.fileUrl.endsWith('.pdf') ? (
+              ) : viewingRecord.fileUrl && (viewingRecord.fileUrl.startsWith('blob:') || viewingRecord.fileUrl.startsWith('data:application/pdf')) ? (
                 <iframe 
                   src={`${viewingRecord.fileUrl}#toolbar=0`}
                   title={viewingRecord.name}
                   className="w-full h-[55vh] rounded-2xl border border-slate-200 bg-white"
                 />
               ) : (
-                <div className="bg-white border border-slate-200 rounded-3xl p-6 max-w-sm w-full text-center space-y-3 shadow-sm">
-                  <div className="w-16 h-16 bg-purple-50 text-purple-600 rounded-2xl mx-auto flex items-center justify-center shadow-inner">
-                    <FileText size={32} />
+                <div className="bg-white border border-slate-200/90 rounded-3xl p-6 max-w-md w-full text-center space-y-4 shadow-xs">
+                  <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl mx-auto flex items-center justify-center shadow-inner">
+                    <FileCheck size={32} />
                   </div>
                   <div>
-                    <h4 className="text-sm font-black text-slate-900">{viewingRecord.name}</h4>
-                    <p className="text-xs text-slate-400 font-semibold mt-0.5">{viewingRecord.fileName}</p>
-                    <p className="text-[11px] text-blue-600 font-bold mt-1">{viewingRecord.fileSize}</p>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-0.5 rounded-full inline-block mb-1.5">
+                      Verified Digital Health Record
+                    </span>
+                    <h4 className="text-base font-black text-slate-900 leading-tight">{viewingRecord.name}</h4>
+                    <p className="text-xs text-slate-500 font-semibold mt-1">
+                      {viewingRecord.doctor || 'Consulting Specialist'} · {viewingRecord.hospital || 'Hospital OPD'}
+                    </p>
+                    <p className="text-[11px] text-slate-400 font-medium mt-0.5">
+                      Recorded on {viewingRecord.date}
+                    </p>
                   </div>
-                  <button
-                    onClick={() => downloadMedicalRecord(viewingRecord)}
-                    className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
-                  >
-                    <Download size={14} />
-                    <span>Download to View File</span>
-                  </button>
+
+                  {viewingRecord.notes && (
+                    <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 text-left space-y-1">
+                      <span className="text-[9.5px] font-black uppercase text-slate-400 block tracking-wider">
+                        Doctor Findings &amp; Clinical Notes
+                      </span>
+                      <p className="text-xs text-slate-700 font-semibold leading-relaxed">
+                        {viewingRecord.notes}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="pt-1 flex items-center gap-2">
+                    <button
+                      onClick={() => downloadMedicalRecord(viewingRecord)}
+                      className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black flex items-center justify-center gap-1.5 shadow-xs cursor-pointer transition-colors"
+                    >
+                      <Download size={14} />
+                      <span>Download Record Slip</span>
+                    </button>
+                    <button
+                      onClick={() => setViewingRecord(null)}
+                      className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-extrabold cursor-pointer transition-colors"
+                    >
+                      Close
+                    </button>
+                  </div>
                 </div>
               )}
 

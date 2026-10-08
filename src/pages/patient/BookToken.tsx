@@ -249,6 +249,25 @@ export const BookToken: React.FC = () => {
   const [error, setError] = useState('');
 
   const dateInputRef = useRef<HTMLInputElement>(null);
+  const patientDetailsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // 1. Immediately reset scroll to top so doctor info and date selection are clearly seen
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    if (typeof document !== 'undefined') {
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    }
+
+    // 2. Auto-scroll slowly from top down to the form
+    const timer = setTimeout(() => {
+      if (patientDetailsRef.current) {
+        patientDetailsRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, [hospitalId, doctorId]);
 
   // Generate date pills dynamically constrained by hospital booking window and doctor's schedule
   const dateOptions = useMemo(() => {
@@ -641,7 +660,7 @@ export const BookToken: React.FC = () => {
           </div>
 
           {/* Patient Details Section matching Image 48 */}
-          <div>
+          <div ref={patientDetailsRef} className="scroll-mt-16">
             <h4 className="text-xs font-extrabold text-slate-900 flex items-center gap-1.5 mb-1.5">
               <User size={14} className="text-blue-600" />
               <span>Patient Details</span>

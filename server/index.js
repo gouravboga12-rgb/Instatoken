@@ -3266,7 +3266,7 @@ app.post('/api/customers/login', async (req, res) => {
 
 // GET Super Admin Revenue Tracking
 app.get('/api/admin/revenue', async (req, res) => {
-  const { dateFilter, hospitalId } = req.query;
+  const { dateFilter, hospitalId, startDate, endDate } = req.query;
   let allAppts = [];
   let allTokens = [];
 
@@ -3322,12 +3322,27 @@ app.get('/api/admin/revenue', async (req, res) => {
     transactions = transactions.filter(t => t.hospitalId === hospitalId);
   }
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const now = new Date();
+  const todayStr = now.toISOString().split('T')[0];
+
   if (dateFilter === 'today') {
     transactions = transactions.filter(t => (t.date === todayStr || (t.createdAt && t.createdAt.startsWith(todayStr))));
+  } else if (dateFilter === 'week') {
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    transactions = transactions.filter(t => {
+      const d = t.date || (t.createdAt ? t.createdAt.split('T')[0] : '');
+      return d && d >= sevenDaysAgo && d <= todayStr;
+    });
   } else if (dateFilter === 'month') {
     const curMonth = todayStr.slice(0, 7);
     transactions = transactions.filter(t => (t.date?.startsWith(curMonth) || (t.createdAt && t.createdAt.startsWith(curMonth))));
+  } else if (dateFilter === 'custom' && startDate) {
+    const sDate = startDate;
+    const eDate = endDate || todayStr;
+    transactions = transactions.filter(t => {
+      const d = t.date || (t.createdAt ? t.createdAt.split('T')[0] : '');
+      return d && d >= sDate && d <= eDate;
+    });
   }
 
   const store = await getUnifiedStore();

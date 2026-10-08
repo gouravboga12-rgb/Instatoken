@@ -382,7 +382,7 @@ export const SearchHospitals: React.FC<SearchHospitalsProps> = ({
                           }}
                           className="text-[11px] sm:text-xs text-white font-extrabold bg-blue-600 hover:bg-blue-700 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl flex items-center gap-1 cursor-pointer shadow-sm shadow-blue-500/25 hover:shadow-blue-500/40 transition-all hover:scale-105 active:scale-95 shrink-0 whitespace-nowrap"
                         >
-                          Book OPD Token
+                          Book Token Now
                         </button>
                       </div>
                     </div>

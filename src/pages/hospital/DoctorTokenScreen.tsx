@@ -415,149 +415,97 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
         </div>
       </div>
 
-      {/* ── Key Metrics Cards ─────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-xs flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-black">
-            <Clock size={22} />
+      {/* ── Key Metrics Cards (Compact & Screen Compatible) ─────────────────── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+        <div className="bg-white rounded-2xl p-3 border border-slate-150 shadow-2xs flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+            <Clock size={16} />
           </div>
-          <div>
-            <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider block">Waiting in Queue</span>
-            <span className="text-2xl font-black text-slate-800">{activeQueue.length}</span>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-xs flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-black">
-            <CheckCircle size={22} />
-          </div>
-          <div>
-            <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider block">Visited Today</span>
-            <span className="text-2xl font-black text-emerald-600">{completedToday.length}</span>
+          <div className="min-w-0">
+            <span className="text-[9.5px] text-slate-400 font-black uppercase tracking-wider block truncate">Waiting in Queue</span>
+            <span className="text-lg sm:text-xl font-black text-slate-800 leading-tight block">{activeQueue.length}</span>
           </div>
         </div>
 
-        <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-xs flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center font-black">
-            <UserX size={22} />
+        <div className="bg-white rounded-2xl p-3 border border-slate-150 shadow-2xs flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+            <CheckCircle size={16} />
           </div>
-          <div>
-            <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider block">Not Visited / Absent</span>
-            <span className="text-2xl font-black text-amber-600">{notVisitedToday.length}</span>
+          <div className="min-w-0">
+            <span className="text-[9.5px] text-slate-400 font-black uppercase tracking-wider block truncate">Visited Today</span>
+            <span className="text-lg sm:text-xl font-black text-emerald-600 leading-tight block">{completedToday.length}</span>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl p-3 border border-slate-150 shadow-2xs flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+            <UserX size={16} />
+          </div>
+          <div className="min-w-0">
+            <span className="text-[9.5px] text-slate-400 font-black uppercase tracking-wider block truncate">Not Visited / Absent</span>
+            <span className="text-lg sm:text-xl font-black text-amber-600 leading-tight block">{notVisitedToday.length}</span>
           </div>
         </div>
 
-        <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-xs flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center font-black">
-            <Sparkles size={22} />
+        <div className="bg-white rounded-2xl p-3 border border-slate-150 shadow-2xs flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+            <Sparkles size={16} />
           </div>
-          <div>
-            <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider block">Today's Earned Revenue</span>
-            <span className="text-2xl font-black text-slate-800">₹{todayDoctorRevenue.toLocaleString('en-IN')}</span>
+          <div className="min-w-0">
+            <span className="text-[9.5px] text-slate-400 font-black uppercase tracking-wider block truncate">Today's Earned Revenue</span>
+            <span className="text-lg sm:text-xl font-black text-slate-800 leading-tight block truncate">₹{todayDoctorRevenue.toLocaleString('en-IN')}</span>
           </div>
-        </div>
-      </div>
-
-      {/* ── Active Cabin Display (Spotlight Hero) ─────────────────────────── */}
-      <div className="bg-linear-to-br from-slate-900 to-blue-950 text-white rounded-3xl p-6 sm:p-8 shadow-md relative overflow-hidden">
-        <div className="absolute right-0 top-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
-              <span className="text-xs font-black uppercase tracking-widest text-emerald-400">
-                Current Active Token in Cabin
-              </span>
-            </div>
-
-            {inConsultation ? (
-              <div>
-                <div className="flex items-baseline gap-4">
-                  <span className="text-6xl font-black tracking-tight text-white">
-                    #{inConsultation.tokenNo}
-                  </span>
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h2 className="text-2xl font-black text-white">{inConsultation.patientName}</h2>
-                      {inConsultation.isExisting && (
-                        <span className="bg-purple-500/30 text-purple-200 border border-purple-400 text-[10px] font-black px-2 py-0.5 rounded-md">
-                          ★ Existing Patient
-                        </span>
-                      )}
-                      {inConsultation.type === 'online' ? (
-                        <span className="bg-blue-500/30 text-blue-200 border border-blue-400 text-[10px] font-black px-2 py-0.5 rounded-md">
-                          Online Token
-                        </span>
-                      ) : (
-                        <span className="bg-amber-500/30 text-amber-200 border border-amber-400 text-[10px] font-black px-2 py-0.5 rounded-md">
-                          Offline Token
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-blue-200 font-semibold mt-1">
-                      {inConsultation.patientAgeDisplay || `${inConsultation.patientAge} Yrs`} · {inConsultation.patientGender} · Phone: {inConsultation.patientPhone}
-                    </p>
-                    {inConsultation.rmpReference && inConsultation.rmpReference.name && (
-                      <p className="text-xs text-indigo-200 font-bold mt-0.5">
-                        Doctor Reference: Dr. {inConsultation.rmpReference.name} {inConsultation.rmpReference.phone ? `(${inConsultation.rmpReference.phone})` : ''}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3 mt-3 flex-wrap text-xs text-slate-300">
-                  <span className="bg-white/10 px-3 py-1 rounded-xl font-bold">
-                    Session: {inConsultation.session?.toUpperCase()} OPD
-                  </span>
-                  <span className="bg-white/10 px-3 py-1 rounded-xl font-bold">
-                    Booked at: {inConsultation.time}
-                  </span>
-                  <span className="bg-emerald-500/20 text-emerald-300 px-3 py-1 rounded-xl font-black">
-                    Fee: ₹{inConsultation.consultationFee} ({inConsultation.paymentStatus.toUpperCase()})
-                  </span>
-                </div>
-              </div>
-            ) : (
-              <div className="py-3">
-                <h2 className="text-2xl font-black text-white/90">Doctor Cabin is Ready</h2>
-                <p className="text-xs text-slate-300 font-semibold mt-1">
-                  No patient currently in consultation. Click "Call Next Patient" to bring in the next token in line.
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* Quick Cabin Controls */}
-          {inConsultation && (
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full md:w-auto">
-              <button
-                onClick={() => handleCompleteToken(inConsultation.id)}
-                className="px-5 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black text-xs cursor-pointer border-none shadow-sm flex items-center justify-center gap-2 transition-colors"
-                title="Mark Visited / Done (Adds to Doctor Revenue)"
-              >
-                <CheckCircle size={16} /> Mark Visited / Done
-              </button>
-
-              <button
-                onClick={() => handleMarkNotVisited(inConsultation.id)}
-                className="px-4 py-3 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-2xl font-bold text-xs cursor-pointer flex items-center justify-center gap-1.5 transition-colors"
-                title="Patient absent or skipped - moves to Not Visited list (No revenue counted)"
-              >
-                <UserX size={15} /> Mark Not Visited
-              </button>
-
-              <button
-                onClick={() => setPrintToken(inConsultation)}
-                className="p-3 bg-white/10 hover:bg-white/20 text-white rounded-2xl cursor-pointer border-none flex items-center justify-center transition-colors"
-                title="Print Slip"
-              >
-                <Printer size={16} />
-              </button>
-            </div>
-          )}
         </div>
       </div>
+
+      {/* ── Active Consultation Quick Bar (Only visible when patient is in cabin) ── */}
+      {inConsultation && (
+        <div className="bg-slate-900 text-white rounded-2xl p-3.5 sm:p-4 shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-3 animate-in fade-in duration-150 border border-slate-800">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white font-black text-base flex items-center justify-center shrink-0 shadow-sm">
+              #{inConsultation.tokenNo}
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                  In Consultation
+                </span>
+                <span className="text-slate-500">·</span>
+                <h3 className="text-sm font-black text-white">{inConsultation.patientName}</h3>
+                <span className="text-[10px] text-slate-300 font-semibold">
+                  ({inConsultation.patientAgeDisplay || `${inConsultation.patientAge}y`} · {inConsultation.patientGender} · {inConsultation.patientPhone})
+                </span>
+              </div>
+              <p className="text-[10.5px] text-slate-400 mt-0.5 font-medium">
+                Fee: ₹{inConsultation.consultationFee} · Session: {inConsultation.session?.toUpperCase()} · Type: {inConsultation.type?.toUpperCase()}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-end md:self-auto shrink-0">
+            <button
+              onClick={() => handleCompleteToken(inConsultation.id)}
+              className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-black text-xs cursor-pointer border-none shadow-xs flex items-center gap-1.5 transition-colors"
+            >
+              <CheckCircle size={14} /> Visited / Done
+            </button>
+            <button
+              onClick={() => handleMarkNotVisited(inConsultation.id)}
+              className="px-3 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-xl font-bold text-xs cursor-pointer flex items-center gap-1 transition-colors"
+            >
+              <UserX size={13} /> Absent
+            </button>
+            <button
+              onClick={() => setPrintToken(inConsultation)}
+              className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-xl cursor-pointer border-none flex items-center justify-center transition-colors"
+              title="Print Token Slip"
+            >
+              <Printer size={14} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Filters & Search Toolbar ───────────────────────────────────────── */}
       <div className="bg-white rounded-3xl border border-slate-100 shadow-xs p-4 space-y-3">

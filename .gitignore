@@ -36,4 +36,6 @@ image copy*.png
 server/scripts/ec2-deploy.sh
 server/scripts/test-aws.js
 server/data/
+instatoken_dump.sql
+*.sql
 

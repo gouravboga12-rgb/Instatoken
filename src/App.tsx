@@ -303,6 +303,20 @@ const AdminGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return <>{children}</>;
 };
 
+const ScrollToTop: React.FC = () => {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    if (typeof document !== 'undefined') {
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    }
+  }, [pathname]);
+
+  return null;
+};
+
 const AppContent: React.FC = () => {
   const { user } = useApp();
   const navigate = useNavigate();
@@ -396,6 +410,7 @@ const AppContent: React.FC = () => {
 
   return (
     <div className={`min-h-screen bg-slate-50 flex flex-col justify-between relative ${isPanelRoute ? 'h-screen overflow-hidden' : ''}`} style={{ overflowX: 'clip' }}>
+      <ScrollToTop />
 
       {/* Desktop Navigation Header */}
       {!isManagementRoute && <TopNavbar />}

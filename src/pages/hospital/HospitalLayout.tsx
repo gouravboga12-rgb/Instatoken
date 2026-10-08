@@ -219,20 +219,25 @@ const TopHeader: React.FC<{ onMenuToggle: () => void }> = ({ onMenuToggle }) => 
         <Menu size={18} className="text-slate-600" />
       </button>
 
-      {/* Welcome */}
+      {/* Big Hospital Name & Welcome Header */}
       <div className="flex-1 min-w-0">
-        <p className="text-base font-black text-slate-800 leading-none">
-          Welcome, {hospitalUser?.name?.split(' ')[0]} 👋
-        </p>
-        <div className="flex items-center gap-2 mt-0.5">
-          <p className="text-[11px] font-extrabold text-slate-700 truncate max-w-[240px]">
-            {hospitalProfile?.name || hospitalUser?.hospitalName || 'Hospital Management Panel'}
-          </p>
-          <span className="text-slate-200">·</span>
-          <span className={`text-[9px] font-black px-2 py-0.5 rounded-full capitalize ${roleColor}`}>
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <h1 className="text-lg sm:text-xl md:text-2xl font-black text-slate-900 tracking-tight leading-none uppercase font-heading">
+            {hospitalProfile?.name || hospitalUser?.hospitalName || 'Hospital Administration'}
+          </h1>
+          <span className="hidden sm:inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-black px-2.5 py-0.5 rounded-full">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            Hospital Online
+          </span>
+          <span className={`text-[9.5px] font-black px-2.5 py-0.5 rounded-full capitalize ${roleColor}`}>
             {hospitalUser?.role}
           </span>
         </div>
+        <p className="text-[11px] text-slate-400 font-semibold mt-1 flex items-center gap-1.5">
+          <span>Welcome, {hospitalUser?.name || 'Administrator'}</span>
+          <span className="text-slate-300">·</span>
+          <span>Hospital Administration Portal</span>
+        </p>
       </div>
 
       {/* Date */}

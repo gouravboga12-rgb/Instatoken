@@ -124,7 +124,7 @@ export const Home: React.FC<HomeProps> = ({
       rating: h.rating || 4.8,
       reviews: h.reviewsCount || 120,
       image: h.image || "https://images.unsplash.com/photo-1587351021759-3e566b6af7cc?w=800&auto=format&fit=crop&q=80",
-      cta: "Book OPD Token",
+      cta: "Book Token Now",
       color: gradients[idx % gradients.length]
     }));
   }, [hospitals]);
@@ -706,7 +706,7 @@ export const Home: React.FC<HomeProps> = ({
               )}
 
               {/* Top Badges Header */}
-              <div className="relative z-20 flex items-center justify-between gap-2 px-3 sm:px-6 md:px-10">
+              <div className="relative z-20 flex items-center justify-between gap-2 px-12 sm:px-14 md:px-16">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="bg-blue-600/90 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg border border-blue-400/30 shadow-md">
                     {currentBanner.badge}
@@ -735,7 +735,7 @@ export const Home: React.FC<HomeProps> = ({
               </div>
 
               {/* Bottom Main Content */}
-              <div className="relative z-20 flex flex-col sm:flex-row sm:items-end justify-between gap-3 px-3 sm:px-6 md:px-10 pt-2">
+              <div className="relative z-20 flex flex-col sm:flex-row sm:items-end justify-between gap-3 px-12 sm:px-14 md:px-16 pt-2">
                 <div className="max-w-xl space-y-1">
                   <h2 className="text-lg sm:text-2xl md:text-3xl font-black font-heading leading-tight tracking-tight drop-shadow-md text-white">
                     {currentBanner.title}
@@ -760,7 +760,7 @@ export const Home: React.FC<HomeProps> = ({
                     size="sm"
                     className="bg-white text-blue-600 hover:bg-blue-50 font-black text-xs py-2 px-4 rounded-xl shadow-lg border-none flex items-center gap-1.5 cursor-pointer"
                   >
-                    <span>{currentBanner.cta || 'Book OPD Token'}</span>
+                    <span>{currentBanner.cta || 'Book Token Now'}</span>
                     <ArrowRight size={13} />
                   </Button>
                 </div>
@@ -969,7 +969,7 @@ export const Home: React.FC<HomeProps> = ({
                         }}
                         className="text-[11px] sm:text-xs text-white font-extrabold bg-blue-600 hover:bg-blue-700 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl flex items-center gap-1 cursor-pointer shadow-sm shadow-blue-500/25 hover:shadow-blue-500/40 transition-all hover:scale-105 active:scale-95 shrink-0 whitespace-nowrap"
                       >
-                        Book OPD Token
+                        Book Token Now
                       </button>
                     </div>
                   </div>

@@ -6,10 +6,6 @@ import { Card } from '../../components/ui/Card';
 import { 
   ArrowLeft, 
   ShieldCheck, 
-  CreditCard, 
-  Wallet, 
-  Landmark, 
-  QrCode, 
   AlertCircle, 
   Lock,
   ExternalLink
@@ -382,62 +378,26 @@ export const Payment: React.FC = () => {
             </div>
           )}
 
-          {/* Razorpay Main Action Card */}
-          <div className="bg-white border border-blue-100 rounded-3xl p-5 sm:p-6 shadow-sm space-y-5">
-            
+          {/* Streamlined Razorpay Payment Action Card */}
+          <div className="bg-white border border-slate-200/90 rounded-3xl p-5 sm:p-6 shadow-xs space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2.5">
                 <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-black text-lg shadow-sm">
                   ₹
                 </div>
                 <div>
-                  <h3 className="font-black text-slate-900 text-sm sm:text-base leading-tight">Razorpay Payment Gateway</h3>
-                  <p className="text-[10px] text-slate-400 font-bold">UPI, Cards, NetBanking, Wallets</p>
+                  <h3 className="font-black text-slate-900 text-sm sm:text-base leading-tight">Proceed to Payment</h3>
+                  <p className="text-[11px] text-slate-400 font-semibold">Instant OPD token confirmation</p>
                 </div>
               </div>
 
-              <span className="text-[9px] font-black uppercase text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">
-                All-in-One
+              <span className="text-[10px] font-black uppercase text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-full">
+                100% Secure
               </span>
             </div>
 
-            {/* Supported Channels Showcase */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3 text-center flex flex-col items-center justify-center gap-1.5">
-                <div className="w-8 h-8 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center">
-                  <QrCode size={16} />
-                </div>
-                <span className="text-xs font-black text-slate-800">UPI / QR</span>
-                <span className="text-[9px] text-slate-400 font-bold leading-tight">GPay, PhonePe, Paytm</span>
-              </div>
-
-              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3 text-center flex flex-col items-center justify-center gap-1.5">
-                <div className="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center">
-                  <CreditCard size={16} />
-                </div>
-                <span className="text-xs font-black text-slate-800">Debit / Credit</span>
-                <span className="text-[9px] text-slate-400 font-bold leading-tight">Visa, MC, RuPay</span>
-              </div>
-
-              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3 text-center flex flex-col items-center justify-center gap-1.5">
-                <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
-                  <Landmark size={16} />
-                </div>
-                <span className="text-xs font-black text-slate-800">NetBanking</span>
-                <span className="text-[9px] text-slate-400 font-bold leading-tight">50+ Indian Banks</span>
-              </div>
-
-              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3 text-center flex flex-col items-center justify-center gap-1.5">
-                <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center">
-                  <Wallet size={16} />
-                </div>
-                <span className="text-xs font-black text-slate-800">Wallets</span>
-                <span className="text-[9px] text-slate-400 font-bold leading-tight">Paytm, Mobikwik</span>
-              </div>
-            </div>
-
             {/* Launch Primary Razorpay Modal Button */}
-            <div className="space-y-2.5 pt-2">
+            <div className="space-y-2 pt-1">
               <Button 
                 type="button" 
                 onClick={handleRazorpayPayment}
@@ -445,30 +405,30 @@ export const Payment: React.FC = () => {
                 variant="primary" 
                 size="lg" 
                 fullWidth 
-                className="py-3.5 text-sm font-extrabold flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white shadow-lg shadow-blue-500/25 rounded-2xl cursor-pointer"
+                className="py-3.5 text-sm font-extrabold flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg shadow-blue-500/25 rounded-2xl cursor-pointer"
               >
                 <Lock size={15} />
                 <span>{processing ? 'Connecting Razorpay...' : `Pay ₹${totalAmount.toFixed(2)} with Razorpay`}</span>
                 <ExternalLink size={14} className="opacity-80 ml-0.5" />
               </Button>
 
-              <p className="text-[9.5px] text-center text-slate-400 font-medium">
-                Clicking opens the official Razorpay test checkout window to complete payment
+              <p className="text-[10px] text-center text-slate-400 font-medium">
+                Clicking opens the Razorpay checkout to complete payment via UPI, Cards, or NetBanking
               </p>
             </div>
 
-            {/* Test Simulation Option */}
-            <div className="border-t border-slate-100 pt-4 flex items-center justify-between">
+            {/* Fast Test Pay Option */}
+            <div className="border-t border-slate-100 pt-3 flex items-center justify-between text-xs">
               <div>
-                <span className="text-[10px] font-bold text-slate-500 block">Fast Test Simulation</span>
-                <span className="text-[9px] text-slate-400">Simulate successful token booking without popup</span>
+                <span className="text-[11px] font-extrabold text-slate-600 block">Test Mode Simulation</span>
+                <span className="text-[9.5px] text-slate-400">Instant test confirmation without popup</span>
               </div>
 
               <button
                 type="button"
                 onClick={handleTestSimulatedPayment}
                 disabled={processing}
-                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-[10px] font-bold transition-all cursor-pointer disabled:opacity-50"
+                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-[10.5px] font-bold transition-all cursor-pointer disabled:opacity-50"
               >
                 Instant Test Pay
               </button>

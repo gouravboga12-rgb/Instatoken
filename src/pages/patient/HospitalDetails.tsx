@@ -113,6 +113,14 @@ export const HospitalDetails: React.FC<HospitalDetailsProps> = ({ onDoctorSelect
   }, [hospital]);
 
   useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    if (typeof document !== 'undefined') {
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    }
+  }, [id]);
+
+  useEffect(() => {
     if (mediaList.length <= 1 || isHovered) return;
     const interval = setInterval(() => {
       setActiveMediaIndex(prev => (prev + 1) % mediaList.length);

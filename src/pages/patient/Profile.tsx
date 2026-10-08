@@ -125,8 +125,16 @@ export const Profile: React.FC = () => {
       .map(doc => ({ ...doc, hospital: hosp }))
   );
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    if (typeof document !== 'undefined') {
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    }
+  }, []);
+
   return (
-    <div className="pb-24 bg-slate-50 min-h-screen md:min-h-0 md:pb-6 w-full px-2.5 sm:px-0 max-w-full overflow-hidden">
+    <div className="pb-36 bg-slate-50 min-h-screen md:min-h-0 md:pb-8 w-full px-3 sm:px-0 max-w-full">
       
       {/* 1. TOP PROFILE HEADER BANNER */}
       <div className="bg-gradient-to-r from-[#0055FE] via-[#004CF6] to-[#0038CE] text-white p-4 sm:p-6 rounded-2xl sm:rounded-3xl shadow-lg relative overflow-hidden">
