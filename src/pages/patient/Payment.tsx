@@ -44,7 +44,12 @@ export const Payment: React.FC = () => {
       email: string;
       address: string;
       isExisting: boolean;
-      rmpReference?: { name: string; phone: string } | null;
+      doctorReference?: { name: string; phone: string; place?: string } | null;
+      rmpReference?: { name: string; phone: string; place?: string } | null;
+      platformFee?: number;
+      gatewayFee?: number;
+      gstFee?: number;
+      totalBookingCharges?: number;
     } | null;
     hospitalId: string;
     doctorId: string;
@@ -52,6 +57,10 @@ export const Payment: React.FC = () => {
     time: string;
     fee: number;
     tokenFee?: number;
+    platformFee?: number;
+    gatewayFee?: number;
+    gstFee?: number;
+    totalBookingCharges?: number;
     subscriptionPlan?: { name: string; price: number; days: number };
     redirectUrl?: string;
   };
@@ -75,14 +84,12 @@ export const Payment: React.FC = () => {
   }
 
   const { fee, patientDetails, hospitalId, doctorId, date, time, redirectUrl } = state;
-  const tokenFee = state.tokenFee !== undefined
-    ? state.tokenFee
-    : (state.subscriptionPlan?.price !== undefined
-      ? state.subscriptionPlan.price
-      : Math.max(10, Math.round((fee || 500) * 0.05)));
-  const subPlan = state.subscriptionPlan || { name: "OPD Token Booking Fee", price: tokenFee, days: 3 };
-  const basePrice = tokenFee;
-  const totalAmount = parseFloat(basePrice.toFixed(2));
+  const platFee = state.platformFee || patientDetails?.platformFee || Math.max(10, Math.round((fee || 500) * 0.05));
+  const gatewayFee = state.gatewayFee || patientDetails?.gatewayFee || 1.50;
+  const taxableSum = platFee + gatewayFee;
+  const gstFee = state.gstFee || patientDetails?.gstFee || parseFloat((taxableSum * 0.18).toFixed(2));
+  const totalAmount = state.totalBookingCharges || state.tokenFee || patientDetails?.totalBookingCharges || parseFloat((taxableSum + gstFee).toFixed(2));
+  const subPlan = state.subscriptionPlan || { name: "InstaToken Booking Charges", price: totalAmount, days: 3 };
 
   // ─── Initiate Razorpay Payment ──────────────────────────────────────────────
   const handleRazorpayPayment = async () => {
@@ -310,35 +317,35 @@ export const Payment: React.FC = () => {
             
             <div className="space-y-2 pb-3 border-b border-slate-100 text-xs">
               <div className="flex justify-between text-slate-700 font-extrabold">
-                <span>{patientDetails ? (subPlan.name || 'OPD Token Booking Fee') : `Platform Booking Pass: ${subPlan.name}`}</span>
-                <span className="text-blue-600 font-black">₹{basePrice.toFixed(2)}</span>
+                <span>Platform Fee (5%)</span>
+                <span className="text-slate-900 font-black">₹{platFee.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between text-slate-400 text-[11px] font-medium">
-                <span>Platform Convenience Fee</span>
-                <span className="text-emerald-600 font-bold">Waived (₹0.00)</span>
+              <div className="flex justify-between text-slate-600 text-[11px] font-medium">
+                <span>Payment Gateway Fee</span>
+                <span className="text-slate-900 font-bold">₹{gatewayFee.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between text-slate-400 text-[11px] font-medium">
-                <span>Razorpay Gateway Charges & Taxes</span>
-                <span className="text-emerald-600 font-bold">Included</span>
+              <div className="flex justify-between text-slate-600 text-[11px] font-medium">
+                <span>GST (18% on ₹{taxableSum.toFixed(2)})</span>
+                <span className="text-slate-900 font-bold">₹{gstFee.toFixed(2)}</span>
               </div>
               
               {patientDetails && fee > 0 && (
-                <div className="flex justify-between items-center text-slate-500 font-bold border-t border-dashed border-slate-200 pt-2.5 text-[10px] bg-amber-50/70 p-2.5 rounded-xl mt-1">
+                <div className="flex justify-between items-center text-slate-500 font-bold border-t border-dashed border-slate-200 pt-2.5 text-[10px] bg-emerald-50/70 p-2.5 rounded-xl mt-1">
                   <div>
                     <span className="text-slate-800 font-black block">Doctor Consultation Fee</span>
-                    <span className="text-[9px] text-amber-700 font-semibold">Pay directly at hospital cabin / desk</span>
+                    <span className="text-[9px] text-emerald-700 font-semibold">Pay directly at hospital cabin / desk</span>
                   </div>
-                  <span className="text-amber-800 font-black text-xs">₹{fee.toFixed(2)} (Pay at Hospital)</span>
+                  <span className="text-emerald-800 font-black text-xs">₹{fee.toFixed(2)} (Pay at Hospital)</span>
                 </div>
               )}
             </div>
 
             <div className="flex justify-between items-center pt-3 font-heading font-black text-sm text-slate-850">
               <div>
-                <span>Total Payable Online</span>
-                <p className="text-[9.5px] text-slate-400 font-normal">Official InstaToken booking fee only</p>
+                <span>Total Payable Now</span>
+                <p className="text-[9.5px] text-slate-400 font-normal">InstaToken Booking Charges (incl. GST)</p>
               </div>
-              <span className="text-blue-600 text-lg font-black font-heading">₹{totalAmount.toFixed(2)}</span>
+              <span className="text-blue-600 text-xl font-black font-heading">₹{totalAmount.toFixed(2)}</span>
             </div>
           </Card>
 

@@ -14,6 +14,7 @@ const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || 'vm2Lt528SZHDC8Jq
 // AWS & DB Integrations
 const { query, testConnection } = require('./config/db');
 const { generateUploadUrl, uploadFile, deleteFile } = require('./config/s3');
+const { normalizePhone10, sendSmsOtp, verifySmsOtp } = require('./services/smsService');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -899,7 +900,7 @@ app.post('/api/sync', async (req, res) => {
 // ─── Hospital Auth & Access Control (Phase 22) ───────────────────────────────
 
 const DEFAULT_HOSPITAL_CREDENTIALS = [
-  { hospitalId: 'hosp-apollo', email: 'admin@instatoken.in', password: 'password', role: 'owner', name: 'Dr. Rajesh Kumar', hospitalName: 'City Care Multi-Specialty Hospital' }
+  { hospitalId: 'hosp-apollo', email: 'admin@instatoken.in', phone: '9876543210', password: 'password', role: 'owner', name: 'Dr. Rajesh Kumar', hospitalName: 'City Care Multi-Specialty Hospital' }
 ];
 
 const ACTIVE_SESSIONS = new Map();
@@ -912,6 +913,7 @@ DEFAULT_HOSPITAL_CREDENTIALS.forEach(cred => {
     hospitalId: cred.hospitalId,
     hospitalName: cred.hospitalName,
     email: cred.email,
+    phone: cred.phone || '',
     role: cred.role,
     name: cred.name,
     createdAt: Date.now()
@@ -926,6 +928,7 @@ function generateSessionToken(cred) {
     hospitalId: cred.hospitalId,
     hospitalName: cred.hospitalName,
     email: cred.email,
+    phone: cred.phone || '',
     role: cred.role || 'owner',
     name: cred.name || 'Hospital Admin',
     createdAt: Date.now()
@@ -1004,6 +1007,340 @@ function requireHospitalAuth(req, res, next) {
 }
 
 // ─── Auth Endpoints ──────────────────────────────────────────────────────────
+
+// ─── DLT SMS & MSG91 OTP Authentication ──────────────────────────────────────
+
+// POST /api/auth/sms/send-otp
+app.post('/api/auth/sms/send-otp', async (req, res) => {
+  try {
+    const { phone, purpose } = req.body;
+    if (!phone) {
+      return res.status(400).json({ success: false, message: 'Mobile number is required' });
+    }
+    const result = await sendSmsOtp(phone, purpose || 'auth');
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+    return res.json(result);
+  } catch (err) {
+    console.error('Error in /api/auth/sms/send-otp:', err);
+    return res.status(500).json({ success: false, message: 'Failed to send SMS OTP. Please try again.' });
+  }
+});
+
+// POST /api/auth/hospital-otp-login
+app.post('/api/auth/hospital-otp-login', async (req, res) => {
+  try {
+    const { phone, otp } = req.body;
+    if (!phone || !otp) {
+      return res.status(400).json({ success: false, message: 'Mobile number and OTP are required' });
+    }
+
+    const verification = verifySmsOtp(phone, otp);
+    if (!verification.success) {
+      return res.status(400).json(verification);
+    }
+
+    const cleanPhone10 = normalizePhone10(phone);
+    const store = await getUnifiedStore();
+
+    // Look up in store.hospitalCredentials or DEFAULT_HOSPITAL_CREDENTIALS
+    let activeCred = (store.hospitalCredentials || []).find(c => {
+      return normalizePhone10(c.phone) === cleanPhone10;
+    });
+
+    if (!activeCred) {
+      activeCred = DEFAULT_HOSPITAL_CREDENTIALS.find(c => {
+        return normalizePhone10(c.phone) === cleanPhone10;
+      });
+    }
+
+    // Fallback: check if any hospital in store.hospitals has this phone
+    if (!activeCred && store.hospitals && Array.isArray(store.hospitals)) {
+      const hosp = store.hospitals.find(h => normalizePhone10(h.phone) === cleanPhone10);
+      if (hosp) {
+        activeCred = {
+          hospitalId: hosp.id,
+          phone: hosp.phone,
+          email: hosp.email || `admin@${hosp.id}.com`,
+          role: 'owner',
+          name: hosp.adminName || 'Hospital Admin',
+          hospitalName: hosp.name
+        };
+        store.hospitalCredentials = store.hospitalCredentials || [];
+        store.hospitalCredentials.push(activeCred);
+        await saveUnifiedStore(store);
+      }
+    }
+
+    if (!activeCred) {
+      return res.status(404).json({
+        success: false,
+        message: 'No hospital found registered with this mobile number. Please register your hospital.'
+      });
+    }
+
+    const session = generateSessionToken(activeCred);
+    return res.json({
+      success: true,
+      message: 'Login successful',
+      token: session.token,
+      user: {
+        id: `huser-${session.hospitalId}`,
+        hospitalId: session.hospitalId,
+        hospitalName: session.hospitalName,
+        name: session.name,
+        email: session.email,
+        phone: activeCred.phone || phone,
+        role: session.role
+      }
+    });
+  } catch (err) {
+    console.error('Hospital OTP login error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/auth/hospital-otp-signup
+app.post('/api/auth/hospital-otp-signup', async (req, res) => {
+  try {
+    const { name, phone, otp, adminName, email, city, address, category, registrationNumber } = req.body;
+    if (!name || !phone || !otp) {
+      return res.status(400).json({ success: false, message: 'Hospital Name, Mobile number, and OTP are required' });
+    }
+
+    const verification = verifySmsOtp(phone, otp);
+    if (!verification.success) {
+      return res.status(400).json(verification);
+    }
+
+    const cleanPhone10 = normalizePhone10(phone);
+    const store = await getUnifiedStore();
+    store.hospitalCredentials = store.hospitalCredentials || [];
+
+    const existing = store.hospitalCredentials.find(c => normalizePhone10(c.phone) === cleanPhone10);
+    if (existing) {
+      const session = generateSessionToken(existing);
+      return res.json({
+        success: true,
+        message: 'Hospital already registered. Logged in successfully.',
+        token: session.token,
+        user: {
+          id: `huser-${session.hospitalId}`,
+          hospitalId: session.hospitalId,
+          hospitalName: session.hospitalName,
+          name: session.name,
+          email: session.email,
+          phone: existing.phone,
+          role: session.role
+        }
+      });
+    }
+
+    const newHospitalId = `hosp-${Date.now().toString(36)}`;
+    const newCred = {
+      hospitalId: newHospitalId,
+      email: (email || `${cleanPhone10}@hospital.instatoken.in`).trim().toLowerCase(),
+      phone: `+91 ${cleanPhone10}`,
+      role: 'owner',
+      name: adminName ? adminName.trim() : 'Hospital Administrator',
+      hospitalName: name.trim()
+    };
+
+    store.hospitalCredentials.push(newCred);
+
+    const newProfile = {
+      id: newHospitalId,
+      name: name.trim(),
+      email: newCred.email,
+      phone: `+91 ${cleanPhone10}`,
+      whatsapp: `+91 ${cleanPhone10}`,
+      city: city || 'Bengaluru',
+      state: '',
+      area: '',
+      address: address || '',
+      type: category || 'Multi Speciality',
+      ownershipType: 'Private',
+      registrationNumber: registrationNumber || `REG-${Date.now()}`,
+      rating: 4.8,
+      reviewsCount: 1,
+      image: "https://images.unsplash.com/photo-1587351021759-3e566b6af7cc?w=800&auto=format&fit=crop&q=80",
+      consultationFee: 300,
+      departments: ["General Medicine", "Cardiology", "Pediatrics"],
+      openTime: "08:00 AM",
+      closeTime: "08:00 PM"
+    };
+
+    store.hospitals = store.hospitals || [];
+    store.hospitalProfiles = store.hospitalProfiles || {};
+    store.hospitalProfiles[newHospitalId] = newProfile;
+    store.hospitalDoctors = store.hospitalDoctors || {};
+    store.hospitalDoctors[newHospitalId] = [];
+    store.hospitalDepartments = store.hospitalDepartments || {};
+    store.hospitalDepartments[newHospitalId] = INITIAL_DEPARTMENTS.map(d => ({ ...d }));
+    store.hospitalPatients = store.hospitalPatients || {};
+    store.hospitalPatients[newHospitalId] = [];
+    store.hospitalStaff = store.hospitalStaff || {};
+    store.hospitalStaff[newHospitalId] = [];
+
+    syncProfileToHospitalsList(store, newHospitalId, newProfile);
+
+    if (isDbConnected) {
+      try {
+        await query(
+          `INSERT INTO hospitals (id, name, email, phone, city, state, data) 
+           VALUES ($1, $2, $3, $4, $5, $6, $7)
+           ON CONFLICT (id) DO UPDATE SET name = $2, email = $3, phone = $4, city = $5, state = $6, data = $7`,
+          [newHospitalId, name.trim(), newCred.email, newProfile.phone, city || '', '', JSON.stringify(newProfile)]
+        );
+        await query(
+          `INSERT INTO hospital_profiles (hospital_id, profile_data) 
+           VALUES ($1, $2)
+           ON CONFLICT (hospital_id) DO UPDATE SET profile_data = $2`,
+          [newHospitalId, JSON.stringify(newProfile)]
+        );
+        for (const dept of INITIAL_DEPARTMENTS) {
+          await query(
+            `INSERT INTO hospital_departments (id, hospital_id, name, icon, head_doctor, total_doctors, active, data, created_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+             ON CONFLICT (id, hospital_id) DO NOTHING`,
+            [
+              dept.id,
+              newHospitalId,
+              dept.name,
+              dept.icon || '🩺',
+              dept.headDoctor || '',
+              0,
+              true,
+              JSON.stringify(dept)
+            ]
+          );
+        }
+      } catch (dbErr) {
+        console.warn('Error saving new hospital to RDS tables:', dbErr.message);
+      }
+    }
+
+    await saveUnifiedStore(store);
+
+    const session = generateSessionToken(newCred);
+    console.log(`✅ [DLT OTP] Registered new hospital: ${newProfile.name} (${newProfile.phone})`);
+
+    return res.status(201).json({
+      success: true,
+      message: 'Hospital registered successfully',
+      token: session.token,
+      user: {
+        id: `huser-${session.hospitalId}`,
+        hospitalId: session.hospitalId,
+        hospitalName: session.hospitalName,
+        name: session.name,
+        email: session.email,
+        phone: newCred.phone,
+        role: session.role
+      }
+    });
+  } catch (err) {
+    console.error('Hospital OTP signup error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/customers/otp-auth (Login & Registration for Patients via Mobile OTP)
+app.post('/api/customers/otp-auth', async (req, res) => {
+  try {
+    const { phone, otp, name } = req.body;
+    if (!phone || !otp) {
+      return res.status(400).json({ success: false, message: 'Phone number and OTP code are required.' });
+    }
+
+    const verification = verifySmsOtp(phone, otp);
+    if (!verification.success) {
+      return res.status(400).json(verification);
+    }
+
+    const normPhone = normalizePhone10(phone);
+    const store = await getUnifiedStore();
+    store.customers = store.customers || [];
+
+    let customer = store.customers.find(c => {
+      return normPhone && normalizePhone10(c.phone) === normPhone;
+    });
+
+    if (!customer) {
+      if (!name || !name.trim()) {
+        return res.json({
+          success: true,
+          needName: true,
+          phone: normPhone,
+          message: 'Mobile verified. Please enter your name to complete registration.'
+        });
+      }
+
+      const cleanName = name.trim();
+      customer = {
+        id: `cust-${Date.now()}`,
+        name: cleanName,
+        email: `${normPhone}@patient.instatoken.in`,
+        phone: `+91 ${normPhone}`,
+        password: '',
+        location: 'Hyderabad, Telangana',
+        joinedDate: new Date().toISOString().split('T')[0],
+        status: 'active',
+        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+        familyMembers: [],
+        savedDoctors: [],
+        savedHospitals: [],
+        subscription: {
+          planName: "3-Day Pass",
+          expiresAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+          price: 10
+        },
+        bookings: []
+      };
+
+      store.customers.unshift(customer);
+      await saveUnifiedStore(store);
+
+      if (isDbConnected) {
+        try {
+          await query(`
+            INSERT INTO customers (id, name, phone, email, location, data)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            ON CONFLICT (id) DO UPDATE SET name = $2, phone = $3, data = $6
+          `, [customer.id, customer.name, customer.phone, customer.email, customer.location, JSON.stringify(customer)]);
+        } catch (dbErr) {
+          console.warn('[DB Sync Warn] Failed to insert customer into Postgres:', dbErr.message);
+        }
+      }
+
+      console.log(`✅ [DLT OTP] Auto-registered new customer: ${customer.name} (${customer.phone})`);
+      return res.json({
+        success: true,
+        customer,
+        isNewUser: true,
+        message: 'Registration successful!'
+      });
+    }
+
+    // Existing customer found
+    if (name && name.trim() && (!customer.name || customer.name === 'Patient' || customer.name === 'Valued Patient')) {
+      customer.name = name.trim();
+      await saveUnifiedStore(store);
+    }
+
+    console.log(`✅ [DLT OTP] Logged in customer: ${customer.name} (${customer.phone})`);
+    return res.json({
+      success: true,
+      customer,
+      isNewUser: false,
+      message: 'Login successful!'
+    });
+  } catch (err) {
+    console.error('Customer OTP auth error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
 
 // POST /api/auth/hospital-login
 app.post('/api/auth/hospital-login', async (req, res) => {
@@ -2595,44 +2932,52 @@ app.post('/api/hospitals/:hospitalId/tokens', requireHospitalAuth, async (req, r
 
 app.patch('/api/hospitals/:hospitalId/tokens/:tokenId/status', requireHospitalAuth, async (req, res) => {
   const { hospitalId, tokenId } = req.params;
-  const { status } = req.body;
+  const { status, paymentStatus, paymentMethod } = req.body;
   const store = await getUnifiedStore();
 
   let targetToken = null;
   store.tokens = (store.tokens || []).map(t => {
     if (t.id === tokenId) {
+      const newStatus = status || t.status;
+      const computedPayStatus = paymentStatus !== undefined 
+        ? paymentStatus 
+        : (status === 'cancelled' ? 'refunded' : status === 'completed' ? (t.paymentStatus || 'paid') : t.paymentStatus);
+      const computedPayMethod = paymentMethod !== undefined ? paymentMethod : t.paymentMethod;
+
       targetToken = {
         ...t,
-        status,
-        paymentStatus: status === 'cancelled' ? 'refunded' : status === 'completed' ? 'paid' : t.paymentStatus
+        status: newStatus,
+        paymentStatus: computedPayStatus,
+        paymentMethod: computedPayMethod
       };
       return targetToken;
     }
     return t;
   });
 
-  const apptStatus = status === 'completed' ? 'completed' : ['cancelled', 'not-visited', 'skipped'].includes(status) ? 'cancelled' : 'booked';
-  store.appointments = (store.appointments || []).map(a => {
-    if (a.id === tokenId || (targetToken && a.hospitalId === targetToken.hospitalId && a.doctorId === targetToken.doctorId && (a.tokenNumber === targetToken.tokenNo || a.tokenNumber === targetToken.tokenNumber))) {
-      return { ...a, status: apptStatus };
-    }
-    return a;
-  });
+  if (targetToken && status) {
+    const apptStatus = status === 'completed' ? 'completed' : ['cancelled', 'not-visited', 'skipped'].includes(status) ? 'cancelled' : 'booked';
+    store.appointments = (store.appointments || []).map(a => {
+      if (a.id === tokenId || (targetToken && a.hospitalId === targetToken.hospitalId && a.doctorId === targetToken.doctorId && (a.tokenNumber === targetToken.tokenNo || a.tokenNumber === targetToken.tokenNumber))) {
+        return { ...a, status: apptStatus };
+      }
+      return a;
+    });
+  }
 
   if (isDbConnected) {
     try {
       if (targetToken) {
         await query(
           `UPDATE tokens SET status = $1, data = (COALESCE(data, '{}'::jsonb) || $2::jsonb), updated_at = NOW() WHERE id = $3`,
-          [status, JSON.stringify(targetToken), tokenId]
+          [targetToken.status, JSON.stringify(targetToken), tokenId]
         );
-      } else {
+      } else if (status) {
         await query(
           `UPDATE tokens SET status = $1::varchar, data = (COALESCE(data, '{}'::jsonb) || jsonb_build_object('status', $1::varchar)), updated_at = NOW() WHERE id = $2`,
           [status, tokenId]
         );
       }
-
       // Update matching appointment in PostgreSQL
       await query(
         `UPDATE appointments SET status = $1::varchar, data = (COALESCE(data, '{}'::jsonb) || jsonb_build_object('status', $1::varchar)), updated_at = NOW() WHERE id = $2`,
@@ -2938,6 +3283,14 @@ app.post('/api/appointments', async (req, res) => {
 
   const store = await getUnifiedStore();
   store.appointments = store.appointments || [];
+
+  // Standardize doctor reference across backend and support backward compatibility
+  const ref = appt.doctorReference || appt.rmpReference || null;
+  if (ref) {
+    appt.doctorReference = ref;
+    appt.rmpReference = ref;
+  }
+
   store.appointments = [appt, ...store.appointments.filter(a => a.id !== appt.id)];
 
   const tokenRecord = {
@@ -2958,13 +3311,17 @@ app.post('/api/appointments', async (req, res) => {
     status: appt.status || 'booked',
     estimatedWait: appt.estimatedWaitTime || 15,
     consultationFee: appt.fee || 500,
-    platformFee: appt.platformFee || 25,
-    totalFee: appt.totalFee || appt.platformFee || 25,
+    platformFee: appt.platformFee || 15,
+    gatewayFee: appt.gatewayFee || 1.5,
+    gstFee: appt.gstFee || 2.97,
+    totalFee: appt.totalFee || appt.totalBookingCharges || 19.47,
     paymentStatus: 'pending',
     paymentMethod: 'Pay at Hospital',
     paymentId: appt.paymentId,
     hospitalId: appt.hospitalId,
     hospitalName: appt.hospitalName,
+    doctorReference: ref,
+    rmpReference: ref,
     createdAt: appt.createdAt || new Date().toISOString()
   };
 

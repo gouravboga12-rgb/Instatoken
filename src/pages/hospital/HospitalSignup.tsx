@@ -1,119 +1,163 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useHospital } from '../../context/HospitalContext';
-import { Activity, Eye, EyeOff, AlertCircle, ArrowRight, Building2, Shield, CheckCircle2 } from 'lucide-react';
-import { OTPModal } from '../../components/common/OTPModal';
+import { Activity, AlertCircle, ArrowRight, Building2, Shield, CheckCircle2, RefreshCw, ArrowLeft, ShieldCheck } from 'lucide-react';
+import { sendSmsOtpClient, normalizePhoneInput } from '../../utils/otpService';
 
 export const HospitalSignup: React.FC = () => {
-  const { updateHospitalProfile, hospitalLogin } = useHospital();
+  const { hospitalSignupWithOtp } = useHospital();
   const navigate = useNavigate();
 
   const [step, setStep] = useState<1 | 2>(1);
   const [hospName, setHospName] = useState('');
+  const [adminName, setAdminName] = useState('');
   const [category, setCategory] = useState('Multi Speciality');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [city, setCity] = useState('Bengaluru');
   const [address, setAddress] = useState('');
   const [regNo, setRegNo] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPass, setShowPass] = useState(false);
+
+  // OTP State for Step 2
+  const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
+  const [timer, setTimer] = useState(60);
+  const [canResend, setCanResend] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState(false);
-  const [showOtpModal, setShowOtpModal] = useState(false);
 
-  const handleNextStep = (e: React.FormEvent) => {
-    e.preventDefault();
+  useEffect(() => {
+    let interval: any = null;
+    if (step === 2 && timer > 0) {
+      interval = setInterval(() => setTimer(prev => prev - 1), 1000);
+    } else if (timer === 0) {
+      setCanResend(true);
+    }
+    return () => clearInterval(interval);
+  }, [step, timer]);
+
+  // Step 1: Send DLT OTP to Admin Phone
+  const handleSendOtp = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     setError('');
-    if (!hospName || !phone || !email || !city) {
-      setError('Please fill in all hospital basic details.');
-      return;
-    }
-    setStep(2);
-  };
 
-  const handleSignup = (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-
-    if (password !== confirmPassword) {
-      setError('Passwords do not match. Please check again.');
-      return;
-    }
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters.');
+    if (!hospName.trim()) {
+      setError('Please enter your hospital name.');
       return;
     }
 
-    // Open OTP verification modal
-    setShowOtpModal(true);
-  };
+    const clean10 = normalizePhoneInput(phone);
+    if (!clean10 || clean10.length !== 10) {
+      setError('Please enter a valid 10-digit Indian mobile number.');
+      return;
+    }
 
-  const handleOtpSuccess = async () => {
-    setShowOtpModal(false);
     setLoading(true);
-
     try {
-      // 1. Call backend hospital signup endpoint
-      const res = await fetch('/api/auth/hospital-signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: hospName,
-          email: email.trim().toLowerCase(),
-          password,
-          phone,
-          city,
-          address,
-          category,
-          registrationNumber: regNo || `KA/HOS/2026/${Math.floor(1000 + Math.random() * 9000)}`
-        })
-      });
-
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        setLoading(false);
-        setError(data.message || 'Hospital registration failed.');
+      const res = await sendSmsOtpClient(clean10, 'hospital_auth');
+      if (!res.success) {
+        setError(res.message || 'Failed to send OTP SMS to this number.');
         return;
       }
+      setStep(2);
+      setTimer(60);
+      setCanResend(false);
+      setOtpDigits(['', '', '', '', '', '']);
+      setTimeout(() => {
+        document.getElementById('hosp-reg-otp-0')?.focus();
+      }, 150);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to reach SMS gateway.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      // 2. Save credentials in local storage
-      const savedCreds = localStorage.getItem('insta_hospital_credentials');
-      let creds = savedCreds ? JSON.parse(savedCreds) : [];
-      creds = creds.filter((c: any) => c.email.toLowerCase() !== email.trim().toLowerCase());
-      creds.push({
-        email: email.trim().toLowerCase(),
-        password,
-        hospitalId: data.user?.hospitalId,
-        name: hospName,
-        hospitalName: hospName
+  const handleDigitChange = (index: number, val: string) => {
+    const onlyDigits = val.replace(/\D/g, '');
+    if (onlyDigits.length > 1) {
+      const chars = onlyDigits.slice(0, 6).split('');
+      const newDigits = [...otpDigits];
+      chars.forEach((d, i) => {
+        if (index + i < 6) newDigits[index + i] = d;
       });
-      localStorage.setItem('insta_hospital_credentials', JSON.stringify(creds));
+      setOtpDigits(newDigits);
+      const nextIdx = Math.min(index + chars.length, 5);
+      document.getElementById(`hosp-reg-otp-${nextIdx}`)?.focus();
+      return;
+    }
 
-      // Update hospital profile in context
-      updateHospitalProfile({
-        id: data.user?.hospitalId,
-        name: hospName,
-        type: category,
-        phone,
+    if (!/^\d*$/.test(val)) return;
+    const newDigits = [...otpDigits];
+    newDigits[index] = val.slice(-1);
+    setOtpDigits(newDigits);
+
+    if (val && index < 5) {
+      document.getElementById(`hosp-reg-otp-${index + 1}`)?.focus();
+    }
+  };
+
+  const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' && !otpDigits[index] && index > 0) {
+      document.getElementById(`hosp-reg-otp-${index - 1}`)?.focus();
+    }
+  };
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pastedData = e.clipboardData.getData('text');
+    const clean = pastedData.replace(/\D/g, '').slice(0, 6).split('');
+    if (clean.length === 0) return;
+
+    const newDigits = ['', '', '', '', '', ''];
+    clean.forEach((d, i) => {
+      newDigits[i] = d;
+    });
+    setOtpDigits(newDigits);
+    const targetIdx = Math.min(clean.length, 5);
+    document.getElementById(`hosp-reg-otp-${targetIdx}`)?.focus();
+  };
+
+  // Step 2: Verify OTP and Register Hospital
+  const handleVerifyAndSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    const code = otpDigits.join('').trim();
+    if (code.length !== 6) {
+      setError('Please enter the complete 6-digit OTP');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const clean10 = normalizePhoneInput(phone);
+      const res = await hospitalSignupWithOtp({
+        name: hospName.trim(),
+        adminName: adminName.trim() || 'Hospital Administrator',
+        phone: clean10,
+        otp: code,
         email: email.trim().toLowerCase(),
         city,
         address,
-        registrationNumber: regNo || `KA/HOS/2026/${Math.floor(1000 + Math.random() * 9000)}`,
+        category,
+        registrationNumber: regNo || `KA/HOS/2026/${Math.floor(1000 + Math.random() * 9000)}`
       });
 
-      setLoading(false);
-      setSuccessMsg(true);
+      if (!res.success) {
+        setError(res.message || 'Hospital registration failed.');
+        setLoading(false);
+        return;
+      }
 
-      setTimeout(async () => {
-        await hospitalLogin(email.trim().toLowerCase(), password);
+      setSuccessMsg(true);
+      setTimeout(() => {
         navigate('/hospital/dashboard');
       }, 1200);
     } catch (err: any) {
-      setLoading(false);
       setError(err?.message || 'Hospital registration error.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -147,19 +191,19 @@ export const HospitalSignup: React.FC = () => {
             </div>
             <h2 className="text-4xl xl:text-5xl font-black text-white leading-tight tracking-tight mb-4">
               Register Your Hospital<br />
-              <span className="text-blue-300">In 2 Minutes</span>
+              <span className="text-blue-300">With Direct Mobile OTP</span>
             </h2>
             <p className="text-blue-100 text-sm leading-relaxed max-w-md">
-              Enable smart token booking, live OPD queue management, digital prescriptions, and patient flow analytics for your hospital.
+              Passwordless registration secured by Indian Telecom DLT verification. Instant activation for smart tokens, OPD queue management, and doctor cabins.
             </p>
           </div>
 
           <div className="space-y-3 max-w-sm">
             {[
+              'Direct SIM mobile verification (No passwords)',
               'Zero setup fee · Instant live dashboard',
               'Patients book token online or walk-in',
-              'Automated SMS & WhatsApp status alerts',
-              'Multi-receptionist & Doctor cabin RBAC',
+              'TRAI DLT Verified Telecom SMS alerts',
             ].map((feature, idx) => (
               <div key={idx} className="flex items-center gap-2.5 text-xs text-white font-bold bg-white/10 p-2.5 rounded-xl border border-white/10">
                 <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
@@ -191,209 +235,246 @@ export const HospitalSignup: React.FC = () => {
               <Shield size={16} className="text-blue-600" />
               <span className="text-xs font-extrabold text-blue-600 uppercase tracking-widest">Hospital Registration</span>
             </div>
-            <h2 className="text-3xl font-black text-slate-900 tracking-tight">Register Hospital</h2>
-            <p className="text-slate-500 text-xs mt-1">Create your hospital management panel account</p>
+            <h2 className="text-3xl font-black text-slate-900 tracking-tight">
+              {step === 1 ? 'Register Hospital' : 'Verify Mobile OTP'}
+            </h2>
+            <p className="text-slate-500 text-xs mt-1">
+              {step === 1
+                ? 'Fill basic hospital details to receive your DLT OTP'
+                : `Enter the 6-digit OTP code sent to +91 ${normalizePhoneInput(phone)}`}
+            </p>
           </div>
 
           {/* Progress Indicator */}
           <div className="flex items-center gap-2 mb-6">
             <div className={`flex-1 h-1.5 rounded-full ${step >= 1 ? 'bg-blue-600' : 'bg-slate-200'}`} />
-            <div className={`flex-1 h-1.5 rounded-full ${step === 2 ? 'bg-blue-600' : 'bg-slate-200'}`} />
+            <div className={`flex-1 h-1.5 rounded-full ${step >= 2 ? 'bg-blue-600' : 'bg-slate-200'}`} />
           </div>
 
-          {successMsg ? (
-            <div className="bg-emerald-50 border border-emerald-200 p-6 rounded-3xl text-center space-y-3 animate-in fade-in duration-300">
-              <CheckCircle2 size={42} className="text-emerald-600 mx-auto" />
-              <h3 className="text-lg font-black text-slate-800">Hospital Registered!</h3>
-              <p className="text-xs text-slate-600 font-semibold">Redirecting to your hospital panel dashboard...</p>
+          {error && (
+            <div className="mb-4 flex items-center gap-2 bg-red-50 border border-red-100 text-red-600 px-4 py-3 rounded-xl text-xs font-semibold">
+              <AlertCircle size={14} className="shrink-0" />
+              <span>{error}</span>
             </div>
-          ) : step === 1 ? (
-            <form onSubmit={handleNextStep} className="space-y-3.5">
+          )}
+
+          {successMsg && (
+            <div className="mb-4 flex items-center gap-2 bg-emerald-50 border border-emerald-100 text-emerald-700 px-4 py-3 rounded-xl text-xs font-bold animate-pulse">
+              <CheckCircle2 size={16} className="text-emerald-600" />
+              <span>Hospital registered! Redirecting to Dashboard...</span>
+            </div>
+          )}
+
+          {/* STEP 1: HOSPITAL DETAILS */}
+          {step === 1 && (
+            <form onSubmit={handleSendOtp} className="space-y-3.5">
               <div>
                 <label className="text-xs font-bold text-slate-700 block mb-1">Hospital Name *</label>
                 <input
                   type="text"
                   value={hospName}
                   onChange={e => setHospName(e.target.value)}
-                  placeholder="e.g. City Care Multispeciality Hospital"
+                  placeholder="Apollo City Hospital"
                   required
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 bg-slate-50"
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 bg-slate-50 font-medium"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">Admin / Doctor Name</label>
+                  <input
+                    type="text"
+                    value={adminName}
+                    onChange={e => setAdminName(e.target.value)}
+                    placeholder="Dr. Rajesh"
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 bg-slate-50 font-medium"
+                  />
+                </div>
+                <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">Category</label>
                   <select
                     value={category}
                     onChange={e => setCategory(e.target.value)}
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none bg-slate-50"
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-blue-500 bg-slate-50 font-medium"
                   >
                     <option value="Multi Speciality">Multi Speciality</option>
-                    <option value="Children Hospital">Children Hospital</option>
+                    <option value="Super Speciality">Super Speciality</option>
                     <option value="Eye Hospital">Eye Hospital</option>
                     <option value="Dental Clinic">Dental Clinic</option>
-                    <option value="Cardiology">Cardiology</option>
+                    <option value="Children Hospital">Children Hospital</option>
+                    <option value="Cardiology Center">Cardiology Center</option>
+                    <option value="General Clinic">General Clinic</option>
                   </select>
                 </div>
+              </div>
 
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">Admin Mobile Number (For DLT OTP) *</label>
+                <div className="relative flex items-center">
+                  <span className="absolute left-3.5 text-xs font-extrabold text-slate-500 select-none">+91</span>
+                  <input
+                    type="tel"
+                    value={phone}
+                    onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    placeholder="98765 43210"
+                    maxLength={10}
+                    required
+                    className="w-full pl-12 pr-4 py-2.5 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 bg-slate-50 font-bold tracking-wide"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">City *</label>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">Email Address</label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    placeholder="contact@hospital.com"
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 bg-slate-50 font-medium"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">City / Town</label>
                   <input
                     type="text"
                     value={city}
                     onChange={e => setCity(e.target.value)}
-                    placeholder="Bengaluru"
-                    required
-                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none bg-slate-50"
+                    placeholder="Hyderabad"
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 bg-slate-50 font-medium"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">Contact Phone *</label>
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={e => setPhone(e.target.value)}
-                  placeholder="+91 98765 43210"
-                  required
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none bg-slate-50"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">Hospital Official Email *</label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  placeholder="contact@citycarehospital.com"
-                  required
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none bg-slate-50"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">Hospital Address</label>
+                <label className="text-xs font-bold text-slate-700 block mb-1">Street Address</label>
                 <input
                   type="text"
                   value={address}
                   onChange={e => setAddress(e.target.value)}
-                  placeholder="Street, Area, LandMark..."
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none bg-slate-50"
+                  placeholder="Main Road, Near Central Bus Stand"
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 bg-slate-50 font-medium"
                 />
               </div>
 
-              {error && (
-                <div className="flex items-center gap-2 bg-red-50 border border-red-100 text-red-600 px-3 py-2.5 rounded-xl text-xs font-semibold">
-                  <AlertCircle size={14} />
-                  {error}
-                </div>
-              )}
-
-              <button
-                type="submit"
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-3 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer border-none text-xs shadow-md shadow-blue-500/20"
-              >
-                Continue to Step 2 <ArrowRight size={15} />
-              </button>
-            </form>
-          ) : (
-            <form onSubmit={handleSignup} className="space-y-3.5">
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">License / Reg Number (Optional)</label>
+                <label className="text-xs font-bold text-slate-700 block mb-1">Registration / License Number (Optional)</label>
                 <input
                   type="text"
                   value={regNo}
                   onChange={e => setRegNo(e.target.value)}
-                  placeholder="e.g. KA/HOS/2026/0452"
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none bg-slate-50"
+                  placeholder="e.g. TS/HOS/2026/1024"
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 bg-slate-50 font-medium"
                 />
               </div>
 
-              <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">Create Admin Password *</label>
-                <div className="relative">
-                  <input
-                    type={showPass ? 'text' : 'password'}
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    required
-                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none bg-slate-50 pr-10"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPass(!showPass)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer border-none bg-transparent"
-                  >
-                    {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">Confirm Password *</label>
-                <input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={e => setConfirmPassword(e.target.value)}
-                  placeholder="••••••••"
-                  required
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none bg-slate-50"
-                />
-              </div>
-
-              {error && (
-                <div className="flex items-center gap-2 bg-red-50 border border-red-100 text-red-600 px-3 py-2.5 rounded-xl text-xs font-semibold">
-                  <AlertCircle size={14} />
-                  {error}
-                </div>
-              )}
-
-              <div className="flex gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => setStep(1)}
-                  className="px-4 py-3 border border-slate-200 text-slate-600 font-bold rounded-xl text-xs cursor-pointer hover:bg-slate-50 border-none"
-                >
-                  Back
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-black py-3 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer border-none text-xs shadow-md shadow-emerald-500/20"
-                >
-                  {loading ? 'Creating Account...' : 'Complete Registration ✓'}
-                </button>
-              </div>
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full mt-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-bold py-3.5 px-6 rounded-2xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-blue-500/20 text-xs"
+              >
+                {loading ? (
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <>Send DLT OTP to Admin Phone <ArrowRight size={15} /></>
+                )}
+              </button>
             </form>
           )}
 
-          {/* Login Switch Link */}
+          {/* STEP 2: DLT OTP VERIFICATION */}
+          {step === 2 && (
+            <form onSubmit={handleVerifyAndSignup} className="space-y-5">
+              <div>
+                <div className="flex justify-between items-center mb-2">
+                  <label className="text-xs font-bold text-slate-700">Enter 6-Digit OTP</label>
+                  <button
+                    type="button"
+                    onClick={() => setStep(1)}
+                    className="text-xs text-blue-600 font-bold hover:underline cursor-pointer flex items-center gap-1 border-none bg-transparent"
+                  >
+                    <ArrowLeft size={12} />
+                    <span>Edit Hospital Details</span>
+                  </button>
+                </div>
+
+                <div className="flex gap-2 justify-between">
+                  {otpDigits.map((digit, idx) => (
+                    <input
+                      key={idx}
+                      id={`hosp-reg-otp-${idx}`}
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={1}
+                      value={digit}
+                      onChange={(e) => handleDigitChange(idx, e.target.value)}
+                      onKeyDown={(e) => handleKeyDown(idx, e)}
+                      onPaste={idx === 0 ? handlePaste : undefined}
+                      className="w-11 h-12 md:w-12 md:h-13 text-center text-lg font-black text-slate-800 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-600 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition-all shadow-xs"
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-xs text-slate-500">
+                {canResend ? (
+                  <button
+                    type="button"
+                    onClick={() => handleSendOtp()}
+                    disabled={loading}
+                    className="text-blue-600 font-bold hover:underline cursor-pointer border-none bg-transparent flex items-center gap-1"
+                  >
+                    <RefreshCw size={13} />
+                    <span>Resend OTP Code</span>
+                  </button>
+                ) : (
+                  <span className="text-slate-400 font-medium">
+                    Resend OTP in <strong className="text-slate-700 font-mono">{timer}s</strong>
+                  </span>
+                )}
+                <span className="text-[10px] text-slate-400 font-bold">Valid for 10 mins</span>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-bold py-3.5 px-6 rounded-2xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-blue-500/20 text-xs"
+              >
+                {loading ? (
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <>Verify OTP & Activate Hospital <ArrowRight size={15} /></>
+                )}
+              </button>
+            </form>
+          )}
+
           <div className="mt-6 pt-4 border-t border-slate-100 text-center text-xs">
-            <span className="text-slate-500 font-semibold">Already registered your hospital? </span>
+            <span className="text-slate-500 font-semibold">Already registered? </span>
             <button
               onClick={() => navigate('/hospital-login')}
               className="text-blue-600 font-extrabold hover:underline cursor-pointer border-none bg-transparent"
             >
-              Sign In
+              Sign In to Hospital Portal
             </button>
+          </div>
+
+          <div className="mt-4 text-center">
+            <a href="/#/" className="text-xs text-slate-400 hover:text-blue-600 transition-colors">
+              ← Back to Patient Portal
+            </a>
+          </div>
+
+          <div className="mt-6 text-center">
+            <div className="flex items-center justify-center gap-1.5 text-[10px] text-slate-400 font-bold">
+              <ShieldCheck size={13} className="text-emerald-500" />
+              <span>Passwordless Security &middot; DLT Template 1077385660092541347</span>
+            </div>
           </div>
         </div>
       </div>
-
-      {/* Hospital Registration OTP Verification Modal */}
-      <OTPModal
-        isOpen={showOtpModal}
-        email={email}
-        type="hospital_signup"
-        recipientName={hospName}
-        onSuccess={handleOtpSuccess}
-        onClose={() => setShowOtpModal(false)}
-        title="Hospital Registration OTP Verification"
-      />
     </div>
   );
 };

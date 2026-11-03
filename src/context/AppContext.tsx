@@ -4,6 +4,7 @@ import type { Hospital, Doctor, HealthArticle, CustomerAccount, MedicalRecord } 
 import { broadcastGlobalSync, subscribeGlobalSync, formatTimeSlot, fetchCloudSync } from '../utils/syncBus';
 import { geocodeLocation, reverseGeocode, reverseGeocodeAddressDetails } from '../utils/googleMaps';
 import type { GeoLocationDetails, BannerRecord } from '../utils/geoHierarchy';
+import { verifyCustomerOtpClient } from '../utils/otpService';
 
 export interface FamilyMember {
   id: string;
@@ -53,13 +54,16 @@ export interface Appointment {
   time: string;
   fee: number;
   platformFee?: number;
+  gatewayFee?: number;
+  gstFee?: number;
   totalFee?: number;
   status: 'booked' | 'checked-in' | 'in-cabin' | 'completed' | 'cancelled';
   paymentId: string;
   paymentMethod: string;
   estimatedWaitTime: number; // in minutes
   isExisting?: boolean;
-  rmpReference?: { name: string; phone: string } | null;
+  doctorReference?: { name: string; phone: string; place?: string } | null;
+  rmpReference?: { name: string; phone: string; place?: string } | null;
   ageDisplay?: string;
   ageUnit?: string;
   createdAt: string;
@@ -93,6 +97,7 @@ interface AppContextType {
   updateUserLocation: (locationName: string, coords?: { lat: number; lng: number }) => Promise<void>;
   getOrCreateCustomerAccount: (name: string, phone: string, email?: string) => CustomerAccount;
   login: (emailOrPhone: string, passwordOrOtp: string, optionalName?: string, isGoogleAuth?: boolean, googleProfile?: any) => Promise<boolean> | boolean;
+  loginWithPhoneOtp: (phone: string, otp: string, name?: string) => Promise<{ success: boolean; isNewUser?: boolean; needName?: boolean; message?: string }>;
   signup: (name: string, email: string, phone: string, password?: string) => Promise<boolean> | boolean;
   logout: () => void;
   addFamilyMember: (name: string, age: number, gender: string, relationship: string) => void;
@@ -112,7 +117,12 @@ interface AppContextType {
       email: string;
       address: string;
       isExisting?: boolean;
-      rmpReference?: { name: string; phone: string } | null;
+      rmpReference?: { name: string; phone: string; place?: string } | null;
+      doctorReference?: { name: string; phone: string; place?: string } | null;
+      platformFee?: number;
+      gatewayFee?: number;
+      gstFee?: number;
+      totalBookingCharges?: number;
       ageDisplay?: string;
       ageUnit?: string;
     },
@@ -1184,6 +1194,61 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return true;
   };
 
+  const loginWithPhoneOtp = async (phone: string, otp: string, name?: string): Promise<{ success: boolean; isNewUser?: boolean; needName?: boolean; message?: string }> => {
+    const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+    const res = await verifyCustomerOtpClient(cleanPhone, otp, name);
+
+    if (!res.success) {
+      throw new Error(res.message || 'OTP verification failed');
+    }
+
+    if (res.needName) {
+      return { success: true, needName: true, message: res.message };
+    }
+
+    if (res.customer) {
+      const cust = res.customer;
+      const profile: UserProfile = {
+        name: cust.name || 'Valued Patient',
+        email: cust.email || `${cleanPhone}@patient.instatoken.in`,
+        phone: cust.phone || `+91 ${cleanPhone}`,
+        role: 'patient',
+        savedHospitals: cust.savedHospitals || [],
+        savedDoctors: cust.savedDoctors || [],
+        familyMembers: cust.familyMembers || [],
+        subscription: cust.subscription || {
+          planName: "3-Day Pass",
+          expiresAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+          price: 10
+        },
+        location: cust.location,
+        lat: cust.lat,
+        lng: cust.lng
+      };
+
+      setUser(profile);
+      localStorage.setItem('insta_user', JSON.stringify(profile));
+
+      setCustomers(prev => {
+        const idx = prev.findIndex(c => c.id === cust.id || c.phone.replace(/\D/g, '').slice(-10) === cleanPhone);
+        let next;
+        if (idx !== -1) {
+          next = [...prev];
+          next[idx] = { ...next[idx], ...cust };
+        } else {
+          next = [cust, ...prev];
+        }
+        localStorage.setItem('insta_customers', JSON.stringify(next));
+        return next;
+      });
+
+      addNotification("Logged in Successfully", `Welcome, ${profile.name}!`, "success");
+      return { success: true, isNewUser: res.isNewUser };
+    }
+
+    return { success: true };
+  };
+
   const signup = async (name: string, email: string, phone: string, password?: string): Promise<boolean> => {
     const cleanName = name.trim();
     const cleanEmail = email.trim();
@@ -1323,7 +1388,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       email: string;
       address: string;
       isExisting?: boolean;
-      rmpReference?: { name: string; phone: string } | null;
+      rmpReference?: { name: string; phone: string; place?: string } | null;
+      doctorReference?: { name: string; phone: string; place?: string } | null;
+      platformFee?: number;
+      gatewayFee?: number;
+      gstFee?: number;
+      totalBookingCharges?: number;
       ageDisplay?: string;
       ageUnit?: string;
     },
@@ -1349,9 +1419,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const patientsAhead = Math.max(0, tokenAssigned - targetDoc.currentQueue - 1);
     const computedWaitTime = Math.max(0, patientsAhead * targetDoc.estimatedWaitPerPatient);
 
-    // Calculate dynamic platform fee (default 5% of doctor fee, min ₹10)
-    const platformFee = Math.max(10, Math.round(targetDoc.consultationFee * (platformFeePercent / 100)));
-    const totalFee = platformFee; // Only token fee collected online; consultation fee is paid at hospital
+    // Calculate dynamic booking charges breakdown matching Image 78
+    const baseConsultation = targetDoc.consultationFee || 500;
+    const platformFee = patientDetails.platformFee !== undefined
+      ? patientDetails.platformFee
+      : Math.max(10, Math.round(baseConsultation * (platformFeePercent / 100)));
+    const gatewayFee = patientDetails.gatewayFee !== undefined ? patientDetails.gatewayFee : 1.5;
+    const taxableAmount = platformFee + gatewayFee;
+    const gstFee = patientDetails.gstFee !== undefined ? patientDetails.gstFee : parseFloat((taxableAmount * 0.18).toFixed(2));
+    const totalFee = patientDetails.totalBookingCharges !== undefined
+      ? patientDetails.totalBookingCharges
+      : parseFloat((taxableAmount + gstFee).toFixed(2));
+
+    const ref = patientDetails.doctorReference || patientDetails.rmpReference || null;
 
     // Ensure customer account exists & is updated
     getOrCreateCustomerAccount(patientDetails.name, patientDetails.phone, patientDetails.email);
@@ -1374,13 +1454,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       time,
       fee: targetDoc.consultationFee,
       platformFee,
+      gatewayFee,
+      gstFee,
       totalFee,
       status: 'booked',
       paymentId: customPaymentId || `PAYID-${Math.floor(1000000 + Math.random() * 9000000)}`,
       paymentMethod,
       estimatedWaitTime: computedWaitTime,
       isExisting: Boolean(patientDetails.isExisting),
-      rmpReference: patientDetails.rmpReference || null,
+      doctorReference: ref,
+      rmpReference: ref,
       ageDisplay: patientDetails.ageDisplay || (patientDetails.age ? `${patientDetails.age} Yrs` : '28 Yrs'),
       ageUnit: patientDetails.ageUnit || 'Years',
       createdAt: new Date().toISOString()
@@ -1413,7 +1496,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       paymentMethod: 'Pay at Hospital',
       isRevisit: Boolean(patientDetails.isExisting),
       isExisting: Boolean(patientDetails.isExisting),
-      rmpReference: patientDetails.rmpReference || null,
+      doctorReference: ref,
+      rmpReference: ref,
       hospitalId
     };
 
@@ -2541,6 +2625,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       updateUserLocation,
       getOrCreateCustomerAccount,
       login,
+      loginWithPhoneOtp,
       signup,
       logout,
       addFamilyMember,

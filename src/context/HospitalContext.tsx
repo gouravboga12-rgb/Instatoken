@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useApp } from './AppContext';
 import type { Doctor } from '../utils/mockData';
 import { broadcastGlobalSync, subscribeGlobalSync } from '../utils/syncBus';
+import { verifyHospitalOtpLoginClient, verifyHospitalOtpSignupClient } from '../utils/otpService';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -11,6 +12,7 @@ export interface HospitalUser {
   id: string;
   name: string;
   email: string;
+  phone?: string;
   role: HospitalRole;
   hospitalId: string;
   hospitalName: string;
@@ -79,7 +81,8 @@ export interface TokenRecord {
   notes?: string;
   hospitalId?: string;
   isExisting?: boolean;
-  rmpReference?: { name: string; phone: string } | null;
+  doctorReference?: { name: string; phone: string; place?: string } | null;
+  rmpReference?: { name: string; phone: string; place?: string } | null;
   patientAgeDisplay?: string;
   patientAgeUnit?: string;
   hospitalName?: string;
@@ -208,6 +211,32 @@ export interface HospitalProfile {
   brandColor: string;
 }
 
+export interface DoctorReferenceRecord {
+  id: string;
+  hospitalId?: string;
+  name: string;
+  phone: string;
+  place: string;
+  qualification?: string;
+  status: 'active' | 'inactive';
+  registeredDate: string;
+  notes?: string;
+  avatar?: string;
+}
+
+export const INITIAL_DOCTOR_REFERENCES: DoctorReferenceRecord[] = [
+  { id: 'doc-ref-1', name: 'Dr. Srinivas', phone: '98765 43210', place: 'Adoni', qualification: 'RMP / General Practitioner', status: 'active', registeredDate: '2026-10-12', notes: 'Primary rural healthcare partner' },
+  { id: 'doc-ref-2', name: 'Dr. Ramesh', phone: '91234 56789', place: 'Yemmiganur', qualification: 'RMP', status: 'active', registeredDate: '2026-10-10', notes: 'Community clinic referral' },
+  { id: 'doc-ref-3', name: 'Dr. Mahesh', phone: '99887 66554', place: 'Mantralayam', qualification: 'RMP', status: 'active', registeredDate: '2026-10-08', notes: 'Pilgrim town clinic' },
+  { id: 'doc-ref-4', name: 'Dr. Prasad', phone: '98761 23456', place: 'Allagadda', qualification: 'RMP', status: 'active', registeredDate: '2026-10-05', notes: 'Mandal referral' },
+  { id: 'doc-ref-5', name: 'Dr. Shankar', phone: '90123 45678', place: 'Kurnool', qualification: 'RMP / MBBS', status: 'active', registeredDate: '2026-10-01', notes: 'City clinic' },
+  { id: 'doc-ref-6', name: 'Dr. Naresh', phone: '93456 78901', place: 'Gadivemula', qualification: 'RMP', status: 'active', registeredDate: '2026-09-28', notes: 'Rural primary care' },
+  { id: 'doc-ref-7', name: 'Dr. Imran', phone: '97012 34567', place: 'Adoni Rural', qualification: 'RMP', status: 'active', registeredDate: '2026-09-25', notes: 'Sub-district clinic' },
+  { id: 'doc-ref-8', name: 'Dr. Lakshman', phone: '90321 65489', place: 'Pattikonda', qualification: 'RMP', status: 'active', registeredDate: '2026-09-20', notes: 'Pattikonda junction clinic' },
+  { id: 'doc-ref-9', name: 'Dr. Saleem', phone: '96123 49876', place: 'Holagunda', qualification: 'RMP', status: 'active', registeredDate: '2026-09-18', notes: 'Border village clinic' },
+  { id: 'doc-ref-10', name: 'Dr. Raju', phone: '99882 33445', place: 'Nandyal', qualification: 'RMP', status: 'active', registeredDate: '2026-09-15', notes: 'Regional practitioner' },
+];
+
 // ─── Context type ─────────────────────────────────────────────────────────────
 
 interface HospitalContextType {
@@ -217,6 +246,7 @@ interface HospitalContextType {
   doctors: HospitalDoctor[];
   tokens: TokenRecord[];
   patients: PatientRecord[];
+  doctorReferences: DoctorReferenceRecord[];
   scheduleConfig: ScheduleConfig;
   notifications: NotificationMessage[];
   activeSection: string;
@@ -224,6 +254,8 @@ interface HospitalContextType {
 
   // Auth
   hospitalLogin: (email: string, password: string) => Promise<{ success: boolean; message: string }> | { success: boolean; message: string };
+  hospitalLoginWithOtp: (phone: string, otp: string) => Promise<{ success: boolean; message: string }>;
+  hospitalSignupWithOtp: (formData: any) => Promise<{ success: boolean; message: string }>;
   hospitalLogout: () => void;
 
   // Navigation
@@ -256,10 +288,22 @@ interface HospitalContextType {
     session: 'morning' | 'afternoon' | 'evening';
     isRevisit?: boolean;
     isExisting?: boolean;
-    rmpReference?: { name: string; phone: string } | null;
+    doctorReference?: { name: string; phone: string; place?: string } | null;
+    rmpReference?: { name: string; phone: string; place?: string } | null;
+    paymentStatus?: 'paid' | 'pending';
+    paymentMethod?: 'Online' | 'Cash' | string;
     notes?: string;
   }) => TokenRecord;
-  updateTokenStatus: (id: string, status: TokenRecord['status']) => void;
+  updateTokenStatus: (
+    id: string, 
+    status: TokenRecord['status'],
+    paymentUpdates?: { paymentStatus?: 'paid' | 'pending' | 'refunded'; paymentMethod?: string }
+  ) => void;
+  updateTokenPayment: (
+    id: string,
+    paymentStatus: 'paid' | 'pending' | 'refunded',
+    paymentMethod: string
+  ) => void;
   cancelToken: (id: string) => void;
   deleteToken: (id: string) => void;
 
@@ -288,6 +332,11 @@ interface HospitalContextType {
   updateHospitalProfile: (updates: Partial<HospitalProfile>) => void;
   switchHospital: (hospitalId: string) => void;
   availableHospitals: { id: string; name: string; category?: string }[];
+
+  // Doctor References & Referrals
+  addDoctorReference: (ref: Omit<DoctorReferenceRecord, 'id' | 'registeredDate'>) => void;
+  updateDoctorReference: (id: string, updates: Partial<DoctorReferenceRecord>) => void;
+  deleteDoctorReference: (id: string) => void;
 
   // Phase 20-22 Additions: Access Control, Backend Revenue & Patients
   authToken: string;
@@ -738,6 +787,55 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return localStorage.getItem('insta_hospital_auth_token') || `htok_${targetHospId}_default`;
   });
 
+  // Doctor References State & Operations
+  const [doctorReferences, setDoctorReferences] = useState<DoctorReferenceRecord[]>(() => {
+    const curHospId = targetHospId || localStorage.getItem('insta_current_hospital_id') || 'hosp-apollo';
+    try {
+      const saved = localStorage.getItem(`insta_hospital_doctor_references_${curHospId}`);
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return INITIAL_DOCTOR_REFERENCES;
+  });
+
+  const addDoctorReference = (refData: Omit<DoctorReferenceRecord, 'id' | 'registeredDate'>) => {
+    const curHospId = targetHospId || localStorage.getItem('insta_current_hospital_id') || 'hosp-apollo';
+    const newRecord: DoctorReferenceRecord = {
+      ...refData,
+      id: `doc-ref-${Date.now()}`,
+      hospitalId: curHospId,
+      registeredDate: new Date().toISOString().split('T')[0]
+    };
+    setDoctorReferences(prev => {
+      const next = [newRecord, ...prev];
+      try {
+        localStorage.setItem(`insta_hospital_doctor_references_${curHospId}`, JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
+  };
+
+  const updateDoctorReference = (id: string, updates: Partial<DoctorReferenceRecord>) => {
+    const curHospId = targetHospId || localStorage.getItem('insta_current_hospital_id') || 'hosp-apollo';
+    setDoctorReferences(prev => {
+      const next = prev.map(d => d.id === id ? { ...d, ...updates } : d);
+      try {
+        localStorage.setItem(`insta_hospital_doctor_references_${curHospId}`, JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
+  };
+
+  const deleteDoctorReference = (id: string) => {
+    const curHospId = targetHospId || localStorage.getItem('insta_current_hospital_id') || 'hosp-apollo';
+    setDoctorReferences(prev => {
+      const next = prev.filter(d => d.id !== id);
+      try {
+        localStorage.setItem(`insta_hospital_doctor_references_${curHospId}`, JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
+  };
+
   // Dynamic fetch of hospital patients strictly for current hospital (Phase 20)
   const fetchPatients = async (doctorId?: string, search?: string, status?: string): Promise<PatientRecord[]> => {
     try {
@@ -1158,6 +1256,66 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return { success: true, message: 'Login successful.' };
   };
 
+  const hospitalLoginWithOtp = async (phone: string, otp: string): Promise<{ success: boolean; message: string }> => {
+    try {
+      const res = await verifyHospitalOtpLoginClient(phone, otp);
+      if (!res.success || !res.token || !res.user) {
+        return { success: false, message: res.message || 'Hospital OTP login failed.' };
+      }
+
+      setAuthToken(res.token);
+      localStorage.setItem('insta_hospital_auth_token', res.token);
+      const u: HospitalUser = {
+        id: res.user.id,
+        name: res.user.name,
+        email: res.user.email,
+        phone: res.user.phone,
+        role: res.user.role,
+        hospitalId: res.user.hospitalId,
+        hospitalName: res.user.hospitalName,
+        avatar: '',
+        isOnline: true
+      };
+      setHospitalUser(u);
+      localStorage.setItem('insta_hospital_user', JSON.stringify(u));
+      localStorage.setItem('insta_current_hospital_id', res.user.hospitalId);
+      switchHospital(res.user.hospitalId);
+      return { success: true, message: 'Login successful' };
+    } catch (err: any) {
+      return { success: false, message: err?.message || 'Login failed.' };
+    }
+  };
+
+  const hospitalSignupWithOtp = async (formData: any): Promise<{ success: boolean; message: string }> => {
+    try {
+      const res = await verifyHospitalOtpSignupClient(formData);
+      if (!res.success || !res.token || !res.user) {
+        return { success: false, message: res.message || 'Hospital registration failed.' };
+      }
+
+      setAuthToken(res.token);
+      localStorage.setItem('insta_hospital_auth_token', res.token);
+      const u: HospitalUser = {
+        id: res.user.id,
+        name: res.user.name,
+        email: res.user.email,
+        phone: res.user.phone,
+        role: res.user.role,
+        hospitalId: res.user.hospitalId,
+        hospitalName: res.user.hospitalName,
+        avatar: '',
+        isOnline: true
+      };
+      setHospitalUser(u);
+      localStorage.setItem('insta_hospital_user', JSON.stringify(u));
+      localStorage.setItem('insta_current_hospital_id', res.user.hospitalId);
+      switchHospital(res.user.hospitalId);
+      return { success: true, message: 'Registration successful' };
+    } catch (err: any) {
+      return { success: false, message: err?.message || 'Registration failed.' };
+    }
+  };
+
   const hospitalLogout = () => {
     setHospitalUser(null);
     setAuthToken('');
@@ -1548,7 +1706,10 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     session: 'morning' | 'afternoon' | 'evening';
     isRevisit?: boolean;
     isExisting?: boolean;
-    rmpReference?: { name: string; phone: string } | null;
+    doctorReference?: { name: string; phone: string; place?: string } | null;
+    rmpReference?: { name: string; phone: string; place?: string } | null;
+    paymentStatus?: 'paid' | 'pending';
+    paymentMethod?: 'Online' | 'Cash' | string;
     notes?: string;
   }): TokenRecord => {
     const maxToken = tokens.length > 0 ? Math.max(...tokens.map(t => t.tokenNo || 0)) : 0;
@@ -1559,6 +1720,11 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const timeStr = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
 
     const resolvedHospitalName = hospitalProfile?.name || hospitals.find(h => h.id === targetHospId)?.name || 'Hospital';
+
+    const ref = form.doctorReference || form.rmpReference || null;
+
+    const resolvedPaymentStatus = form.paymentStatus || 'paid';
+    const resolvedPaymentMethod = form.paymentMethod || (resolvedPaymentStatus === 'pending' ? 'Unpaid / Pending' : 'Online');
 
     const newToken: TokenRecord = {
       id: `tok-${Date.now()}`,
@@ -1581,11 +1747,12 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       queuePosition: waitingInSession + 1,
       estimatedWait: (waitingInSession + 1) * (doctor?.consultationDuration || 12),
       consultationFee: doctor?.consultationFee || 0,
-      paymentStatus: 'pending',
-      paymentMethod: 'Cash',
+      paymentStatus: resolvedPaymentStatus,
+      paymentMethod: resolvedPaymentMethod,
       isRevisit: Boolean(form.isRevisit || form.isExisting),
       isExisting: Boolean(form.isExisting || form.isRevisit),
-      rmpReference: form.rmpReference || null,
+      doctorReference: ref,
+      rmpReference: ref,
       hospitalId: targetHospId,
       hospitalName: resolvedHospitalName
     };
@@ -1638,7 +1805,8 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         paymentMethod: 'Counter / Walk-in Cash',
         estimatedWaitTime: newToken.estimatedWait,
         isExisting: Boolean(newToken.isExisting),
-        rmpReference: newToken.rmpReference || null,
+        doctorReference: ref,
+        rmpReference: ref,
         createdAt: new Date().toISOString()
       };
       localStorage.setItem('insta_appointments', JSON.stringify([newAppt, ...curAppts]));
@@ -1711,7 +1879,11 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return newToken;
   };
 
-  const updateTokenStatus = (id: string, status: TokenRecord['status']) => {
+  const updateTokenStatus = (
+    id: string, 
+    status: TokenRecord['status'],
+    paymentUpdates?: { paymentStatus?: 'paid' | 'pending' | 'refunded'; paymentMethod?: string }
+  ) => {
     const targetToken = tokens.find(t => t.id === id);
     const targetTokenNo = targetToken?.tokenNo || (targetToken as any)?.tokenNumber;
     const targetDoctorId = targetToken?.doctorId;
@@ -1720,7 +1892,10 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const updated = prev.map(t => t.id === id ? {
         ...t,
         status,
-        paymentStatus: status === 'cancelled' ? ('refunded' as const) : status === 'completed' ? ('paid' as const) : t.paymentStatus
+        paymentStatus: paymentUpdates?.paymentStatus 
+          ? paymentUpdates.paymentStatus 
+          : (status === 'cancelled' ? ('refunded' as const) : status === 'completed' ? ('paid' as const) : t.paymentStatus),
+        paymentMethod: paymentUpdates?.paymentMethod ? paymentUpdates.paymentMethod : t.paymentMethod
       } : t);
       localStorage.setItem('insta_hospital_tokens', JSON.stringify(updated));
       localStorage.setItem(`insta_hospital_tokens_${targetHospId}`, JSON.stringify(updated));
@@ -1791,13 +1966,43 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${authToken}`
       },
-      body: JSON.stringify({ status })
+      body: JSON.stringify({ 
+        status,
+        ...(paymentUpdates || {})
+      })
     }).catch(() => {});
 
     fetch(`/api/appointments/${id}/status`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: apptStatus })
+    }).catch(() => {});
+  };
+
+  const updateTokenPayment = (
+    id: string,
+    paymentStatus: 'paid' | 'pending' | 'refunded',
+    paymentMethod: string
+  ) => {
+    setTokens(prev => {
+      const updated = prev.map(t => t.id === id ? {
+        ...t,
+        paymentStatus,
+        paymentMethod
+      } : t);
+      localStorage.setItem('insta_hospital_tokens', JSON.stringify(updated));
+      localStorage.setItem(`insta_hospital_tokens_${targetHospId}`, JSON.stringify(updated));
+      broadcastGlobalSync('HOSPITAL_TOKENS_UPDATED', updated);
+      return updated;
+    });
+
+    fetch(`/api/hospitals/${targetHospId}/tokens/${id}/status`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify({ paymentStatus, paymentMethod })
     }).catch(() => {});
   };
 
@@ -2274,18 +2479,22 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     <HospitalContext.Provider value={{
       hospitalUser, hospitalProfile, departments, doctors, staff, tokens, patients,
       scheduleConfig, notifications, activeSection, sidebarCollapsed,
-      hospitalLogin, hospitalLogout,
+      hospitalLogin, hospitalLoginWithOtp, hospitalSignupWithOtp, hospitalLogout,
       setActiveSection, setSidebarCollapsed,
       addDoctor, updateDoctor, deleteDoctor, toggleDoctorActive,
       addDepartment, updateDepartment, deleteDepartment, toggleDepartmentActive,
       addStaffMember, updateStaffMember, deleteStaffMember, markStaffAttendance,
-      generateWalkInToken, updateTokenStatus, cancelToken, deleteToken,
+      generateWalkInToken, updateTokenStatus, updateTokenPayment, cancelToken, deleteToken,
       addPatient, updatePatient, searchPatients, validateToken,
       updateScheduleConfig, updateSession,
       sendNotification, clearHospitalNotifications,
       updateHospitalProfile,
       switchHospital,
       availableHospitals,
+      doctorReferences,
+      addDoctorReference,
+      updateDoctorReference,
+      deleteDoctorReference,
       authToken,
       fetchPatients,
       fetchHospitalRevenue

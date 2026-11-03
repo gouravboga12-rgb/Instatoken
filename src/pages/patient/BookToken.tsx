@@ -6,8 +6,8 @@ import { Button } from '../../components/ui/Button';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
   ArrowLeft, Calendar as CalendarIcon, Clock, User, Phone, 
-  MapPin, ShieldCheck, Sun, Moon, Ticket, ArrowRight, Zap, Users,
-  ChevronDown, Heart, Stethoscope, UserX
+  MapPin, ShieldCheck, Sun, Moon, Zap, Users,
+  ChevronDown, Heart, Stethoscope, UserX, Receipt, Info, Lock, Building2
 } from 'lucide-react';
 
 const monthsList = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -245,6 +245,7 @@ export const BookToken: React.FC = () => {
   const [showRmpFields, setShowRmpFields] = useState(false);
   const [rmpName, setRmpName] = useState('');
   const [rmpPhone, setRmpPhone] = useState('');
+  const [rmpPlace, setRmpPlace] = useState('');
   
   const [error, setError] = useState('');
 
@@ -400,6 +401,19 @@ export const BookToken: React.FC = () => {
     const ageVal = parseInt(age) || 0;
     const computedAgeDisplay = age ? `${age} ${ageUnit}` : '28 Years';
 
+    const docFee = doctor.consultationFee || 500;
+    const platFee = Math.max(10, Math.round(docFee * ((platformFeePercent || 5) / 100)));
+    const gatewayFee = 1.5;
+    const taxableSum = platFee + gatewayFee;
+    const gstFee = parseFloat((taxableSum * 0.18).toFixed(2));
+    const totalPayable = parseFloat((taxableSum + gstFee).toFixed(2));
+
+    const ref = showRmpFields && rmpName.trim() ? { 
+      name: rmpName.trim(), 
+      phone: rmpPhone.trim(), 
+      place: rmpPlace.trim() || place.trim() || 'Adoni' 
+    } : null;
+
     const patientDetails = {
       name,
       age: ageVal,
@@ -410,16 +424,18 @@ export const BookToken: React.FC = () => {
       email: user?.email || 'patient@example.com',
       address: place,
       isExisting,
-      rmpReference: showRmpFields ? { name: rmpName, phone: rmpPhone } : null
+      doctorReference: ref,
+      rmpReference: ref,
+      platformFee: platFee,
+      gatewayFee,
+      gstFee,
+      totalBookingCharges: totalPayable
     };
 
     const activeSessionObj = sessionOptions.find(s => s.id === selectedSession);
     const slotTime = activeSessionObj ? `${activeSessionObj.title} (${activeSessionObj.timing})` : '10:00 AM - 12:00 PM';
 
-    const docFee = doctor.consultationFee || 500;
-    const platFee = Math.max(10, Math.round(docFee * ((platformFeePercent || 5) / 100)));
-
-    // Navigate to Razorpay/UPI Payment Gateway - only collecting token fee online
+    // Navigate to Razorpay/UPI Payment Gateway - collecting online token charges including GST
     navigate('/payment', {
       state: {
         patientDetails,
@@ -428,8 +444,12 @@ export const BookToken: React.FC = () => {
         date: selectedDate,
         time: slotTime,
         fee: docFee,
-        tokenFee: platFee,
-        subscriptionPlan: { name: "OPD Token Booking Fee", price: platFee, days: 3 }
+        tokenFee: totalPayable,
+        platformFee: platFee,
+        gatewayFee,
+        gstFee,
+        totalBookingCharges: totalPayable,
+        subscriptionPlan: { name: "InstaToken Booking Charges", price: totalPayable, days: 3 }
       }
     });
   };
@@ -777,24 +797,34 @@ export const BookToken: React.FC = () => {
                 </div>
 
                 {showRmpFields && (
-                  <div className="grid grid-cols-2 gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200 animate-in fade-in duration-150">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 bg-slate-50 p-3 rounded-2xl border border-slate-200 animate-in fade-in duration-150">
                     <div>
-                      <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">Referring Doctor Name</label>
+                      <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">Referring Doctor Name *</label>
                       <input 
                         type="text" 
                         value={rmpName} 
                         onChange={(e) => setRmpName(e.target.value)}
-                        placeholder="Dr. Doctor name"
+                        placeholder="Dr. Srinivas / Doctor Name"
                         className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold focus:border-blue-600 outline-none"
                       />
                     </div>
                     <div>
-                      <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">Doctor Phone Number</label>
+                      <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">Doctor Mobile Number</label>
                       <input 
                         type="tel" 
                         value={rmpPhone} 
                         onChange={(e) => setRmpPhone(e.target.value)}
-                        placeholder="10-digit phone"
+                        placeholder="10-digit mobile"
+                        className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold focus:border-blue-600 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">Place / Village</label>
+                      <input 
+                        type="text" 
+                        value={rmpPlace} 
+                        onChange={(e) => setRmpPlace(e.target.value)}
+                        placeholder="e.g. Adoni, Yemmiganur"
                         className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold focus:border-blue-600 outline-none"
                       />
                     </div>
@@ -804,87 +834,103 @@ export const BookToken: React.FC = () => {
             </div>
           </div>
 
-          {/* Clear fee breakdown matching Image 48 */}
+          {/* Exact fee breakdown matching Image copy 78.png */}
           {(() => {
             const docFee = doctor.consultationFee || 500;
             const platFee = Math.max(10, Math.round(docFee * ((platformFeePercent || 5) / 100)));
+            const gatewayFee = 1.5;
+            const taxableSum = platFee + gatewayFee;
+            const gstFee = parseFloat((taxableSum * 0.18).toFixed(2));
+            const totalPayable = parseFloat((taxableSum + gstFee).toFixed(2));
 
             return (
-              <div className="p-3.5 bg-gradient-to-r from-blue-50/70 to-indigo-50/70 border border-blue-100 rounded-2xl space-y-2 text-xs font-bold text-slate-800">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-slate-600">
-                    <Stethoscope size={13} className="text-blue-600" />
-                    <span className="text-[11px]">Doctor Consultation Fee</span>
+              <div className="space-y-3">
+                {/* 1. Doctor Consultation Fee (Green Card) */}
+                <div className="bg-emerald-50/80 border border-emerald-200/90 rounded-2xl p-3.5 sm:p-4 flex items-center justify-between shadow-2xs">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                      <Stethoscope size={20} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <h4 className="text-sm font-black text-slate-900">Doctor Consultation Fee</h4>
+                        <Info size={13} className="text-slate-400" />
+                      </div>
+                      <p className="text-[11px] text-slate-500 font-semibold mt-0.5">Pay directly at the hospital.</p>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-extrabold text-slate-900 text-xs">₹{docFee}</span>
-                    <span className="text-[9px] font-extrabold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
-                      Pay at Hospital
+
+                  <div className="text-right">
+                    <span className="text-lg font-black text-slate-900 font-heading block">₹{docFee.toFixed(2)}</span>
+                    <span className="inline-flex items-center gap-1 bg-emerald-700 text-white text-[9px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider mt-0.5">
+                      <Building2 size={10} /> Pay at Hospital
                     </span>
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-blue-700">
-                    <Zap size={13} className="text-blue-600" />
-                    <span className="text-[11px]">Platform Booking Fee ({platformFeePercent || 5}%)</span>
+                {/* 2. InstaToken Booking Charges with 18% GST (Blue Card) */}
+                <div className="bg-blue-50/60 border border-blue-200/90 rounded-2xl p-4 space-y-3 shadow-2xs">
+                  <div className="flex items-center gap-3 pb-3 border-b border-blue-100">
+                    <div className="w-10 h-10 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+                      <Receipt size={20} />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-black text-slate-900">InstaToken Booking Charges</h4>
+                      <p className="text-[11px] text-slate-500 font-medium">This is for our token booking service.</p>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-extrabold text-blue-700 text-xs">₹{platFee}</span>
-                    <span className="text-[9px] font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
-                      Pay Online Now
-                    </span>
+
+                  <div className="space-y-2.5 text-xs">
+                    <div className="flex justify-between items-center text-slate-700 font-bold">
+                      <div className="flex items-center gap-1.5">
+                        <span>Platform Fee ({platformFeePercent || 5}%)</span>
+                        <Info size={12} className="text-slate-400" />
+                      </div>
+                      <span className="font-black text-slate-900">₹{platFee.toFixed(2)}</span>
+                    </div>
+
+                    <div className="flex justify-between items-center text-slate-700 font-bold border-t border-blue-100/60 pt-2.5">
+                      <div className="flex items-center gap-1.5">
+                        <span>Payment Gateway Fee</span>
+                        <Info size={12} className="text-slate-400" />
+                      </div>
+                      <span className="font-black text-slate-900">₹{gatewayFee.toFixed(2)}</span>
+                    </div>
+
+                    <div className="flex justify-between items-center text-slate-700 font-bold border-t border-blue-100/60 pt-2.5">
+                      <div className="flex items-center gap-1.5">
+                        <span>GST (18% on ₹{taxableSum.toFixed(2)})</span>
+                        <Info size={12} className="text-slate-400" />
+                      </div>
+                      <span className="font-black text-slate-900">₹{gstFee.toFixed(2)}</span>
+                    </div>
+
+                    <div className="flex justify-between items-center border-t border-blue-200 pt-3">
+                      <div>
+                        <span className="text-sm font-black text-slate-900 block leading-tight">Total Payable Now</span>
+                        <span className="text-[10px] text-slate-500 font-semibold">(InstaToken Booking Charges)</span>
+                      </div>
+                      <span className="text-2xl font-black text-blue-700 font-heading">₹{totalPayable.toFixed(2)}</span>
+                    </div>
                   </div>
                 </div>
 
-                <div className="pt-2 border-t border-blue-200/60 flex items-center justify-between text-xs">
-                  <div>
-                    <span className="font-black text-slate-900 block text-xs">Total Payable Now</span>
-                    <span className="text-[9px] text-slate-500 font-medium">Token fee only • Consultation fee of ₹{docFee} payable at hospital</span>
-                  </div>
-                  <span className="font-black text-blue-700 text-base">₹{platFee}</span>
-                </div>
+                {/* 3. Big Action Button matching Image 78 */}
+                <button 
+                  type="submit"
+                  disabled={!isDoctorOnlineAvailable}
+                  className={`w-full py-4 px-6 rounded-2xl flex items-center justify-center gap-2 font-black text-sm text-white shadow-lg transition-all cursor-pointer ${
+                    !isDoctorOnlineAvailable
+                      ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none'
+                      : 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/25 transform hover:scale-[1.01] active:scale-[0.99]'
+                  }`}
+                >
+                  <Lock size={16} />
+                  <span>Pay ₹{totalPayable.toFixed(2)} and Confirm Booking →</span>
+                </button>
               </div>
             );
           })()}
-
-          {/* Big prominent Book button matching Image 48 */}
-          <button 
-            type="submit"
-            disabled={!isDoctorOnlineAvailable}
-            className={`w-full rounded-full p-2 flex items-center justify-between shadow-lg transition-all ${
-              !isDoctorOnlineAvailable
-                ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none'
-                : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/25 cursor-pointer transform hover:scale-[1.01] active:scale-[0.99]'
-            }`}
-          >
-            {/* Left Ticket Circle */}
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 shadow-inner ${
-              !isDoctorOnlineAvailable ? 'bg-slate-200 text-slate-400' : 'bg-white text-blue-600'
-            }`}>
-              <Ticket size={20} />
-            </div>
-
-            {/* Center Text */}
-            <div className="text-center px-2">
-              <h4 className="text-sm font-black tracking-tight leading-tight">
-                {!isDoctorOnlineAvailable 
-                  ? 'Doctor Unavailable for Booking' 
-                  : `Book Token • Pay ₹${Math.max(10, Math.round((doctor.consultationFee || 500) * ((platformFeePercent || 5) / 100)))}`
-                }
-              </h4>
-              <p className={`text-[9.5px] font-medium ${!isDoctorOnlineAvailable ? 'text-slate-500' : 'text-blue-100'}`}>
-                {!isDoctorOnlineAvailable ? 'Consultations suspended by clinic' : 'OPD spot confirmed • Doctor fee payable at hospital'}
-              </p>
-            </div>
-
-            {/* Right Arrow Circle */}
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 shadow-inner ${
-              !isDoctorOnlineAvailable ? 'bg-slate-200 text-slate-400' : 'bg-white text-blue-600'
-            }`}>
-              <ArrowRight size={20} />
-            </div>
-          </button>
 
           {/* Bottom Trust Indicators */}
           <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-200/60 text-center">

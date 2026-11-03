@@ -45,11 +45,54 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
   // --- Add Hospital Form State ---
   const [hospName, setHospName] = useState('');
   const [hospCat, setHospCat] = useState('Multi Speciality');
+  const [hospCity, setHospCity] = useState('');
+  const [hospArea, setHospArea] = useState('');
   const [hospAddress, setHospAddress] = useState('');
   const [hospAbout, setHospAbout] = useState('');
   const [hospContact, setHospContact] = useState('');
   const [hospCommission, setHospCommission] = useState('10');
   const hospTimings = '09:00 AM - 05:00 PM';
+
+  // Helper to cleanly format City, Village and Area Name for Super Admin view (Image 77)
+  const getHospitalLocationDisplay = (hosp: any): string => {
+    if (hosp.city && (hosp.area || hosp.village)) {
+      return `${hosp.city}, ${hosp.area || hosp.village}`;
+    }
+    if (hosp.city) return hosp.city;
+    if (!hosp.address) return 'Adoni';
+
+    const raw = String(hosp.address).trim();
+    const lower = raw.toLowerCase();
+
+    // Map known addresses to clean City, Village / Area Name
+    if (lower.includes('ramkrishna') || lower.includes('kothapet') || lower.includes('pratap nagar')) {
+      return 'Hyderabad, Kothapet';
+    }
+    if (lower.includes('rotary nagar')) {
+      return 'Adoni, Rotary Nagar';
+    }
+    if (lower.includes('new bustand') || lower.includes('bus stand')) {
+      return 'Adoni, Near New Bus Stand';
+    }
+    if (lower.includes('skd colony')) {
+      return 'Adoni, SKD Colony';
+    }
+
+    const parts = raw.split(',').map((p: string) => p.trim()).filter(Boolean);
+    if (parts.length >= 2) {
+      const cityCandidates = ['adoni', 'hyderabad', 'kurnool', 'bengaluru', 'bangalore', 'yemmiganur', 'nandyal', 'mantralayam', 'allagadda'];
+      const foundCityIndex = parts.findIndex((p: string) => cityCandidates.some(c => p.toLowerCase().includes(c)));
+      if (foundCityIndex !== -1) {
+        const cityPart = parts[foundCityIndex];
+        const areaParts = parts.filter((_, idx) => idx !== foundCityIndex && !parts[idx].match(/^\d+/) && !parts[idx].toLowerCase().includes('india') && !parts[idx].match(/\b\d{6}\b/));
+        const areaPart = areaParts[0] || '';
+        return areaPart ? `${cityPart}, ${areaPart}` : cityPart;
+      }
+      return `${parts[parts.length - 2]}, ${parts[0]}`;
+    }
+
+    return raw;
+  };
   
   // --- Add Doctor Form State ---
   const [selectedHospId, setSelectedHospId] = useState(hospitals[0]?.id || '');
@@ -189,6 +232,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
     addHospital({
       name: hospName,
       category: hospCat,
+      city: hospCity || 'Adoni',
+      area: hospArea || '',
+      village: hospArea || '',
       address: hospAddress,
       about: hospAbout,
       contact: hospContact,
@@ -220,6 +266,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
 
     // Reset Form
     setHospName('');
+    setHospCity('');
+    setHospArea('');
     setHospAddress('');
     setHospAbout('');
     setHospContact('');
@@ -950,7 +998,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                   <thead className="bg-slate-50 border-b border-slate-100 text-[10px] font-black text-slate-500 uppercase tracking-wider">
                     <tr>
                       <th className="px-5 py-3.5">Hospital Name</th>
-                      <th className="px-5 py-3.5">Location</th>
+                      <th className="px-5 py-3.5">City, Village & Area</th>
                       <th className="px-5 py-3.5 text-center">Doctors</th>
                       <th className="px-5 py-3.5 text-center">Today's Tokens</th>
                       <th className="px-5 py-3.5">Revenue</th>
@@ -983,9 +1031,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                             </div>
                           </td>
                           <td className="px-5 py-3.5">
-                            <div className="flex items-center gap-1.5 text-slate-600 font-bold text-xs">
+                            <div className="flex items-center gap-1.5 text-slate-700 font-bold text-xs">
                               <MapPin size={12} className="text-blue-500 shrink-0" />
-                              <span>{hosp.address ? hosp.address.split(',')[1]?.trim() || hosp.address.split(',')[0] : 'Adoni'}</span>
+                              <span className="font-extrabold text-slate-800">{getHospitalLocationDisplay(hosp)}</span>
                             </div>
                           </td>
                           <td className="px-5 py-3.5 text-center font-bold text-slate-700">
@@ -1246,7 +1294,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                     <tr>
                       <th className="px-4 py-3.5">Hospital</th>
                       <th className="px-4 py-3.5">Contact Details</th>
-                      <th className="px-4 py-3.5">Hospital Address</th>
+                      <th className="px-4 py-3.5">City, Village & Area</th>
                       <th className="px-4 py-3.5">Call Option</th>
                       <th className="px-4 py-3.5">Doctors & Fee</th>
                       <th className="px-4 py-3.5">Status</th>
@@ -1307,11 +1355,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                               </div>
                             </td>
 
-                            {/* Full Address */}
+                            {/* City, Village & Area */}
                             <td className="px-4 py-3.5">
-                              <div className="flex items-start gap-1.5 text-[11px] text-slate-600 max-w-[240px] leading-snug">
-                                <MapPin size={13} className="text-rose-500 shrink-0 mt-0.5" />
-                                <span>{hosp.address || 'Address not specified'}</span>
+                              <div className="space-y-0.5 max-w-[240px]">
+                                <div className="flex items-center gap-1.5 text-xs font-black text-slate-800">
+                                  <MapPin size={13} className="text-rose-500 shrink-0" />
+                                  <span>{getHospitalLocationDisplay(hosp)}</span>
+                                </div>
+                                {hosp.address && (
+                                  <span className="text-[10px] text-slate-400 block truncate pl-4.5">
+                                    {hosp.address}
+                                  </span>
+                                )}
                               </div>
                             </td>
 
@@ -2233,12 +2288,36 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wide">Street Address</label>
+                  <label className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wide">City / Town *</label>
+                  <input 
+                    type="text" 
+                    value={hospCity}
+                    onChange={(e) => setHospCity(e.target.value)}
+                    placeholder="e.g. Adoni, Hyderabad"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:bg-white"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wide">Village / Area Name *</label>
+                  <input 
+                    type="text" 
+                    value={hospArea}
+                    onChange={(e) => setHospArea(e.target.value)}
+                    placeholder="e.g. SKD Colony, Rotary Nagar"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:bg-white"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wide">Street Address (Door / Landmark)</label>
                   <input 
                     type="text" 
                     value={hospAddress}
                     onChange={(e) => setHospAddress(e.target.value)}
-                    placeholder="e.g. Jayanagar 4th Block, Bengaluru"
+                    placeholder="e.g. Near New Bus Stand, Main Road"
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:bg-white"
                   />
                 </div>

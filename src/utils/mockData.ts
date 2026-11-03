@@ -62,6 +62,9 @@ export interface Hospital {
   website?: string;
   lat: number;
   lng: number;
+  city?: string;
+  village?: string;
+  area?: string;
   status?: 'active' | 'disabled';
 }
 
@@ -250,6 +253,9 @@ export const HOSPITALS: Hospital[] = [
     distance: 1.8,
     baseWaitingTime: 20,
     address: "15-57/2, RAMkrishna Raju Residency, Pratap Nagar, Kothapet, Hyderabad, Telangana 500060, India",
+    city: "Hyderabad",
+    area: "Kothapet",
+    village: "Pratap Nagar",
     email: "info@instatoken.in",
     phone: "+91 80 4668 8888",
     image: "https://images.unsplash.com/photo-1587351021759-3e566b6af7cc?w=800&auto=format&fit=crop&q=80",

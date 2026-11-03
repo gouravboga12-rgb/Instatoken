@@ -19,9 +19,10 @@ import { ReportsAnalytics } from './ReportsAnalytics';
 import { HospitalSettings } from './HospitalSettings';
 import { HospitalStaff } from './HospitalStaff';
 import { DepartmentManagement } from './DepartmentManagement';
+import { DoctorReferences } from './DoctorReferences';
 import {
   LayoutDashboard, Plus, List, Wifi, WifiOff, Calendar, RefreshCw,
-  Users, Stethoscope, Building2,
+  Users, Stethoscope, Building2, UserCheck,
   BarChart2, Download, Settings,
   ChevronLeft, ChevronRight, Bell, Search, LogOut, Menu, X, Activity,
   CreditCard, DollarSign, Sliders, Megaphone
@@ -29,11 +30,11 @@ import {
 
 // ─── RBAC permission map ──────────────────────────────────────────────────────
 const ROLE_SECTIONS: Record<string, string[]> = {
-  owner:        ['dashboard','doctor-screens','token-manage','tokens','add-token','all-tokens','online-tokens','offline-tokens','today-tokens','upcoming-tokens','completed-tokens','cancelled-tokens','revisit-tokens','revenue','doctors','departments','sessions','staff','patients','communication','ads-promotion','billing','reports','settings'],
-  admin:        ['dashboard','doctor-screens','token-manage','tokens','add-token','all-tokens','online-tokens','offline-tokens','today-tokens','upcoming-tokens','completed-tokens','cancelled-tokens','revisit-tokens','revenue','doctors','departments','sessions','staff','patients','communication','ads-promotion','reports'],
-  receptionist: ['dashboard','doctor-screens','token-manage','add-token','all-tokens','today-tokens','staff','patients'],
-  doctor:       ['dashboard','doctor-screens','today-tokens','patients'],
-  accountant:   ['dashboard','revenue','billing','reports'],
+  owner:        ['dashboard','doctor-screens','token-manage','tokens','add-token','all-tokens','online-tokens','offline-tokens','today-tokens','upcoming-tokens','completed-tokens','cancelled-tokens','revisit-tokens','revenue','doctors','departments','doctor-references','sessions','staff','patients','communication','ads-promotion','billing','reports','settings'],
+  admin:        ['dashboard','doctor-screens','token-manage','tokens','add-token','all-tokens','online-tokens','offline-tokens','today-tokens','upcoming-tokens','completed-tokens','cancelled-tokens','revisit-tokens','revenue','doctors','departments','doctor-references','sessions','staff','patients','communication','ads-promotion','reports'],
+  receptionist: ['dashboard','doctor-screens','token-manage','add-token','all-tokens','today-tokens','doctor-references','staff','patients'],
+  doctor:       ['dashboard','doctor-screens','today-tokens','doctor-references','patients'],
+  accountant:   ['dashboard','revenue','billing','doctor-references','reports'],
   nurse:        ['dashboard','doctor-screens','today-tokens','staff'],
 };
 
@@ -79,6 +80,7 @@ const buildNav = (doctors: HospitalDoctor[], tokens: TokenRecord[]): { section: 
     { section: 'Doctor Management', items: [
       { id: 'doctors', label: 'Doctors Management', icon: <Stethoscope size={15} />, path: '/hospital/doctors' },
       { id: 'departments', label: 'Departments', icon: <Building2 size={15} />, path: '/hospital/departments' },
+      { id: 'doctor-references', label: 'Doctor References', icon: <UserCheck size={15} />, path: '/hospital/doctor-references' },
     ]},
     { section: 'Staff & Team', items: [
       { id: 'staff', label: 'Staff & Employees', icon: <Users size={15} />, path: '/hospital/staff' },
@@ -420,6 +422,8 @@ export const HospitalLayout: React.FC = () => {
               <Route path="schedule" element={<TokenManage />} />
               <Route path="staff" element={<HospitalStaff />} />
               <Route path="patients" element={<PatientManagement />} />
+              <Route path="doctor-references" element={<DoctorReferences />} />
+              <Route path="rmp-referrals" element={<DoctorReferences />} />
 
               <Route path="communication" element={<CommunicationCenter />} />
               <Route path="ads-promotion" element={<AdsPromotion />} />

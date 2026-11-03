@@ -374,9 +374,9 @@ export const TokenConfirmation: React.FC = () => {
                       {appointment.gender || 'Patient'} • {appointment.ageDisplay || (appointment.age ? `${appointment.age} yrs` : '28 yrs')}
                       {appointment.phone ? ` • 📞 ${appointment.phone}` : ''}
                     </p>
-                    {appointment.rmpReference && appointment.rmpReference.name && (
+                    {((appointment.doctorReference && appointment.doctorReference.name) || (appointment.rmpReference && appointment.rmpReference.name)) && (
                       <p className="text-[9.5px] font-bold text-indigo-700 mt-0.5">
-                        Doctor Reference: Dr. {appointment.rmpReference.name} {appointment.rmpReference.phone ? `(${appointment.rmpReference.phone})` : ''}
+                        Doctor Reference: Dr. {appointment.doctorReference?.name || appointment.rmpReference?.name} {appointment.doctorReference?.phone || appointment.rmpReference?.phone ? `(${appointment.doctorReference?.phone || appointment.rmpReference?.phone})` : ''}
                       </p>
                     )}
                   </div>
@@ -385,17 +385,17 @@ export const TokenConfirmation: React.FC = () => {
             </div>
 
             {/* 3. Doctor Consultation Fee Card */}
-            <div className="bg-gradient-to-r from-amber-50/70 to-yellow-50/70 border border-amber-200 rounded-2xl p-4 flex items-center justify-between">
+            <div className="bg-gradient-to-r from-emerald-50/80 to-teal-50/80 border border-emerald-200 rounded-2xl p-4 flex items-center justify-between">
               <div className="space-y-0.5">
-                <span className="text-[9px] font-black text-amber-800 uppercase tracking-wider flex items-center gap-1">
-                  <CreditCard size={12} className="text-amber-600" /> DOCTOR CONSULTATION FEE
+                <span className="text-[9px] font-black text-emerald-800 uppercase tracking-wider flex items-center gap-1">
+                  <CreditCard size={12} className="text-emerald-600" /> DOCTOR CONSULTATION FEE
                 </span>
                 <span className="text-3xl font-black text-slate-900 block font-heading">₹{appointment.fee || 500}</span>
-                <p className="text-[10px] text-amber-900/70 font-semibold">To be collected at doctor's cabin / OPD desk</p>
+                <p className="text-[10px] text-emerald-900/70 font-semibold">Pay directly at doctor's cabin / OPD desk</p>
               </div>
 
               <div className="text-right">
-                <span className="bg-amber-600 text-white text-[10px] font-black px-3 py-1 rounded-md inline-block uppercase shadow-sm">
+                <span className="bg-emerald-700 text-white text-[10px] font-black px-3 py-1 rounded-md inline-block uppercase shadow-sm">
                   PAY AT HOSPITAL
                 </span>
                 <h5 className="text-[10px] font-black text-slate-700 mt-1">
@@ -404,18 +404,24 @@ export const TokenConfirmation: React.FC = () => {
               </div>
             </div>
 
-            {/* Token Booking Fee Paid Online */}
-            <div className="bg-blue-50/80 border border-blue-200/80 rounded-2xl p-3.5 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <ShieldCheck size={16} className="text-blue-600 shrink-0" />
-                <div>
-                  <span className="text-xs font-black text-slate-800 block">Token Booking Fee</span>
-                  <span className="text-[10px] text-slate-500 font-semibold">Ref: {appointment.paymentId}</span>
+            {/* Token Booking Charges Paid Online with GST */}
+            <div className="bg-blue-50/80 border border-blue-200/80 rounded-2xl p-3.5 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck size={16} className="text-blue-600 shrink-0" />
+                  <div>
+                    <span className="text-xs font-black text-slate-800 block">InstaToken Booking Charges (Paid Online)</span>
+                    <span className="text-[10px] text-slate-500 font-semibold">Ref: {appointment.paymentId}</span>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="text-base font-black text-blue-700 block">₹{appointment.totalFee || appointment.platformFee || 19.47}</span>
+                  <span className="text-[9px] font-black text-emerald-700 uppercase">Paid Online ({appointment.paymentMethod || 'Online'})</span>
                 </div>
               </div>
-              <div className="text-right">
-                <span className="text-sm font-black text-blue-700 block">₹{appointment.platformFee || 25}</span>
-                <span className="text-[9.5px] font-black text-emerald-700 uppercase">Paid Online ({appointment.paymentMethod || 'Online'})</span>
+              <div className="text-[10px] text-slate-500 font-medium border-t border-blue-100 pt-1.5 flex justify-between">
+                <span>Includes Platform Fee + Gateway Fee + 18% GST</span>
+                <span className="font-bold text-slate-700">Official InstaToken Digital Pass</span>
               </div>
             </div>
 

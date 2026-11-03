@@ -173,9 +173,9 @@ export const MyBookings: React.FC = () => {
                   ★ Existing
                 </span>
               )}
-              {appt.rmpReference && appt.rmpReference.name && (
+              {((appt.doctorReference && appt.doctorReference.name) || (appt.rmpReference && appt.rmpReference.name)) && (
                 <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.2 rounded">
-                  Doctor Ref: Dr. {appt.rmpReference.name}
+                  Doctor Ref: Dr. {appt.doctorReference?.name || appt.rmpReference?.name}
                 </span>
               )}
             </div>
@@ -198,7 +198,12 @@ export const MyBookings: React.FC = () => {
             <div>
               <span className="text-[9px] text-blue-600 font-extrabold uppercase tracking-wider block">Token Number</span>
               <span className="text-3xl font-black text-blue-700 font-heading block leading-none mt-0.5">#{appt.tokenNumber}</span>
-              <span className="text-[9.5px] text-slate-500 font-semibold block mt-1.5">Consultation: ₹{appt.fee} (Pay at Cabin)</span>
+              <span className="text-[9.5px] text-slate-600 font-bold block mt-1.5">
+                Consultation: ₹{appt.fee} (Pay at Hospital)
+              </span>
+              <span className="text-[8.5px] text-emerald-700 font-semibold block">
+                Booking Charges: ₹{appt.totalFee || appt.platformFee || 19.47} (incl. GST Paid Online)
+              </span>
             </div>
 
             {/* QR Code */}

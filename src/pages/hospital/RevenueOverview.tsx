@@ -1,11 +1,12 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useHospital } from '../../context/HospitalContext';
-import type { HospitalDoctor } from '../../context/HospitalContext';
+import type { HospitalDoctor, TokenRecord } from '../../context/HospitalContext';
 import {
   DollarSign, TrendingUp, ChevronRight,
   Search, CheckCircle2,
   Stethoscope, X, UserX, CheckCircle, Trash2
 } from 'lucide-react';
+import { TokenPaymentModal } from '../../components/hospital/TokenPaymentModal';
 
 export const RevenueOverview: React.FC = () => {
   const { doctors, tokens, updateTokenStatus, deleteToken, fetchHospitalRevenue } = useHospital();
@@ -146,8 +147,15 @@ export const RevenueOverview: React.FC = () => {
     return selectedDoctorCompletedTokens.reduce((acc, t) => acc + (t.consultationFee || selectedDoctor.consultationFee || 0), 0);
   }, [selectedDoctor, selectedDoctorCompletedTokens]);
 
+  const [paymentModalToken, setPaymentModalToken] = useState<TokenRecord | null>(null);
+
   const handleMarkVisitedFromModal = (tokenId: string) => {
-    updateTokenStatus(tokenId, 'completed');
+    const target = tokens.find(t => t.id === tokenId);
+    if (target && target.paymentStatus !== 'paid') {
+      setPaymentModalToken(target);
+    } else {
+      updateTokenStatus(tokenId, 'completed');
+    }
   };
 
   const handleReleaseSlotFromModal = (tokenId: string) => {
@@ -576,6 +584,22 @@ export const RevenueOverview: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Payment Confirmation Modal for marking visited in Revenue Overview */}
+      {paymentModalToken && (
+        <TokenPaymentModal
+          isOpen={Boolean(paymentModalToken)}
+          token={paymentModalToken}
+          title="Collect Consultation Fee"
+          subtitle="Record consultation fee payment to realize revenue:"
+          confirmButtonText="Confirm & Mark Visited"
+          onClose={() => setPaymentModalToken(null)}
+          onSave={(status, method) => {
+            updateTokenStatus(paymentModalToken.id, 'completed', { paymentStatus: status, paymentMethod: method });
+            setPaymentModalToken(null);
+          }}
+        />
       )}
     </div>
   );

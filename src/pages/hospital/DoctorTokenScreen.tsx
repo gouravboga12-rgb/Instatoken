@@ -6,13 +6,15 @@ import {
   CheckCircle, Clock, Play,
   XCircle, Calendar, Search, Tv,
   Printer, Eye, Phone, Wifi, WifiOff,
-  Volume2, Stethoscope, Sparkles, X, UserX, Trash2
+  Volume2, Stethoscope, Sparkles, X, UserX, Trash2,
+  Wallet
 } from 'lucide-react';
+import { TokenPaymentModal } from '../../components/hospital/TokenPaymentModal';
 
 export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorIdProp }) => {
   const params = useParams<{ doctorId: string }>();
   const doctorId = doctorIdProp || params.doctorId;
-  const { doctors, tokens, updateTokenStatus, deleteToken, hospitalProfile } = useHospital();
+  const { doctors, tokens, updateTokenStatus, updateTokenPayment, deleteToken, hospitalProfile } = useHospital();
   const navigate = useNavigate();
 
   const doctor = doctors.find(d => d.id === doctorId) || doctors[0];
@@ -28,6 +30,8 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
   // Modals & Full-Screen TV Display Mode
   const [viewToken, setViewToken] = useState<TokenRecord | null>(null);
   const [printToken, setPrintToken] = useState<TokenRecord | null>(null);
+  const [visitingToken, setVisitingToken] = useState<TokenRecord | null>(null);
+  const [paymentTargetToken, setPaymentTargetToken] = useState<TokenRecord | null>(null);
   const [tvMode, setTvMode] = useState(false);
 
   const todayStr = new Date().toISOString().split('T')[0];
@@ -216,7 +220,12 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
   };
 
   const handleCompleteToken = (id: string) => {
-    updateTokenStatus(id, 'completed');
+    const target = tokens.find(t => t.id === id);
+    if (target && target.paymentStatus !== 'paid') {
+      setVisitingToken(target);
+    } else {
+      updateTokenStatus(id, 'completed');
+    }
   };
 
   const handleMarkNotVisited = (id: string) => {
@@ -667,9 +676,9 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
                           <span>·</span>
                           <span className="flex items-center gap-1"><Phone size={10} /> {tok.patientPhone}</span>
                         </div>
-                        {tok.rmpReference && tok.rmpReference.name && (
+                        {((tok.doctorReference && tok.doctorReference.name) || (tok.rmpReference && tok.rmpReference.name)) && (
                           <div className="text-[9.5px] font-bold text-indigo-700 mt-0.5">
-                            Doctor Ref: Dr. {tok.rmpReference.name} {tok.rmpReference.phone ? `(${tok.rmpReference.phone})` : ''}
+                            Doctor Ref: Dr. {tok.doctorReference?.name || tok.rmpReference?.name} {tok.doctorReference?.phone || tok.rmpReference?.phone ? `(${tok.doctorReference?.phone || tok.rmpReference?.phone})` : ''}
                           </div>
                         )}
                       </td>
@@ -704,17 +713,32 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
 
                       <td className="py-3.5 px-4">
                         <div className="font-extrabold text-slate-800">₹{tok.consultationFee}</div>
-                        <span className={`text-[9px] font-black uppercase ${
-                          tok.status === 'completed'
-                            ? 'text-emerald-600'
-                            : isNotVisited
-                            ? 'text-amber-600'
-                            : tok.paymentStatus === 'paid'
-                            ? 'text-emerald-600'
-                            : 'text-slate-400'
-                        }`}>
-                          {tok.status === 'completed' ? 'Earned' : isNotVisited ? 'Uncollected' : tok.paymentStatus}
-                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setPaymentTargetToken(tok)}
+                          className="mt-0.5 inline-flex items-center gap-1 cursor-pointer border-none bg-transparent p-0 text-left group"
+                          title="Click to record or update payment status / method"
+                        >
+                          <span className={`text-[9.5px] font-black px-1.5 py-0.5 rounded flex items-center gap-1 transition-all group-hover:scale-102 ${
+                            tok.paymentStatus === 'paid'
+                              ? 'text-emerald-700 bg-emerald-50 border border-emerald-200'
+                              : isNotVisited
+                              ? 'text-amber-700 bg-amber-50 border border-amber-200'
+                              : 'text-amber-700 bg-amber-50 border border-amber-300 font-extrabold shadow-2xs'
+                          }`}>
+                            {tok.paymentStatus === 'paid' ? (
+                              <>
+                                <CheckCircle size={9} />
+                                <span>Paid {tok.paymentMethod ? `· ${tok.paymentMethod.replace(/\s*\(.*\)/, '')}` : ''}</span>
+                              </>
+                            ) : (
+                              <>
+                                <Wallet size={9} />
+                                <span>{isNotVisited ? 'Uncollected' : 'Pending · Collect'}</span>
+                              </>
+                            )}
+                          </span>
+                        </button>
                       </td>
 
                       <td className="py-3.5 px-4">
@@ -1064,6 +1088,37 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── Consultation Fee Payment Modals ── */}
+      {visitingToken && (
+        <TokenPaymentModal
+          isOpen={Boolean(visitingToken)}
+          token={visitingToken}
+          title="Collect Consultation Fee"
+          subtitle="Patient consultation done. Record payment collected at hospital:"
+          confirmButtonText="Confirm & Mark Visited"
+          onClose={() => setVisitingToken(null)}
+          onSave={(status, method) => {
+            updateTokenStatus(visitingToken.id, 'completed', { paymentStatus: status, paymentMethod: method });
+            setVisitingToken(null);
+          }}
+        />
+      )}
+
+      {paymentTargetToken && (
+        <TokenPaymentModal
+          isOpen={Boolean(paymentTargetToken)}
+          token={paymentTargetToken}
+          title="Update Consultation Fee Payment"
+          subtitle="Update payment status or payment method:"
+          confirmButtonText="Save & Update Payment"
+          onClose={() => setPaymentTargetToken(null)}
+          onSave={(status, method) => {
+            updateTokenPayment(paymentTargetToken.id, status, method);
+            setPaymentTargetToken(null);
+          }}
+        />
       )}
     </div>
   );
