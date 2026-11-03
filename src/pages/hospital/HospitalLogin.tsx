@@ -162,7 +162,7 @@ export const HospitalLogin: React.FC = () => {
               <span className="text-blue-200">Hospital Administration</span>
             </h2>
             <p className="text-blue-100 text-base leading-relaxed max-w-md">
-              Secure passwordless access protected by Indian Telecom DLT OTP. Manage queues, doctors, walk-ins, and revenue seamlessly.
+              Secure passwordless access protected by Mobile OTP verification. Manage queues, doctors, walk-ins, and revenue seamlessly.
             </p>
           </div>
 
@@ -177,7 +177,7 @@ export const HospitalLogin: React.FC = () => {
 
         {/* Bottom stats */}
         <div className="relative z-10 grid grid-cols-3 gap-4">
-          {[{ label: 'Hospitals', val: '200+' }, { label: 'Tokens Today', val: '12K+' }, { label: 'DLT Header', val: 'ITOKEN' }].map(s => (
+          {[{ label: 'Hospitals', val: '200+' }, { label: 'Tokens Today', val: '12K+' }, { label: 'Security', val: 'SMS OTP' }].map(s => (
             <div key={s.label} className="bg-white/10 backdrop-blur-sm border border-white/15 rounded-2xl p-4 text-center">
               <div className="text-2xl font-black text-white">{s.val}</div>
               <div className="text-blue-200 text-[10px] font-bold uppercase tracking-wider mt-1">{s.label}</div>
@@ -250,7 +250,7 @@ export const HospitalLogin: React.FC = () => {
                 {loading ? (
                   <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 ) : (
-                  <>Send DLT OTP <ArrowRight size={16} /></>
+                  <>Send OTP Code <ArrowRight size={16} /></>
                 )}
               </button>
             </form>
@@ -339,7 +339,7 @@ export const HospitalLogin: React.FC = () => {
           <div className="mt-8 pt-6 border-t border-slate-100 text-center">
             <div className="flex items-center justify-center gap-1.5 text-[10px] text-slate-400 font-bold">
               <ShieldCheck size={13} className="text-emerald-500" />
-              <span>Protected by TRAI DLT OTP Authentication &middot; Sender ITOKEN</span>
+              <span>Protected by Secure Mobile OTP Verification</span>
             </div>
           </div>
         </div>

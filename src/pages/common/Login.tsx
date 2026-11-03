@@ -280,7 +280,7 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
               </div>
               <div className="flex items-center gap-2">
                 <CheckCircle2 size={14} className="text-blue-600" />
-                <span>TRAI DLT Verified Telecom SMS</span>
+                <span>Instant SMS OTP Verification</span>
               </div>
               <div className="flex items-center gap-2">
                 <CheckCircle2 size={14} className="text-blue-600" />
@@ -290,8 +290,8 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
           </div>
 
           <div className="px-6 flex justify-between items-center text-[9px] text-slate-400 font-mono tracking-wider">
-            <span>SECURE DLT AUTH</span>
-            <span>DLT-ITOKEN</span>
+            <span>SECURE OTP AUTH</span>
+            <span>SMS-VERIFIED</span>
           </div>
         </div>
 
@@ -346,7 +346,7 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
             <div className="mb-5">
               <div className="flex items-center gap-1.5 text-blue-600 text-xs font-bold uppercase tracking-wider mb-1">
                 <ShieldCheck size={15} />
-                <span>DLT Telecom OTP Verification</span>
+                <span>Mobile OTP Verification</span>
               </div>
               <h3 className="text-2xl font-black text-slate-800 tracking-tight font-heading">
                 {step === 'otp'
@@ -440,7 +440,7 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
                   fullWidth 
                   className="py-3 mt-2 rounded-2xl text-xs font-black shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2"
                 >
-                  <span>{mode === 'login' ? 'Get Sign-In OTP' : 'Send DLT OTP & Register'}</span>
+                  <span>{mode === 'login' ? 'Get Sign-In OTP' : 'Send OTP & Register'}</span>
                   <ArrowRight size={15} />
                 </Button>
               </form>

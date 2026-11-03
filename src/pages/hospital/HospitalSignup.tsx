@@ -36,7 +36,7 @@ export const HospitalSignup: React.FC = () => {
     return () => clearInterval(interval);
   }, [step, timer]);
 
-  // Step 1: Send DLT OTP to Admin Phone
+  // Step 1: Send OTP to Admin Phone
   const handleSendOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setError('');
@@ -194,7 +194,7 @@ export const HospitalSignup: React.FC = () => {
               <span className="text-blue-300">With Direct Mobile OTP</span>
             </h2>
             <p className="text-blue-100 text-sm leading-relaxed max-w-md">
-              Passwordless registration secured by Indian Telecom DLT verification. Instant activation for smart tokens, OPD queue management, and doctor cabins.
+              Passwordless registration secured by Mobile OTP verification. Instant activation for smart tokens, OPD queue management, and doctor cabins.
             </p>
           </div>
 
@@ -203,7 +203,7 @@ export const HospitalSignup: React.FC = () => {
               'Direct SIM mobile verification (No passwords)',
               'Zero setup fee · Instant live dashboard',
               'Patients book token online or walk-in',
-              'TRAI DLT Verified Telecom SMS alerts',
+              'Instant SMS OTP verification alerts',
             ].map((feature, idx) => (
               <div key={idx} className="flex items-center gap-2.5 text-xs text-white font-bold bg-white/10 p-2.5 rounded-xl border border-white/10">
                 <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
@@ -240,7 +240,7 @@ export const HospitalSignup: React.FC = () => {
             </h2>
             <p className="text-slate-500 text-xs mt-1">
               {step === 1
-                ? 'Fill basic hospital details to receive your DLT OTP'
+                ? 'Fill basic hospital details to receive your verification OTP'
                 : `Enter the 6-digit OTP code sent to +91 ${normalizePhoneInput(phone)}`}
             </p>
           </div>
@@ -310,7 +310,7 @@ export const HospitalSignup: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">Admin Mobile Number (For DLT OTP) *</label>
+                <label className="text-xs font-bold text-slate-700 block mb-1">Admin Mobile Number (For OTP Verification) *</label>
                 <div className="relative flex items-center">
                   <span className="absolute left-3.5 text-xs font-extrabold text-slate-500 select-none">+91</span>
                   <input
@@ -378,13 +378,13 @@ export const HospitalSignup: React.FC = () => {
                 {loading ? (
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 ) : (
-                  <>Send DLT OTP to Admin Phone <ArrowRight size={15} /></>
+                  <>Send OTP to Admin Phone <ArrowRight size={15} /></>
                 )}
               </button>
             </form>
           )}
 
-          {/* STEP 2: DLT OTP VERIFICATION */}
+          {/* STEP 2: OTP VERIFICATION */}
           {step === 2 && (
             <form onSubmit={handleVerifyAndSignup} className="space-y-5">
               <div>
@@ -470,7 +470,7 @@ export const HospitalSignup: React.FC = () => {
           <div className="mt-6 text-center">
             <div className="flex items-center justify-center gap-1.5 text-[10px] text-slate-400 font-bold">
               <ShieldCheck size={13} className="text-emerald-500" />
-              <span>Passwordless Security &middot; DLT Template 1077385660092541347</span>
+              <span>Passwordless Security &middot; Instant SMS OTP Verification</span>
             </div>
           </div>
         </div>
