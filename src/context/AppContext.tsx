@@ -97,7 +97,7 @@ interface AppContextType {
   updateUserLocation: (locationName: string, coords?: { lat: number; lng: number }) => Promise<void>;
   getOrCreateCustomerAccount: (name: string, phone: string, email?: string) => CustomerAccount;
   login: (emailOrPhone: string, passwordOrOtp: string, optionalName?: string, isGoogleAuth?: boolean, googleProfile?: any) => Promise<boolean> | boolean;
-  loginWithPhoneOtp: (phone: string, otp: string, name?: string) => Promise<{ success: boolean; isNewUser?: boolean; needName?: boolean; message?: string }>;
+  loginWithPhoneOtp: (phone: string, otp: string, name?: string, email?: string, mode?: 'login' | 'signup') => Promise<{ success: boolean; isNewUser?: boolean; needName?: boolean; notFound?: boolean; message?: string }>;
   signup: (name: string, email: string, phone: string, password?: string) => Promise<boolean> | boolean;
   logout: () => void;
   addFamilyMember: (name: string, age: number, gender: string, relationship: string) => void;
@@ -1194,9 +1194,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return true;
   };
 
-  const loginWithPhoneOtp = async (phone: string, otp: string, name?: string): Promise<{ success: boolean; isNewUser?: boolean; needName?: boolean; message?: string }> => {
+  const loginWithPhoneOtp = async (phone: string, otp: string, name?: string, email?: string, mode?: 'login' | 'signup'): Promise<{ success: boolean; isNewUser?: boolean; needName?: boolean; notFound?: boolean; message?: string }> => {
     const cleanPhone = phone.replace(/\D/g, '').slice(-10);
-    const res = await verifyCustomerOtpClient(cleanPhone, otp, name);
+    const res = await verifyCustomerOtpClient(cleanPhone, otp, name, email, mode);
 
     if (!res.success) {
       throw new Error(res.message || 'OTP verification failed');

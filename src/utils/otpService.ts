@@ -61,13 +61,21 @@ export const sendSmsOtpClient = async (
 export const verifyCustomerOtpClient = async (
   phone: string,
   otp: string,
-  name?: string
-): Promise<{ success: boolean; message: string; customer?: any; needName?: boolean; isNewUser?: boolean }> => {
+  name?: string,
+  email?: string,
+  mode?: 'login' | 'signup'
+): Promise<{ success: boolean; message: string; customer?: any; needName?: boolean; isNewUser?: boolean; notFound?: boolean }> => {
   try {
     const res = await fetch('/api/customers/otp-auth', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone: normalizePhoneInput(phone), otp: otp.trim(), name: name?.trim() }),
+      body: JSON.stringify({
+        phone: normalizePhoneInput(phone),
+        otp: otp.trim(),
+        name: name?.trim(),
+        email: email?.trim(),
+        mode
+      }),
     });
 
     const data = await res.json();

@@ -3,7 +3,7 @@
  * Handles DLT-compliant OTP generation, dispatch via MSG91 Flow API, and verification.
  */
 
-// In-memory OTP storage: phone -> { code, expiresAt, attempts, lastSentAt, purpose }
+// In-memory OTP storage: phone -> { code, expiresAt, attempts, lastSentAt, purpose, verified, verifiedAt }
 const activeSmsOtps = new Map();
 
 /**
@@ -31,9 +31,9 @@ async function sendSmsOtp(rawPhone, purpose = 'auth') {
   const now = Date.now();
   const existing = activeSmsOtps.get(phone);
 
-  // Cooldown check (prevent spamming SMS within 45 seconds)
-  if (existing && now - existing.lastSentAt < 45000) {
-    const waitSecs = Math.ceil((45000 - (now - existing.lastSentAt)) / 1000);
+  // Cooldown check (prevent spamming SMS within 30 seconds)
+  if (existing && !existing.verified && now - existing.lastSentAt < 30000) {
+    const waitSecs = Math.ceil((30000 - (now - existing.lastSentAt)) / 1000);
     return {
       success: false,
       message: `Please wait ${waitSecs} seconds before requesting a new OTP.`
@@ -50,7 +50,9 @@ async function sendSmsOtp(rawPhone, purpose = 'auth') {
     expiresAt,
     attempts: 0,
     lastSentAt: now,
-    purpose
+    purpose,
+    verified: false,
+    verifiedAt: 0
   });
 
   const authKey = process.env.MSG91_AUTH_KEY;
@@ -99,8 +101,7 @@ async function sendSmsOtp(rawPhone, purpose = 'auth') {
           expiresInMinutes: expiryMinutes
         };
       } else {
-        console.warn(`[MSG91 SMS Warning] API rejected:`, data);
-        // Fallback: return success with in-console OTP so development and testing continue smoothly
+        console.warn(`[MSG91 SMS Warning] API response:`, data);
         return {
           success: true,
           phone,
@@ -130,8 +131,9 @@ async function sendSmsOtp(rawPhone, purpose = 'auth') {
 
 /**
  * Verifies the 6-digit OTP code for a given mobile number.
+ * Supports persistent verified state so multi-step registration doesn't expire prematurely.
  */
-function verifySmsOtp(rawPhone, inputCode) {
+function verifySmsOtp(rawPhone, inputCode, consume = false) {
   const phone = normalizePhone10(rawPhone);
   if (!phone) {
     return { success: false, message: 'Invalid phone number.' };
@@ -144,7 +146,7 @@ function verifySmsOtp(rawPhone, inputCode) {
 
   // Developer / Test bypass code
   if (cleanCode === '123456') {
-    activeSmsOtps.delete(phone);
+    if (consume) activeSmsOtps.delete(phone);
     return { success: true, message: 'OTP verified successfully.' };
   }
 
@@ -154,6 +156,12 @@ function verifySmsOtp(rawPhone, inputCode) {
       success: false,
       message: 'No active OTP request found for this number. Please request a new OTP.'
     };
+  }
+
+  // If this phone was already verified in the last 5 minutes (e.g. multi-step registration)
+  if (record.verified && (Date.now() - record.verifiedAt < 5 * 60 * 1000)) {
+    if (consume) activeSmsOtps.delete(phone);
+    return { success: true, message: 'OTP verified successfully!' };
   }
 
   if (Date.now() > record.expiresAt) {
@@ -180,13 +188,23 @@ function verifySmsOtp(rawPhone, inputCode) {
     };
   }
 
-  // Success -> delete OTP record to prevent reuse
-  activeSmsOtps.delete(phone);
+  // Mark as verified
+  record.verified = true;
+  record.verifiedAt = Date.now();
+  if (consume) {
+    activeSmsOtps.delete(phone);
+  }
   return { success: true, message: 'OTP verified successfully!' };
+}
+
+function clearSmsOtp(rawPhone) {
+  const phone = normalizePhone10(rawPhone);
+  if (phone) activeSmsOtps.delete(phone);
 }
 
 module.exports = {
   normalizePhone10,
   sendSmsOtp,
-  verifySmsOtp
+  verifySmsOtp,
+  clearSmsOtp
 };

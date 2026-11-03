@@ -14,7 +14,7 @@ const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || 'vm2Lt528SZHDC8Jq
 // AWS & DB Integrations
 const { query, testConnection } = require('./config/db');
 const { generateUploadUrl, uploadFile, deleteFile } = require('./config/s3');
-const { normalizePhone10, sendSmsOtp, verifySmsOtp } = require('./services/smsService');
+const { normalizePhone10, sendSmsOtp, verifySmsOtp, clearSmsOtp } = require('./services/smsService');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -1249,12 +1249,12 @@ app.post('/api/auth/hospital-otp-signup', async (req, res) => {
 // POST /api/customers/otp-auth (Login & Registration for Patients via Mobile OTP)
 app.post('/api/customers/otp-auth', async (req, res) => {
   try {
-    const { phone, otp, name } = req.body;
+    const { phone, otp, name, email, mode } = req.body;
     if (!phone || !otp) {
       return res.status(400).json({ success: false, message: 'Phone number and OTP code are required.' });
     }
 
-    const verification = verifySmsOtp(phone, otp);
+    const verification = verifySmsOtp(phone, otp, false);
     if (!verification.success) {
       return res.status(400).json(verification);
     }
@@ -1266,6 +1266,14 @@ app.post('/api/customers/otp-auth', async (req, res) => {
     let customer = store.customers.find(c => {
       return normPhone && normalizePhone10(c.phone) === normPhone;
     });
+
+    if (mode === 'login' && !customer && (!name || !name.trim())) {
+      return res.status(404).json({
+        success: false,
+        notFound: true,
+        message: 'No registered account found with this mobile number. Please click "Register Patient" to sign up.'
+      });
+    }
 
     if (!customer) {
       if (!name || !name.trim()) {
@@ -1314,6 +1322,7 @@ app.post('/api/customers/otp-auth', async (req, res) => {
         }
       }
 
+      clearSmsOtp(normPhone);
       console.log(`✅ [DLT OTP] Auto-registered new customer: ${customer.name} (${customer.phone})`);
       return res.json({
         success: true,
@@ -1329,6 +1338,7 @@ app.post('/api/customers/otp-auth', async (req, res) => {
       await saveUnifiedStore(store);
     }
 
+    clearSmsOtp(normPhone);
     console.log(`✅ [DLT OTP] Logged in customer: ${customer.name} (${customer.phone})`);
     return res.json({
       success: true,

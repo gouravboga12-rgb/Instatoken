@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '../../components/ui/Button';
 import { useApp } from '../../context/AppContext';
-import { User, AlertCircle, CheckCircle2, ArrowRight, RefreshCw, ShieldCheck, ArrowLeft } from 'lucide-react';
+import { User, AlertCircle, CheckCircle2, ArrowRight, RefreshCw, ShieldCheck, ArrowLeft, Mail } from 'lucide-react';
 import { sendSmsOtpClient, normalizePhoneInput } from '../../utils/otpService';
 import { useGoogleLogin } from '@react-oauth/google';
 
@@ -21,14 +21,27 @@ const specializations = [
 
 export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
   const { login, loginWithPhoneOtp } = useApp();
+  const [mode, setMode] = useState<'login' | 'signup'>('login');
+  const [step, setStep] = useState<'form' | 'otp'>('form');
+
+  // Form fields
   const [phone, setPhone] = useState('');
   const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
   const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
-  const [step, setStep] = useState<'phone' | 'otp' | 'name'>('phone');
+
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [timer, setTimer] = useState(60);
   const [canResend, setCanResend] = useState(false);
+
+  // Switch tabs cleanly
+  const switchMode = (newMode: 'login' | 'signup') => {
+    setMode(newMode);
+    setStep('form');
+    setError('');
+    setOtpDigits(['', '', '', '', '', '']);
+  };
 
   // Countdown timer for OTP resend
   useEffect(() => {
@@ -45,6 +58,11 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
   const handleSendOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setError('');
+
+    if (mode === 'signup' && !name.trim()) {
+      setError('Please enter your full name to register.');
+      return;
+    }
 
     const clean10 = normalizePhoneInput(phone);
     if (!clean10 || clean10.length !== 10) {
@@ -119,24 +137,27 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
     document.getElementById(`otp-digit-${targetIdx}`)?.focus();
   };
 
-  // Verify OTP and complete login / check if new user
+  // Verify OTP and complete login / signup
   const handleVerifyOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setError('');
 
     const code = otpDigits.join('').trim();
     if (code.length !== 6) {
-      setError('Please enter the complete 6-digit OTP');
+      setError('Please enter the complete 6-digit OTP code');
       return;
     }
 
     setLoading(true);
     try {
       const clean10 = normalizePhoneInput(phone);
-      const res = await loginWithPhoneOtp(clean10, code, name);
+      const res = await loginWithPhoneOtp(clean10, code, name.trim(), email.trim(), mode);
 
       if (res.needName) {
-        setStep('name');
+        // Fallback in case name wasn't provided yet
+        setMode('signup');
+        setStep('form');
+        setError('Please enter your full name to complete registration.');
         return;
       }
 
@@ -148,28 +169,7 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
     }
   };
 
-  // Handle final name submission for new user
-  const handleCompleteRegistration = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim()) {
-      setError('Please enter your full name');
-      return;
-    }
-
-    const code = otpDigits.join('').trim();
-    setLoading(true);
-    try {
-      const clean10 = normalizePhoneInput(phone);
-      await loginWithPhoneOtp(clean10, code, name.trim());
-      onSuccess();
-    } catch (err: any) {
-      setError(err?.message || 'Failed to complete registration.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Optional Google OAuth support
+  // Google OAuth
   const [googleLoading, setGoogleLoading] = useState(false);
   const triggerGoogleLogin = useGoogleLogin({
     onSuccess: async (tokenResponse) => {
@@ -296,55 +296,107 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
         </div>
 
         {/* Right Side Login form card (Col-span-7) */}
-        <div className="md:col-span-7 p-0 md:p-10 flex flex-col justify-center bg-white md:overflow-y-auto">
+        <div className="md:col-span-7 p-6 md:p-10 flex flex-col justify-center bg-white md:overflow-y-auto">
           {/* Top visual graphic header (mobile only) */}
-          <div className="md:hidden w-full flex flex-col bg-white pb-6">
+          <div className="md:hidden w-full flex flex-col bg-white pb-6 -mt-6 -mx-6 mb-4">
             <div 
-              className="relative bg-cover bg-center text-white flex flex-col justify-between p-5 h-[180px]"
+              className="relative bg-cover bg-center text-white flex flex-col justify-between p-5 h-[170px]"
               style={{ backgroundImage: `linear-gradient(to bottom, rgba(37, 99, 235, 0.95), rgba(29, 78, 216, 0.90)), url('https://images.unsplash.com/photo-1587351021759-3e566b6af7cc?w=600&q=80')` }}
             >
               <div className="flex items-center justify-between w-full z-10">
                 <img src="/logo.png" className="h-7 object-contain" alt="InstaToken logo" />
               </div>
-              <div className="z-10 pb-4">
+              <div className="z-10 pb-2">
                 <h2 className="text-base font-black tracking-tight text-white">InstaToken</h2>
                 <p className="text-[9px] text-blue-100 font-semibold">Direct Mobile OTP Access</p>
               </div>
             </div>
           </div>
 
-          <div className="p-6 md:p-0">
+          <div>
+            {/* Prominent Tab Switcher: Sign In vs Register Patient */}
+            {step === 'form' && (
+              <div className="flex bg-slate-100 p-1 rounded-2xl mb-6">
+                <button
+                  type="button"
+                  onClick={() => switchMode('login')}
+                  className={`flex-1 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                    mode === 'login'
+                      ? 'bg-white text-blue-600 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  Sign In
+                </button>
+                <button
+                  type="button"
+                  onClick={() => switchMode('signup')}
+                  className={`flex-1 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                    mode === 'signup'
+                      ? 'bg-white text-blue-600 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  Register Patient
+                </button>
+              </div>
+            )}
+
             {/* Header titles */}
-            <div className="mb-6">
-              <div className="flex items-center gap-2 text-blue-600 text-xs font-bold uppercase tracking-wider mb-1">
-                <ShieldCheck size={16} />
-                <span>DLT SMS Verification</span>
+            <div className="mb-5">
+              <div className="flex items-center gap-1.5 text-blue-600 text-xs font-bold uppercase tracking-wider mb-1">
+                <ShieldCheck size={15} />
+                <span>DLT Telecom OTP Verification</span>
               </div>
               <h3 className="text-2xl font-black text-slate-800 tracking-tight font-heading">
-                {step === 'phone' && 'Welcome to InstaToken'}
-                {step === 'otp' && 'Verify Mobile OTP'}
-                {step === 'name' && 'Almost There!'}
+                {step === 'otp'
+                  ? 'Verify 6-Digit OTP'
+                  : mode === 'login'
+                  ? 'Sign In to Account'
+                  : 'Register New Patient'}
               </h3>
               <p className="text-slate-500 text-xs mt-1">
-                {step === 'phone' && 'Enter your 10-digit mobile number to login or register instantly.'}
-                {step === 'otp' && `Enter the 6-digit OTP code sent to +91 ${normalizePhoneInput(phone)}.`}
-                {step === 'name' && 'Please enter your full name to finish your account setup.'}
+                {step === 'otp'
+                  ? `Enter the 6-digit OTP code sent to +91 ${normalizePhoneInput(phone)}.`
+                  : mode === 'login'
+                  ? 'Enter your registered mobile number to receive your sign-in OTP.'
+                  : 'Fill your details to create your patient account instantly.'}
               </p>
             </div>
 
             {error && (
               <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-xl text-red-600 text-xs flex items-start gap-2">
                 <AlertCircle size={16} className="shrink-0 mt-0.5" />
-                <span>{error}</span>
+                <span className="leading-relaxed">{error}</span>
               </div>
             )}
 
-            {/* STEP 1: MOBILE NUMBER INPUT */}
-            {step === 'phone' && (
+            {/* STEP 1: FORM INPUT (LOGIN OR SIGNUP) */}
+            {step === 'form' && (
               <form onSubmit={handleSendOtp} className="space-y-4">
+                {mode === 'signup' && (
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                      Full Name *
+                    </label>
+                    <div className="relative">
+                      <User size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input 
+                        type="text" 
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder="e.g. Gourav"
+                        required
+                        autoFocus
+                        className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 transition-all"
+                      />
+                    </div>
+                  </div>
+                )}
+
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-                    Mobile Number
+                    Mobile Number *
                   </label>
                   <div className="relative flex items-center">
                     <span className="absolute left-3.5 text-xs font-extrabold text-slate-500 select-none">
@@ -356,41 +408,59 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
                       onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
                       placeholder="98765 43210"
                       maxLength={10}
-                      autoFocus
                       required
-                      className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-semibold tracking-wide text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 transition-all"
+                      autoFocus={mode === 'login'}
+                      className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold tracking-wide text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 transition-all"
                     />
                   </div>
                 </div>
+
+                {mode === 'signup' && (
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                      Email Address (Optional)
+                    </label>
+                    <div className="relative">
+                      <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input 
+                        type="email" 
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="name@example.com"
+                        className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 transition-all"
+                      />
+                    </div>
+                  </div>
+                )}
 
                 <Button 
                   type="submit" 
                   variant="primary" 
                   isLoading={loading} 
                   fullWidth 
-                  className="py-3 rounded-2xl text-xs font-black shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2"
+                  className="py-3 mt-2 rounded-2xl text-xs font-black shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2"
                 >
-                  <span>Get OTP</span>
+                  <span>{mode === 'login' ? 'Get Sign-In OTP' : 'Send DLT OTP & Register'}</span>
                   <ArrowRight size={15} />
                 </Button>
               </form>
             )}
 
-            {/* STEP 2: 6-DIGIT OTP INPUT */}
+            {/* STEP 2: 6-DIGIT OTP VERIFICATION */}
             {step === 'otp' && (
               <form onSubmit={handleVerifyOtp} className="space-y-5">
                 <div>
                   <div className="flex justify-between items-center mb-2">
                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                      Enter 6-Digit OTP
+                      Enter 6-Digit OTP Code
                     </label>
                     <button
                       type="button"
-                      onClick={() => setStep('phone')}
+                      onClick={() => setStep('form')}
                       className="text-xs text-blue-600 font-bold hover:underline cursor-pointer flex items-center gap-1 border-none bg-transparent"
                     >
                       <ArrowLeft size={12} />
-                      <span>Change Number</span>
+                      <span>Change Details</span>
                     </button>
                   </div>
 
@@ -439,52 +509,48 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
                   fullWidth 
                   className="py-3 rounded-2xl text-xs font-black shadow-md hover:shadow-lg transition-all"
                 >
-                  Verify & Continue
+                  {mode === 'login' ? 'Verify OTP & Sign In' : 'Verify OTP & Complete Registration'}
                 </Button>
               </form>
             )}
 
-            {/* STEP 3: NAME PROMPT FOR FIRST-TIME REGISTRATION */}
-            {step === 'name' && (
-              <form onSubmit={handleCompleteRegistration} className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-                    Your Full Name
-                  </label>
-                  <div className="relative">
-                    <User size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input 
-                      type="text"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="e.g. Ramesh Sharma"
-                      autoFocus
-                      required
-                      className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 transition-all"
-                    />
-                  </div>
-                </div>
-
-                <Button 
-                  type="submit" 
-                  variant="primary" 
-                  isLoading={loading} 
-                  fullWidth 
-                  className="py-3 rounded-2xl text-xs font-black shadow-md hover:shadow-lg transition-all"
-                >
-                  Complete Registration & Sign In
-                </Button>
-              </form>
+            {/* Toggle footer links */}
+            {step === 'form' && (
+              <div className="mt-4 text-center">
+                {mode === 'login' ? (
+                  <p className="text-xs text-slate-500">
+                    New patient?{' '}
+                    <button 
+                      type="button" 
+                      onClick={() => switchMode('signup')}
+                      className="text-blue-600 font-bold hover:underline cursor-pointer border-none bg-transparent"
+                    >
+                      Register Patient Here
+                    </button>
+                  </p>
+                ) : (
+                  <p className="text-xs text-slate-500">
+                    Already registered?{' '}
+                    <button 
+                      type="button" 
+                      onClick={() => switchMode('login')}
+                      className="text-blue-600 font-bold hover:underline cursor-pointer border-none bg-transparent"
+                    >
+                      Sign In with Mobile
+                    </button>
+                  </p>
+                )}
+              </div>
             )}
 
             {/* Divider & Google option */}
-            <div className="relative flex py-5 items-center">
+            <div className="relative flex py-4 items-center">
               <div className="flex-grow border-t border-slate-100"></div>
               <span className="flex-shrink mx-3 text-slate-400 text-[10px] font-bold uppercase tracking-wider">Or</span>
               <div className="flex-grow border-t border-slate-100"></div>
             </div>
 
-            <div className="mb-4">
+            <div className="mb-2">
               <button 
                 type="button"
                 onClick={() => triggerGoogleLogin()}
