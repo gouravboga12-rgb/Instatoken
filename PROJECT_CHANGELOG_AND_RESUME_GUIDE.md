@@ -137,6 +137,16 @@ InstaToken is a full-stack digital OPD token management and queue optimization p
 
 ---
 
+### D. UI Terminology Clean-Up (DLT Terms Removed)
+* Replaced all telecom/DLT mentions across client-facing pages with clear, user-friendly labels:
+  * "DLT Telecom OTP Verification" -> "Mobile OTP Verification"
+  * "TRAI DLT Verified Telecom SMS" -> "Instant SMS OTP Verification"
+  * "Send DLT OTP & Register" -> "Send OTP & Register"
+  * "Admin Mobile Number (For DLT OTP)" -> "Admin Mobile Number (For OTP Verification)"
+  * "DLT Header / DLT Template" -> "Security / SMS OTP"
+
+---
+
 ## 3. Key Files Reference Index
 
 | File Path | Description of Changes |
