@@ -1487,7 +1487,7 @@ const TokenTable: React.FC<{
   const [statusFilter, setStatusFilter] = useState('all');
   const [deptFilter, setDeptFilter] = useState('all');
   const [docFilter, setDocFilter] = useState('all');
-  const [dateFilter, setDateFilter] = useState(() => defaultDateFilter !== undefined ? defaultDateFilter : new Date().toISOString().split('T')[0]);
+  const [dateFilter, setDateFilter] = useState(() => defaultDateFilter !== undefined ? defaultDateFilter : '');
 
   // Modal states
   const [callConfirmToken, setCallConfirmToken] = useState<TokenRecord | null>(null);

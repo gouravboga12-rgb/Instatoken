@@ -12,7 +12,7 @@ export const RevenueOverview: React.FC = () => {
   const { doctors, tokens, updateTokenStatus, deleteToken, fetchHospitalRevenue } = useHospital();
 
   // Filters State
-  const [dateFilter, setDateFilter] = useState<'today' | 'week' | 'month' | 'all' | 'custom'>('today');
+  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month' | 'custom'>('all');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [searchDoctor, setSearchDoctor] = useState('');
@@ -184,7 +184,7 @@ export const RevenueOverview: React.FC = () => {
 
         {/* Date Filter Pills */}
         <div className="flex flex-wrap items-center gap-1.5 bg-slate-50 p-1.5 rounded-2xl border border-slate-100">
-          {(['today', 'week', 'month', 'all', 'custom'] as const).map(df => (
+          {(['all', 'today', 'week', 'month', 'custom'] as const).map(df => (
             <button
               key={df}
               onClick={() => setDateFilter(df)}
@@ -194,7 +194,7 @@ export const RevenueOverview: React.FC = () => {
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
-              {df === 'today' ? "Today" : df === 'week' ? "This Week" : df === 'month' ? "This Month" : df === 'all' ? "All Time" : "Custom"}
+              {df === 'all' ? "All Time" : df === 'today' ? "Today" : df === 'week' ? "This Week" : df === 'month' ? "This Month" : "Custom"}
             </button>
           ))}
         </div>

@@ -21,7 +21,7 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
 
   // Filters State
   const [statusTab, setStatusTab] = useState<'all' | 'active' | 'completed' | 'not-visited' | 'cancelled'>('all');
-  const [dateFilter, setDateFilter] = useState<'today' | 'tomorrow' | 'yesterday' | 'all' | 'custom'>('today');
+  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'tomorrow' | 'yesterday' | 'custom'>('all');
   const [customDate, setCustomDate] = useState('');
   const [sourceFilter, setSourceFilter] = useState<'all' | 'online' | 'offline'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -120,7 +120,18 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
     return 'evening';
   }, []);
 
-  // Live session statistics for today
+  // Helper to check if token matches the active date filter
+  const isDateMatching = (t: TokenRecord) => {
+    if (dateFilter === 'all') return true;
+    const tDate = t.bookingDate || todayStr;
+    if (dateFilter === 'today') return tDate === todayStr;
+    if (dateFilter === 'tomorrow') return tDate === tomorrowStr;
+    if (dateFilter === 'yesterday') return tDate === yesterdayStr;
+    if (dateFilter === 'custom' && customDate) return tDate === customDate;
+    return true;
+  };
+
+  // Live session statistics respecting the active date filter
   const sessionStats = useMemo(() => {
     const stats: Record<string, { waiting: number; inCabin: number; completed: number; total: number }> = {
       all: { waiting: 0, inCabin: 0, completed: 0, total: 0 },
@@ -134,8 +145,7 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
     });
 
     doctorTokens.forEach(t => {
-      const isToday = t.bookingDate === todayStr || !t.bookingDate;
-      if (!isToday) return;
+      if (!isDateMatching(t)) return;
 
       stats.all.total++;
       if (['booked', 'waiting'].includes(t.status)) stats.all.waiting++;
@@ -150,42 +160,40 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
       if (t.status === 'completed') stats[sKey].completed++;
     });
     return stats;
-  }, [doctorSessions, doctorTokens, todayStr]);
+  }, [doctorSessions, doctorTokens, dateFilter, customDate, todayStr, tomorrowStr, yesterdayStr]);
 
-  // Active Queue strictly respecting Selected Session (or All)
+  // Active Queue strictly respecting Selected Session (or All) and Date filter
   const activeQueue = useMemo(() => {
     return doctorTokens.filter(t => {
-      const isToday = t.bookingDate === todayStr || !t.bookingDate;
+      if (!isDateMatching(t)) return false;
       const isActive = ['booked', 'waiting', 'checked-in'].includes(t.status);
-      if (!isToday || !isActive) return false;
+      if (!isActive) return false;
       if (selectedSessionFilter !== 'all') {
         const sKey = (t.session || 'morning').toLowerCase();
         if (sKey !== selectedSessionFilter.toLowerCase()) return false;
       }
       return true;
     });
-  }, [doctorTokens, todayStr, selectedSessionFilter]);
+  }, [doctorTokens, dateFilter, customDate, selectedSessionFilter, todayStr, tomorrowStr, yesterdayStr]);
 
   const inConsultation = activeQueue.find(t => t.status === 'checked-in');
   const nextInLine = activeQueue.filter(t => t.id !== inConsultation?.id);
   const completedToday = doctorTokens.filter(t => {
-    const isToday = t.bookingDate === todayStr || !t.bookingDate;
-    if (!isToday || t.status !== 'completed') return false;
+    if (!isDateMatching(t) || t.status !== 'completed') return false;
     if (selectedSessionFilter !== 'all') {
       return (t.session || 'morning').toLowerCase() === selectedSessionFilter.toLowerCase();
     }
     return true;
   });
   const notVisitedToday = doctorTokens.filter(t => {
-    const isToday = t.bookingDate === todayStr || !t.bookingDate;
-    if (!isToday || !['not-visited', 'skipped'].includes(t.status)) return false;
+    if (!isDateMatching(t) || !['not-visited', 'skipped'].includes(t.status)) return false;
     if (selectedSessionFilter !== 'all') {
       return (t.session || 'morning').toLowerCase() === selectedSessionFilter.toLowerCase();
     }
     return true;
   });
   const todayDoctorRevenue = doctorTokens
-    .filter(t => t.status === 'completed' && (t.bookingDate === todayStr || !t.bookingDate))
+    .filter(t => t.status === 'completed' && isDateMatching(t))
     .reduce((acc, t) => acc + (t.consultationFee || doctor?.consultationFee || 0), 0);
 
   if (!doctor) {
@@ -441,7 +449,9 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
             <CheckCircle size={16} />
           </div>
           <div className="min-w-0">
-            <span className="text-[9.5px] text-slate-400 font-black uppercase tracking-wider block truncate">Visited Today</span>
+            <span className="text-[9.5px] text-slate-400 font-black uppercase tracking-wider block truncate">
+              {dateFilter === 'today' ? 'Visited Today' : 'Visited'}
+            </span>
             <span className="text-lg sm:text-xl font-black text-emerald-600 leading-tight block">{completedToday.length}</span>
           </div>
         </div>
@@ -461,7 +471,9 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
             <Sparkles size={16} />
           </div>
           <div className="min-w-0">
-            <span className="text-[9.5px] text-slate-400 font-black uppercase tracking-wider block truncate">Today's Earned Revenue</span>
+            <span className="text-[9.5px] text-slate-400 font-black uppercase tracking-wider block truncate">
+              {dateFilter === 'today' ? "Today's Earned Revenue" : 'Earned Revenue'}
+            </span>
             <span className="text-lg sm:text-xl font-black text-slate-800 leading-tight block truncate">₹{todayDoctorRevenue.toLocaleString('en-IN')}</span>
           </div>
         </div>
@@ -564,12 +576,12 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
             <select
               value={dateFilter}
               onChange={e => setDateFilter(e.target.value as any)}
-              className="px-2.5 py-1 border border-slate-200 rounded-lg text-xs font-bold outline-none bg-white text-slate-700"
+              className="px-2.5 py-1 border border-slate-200 rounded-lg text-xs font-bold outline-none bg-white text-slate-700 cursor-pointer"
             >
+              <option value="all">All Dates</option>
               <option value="today">Today</option>
               <option value="tomorrow">Tomorrow</option>
               <option value="yesterday">Yesterday</option>
-              <option value="all">All Dates</option>
               <option value="custom">Custom Date</option>
             </select>
             {dateFilter === 'custom' && (
