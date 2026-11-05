@@ -1008,11 +1008,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {safeHospitals.slice(0, 5).map((hosp, idx) => {
+                    {safeHospitals.slice(0, 5).map((hosp) => {
                       const hospAppts = safeAppointments.filter(a => a.hospitalId === hosp.id || a.hospitalName === hosp.name);
-                      const rev = hospAppts.reduce((sum, a) => sum + (Number(a.fee) || 500), 0);
-                      const displayRev = rev > 0 ? rev : (36800 - idx * 6000);
-                      const displayTokens = hospAppts.length > 0 ? hospAppts.length : (184 - idx * 30);
+                      const rev = hospAppts.reduce((sum, a) => sum + (Number(a.fee) || 0), 0);
+                      const displayRev = rev;
+                      const displayTokens = hospAppts.length;
                       const isDisabled = hosp.status === 'disabled';
 
                       return (
@@ -1037,7 +1037,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                             </div>
                           </td>
                           <td className="px-5 py-3.5 text-center font-bold text-slate-700">
-                            {hosp.doctors?.length || (12 - idx * 2)}
+                            {hosp.doctors?.length || 0}
                           </td>
                           <td className="px-5 py-3.5 text-center font-black text-slate-900">
                             {displayTokens}
@@ -1053,7 +1053,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                             </span>
                           </td>
                           <td className="px-5 py-3.5 text-slate-500 text-[11px] font-medium">
-                            {idx === 0 ? '12 Sep 2026' : idx === 1 ? '02 Sep 2026' : idx === 2 ? '28 Aug 2026' : idx === 3 ? '20 Aug 2026' : '15 Aug 2026'}
+                            {(hosp as any).joinedDate || (hosp as any).created_at?.split('T')[0] || 'Active'}
                           </td>
                           <td className="px-5 py-3.5 text-right">
                             <button

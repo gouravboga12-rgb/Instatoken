@@ -273,6 +273,12 @@ export const getHydratedHospitals = (): Hospital[] => {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+const isDummyPhone = (phone?: string): boolean => {
+  if (!phone) return false;
+  const digits = phone.replace(/\D/g, '').slice(-10);
+  return digits === '9876543210' || digits === '1234567890' || digits === '9999999999';
+};
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // --- States ---
   const [user, setUser] = useState<UserProfile | null>(() => {
@@ -285,6 +291,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (parsed.name === "Guest Patient" || parsed.email === "patient@example.com") {
             localStorage.removeItem('insta_user');
             return null;
+          }
+          if (parsed.phone && isDummyPhone(parsed.phone)) {
+            parsed.phone = '';
+            localStorage.setItem('insta_user', JSON.stringify(parsed));
           }
           if (parsed.subscription === undefined) {
             parsed.subscription = {
@@ -684,17 +694,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                   return false;
                 });
                 if (matched) {
+                  const resolvedPhone = (matched.phone && !isDummyPhone(matched.phone))
+                    ? matched.phone
+                    : ((parsed.phone && !isDummyPhone(parsed.phone)) ? parsed.phone : '');
                   setUser(prev => prev ? {
                     ...prev,
                     name: matched.name || prev.name,
-                    phone: matched.phone || prev.phone,
+                    phone: resolvedPhone,
                     email: matched.email || prev.email,
                     location: matched.location || prev.location
                   } : null);
                   localStorage.setItem('insta_user', JSON.stringify({
                     ...parsed,
                     name: matched.name || parsed.name,
-                    phone: matched.phone || parsed.phone,
+                    phone: resolvedPhone,
                     email: matched.email || parsed.email,
                     location: matched.location || parsed.location
                   }));
@@ -1177,7 +1190,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const profile: UserProfile = {
       name: existing.name,
       email: existing.email || (cleanInput.includes('@') ? cleanInput : "patient@instatoken.com"),
-      phone: existing.phone || (!cleanInput.includes('@') ? cleanInput : "+91 9876543210"),
+      phone: (existing.phone && !isDummyPhone(existing.phone)) 
+        ? existing.phone 
+        : (!cleanInput.includes('@') && !isDummyPhone(cleanInput) ? cleanInput : ""),
       role: "patient",
       savedHospitals: existing.bookings?.map(b => b.hospitalId) || [],
       savedDoctors: [],
@@ -1211,7 +1226,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const profile: UserProfile = {
         name: cust.name || 'Valued Patient',
         email: cust.email || `${cleanPhone}@patient.instatoken.in`,
-        phone: cust.phone || `+91 ${cleanPhone}`,
+        phone: (cust.phone && !isDummyPhone(cust.phone)) ? cust.phone : `+91 ${cleanPhone}`,
         role: 'patient',
         savedHospitals: cust.savedHospitals || [],
         savedDoctors: cust.savedDoctors || [],

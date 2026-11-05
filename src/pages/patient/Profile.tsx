@@ -72,10 +72,16 @@ export const Profile: React.FC = () => {
   const [editLocation, setEditLocation] = useState(user?.location || currentLocation || '');
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
+  const isDummyPhone = (phone?: string) => {
+    if (!phone) return false;
+    const digits = phone.replace(/\D/g, '').slice(-10);
+    return digits === '9876543210' || digits === '9999999999' || digits === '1234567890';
+  };
+
   useEffect(() => {
     if (user) {
       setEditName(user.name);
-      setEditPhone(user.phone);
+      setEditPhone(user.phone && !isDummyPhone(user.phone) ? user.phone : '');
       setEditEmail(user.email);
       setEditLocation(user.location || currentLocation || '');
     }
@@ -201,10 +207,25 @@ export const Profile: React.FC = () => {
               <span className="truncate">{user.name}</span>
               <span className="w-4 h-4 bg-white text-blue-600 rounded-full text-[10px] font-black inline-flex items-center justify-center shadow-xs shrink-0">✓</span>
             </h3>
-            <p className="text-xs sm:text-sm text-blue-100 font-bold flex items-center gap-1">
-              <span>📞</span>
-              <span>{user.phone || 'No phone number'}</span>
-            </p>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <p className="text-xs sm:text-sm text-blue-100 font-bold flex items-center gap-1">
+                <span>📞</span>
+                {user.phone && !isDummyPhone(user.phone) ? (
+                  <span>{user.phone}</span>
+                ) : (
+                  <span className="opacity-80 italic font-medium text-xs">No registered mobile number</span>
+                )}
+              </p>
+              {(!user.phone || isDummyPhone(user.phone)) && (
+                <button 
+                  type="button"
+                  onClick={() => setIsEditProfileOpen(true)}
+                  className="px-2 py-0.5 bg-white/20 hover:bg-white/30 text-white rounded-md text-[10px] font-bold border-none cursor-pointer transition-colors"
+                >
+                  + Add Mobile
+                </button>
+              )}
+            </div>
             {user.email && (
               <p className="text-[11px] text-blue-100/90 font-semibold flex items-center gap-1">
                 <span>✉️</span>

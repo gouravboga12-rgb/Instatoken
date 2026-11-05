@@ -139,76 +139,65 @@ export const DoctorReferences: React.FC = () => {
     return counts;
   }, [dateFilteredRecords]);
 
-  // Mock baseline counts matching Image copy 79.png if fresh start
-  const mockBaselineCounts: Record<string, number> = {
-    'srinivas': 42,
-    'ramesh': 31,
-    'mahesh': 24,
-    'prasad': 18,
-    'shankar': 16,
-    'naresh': 14,
-    'imran': 12,
-    'lakshman': 10,
-    'saleem': 9,
-    'raju': 8
-  };
+  // Combine hospital registered references with any unique doctor references entered during patient bookings
+  const allHospitalDoctors = useMemo(() => {
+    const list = [...doctorReferences];
+    const seenNames = new Set(list.map(d => d.name.toLowerCase().replace(/^(dr\.|rmp\.)\s*/, '').trim()));
+
+    allReferredRecords.forEach(r => {
+      const normName = r.doctorRefName.toLowerCase().replace(/^(dr\.|rmp\.)\s*/, '').trim();
+      if (normName && !seenNames.has(normName)) {
+        seenNames.add(normName);
+        list.push({
+          id: `booking-ref-${normName}`,
+          name: r.doctorRefName,
+          phone: r.doctorRefPhone || '',
+          place: r.doctorRefPlace || r.place || '',
+          qualification: 'RMP / Referring Practitioner',
+          status: 'active',
+          registeredDate: r.referralDate || todayStr,
+          notes: 'Added from patient token booking'
+        });
+      }
+    });
+
+    return list;
+  }, [doctorReferences, allReferredRecords, todayStr]);
 
   // Filtered Doctor References list
   const filteredDoctors = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
-    return doctorReferences.filter(d => {
+    return allHospitalDoctors.filter(d => {
       const matchName = d.name.toLowerCase().includes(q);
       const matchPhone = d.phone.includes(q);
       const matchPlace = d.place.toLowerCase().includes(q);
       return matchName || matchPhone || matchPlace;
     });
-  }, [doctorReferences, searchQuery]);
+  }, [allHospitalDoctors, searchQuery]);
 
-  // Total KPIs
-  const totalReferringDoctors = doctorReferences.length;
-  const totalPatientsReferred = useMemo(() => {
-    let total = dateFilteredRecords.length;
-    if (total === 0) {
-      total = Object.values(mockBaselineCounts).reduce((a, b) => a + b, 0);
-    }
-    return total;
-  }, [dateFilteredRecords, mockBaselineCounts]);
+  // Total KPIs (Strictly Real-time, 0 demo data)
+  const totalReferringDoctors = allHospitalDoctors.length;
+  const totalPatientsReferred = dateFilteredRecords.length;
 
   // Active selected doctor
   const selectedDoctor = useMemo(() => {
-    return doctorReferences.find(d => d.id === selectedDoctorId) || doctorReferences[0] || null;
-  }, [doctorReferences, selectedDoctorId]);
+    return allHospitalDoctors.find(d => d.id === selectedDoctorId) || allHospitalDoctors[0] || null;
+  }, [allHospitalDoctors, selectedDoctorId]);
 
-  // Patients referred by selected doctor
+  // Patients referred by selected doctor (Strictly Real-time, 0 baseline mock patients)
   const selectedDoctorPatients = useMemo(() => {
     if (!selectedDoctor) return [];
     const normDoc = selectedDoctor.name.toLowerCase().replace(/^(dr\.|rmp\.)\s*/, '').trim();
 
-    // Live patients
+    // Only live patients
     const livePatients = dateFilteredRecords.filter(r => {
       const rNorm = r.doctorRefName.toLowerCase().replace(/^(dr\.|rmp\.)\s*/, '').trim();
-      return rNorm === normDoc || (selectedDoctor.phone && r.doctorRefPhone === selectedDoctor.phone);
+      return rNorm === normDoc || (selectedDoctor.phone && r.doctorRefPhone && r.doctorRefPhone === selectedDoctor.phone);
     });
-
-    // If no live patients for this doctor yet, generate mock baseline list matching Image 79
-    const baseline = [
-      { id: 'p-1', tokenNo: 'T012', patientName: 'Ramesh Kumar', patientPhone: '98765 11111', place: selectedDoctor.place || 'Adoni', referralDate: '20 Oct 2026', status: 'completed' },
-      { id: 'p-2', tokenNo: 'T015', patientName: 'Savitri', patientPhone: '91234 22222', place: selectedDoctor.place || 'Adoni', referralDate: '19 Oct 2026', status: 'completed' },
-      { id: 'p-3', tokenNo: 'T018', patientName: 'Mohammed Ali', patientPhone: '99887 33333', place: 'Gandikot', referralDate: '18 Oct 2026', status: 'completed' },
-      { id: 'p-4', tokenNo: 'T021', patientName: 'Lakshmi', patientPhone: '90123 44444', place: selectedDoctor.place || 'Adoni', referralDate: '18 Oct 2026', status: 'completed' },
-      { id: 'p-5', tokenNo: 'T025', patientName: 'Raju', patientPhone: '97012 55555', place: 'Yemmiganur', referralDate: '17 Oct 2026', status: 'completed' },
-      { id: 'p-6', tokenNo: 'T028', patientName: 'Fathima', patientPhone: '93456 66666', place: selectedDoctor.place || 'Adoni', referralDate: '16 Oct 2026', status: 'completed' },
-      { id: 'p-7', tokenNo: 'T031', patientName: 'Ramesh Babu', patientPhone: '90321 77777', place: 'Allagadda', referralDate: '15 Oct 2026', status: 'completed' },
-      { id: 'p-8', tokenNo: 'T034', patientName: 'Jyothi', patientPhone: '96123 88888', place: selectedDoctor.place || 'Adoni', referralDate: '14 Oct 2026', status: 'completed' },
-      { id: 'p-9', tokenNo: 'T037', patientName: 'Suresh', patientPhone: '99882 59999', place: 'Gandikot', referralDate: '14 Oct 2026', status: 'completed' },
-      { id: 'p-10', tokenNo: 'T040', patientName: 'Anitha', patientPhone: '91234 00011', place: selectedDoctor.place || 'Adoni', referralDate: '13 Oct 2026', status: 'completed' }
-    ];
-
-    const combined = [...livePatients, ...baseline];
 
     // Filter by sub-table search
     const pq = patientSearch.toLowerCase().trim();
-    return combined.filter(p => {
+    return livePatients.filter(p => {
       const matchName = p.patientName.toLowerCase().includes(pq);
       const matchPhone = p.patientPhone.includes(pq);
       const matchPlace = (p.place || '').toLowerCase().includes(pq);
@@ -218,9 +207,7 @@ export const DoctorReferences: React.FC = () => {
 
   const getDoctorCount = (doc: any) => {
     const norm = doc.name.toLowerCase().replace(/^(dr\.|rmp\.)\s*/, '').trim();
-    const live = doctorReferralCounts[norm] || 0;
-    const base = mockBaselineCounts[norm] || 12;
-    return live > 0 ? live : base;
+    return doctorReferralCounts[norm] || 0;
   };
 
   const handleAddDoctorSubmit = (e: React.FormEvent) => {
@@ -405,7 +392,29 @@ export const DoctorReferences: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {paginatedDoctors.map((doc, idx) => {
+                  {paginatedDoctors.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-12 text-center">
+                        <div className="max-w-xs mx-auto space-y-2">
+                          <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl mx-auto flex items-center justify-center">
+                            <Stethoscope size={24} />
+                          </div>
+                          <p className="font-extrabold text-slate-800 text-xs">No Referring Doctors Found</p>
+                          <p className="text-[11px] text-slate-400">
+                            Add your hospital's referring RMPs and clinics, or wait for patients to enter a doctor reference during booking.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => setShowAddModal(true)}
+                            className="mt-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all border-none cursor-pointer"
+                          >
+                            + Add Doctor Reference
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    paginatedDoctors.map((doc, idx) => {
                     const rowNum = (currentPage - 1) * itemsPerPage + idx + 1;
                     const isSelected = selectedDoctor?.id === doc.id;
                     const count = getDoctorCount(doc);
@@ -474,7 +483,7 @@ export const DoctorReferences: React.FC = () => {
                         </td>
                       </tr>
                     );
-                  })}
+                  }))}
                 </tbody>
               </table>
             </div>

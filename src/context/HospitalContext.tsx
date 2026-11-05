@@ -224,18 +224,7 @@ export interface DoctorReferenceRecord {
   avatar?: string;
 }
 
-export const INITIAL_DOCTOR_REFERENCES: DoctorReferenceRecord[] = [
-  { id: 'doc-ref-1', name: 'Dr. Srinivas', phone: '98765 43210', place: 'Adoni', qualification: 'RMP / General Practitioner', status: 'active', registeredDate: '2026-10-12', notes: 'Primary rural healthcare partner' },
-  { id: 'doc-ref-2', name: 'Dr. Ramesh', phone: '91234 56789', place: 'Yemmiganur', qualification: 'RMP', status: 'active', registeredDate: '2026-10-10', notes: 'Community clinic referral' },
-  { id: 'doc-ref-3', name: 'Dr. Mahesh', phone: '99887 66554', place: 'Mantralayam', qualification: 'RMP', status: 'active', registeredDate: '2026-10-08', notes: 'Pilgrim town clinic' },
-  { id: 'doc-ref-4', name: 'Dr. Prasad', phone: '98761 23456', place: 'Allagadda', qualification: 'RMP', status: 'active', registeredDate: '2026-10-05', notes: 'Mandal referral' },
-  { id: 'doc-ref-5', name: 'Dr. Shankar', phone: '90123 45678', place: 'Kurnool', qualification: 'RMP / MBBS', status: 'active', registeredDate: '2026-10-01', notes: 'City clinic' },
-  { id: 'doc-ref-6', name: 'Dr. Naresh', phone: '93456 78901', place: 'Gadivemula', qualification: 'RMP', status: 'active', registeredDate: '2026-09-28', notes: 'Rural primary care' },
-  { id: 'doc-ref-7', name: 'Dr. Imran', phone: '97012 34567', place: 'Adoni Rural', qualification: 'RMP', status: 'active', registeredDate: '2026-09-25', notes: 'Sub-district clinic' },
-  { id: 'doc-ref-8', name: 'Dr. Lakshman', phone: '90321 65489', place: 'Pattikonda', qualification: 'RMP', status: 'active', registeredDate: '2026-09-20', notes: 'Pattikonda junction clinic' },
-  { id: 'doc-ref-9', name: 'Dr. Saleem', phone: '96123 49876', place: 'Holagunda', qualification: 'RMP', status: 'active', registeredDate: '2026-09-18', notes: 'Border village clinic' },
-  { id: 'doc-ref-10', name: 'Dr. Raju', phone: '99882 33445', place: 'Nandyal', qualification: 'RMP', status: 'active', registeredDate: '2026-09-15', notes: 'Regional practitioner' },
-];
+export const INITIAL_DOCTOR_REFERENCES: DoctorReferenceRecord[] = [];
 
 // ─── Context type ─────────────────────────────────────────────────────────────
 
@@ -787,14 +776,18 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return localStorage.getItem('insta_hospital_auth_token') || `htok_${targetHospId}_default`;
   });
 
-  // Doctor References State & Operations
+  // Doctor References State & Operations (Demo-free, real-time only)
   const [doctorReferences, setDoctorReferences] = useState<DoctorReferenceRecord[]>(() => {
     const curHospId = targetHospId || localStorage.getItem('insta_current_hospital_id') || 'hosp-apollo';
     try {
       const saved = localStorage.getItem(`insta_hospital_doctor_references_${curHospId}`);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Clean out legacy demo references (doc-ref-1 to doc-ref-10)
+        return Array.isArray(parsed) ? parsed.filter(d => !/^doc-ref-([1-9]|10)$/.test(d.id)) : [];
+      }
     } catch (e) {}
-    return INITIAL_DOCTOR_REFERENCES;
+    return [];
   });
 
   const addDoctorReference = (refData: Omit<DoctorReferenceRecord, 'id' | 'registeredDate'>) => {
