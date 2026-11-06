@@ -2942,13 +2942,14 @@ app.post('/api/hospitals/:hospitalId/tokens', requireHospitalAuth, async (req, r
 
 app.patch('/api/hospitals/:hospitalId/tokens/:tokenId/status', requireHospitalAuth, async (req, res) => {
   const { hospitalId, tokenId } = req.params;
-  const { status, paymentStatus, paymentMethod } = req.body;
+  const { status, paymentStatus, paymentMethod, session } = req.body;
   const store = await getUnifiedStore();
 
   let targetToken = null;
   store.tokens = (store.tokens || []).map(t => {
     if (t.id === tokenId) {
       const newStatus = status || t.status;
+      const newSession = session || t.session;
       const computedPayStatus = paymentStatus !== undefined 
         ? paymentStatus 
         : (status === 'cancelled' ? 'refunded' : status === 'completed' ? (t.paymentStatus || 'paid') : t.paymentStatus);
@@ -2957,6 +2958,7 @@ app.patch('/api/hospitals/:hospitalId/tokens/:tokenId/status', requireHospitalAu
       targetToken = {
         ...t,
         status: newStatus,
+        session: newSession,
         paymentStatus: computedPayStatus,
         paymentMethod: computedPayMethod
       };
@@ -2965,11 +2967,15 @@ app.patch('/api/hospitals/:hospitalId/tokens/:tokenId/status', requireHospitalAu
     return t;
   });
 
-  if (targetToken && status) {
+  if (targetToken && (status || session)) {
     const apptStatus = status === 'completed' ? 'completed' : ['cancelled', 'not-visited', 'skipped'].includes(status) ? 'cancelled' : 'booked';
     store.appointments = (store.appointments || []).map(a => {
       if (a.id === tokenId || (targetToken && a.hospitalId === targetToken.hospitalId && a.doctorId === targetToken.doctorId && (a.tokenNumber === targetToken.tokenNo || a.tokenNumber === targetToken.tokenNumber))) {
-        return { ...a, status: apptStatus };
+        return {
+          ...a,
+          status: status ? apptStatus : a.status,
+          session: targetToken.session || a.session
+        };
       }
       return a;
     });
@@ -2979,20 +2985,27 @@ app.patch('/api/hospitals/:hospitalId/tokens/:tokenId/status', requireHospitalAu
     try {
       if (targetToken) {
         await query(
-          `UPDATE tokens SET status = $1, data = (COALESCE(data, '{}'::jsonb) || $2::jsonb), updated_at = NOW() WHERE id = $3`,
-          [targetToken.status, JSON.stringify(targetToken), tokenId]
+          `UPDATE tokens SET status = $1, session = $2, data = (COALESCE(data, '{}'::jsonb) || $3::jsonb), updated_at = NOW() WHERE id = $4`,
+          [targetToken.status, targetToken.session || 'Morning', JSON.stringify(targetToken), tokenId]
         );
-      } else if (status) {
+      } else if (status || session) {
         await query(
-          `UPDATE tokens SET status = $1::varchar, data = (COALESCE(data, '{}'::jsonb) || jsonb_build_object('status', $1::varchar)), updated_at = NOW() WHERE id = $2`,
-          [status, tokenId]
+          `UPDATE tokens SET status = COALESCE($1::varchar, status), session = COALESCE($2::varchar, session), data = (COALESCE(data, '{}'::jsonb) || jsonb_build_object('status', COALESCE($1::varchar, status), 'session', COALESCE($2::varchar, session))), updated_at = NOW() WHERE id = $3`,
+          [status || null, session || null, tokenId]
         );
       }
       // Update matching appointment in PostgreSQL
-      await query(
-        `UPDATE appointments SET status = $1::varchar, data = (COALESCE(data, '{}'::jsonb) || jsonb_build_object('status', $1::varchar)), updated_at = NOW() WHERE id = $2`,
-        [apptStatus, tokenId]
-      );
+      if (targetToken) {
+        const apptStatus = targetToken.status === 'completed' ? 'completed' : ['cancelled', 'not-visited', 'skipped'].includes(targetToken.status) ? 'cancelled' : 'booked';
+        await query(
+          `UPDATE appointments SET status = $1::varchar, data = (COALESCE(data, '{}'::jsonb) || jsonb_build_object('status', $1::varchar, 'session', $2::varchar)), updated_at = NOW() WHERE id = $3`,
+          [apptStatus, targetToken.session || 'Morning', tokenId]
+        );
+      }
+    } catch (dbErr) {
+      console.error('Error updating token status/session in AWS RDS:', dbErr.message);
+    }
+  }
 
       // Also update by hospital, doctor and token number if ID differs
       if (targetToken && (targetToken.tokenNo || targetToken.tokenNumber)) {

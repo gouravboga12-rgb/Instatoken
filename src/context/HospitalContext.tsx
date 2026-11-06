@@ -296,6 +296,7 @@ interface HospitalContextType {
   cancelToken: (id: string) => void;
   deleteToken: (id: string) => void;
   deleteTokens: (ids: string[]) => void;
+  updateTokenSession: (id: string, newSession: string) => void;
 
   // Patients
   addPatient: (p: Omit<PatientRecord, 'id' | 'uhid' | 'registeredOn' | 'totalVisits' | 'lastVisit' | 'tokenHistory'>) => void;
@@ -1973,6 +1974,45 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }).catch(() => {});
   };
 
+  const updateTokenSession = (id: string, newSession: string) => {
+    const normalizedSession = (newSession.toLowerCase()) as TokenRecord['session'];
+    setTokens(prev => {
+      const updated = prev.map(t => {
+        if (t.id === id) {
+          const resetStatus = ['not-visited', 'skipped'].includes(t.status) ? 'waiting' : t.status;
+          return {
+            ...t,
+            session: normalizedSession,
+            status: resetStatus
+          };
+        }
+        return t;
+      });
+      localStorage.setItem('insta_hospital_tokens', JSON.stringify(updated));
+      localStorage.setItem(`insta_hospital_tokens_${targetHospId}`, JSON.stringify(updated));
+      broadcastGlobalSync('HOSPITAL_TOKENS_UPDATED', updated);
+      return updated;
+    });
+
+    try {
+      const savedAppts = localStorage.getItem('insta_appointments');
+      if (savedAppts) {
+        const appts = JSON.parse(savedAppts);
+        const next = appts.map((a: any) => a.id === id ? { ...a, session: newSession, status: 'booked' } : a);
+        localStorage.setItem('insta_appointments', JSON.stringify(next));
+      }
+    } catch (e) {}
+
+    fetch(`/api/hospitals/${targetHospId}/tokens/${id}/status`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify({ session: newSession, status: 'waiting' })
+    }).catch(() => {});
+  };
+
   const updateTokenPayment = (
     id: string,
     paymentStatus: 'paid' | 'pending' | 'refunded',
@@ -2509,7 +2549,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       addDoctor, updateDoctor, deleteDoctor, toggleDoctorActive,
       addDepartment, updateDepartment, deleteDepartment, toggleDepartmentActive,
       addStaffMember, updateStaffMember, deleteStaffMember, markStaffAttendance,
-      generateWalkInToken, updateTokenStatus, updateTokenPayment, cancelToken, deleteToken, deleteTokens,
+      generateWalkInToken, updateTokenStatus, updateTokenPayment, cancelToken, deleteToken, deleteTokens, updateTokenSession,
       addPatient, updatePatient, searchPatients, validateToken,
       updateScheduleConfig, updateSession,
       sendNotification, clearHospitalNotifications,

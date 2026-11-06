@@ -14,7 +14,7 @@ import { TokenPaymentModal } from '../../components/hospital/TokenPaymentModal';
 export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorIdProp }) => {
   const params = useParams<{ doctorId: string }>();
   const doctorId = doctorIdProp || params.doctorId;
-  const { doctors, tokens, updateTokenStatus, updateTokenPayment, deleteToken, deleteTokens, hospitalProfile } = useHospital();
+  const { doctors, tokens, updateTokenStatus, updateTokenPayment, deleteToken, deleteTokens, updateTokenSession, hospitalProfile } = useHospital();
   const navigate = useNavigate();
 
   const doctor = doctors.find(d => d.id === doctorId) || doctors[0];
@@ -267,6 +267,39 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
     if (window.confirm(`Delete all ${count} unvisited / absent / pending tokens for ${doctor?.name || 'this doctor'} (${dateLabel})? This will permanently clear unvisited records at the end of the day.`)) {
       deleteTokens(unvisitedDoctorTokens.map(t => t.id));
     }
+  };
+
+  const handleShiftSession = (tok: TokenRecord, targetSessionName: string) => {
+    const cleanTarget = targetSessionName.toLowerCase();
+    const sessionObj = doctorSessions.find(s => s.name.toLowerCase() === cleanTarget);
+    const maxCapacity = (sessionObj as any)?.maxTokens || (cleanTarget.includes('morn') ? 30 : 20);
+
+    const targetDate = tok.bookingDate || todayStr;
+    const currentBookedCount = tokens.filter(t =>
+      t.doctorId === doctor?.id &&
+      (t.bookingDate || todayStr) === targetDate &&
+      (t.session || '').toLowerCase() === cleanTarget &&
+      t.status !== 'cancelled' &&
+      t.id !== tok.id
+    ).length;
+
+    const isFull = currentBookedCount >= maxCapacity;
+    const remainingSlots = Math.max(0, maxCapacity - currentBookedCount);
+    const patientLabel = tok.patientName ? `${tok.patientName} (Token #${tok.tokenNo})` : `Token #${tok.tokenNo}`;
+
+    if (isFull) {
+      const proceed = window.confirm(
+        `⚠️ Warning: ${sessionObj?.name || targetSessionName} Session is currently at full capacity (${currentBookedCount}/${maxCapacity} slots booked).\n\nDo you want to accommodate ${patientLabel} anyway as an over-quota consultation?`
+      );
+      if (!proceed) return;
+    } else {
+      const proceed = window.confirm(
+        `Shift ${patientLabel} from ${(tok.session || 'Morning')} to ${sessionObj?.name || targetSessionName} Session?\n\nAvailable slots in ${sessionObj?.name || targetSessionName}: ${remainingSlots} left (${currentBookedCount}/${maxCapacity} booked).`
+      );
+      if (!proceed) return;
+    }
+
+    updateTokenSession(tok.id, sessionObj?.name || targetSessionName);
   };
 
 
@@ -691,6 +724,7 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
                   const isCurrent = inConsultation?.id === tok.id;
                   const isNotVisited = ['not-visited', 'skipped'].includes(tok.status);
                   const isCompleted = tok.status === 'completed';
+                  const otherSessions = doctorSessions.filter(s => s.name.toLowerCase() !== (tok.session || 'morning').toLowerCase());
 
                   return (
                     <tr
@@ -858,6 +892,18 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
                               </button>
                             </>
                           )}
+
+                          {/* Option to shift to another session with Option 1 availability check */}
+                          {!isCompleted && otherSessions.map(os => (
+                            <button
+                              key={os.id}
+                              onClick={() => handleShiftSession(tok, os.name)}
+                              className="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold cursor-pointer flex items-center gap-1 transition-colors"
+                              title={`Shift to ${os.name} Session (${os.startTime} - ${os.endTime})`}
+                            >
+                              <Clock size={11} /> Shift {os.name}
+                            </button>
+                          ))}
 
                           {/* Delete option for unvisited / absent / cancelled / in-cabin patients */}
                           {tok.status !== 'completed' && (
