@@ -2,10 +2,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useHospital } from '../../context/HospitalContext';
 import {
-  Users, Ticket, Stethoscope, Wifi, WifiOff,
-  UserPlus, Plus, Calendar, Bell,
-  CheckCircle2, X, Printer, Play, SkipForward, Pause,
-  AlertTriangle
+  Users, Ticket, Stethoscope, Wifi,
+  UserPlus, Search,
+  CheckCircle2, X, Printer, Eye,
+  ArrowRight
 } from 'lucide-react';
 
 export const HospitalDashboard: React.FC = () => {
@@ -14,10 +14,14 @@ export const HospitalDashboard: React.FC = () => {
     hospitalProfile,
     tokens,
     doctors,
-    generateWalkInToken,
-    updateTokenStatus
+    generateWalkInToken
   } = useHospital();
   const navigate = useNavigate();
+
+  // Search & Filter state for Today's Queue
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedDoctorFilter, setSelectedDoctorFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'waiting' | 'in-cabin' | 'completed'>('all');
 
   // Walk-in modal state
   const [showWalkInModal, setShowWalkInModal] = useState(false);
@@ -27,6 +31,9 @@ export const HospitalDashboard: React.FC = () => {
   const [walkInAge, setWalkInAge] = useState('32');
   const [walkInDoctorId, setWalkInDoctorId] = useState(doctors[0]?.id || '');
   const [generatedSlip, setGeneratedSlip] = useState<any>(null);
+
+  // Detail Modal State
+  const [selectedTokenDetail, setSelectedTokenDetail] = useState<any>(null);
 
   // Sync walkInDoctorId when doctors load
   useEffect(() => {
@@ -64,44 +71,50 @@ export const HospitalDashboard: React.FC = () => {
     return filtered.length > 0 ? filtered : tokens;
   }, [tokens, todayStr]);
 
-  // Operational metrics (strictly non-revenue)
+  // Operational metrics (100% dynamic)
   const totalTokensCount = todayTokens.length;
   const offlineTokensCount = todayTokens.filter(t => t.type === 'offline').length;
   const onlineTokensCount = todayTokens.filter(t => t.type === 'online').length;
-  const onlinePercent = totalTokensCount > 0 ? Math.round((onlineTokensCount / totalTokensCount) * 100) : 0;
-  const offlinePercent = totalTokensCount > 0 ? 100 - onlinePercent : 0;
 
-  // Queue tokens
-  const queueTokens = useMemo(() => {
-    return todayTokens.filter(t =>
-      ['booked', 'waiting', 'checked-in', 'calling', 'in-consultation', 'in-consult'].includes(t.status as string)
-    );
-  }, [todayTokens]);
+  const waitingTokens = todayTokens.filter(t => ['waiting', 'booked'].includes(t.status as string));
+  const inCabinTokens = todayTokens.filter(t =>
+    ['checked-in', 'in-consultation', 'in-consult', 'calling'].includes(t.status as string)
+  );
+  const completedTokens = todayTokens.filter(t => t.status === 'completed');
+  const activeDoctors = doctors.filter(d => d.active !== false);
 
-  const activeDoctorsCount = doctors.filter(d => d.active !== false).length;
-  const completedTokensCount = todayTokens.filter(t => t.status === 'completed').length;
-  const waitingTokens = queueTokens.filter(t => ['waiting', 'booked'].includes(t.status as string));
-  const inConsultToken = queueTokens.find(t => ['checked-in', 'in-consultation', 'in-consult', 'calling'].includes(t.status as string)) || waitingTokens[0];
-  const nextTokensInLine = queueTokens.filter(t => t.id !== inConsultToken?.id).slice(0, 4);
+  // Filtered Today's Queue Table list
+  const filteredQueue = useMemo(() => {
+    return todayTokens.filter(t => {
+      // 1. Doctor Filter
+      if (selectedDoctorFilter !== 'all' && t.doctorId !== selectedDoctorFilter) {
+        return false;
+      }
 
-  // Handle live queue controls
-  const handleCallNext = () => {
-    if (waitingTokens.length > 0) {
-      updateTokenStatus(waitingTokens[0].id, 'checked-in');
-    }
-  };
+      // 2. Status Filter
+      if (statusFilter === 'waiting' && !['waiting', 'booked'].includes(t.status as string)) {
+        return false;
+      }
+      if (statusFilter === 'in-cabin' && !['checked-in', 'in-consultation', 'in-consult', 'calling'].includes(t.status as string)) {
+        return false;
+      }
+      if (statusFilter === 'completed' && t.status !== 'completed') {
+        return false;
+      }
 
-  const handleSkipToken = () => {
-    if (inConsultToken) {
-      updateTokenStatus(inConsultToken.id, 'skipped');
-    }
-  };
+      // 3. Search Query
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const tNum = (t.tokenNo || (t as any).tokenNumber || '').toString();
+        const pName = (t.patientName || '').toLowerCase();
+        const pPhone = (t.patientPhone || '').toLowerCase();
+        const dName = (t.doctorName || '').toLowerCase();
+        return tNum.includes(q) || pName.includes(q) || pPhone.includes(q) || dName.includes(q);
+      }
 
-  const handleHoldToken = () => {
-    if (inConsultToken) {
-      updateTokenStatus(inConsultToken.id, 'waiting');
-    }
-  };
+      return true;
+    });
+  }, [todayTokens, selectedDoctorFilter, statusFilter, searchQuery]);
 
   const handleCreateWalkIn = (e: React.FormEvent) => {
     e.preventDefault();
@@ -119,571 +132,420 @@ export const HospitalDashboard: React.FC = () => {
     setGeneratedSlip(newToken);
   };
 
-  // Recent activity list dynamically generated from actual hospital events
-  const recentActivities = useMemo(() => {
-    const list: { title: string; subtitle: string; time: string; type: 'online' | 'offline' | 'completed' | 'info' }[] = [];
-
-    tokens.slice(0, 6).forEach(t => {
-      if (t.status === 'completed') {
-        list.push({
-          title: `Token #${t.tokenNo} completed`,
-          subtitle: `Dr. ${t.doctorName || 'Doctor'} · ${t.patientName}`,
-          time: t.time || 'Today',
-          type: 'completed'
-        });
-      } else if (t.type === 'online') {
-        list.push({
-          title: `Online token booked`,
-          subtitle: `Patient: ${t.patientName} (${t.doctorName || 'Doctor'})`,
-          time: t.time || 'Today',
-          type: 'online'
-        });
-      } else {
-        list.push({
-          title: `Offline patient registered`,
-          subtitle: `Patient: ${t.patientName}`,
-          time: t.time || 'Today',
-          type: 'offline'
-        });
-      }
-    });
-
-    if (list.length === 0) {
-      return [
-        {
-          title: 'OPD Queue Active',
-          subtitle: `${activeDoctorsCount} doctors ready for consultations`,
-          time: 'Today',
-          type: 'info' as const
-        }
-      ];
-    }
-
-    return list.slice(0, 5);
-  }, [tokens, activeDoctorsCount]);
-
   return (
-    <div className="p-4 sm:p-6 space-y-5 max-w-[1600px] mx-auto bg-slate-50 min-h-screen">
-      
-      {/* ─── 1. TOP HEADER & QUICK ACTIONS (Image 75 style) ────────────────── */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white p-4 sm:p-5 rounded-3xl border border-slate-100 shadow-2xs">
+    <div className="p-4 sm:p-6 space-y-6 max-w-[1600px] mx-auto bg-slate-50 min-h-screen">
+
+      {/* ─── 1. TOP HEADER & OPERATIONAL ACTIONS ─────────────────────────────── */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-3xl border border-slate-100 shadow-2xs">
         <div>
-          <h2 className="text-xl sm:text-2xl font-black text-slate-800 tracking-tight font-heading leading-tight">
-            Good Morning, {firstName} 👋
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-[11px] font-black uppercase tracking-wider text-emerald-600">Hospital Live OPD</span>
+            <span className="text-slate-300">·</span>
+            <span className="text-xs font-bold text-slate-500">{dateFormatted}</span>
+          </div>
+          <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight font-heading mt-1">
+            Welcome, {firstName} 👋
           </h2>
           <p className="text-xs text-slate-400 font-semibold mt-0.5">
-            Here's what's happening at your hospital today · {dateFormatted}
+            {hospitalProfile?.name || 'Hospital Panel'} · Live queue and OPD doctor operations
           </p>
         </div>
 
-        {/* Quick Action Buttons matching Image 75 */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={() => navigate('/hospital/tokens/add')}
-            className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-sm shadow-blue-500/20 cursor-pointer border-none transition-all active:scale-95"
-          >
-            <Plus size={14} />
-            <span>+ Add Token</span>
-          </button>
-
+        {/* Action Buttons */}
+        <div className="flex items-center gap-2.5 flex-wrap">
           <button
             onClick={() => {
               setGeneratedSlip(null);
               setShowWalkInModal(true);
             }}
-            className="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-extrabold flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-2xs"
+            className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-sm shadow-blue-500/20 cursor-pointer border-none transition-all active:scale-95"
           >
-            <UserPlus size={14} className="text-blue-600" />
-            <span>Register Patient</span>
+            <UserPlus size={15} />
+            <span>+ Walk-in Token</span>
           </button>
 
           <button
             onClick={() => navigate('/hospital/doctors')}
-            className="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-extrabold flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-2xs"
+            className="px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-extrabold flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-2xs"
           >
-            <Stethoscope size={14} className="text-emerald-600" />
-            <span>Add Doctor</span>
+            <Stethoscope size={15} className="text-emerald-600" />
+            <span>+ Add Doctor</span>
           </button>
 
           <button
-            onClick={() => navigate('/hospital/tokens/today')}
-            className="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-extrabold flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-2xs"
+            onClick={() => navigate('/hospital/tokens/all')}
+            className="px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-extrabold flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-2xs"
           >
-            <Calendar size={14} className="text-purple-600" />
-            <span>View Today's Tokens</span>
+            <Ticket size={15} className="text-purple-600" />
+            <span>All Tokens Directory</span>
           </button>
         </div>
       </div>
 
-      {/* ─── 2. TOP KPI CARDS (NO REVENUE! Image 75 style) ─────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+      {/* ─── 2. OPERATIONAL KPI METRICS (100% Dynamic) ───────────────────────── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         
-        {/* Card 1: Today's Tokens */}
-        <div className="bg-white rounded-2xl border border-slate-150 p-4 shadow-2xs hover:shadow-xs transition-shadow">
+        {/* KPI 1: Today's Tokens */}
+        <div className="bg-white rounded-3xl border border-slate-100 p-5 shadow-2xs hover:shadow-xs transition-shadow">
           <div className="flex items-center justify-between">
-            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-black">
-              <Ticket size={18} />
+            <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-black">
+              <Ticket size={20} />
             </div>
-            <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
-              Live Today
+            <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full uppercase tracking-wider">
+              Today's OPD
             </span>
           </div>
-          <div className="mt-3">
-            <span className="text-2xl sm:text-3xl font-black text-slate-900 leading-none block font-heading">
+          <div className="mt-4">
+            <span className="text-3xl font-black text-slate-900 leading-none block font-heading">
               {totalTokensCount}
             </span>
-            <span className="text-xs font-bold text-slate-500 mt-1 block">Today's Tokens</span>
-            <span className="text-[10px] text-slate-400 font-semibold block mt-0.5">Total booked today</span>
+            <span className="text-xs font-bold text-slate-700 mt-1.5 block">Today's Tokens</span>
+            <span className="text-[11px] text-slate-400 font-semibold block mt-0.5">
+              {onlineTokensCount} Online · {offlineTokensCount} Walk-in
+            </span>
           </div>
         </div>
 
-        {/* Card 2: Online Tokens */}
-        <div className="bg-white rounded-2xl border border-slate-150 p-4 shadow-2xs hover:shadow-xs transition-shadow">
+        {/* KPI 2: Waiting Queue */}
+        <div className="bg-white rounded-3xl border border-slate-100 p-5 shadow-2xs hover:shadow-xs transition-shadow">
           <div className="flex items-center justify-between">
-            <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-black">
-              <Wifi size={18} />
+            <div className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center font-black">
+              <Users size={20} />
             </div>
-            <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
-              {onlinePercent}% Share
-            </span>
-          </div>
-          <div className="mt-3">
-            <span className="text-2xl sm:text-3xl font-black text-slate-900 leading-none block font-heading">
-              {onlineTokensCount}
-            </span>
-            <span className="text-xs font-bold text-slate-500 mt-1 block">Online Tokens</span>
-            <span className="text-[10px] text-emerald-600 font-bold block mt-0.5">App booked tokens</span>
-          </div>
-        </div>
-
-        {/* Card 3: Offline / Walk-in */}
-        <div className="bg-white rounded-2xl border border-slate-150 p-4 shadow-2xs hover:shadow-xs transition-shadow">
-          <div className="flex items-center justify-between">
-            <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-black">
-              <WifiOff size={18} />
-            </div>
-            <span className="text-[10px] font-black text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full">
-              {offlinePercent}% Share
-            </span>
-          </div>
-          <div className="mt-3">
-            <span className="text-2xl sm:text-3xl font-black text-slate-900 leading-none block font-heading">
-              {offlineTokensCount}
-            </span>
-            <span className="text-xs font-bold text-slate-500 mt-1 block">Offline / Walk-in</span>
-            <span className="text-[10px] text-purple-600 font-bold block mt-0.5">Counter registered</span>
-          </div>
-        </div>
-
-        {/* Card 4: Patients in Queue */}
-        <div className="bg-white rounded-2xl border border-slate-150 p-4 shadow-2xs hover:shadow-xs transition-shadow">
-          <div className="flex items-center justify-between">
-            <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-black">
-              <Users size={18} />
-            </div>
-            <span className="text-[10px] font-black text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
+            <span className="text-[10px] font-black text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full uppercase tracking-wider">
               In Clinic
             </span>
           </div>
-          <div className="mt-3">
-            <span className="text-2xl sm:text-3xl font-black text-slate-900 leading-none block font-heading">
-              {queueTokens.length}
+          <div className="mt-4">
+            <span className="text-3xl font-black text-slate-900 leading-none block font-heading">
+              {waitingTokens.length}
             </span>
-            <span className="text-xs font-bold text-slate-500 mt-1 block">Waiting Patients</span>
-            <span className="text-[10px] text-amber-600 font-bold block mt-0.5">{waitingTokens.length} awaiting call</span>
+            <span className="text-xs font-bold text-slate-700 mt-1.5 block">Waiting in Queue</span>
+            <span className="text-[11px] text-amber-600 font-bold block mt-0.5">
+              {inCabinTokens.length} currently in cabin
+            </span>
           </div>
         </div>
 
-        {/* Card 5: Active Doctors */}
-        <div className="bg-white rounded-2xl border border-slate-150 p-4 shadow-2xs hover:shadow-xs transition-shadow col-span-2 sm:col-span-1">
+        {/* KPI 3: Visited / Completed */}
+        <div className="bg-white rounded-3xl border border-slate-100 p-5 shadow-2xs hover:shadow-xs transition-shadow">
           <div className="flex items-center justify-between">
-            <div className="w-9 h-9 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center font-black">
-              <Stethoscope size={18} />
+            <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-black">
+              <CheckCircle2 size={20} />
             </div>
-            <span className="text-[10px] font-black text-sky-600 bg-sky-50 px-2 py-0.5 rounded-full">
+            <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full uppercase tracking-wider">
+              Completed
+            </span>
+          </div>
+          <div className="mt-4">
+            <span className="text-3xl font-black text-slate-900 leading-none block font-heading">
+              {completedTokens.length}
+            </span>
+            <span className="text-xs font-bold text-slate-700 mt-1.5 block">Visited Today</span>
+            <span className="text-[11px] text-emerald-600 font-bold block mt-0.5">
+              Consultations completed
+            </span>
+          </div>
+        </div>
+
+        {/* KPI 4: Active Doctors */}
+        <div className="bg-white rounded-3xl border border-slate-100 p-5 shadow-2xs hover:shadow-xs transition-shadow">
+          <div className="flex items-center justify-between">
+            <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black">
+              <Stethoscope size={20} />
+            </div>
+            <span className="text-[10px] font-black text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-full uppercase tracking-wider">
               On Duty
             </span>
           </div>
-          <div className="mt-3">
-            <span className="text-2xl sm:text-3xl font-black text-slate-900 leading-none block font-heading">
-              {activeDoctorsCount}
+          <div className="mt-4">
+            <span className="text-3xl font-black text-slate-900 leading-none block font-heading">
+              {activeDoctors.length}
             </span>
-            <span className="text-xs font-bold text-slate-500 mt-1 block">Active Doctors</span>
-            <span className="text-[10px] text-sky-600 font-bold block mt-0.5">{doctors.length} enrolled total</span>
+            <span className="text-xs font-bold text-slate-700 mt-1.5 block">Active Doctors</span>
+            <span className="text-[11px] text-indigo-600 font-bold block mt-0.5">
+              {doctors.length} enrolled total
+            </span>
           </div>
         </div>
 
       </div>
 
-      {/* ─── 3. ROW: LIVE TOKEN QUEUE + TODAY'S TOKEN STATUS + ACTIVITY ───── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        
-        {/* 3A. Live Token Queue Hero Spotlight (Image 75 style) */}
-        <div className="lg:col-span-4 bg-white rounded-3xl border border-slate-150 p-4 sm:p-5 shadow-2xs flex flex-col justify-between space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <h3 className="text-xs font-black text-slate-800 uppercase tracking-wide">Live Token Queue</h3>
-            </div>
-            <button
-              onClick={() => navigate('/hospital/tokens/all')}
-              className="text-[11px] font-bold text-blue-600 hover:underline cursor-pointer border-none bg-transparent"
-            >
-              View All
-            </button>
-          </div>
-
-          {/* Now Serving Big Banner */}
-          <div className="bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-2xl p-4 text-center shadow-sm">
-            <span className="text-[10px] font-black uppercase tracking-widest text-blue-200 block">
-              Now Serving
-            </span>
-            <div className="text-4xl font-black font-heading mt-1">
-              {inConsultToken ? `#${inConsultToken.tokenNo}` : '—'}
-            </div>
-            <div className="mt-2 pt-2 border-t border-white/20 grid grid-cols-3 gap-1 text-[10px]">
-              <div>
-                <span className="text-blue-200 block">Doctor</span>
-                <span className="font-extrabold truncate block">{inConsultToken?.doctorName || doctors[0]?.name || 'Available'}</span>
-              </div>
-              <div>
-                <span className="text-blue-200 block">Session</span>
-                <span className="font-extrabold capitalize block">{inConsultToken?.session || 'Morning'}</span>
-              </div>
-              <div>
-                <span className="text-blue-200 block">Waiting</span>
-                <span className="font-extrabold block">{waitingTokens.length}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Next Tokens In Line */}
+      {/* ─── 3. DOCTOR OPD CABIN STATUS (Live Roster across all Doctors) ──────── */}
+      <div className="bg-white rounded-3xl border border-slate-100 p-5 shadow-2xs space-y-4">
+        <div className="flex items-center justify-between">
           <div>
-            <span className="text-[10px] font-black uppercase text-slate-400 block mb-1.5 tracking-wider">
-              Next in Line
-            </span>
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-              {nextTokensInLine.length > 0 ? (
-                nextTokensInLine.map((t, idx) => (
-                  <React.Fragment key={t.id}>
-                    <span className="bg-slate-100 text-slate-800 text-xs font-black px-2.5 py-1 rounded-xl shrink-0">
-                      #{t.tokenNo}
-                    </span>
-                    {idx < nextTokensInLine.length - 1 && (
-                      <span className="text-slate-300 font-bold text-xs shrink-0">→</span>
-                    )}
-                  </React.Fragment>
-                ))
-              ) : (
-                <span className="text-xs text-slate-400 font-semibold">No pending queue</span>
-              )}
-            </div>
+            <h3 className="text-sm font-black text-slate-800 uppercase tracking-wide flex items-center gap-2">
+              <Stethoscope size={16} className="text-blue-600" />
+              <span>Doctor OPD Cabin Status</span>
+            </h3>
+            <p className="text-[11px] text-slate-400 font-semibold mt-0.5">
+              Live consultation status & token queues across all {doctors.length} doctors
+            </p>
           </div>
-
-          {/* Quick Action Buttons */}
-          <div className="grid grid-cols-3 gap-2 pt-1 border-t border-slate-100">
-            <button
-              onClick={handleCallNext}
-              disabled={waitingTokens.length === 0}
-              className="py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-black flex items-center justify-center gap-1 cursor-pointer border-none shadow-2xs transition-colors"
-            >
-              <Play size={11} fill="white" />
-              <span>Call Next</span>
-            </button>
-            <button
-              onClick={handleSkipToken}
-              disabled={!inConsultToken}
-              className="py-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white rounded-xl text-xs font-black flex items-center justify-center gap-1 cursor-pointer border-none shadow-2xs transition-colors"
-            >
-              <SkipForward size={11} />
-              <span>Skip</span>
-            </button>
-            <button
-              onClick={handleHoldToken}
-              disabled={!inConsultToken}
-              className="py-2 bg-slate-800 hover:bg-slate-900 disabled:opacity-50 text-white rounded-xl text-xs font-black flex items-center justify-center gap-1 cursor-pointer border-none shadow-2xs transition-colors"
-            >
-              <Pause size={11} />
-              <span>Hold</span>
-            </button>
-          </div>
-        </div>
-
-        {/* 3B. Today's Token Status Table (Image 75 style) */}
-        <div className="lg:col-span-5 bg-white rounded-3xl border border-slate-150 p-4 sm:p-5 shadow-2xs flex flex-col justify-between space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-xs font-black text-slate-800 uppercase tracking-wide">Today's Token Status</h3>
-              <p className="text-[10px] text-slate-400 font-semibold">Live status breakdown across departments</p>
-            </div>
-            <button
-              onClick={() => navigate('/hospital/tokens/today')}
-              className="text-[11px] font-bold text-blue-600 hover:underline cursor-pointer border-none bg-transparent"
-            >
-              View All
-            </button>
-          </div>
-
-          {/* Online vs Offline Channel Split Summary */}
-          <div className="grid grid-cols-2 gap-2 bg-slate-50 p-2.5 rounded-2xl border border-slate-100">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
-                <Wifi size={13} />
-              </div>
-              <div>
-                <span className="text-[9.5px] font-black uppercase text-slate-400 block">Online</span>
-                <span className="text-xs font-black text-slate-800">{onlineTokensCount} Tokens ({onlinePercent}%)</span>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center">
-                <Users size={13} />
-              </div>
-              <div>
-                <span className="text-[9.5px] font-black uppercase text-slate-400 block">Offline / Walk-in</span>
-                <span className="text-xs font-black text-slate-800">{offlineTokensCount} Tokens ({offlinePercent}%)</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Mini Real Token Table */}
-          <div className="overflow-x-auto flex-1 max-h-56">
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-slate-100 text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">
-                  <th className="pb-1.5 font-bold">Token</th>
-                  <th className="pb-1.5 font-bold">Patient</th>
-                  <th className="pb-1.5 font-bold">Doctor</th>
-                  <th className="pb-1.5 font-bold">Type</th>
-                  <th className="pb-1.5 font-bold">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {todayTokens.slice(0, 5).map(t => {
-                  const isDone = t.status === 'completed';
-                  const isConsult = ['checked-in', 'in-consultation', 'in-consult'].includes(t.status as string);
-                  return (
-                    <tr key={t.id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="py-2 font-black text-slate-800">#{t.tokenNo}</td>
-                      <td className="py-2 font-extrabold text-slate-700 truncate max-w-[100px]">{t.patientName}</td>
-                      <td className="py-2 text-slate-500 font-semibold truncate max-w-[90px]">{t.doctorName}</td>
-                      <td className="py-2">
-                        <span className={`text-[9.5px] font-black px-1.5 py-0.5 rounded ${t.type === 'online' ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700'}`}>
-                          {t.type?.toUpperCase()}
-                        </span>
-                      </td>
-                      <td className="py-2">
-                        <span className={`text-[9.5px] font-black px-2 py-0.5 rounded-full ${
-                          isDone ? 'bg-emerald-50 text-emerald-700' : isConsult ? 'bg-amber-50 text-amber-700' : 'bg-blue-50 text-blue-700'
-                        }`}>
-                          {isDone ? 'Done' : isConsult ? 'In Cabin' : 'Waiting'}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* 3C. Today's Activity Feed (Image 75 style) */}
-        <div className="lg:col-span-3 bg-white rounded-3xl border border-slate-150 p-4 sm:p-5 shadow-2xs flex flex-col justify-between space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-black text-slate-800 uppercase tracking-wide">Today's Activity</h3>
-            <span className="text-[10px] font-bold text-slate-400">Live</span>
-          </div>
-
-          <div className="divide-y divide-slate-50 space-y-2.5 overflow-y-auto max-h-64 pr-1">
-            {recentActivities.map((act, idx) => (
-              <div key={idx} className="pt-2 first:pt-0 flex items-start gap-2.5">
-                <span className={`w-2 h-2 rounded-full mt-1 shrink-0 ${
-                  act.type === 'completed' ? 'bg-emerald-500' : act.type === 'online' ? 'bg-blue-500' : 'bg-purple-500'
-                }`} />
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-extrabold text-slate-800 leading-tight truncate">{act.title}</p>
-                  <p className="text-[10.5px] text-slate-400 font-medium truncate mt-0.5">{act.subtitle}</p>
-                </div>
-                <span className="text-[9.5px] text-slate-400 font-bold shrink-0">{act.time}</span>
-              </div>
-            ))}
-          </div>
-
           <button
-            onClick={() => navigate('/hospital/communication')}
-            className="w-full py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer border border-slate-200/80 text-center"
+            onClick={() => navigate('/hospital/doctors')}
+            className="text-xs font-bold text-blue-600 hover:underline cursor-pointer border-none bg-transparent"
           >
-            Communication Center →
+            Manage Doctors →
           </button>
         </div>
 
-      </div>
-
-      {/* ─── 4. ROW: TODAY'S DOCTORS + RECENT PATIENTS + SCHEDULE & ALERTS ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        
-        {/* 4A. Today's Doctors Roster (Image 75 style) */}
-        <div className="lg:col-span-5 bg-white rounded-3xl border border-slate-150 p-4 sm:p-5 shadow-2xs space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-xs font-black text-slate-800 uppercase tracking-wide">Today's Doctors</h3>
-              <p className="text-[10px] text-slate-400 font-semibold">{doctors.length} doctors listed at hospital</p>
-            </div>
+        {doctors.length === 0 ? (
+          <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+            <Stethoscope size={28} className="text-slate-300 mx-auto mb-2" />
+            <p className="text-xs font-bold text-slate-500">No doctors registered yet.</p>
             <button
               onClick={() => navigate('/hospital/doctors')}
-              className="text-[11px] font-bold text-blue-600 hover:underline cursor-pointer border-none bg-transparent"
+              className="mt-2 text-xs font-black text-blue-600 hover:underline cursor-pointer border-none bg-transparent"
             >
-              Manage All
+              + Add First Doctor
             </button>
           </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-72 overflow-y-auto pr-1">
-            {doctors.slice(0, 4).map(doc => {
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+            {doctors.map(doc => {
               const docTokens = todayTokens.filter(t => t.doctorId === doc.id);
+              const docWaiting = docTokens.filter(t => ['waiting', 'booked'].includes(t.status as string)).length;
+              const docInCabin = docTokens.filter(t => ['checked-in', 'in-consultation', 'in-consult', 'calling'].includes(t.status as string)).length;
+              const docCompleted = docTokens.filter(t => t.status === 'completed').length;
               const isAvailable = doc.active !== false;
 
               return (
-                <div key={doc.id} className="p-3 bg-slate-50 border border-slate-150 rounded-2xl flex flex-col justify-between space-y-2">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-black shrink-0 overflow-hidden">
-                      {doc.photo || (doc as any).image ? (
-                        <img src={doc.photo || (doc as any).image} alt={doc.name} className="w-full h-full object-cover" />
-                      ) : (
-                        doc.name.charAt(0)
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                      <h4 className="text-xs font-black text-slate-800 truncate">{doc.name}</h4>
-                      <p className="text-[10px] text-slate-400 font-medium truncate">{doc.specialization || (doc as any).specialty || doc.departmentName || 'Specialist'}</p>
-                      <span className={`text-[8.5px] font-black px-1.5 py-0.2 rounded-full inline-block mt-0.5 ${
-                        isAvailable ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'
-                      }`}>
-                        {isAvailable ? '● Available' : '○ Off-duty'}
-                      </span>
+                <div
+                  key={doc.id}
+                  className="p-4 bg-slate-50/80 hover:bg-slate-50 border border-slate-200/80 rounded-2xl flex flex-col justify-between space-y-3 transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-3">
+                      <div className="w-11 h-11 rounded-2xl bg-blue-100 text-blue-700 flex items-center justify-center font-black text-sm shrink-0 overflow-hidden shadow-xs">
+                        {doc.photo || (doc as any).image ? (
+                          <img src={doc.photo || (doc as any).image} alt={doc.name} className="w-full h-full object-cover" />
+                        ) : (
+                          doc.name.charAt(0)
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="text-xs font-black text-slate-900 truncate">{doc.name}</h4>
+                        <p className="text-[10.5px] text-slate-500 font-semibold truncate mt-0.5">
+                          {doc.specialization || (doc as any).specialty || doc.departmentName || 'Specialist'}
+                        </p>
+                        <span className={`text-[9px] font-black px-2 py-0.5 rounded-full inline-block mt-1 ${
+                          isAvailable ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'
+                        }`}>
+                          {isAvailable ? '● Available' : '○ Off-duty'}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-[10px]">
-                    <span className="text-slate-500 font-bold">Today: {docTokens.length} Tokens</span>
-                    <button
-                      onClick={() => navigate(`/hospital/tokens/doctor/${doc.id}`)}
-                      className="px-2 py-1 bg-white hover:bg-blue-50 text-blue-600 rounded-lg font-black border border-slate-200 shadow-3xs cursor-pointer"
-                    >
-                      Cabin Screen →
-                    </button>
+                  {/* Token Numbers breakdown */}
+                  <div className="grid grid-cols-3 gap-1.5 bg-white p-2.5 rounded-xl border border-slate-150 text-center">
+                    <div>
+                      <span className="text-[9px] font-bold text-slate-400 block uppercase">Waiting</span>
+                      <span className="text-xs font-black text-amber-600">{docWaiting}</span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] font-bold text-slate-400 block uppercase">In Cabin</span>
+                      <span className="text-xs font-black text-blue-600">{docInCabin}</span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] font-bold text-slate-400 block uppercase">Done</span>
+                      <span className="text-xs font-black text-emerald-600">{docCompleted}</span>
+                    </div>
                   </div>
+
+                  {/* Direct link to Cabin Screen */}
+                  <button
+                    onClick={() => navigate(`/hospital/tokens/doctor/${doc.id}`)}
+                    className="w-full py-2 bg-white hover:bg-blue-600 hover:text-white text-blue-600 rounded-xl text-xs font-black border border-blue-200 hover:border-blue-600 shadow-2xs cursor-pointer transition-all flex items-center justify-center gap-1.5"
+                  >
+                    <span>Open Cabin Screen</span>
+                    <ArrowRight size={13} />
+                  </button>
                 </div>
               );
             })}
           </div>
-        </div>
+        )}
+      </div>
 
-        {/* 4B. Recent Patients Queue (Image 75 style) */}
-        <div className="lg:col-span-4 bg-white rounded-3xl border border-slate-150 p-4 sm:p-5 shadow-2xs space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-xs font-black text-slate-800 uppercase tracking-wide">Recent Patients</h3>
-              <p className="text-[10px] text-slate-400 font-semibold">Live registration queue</p>
-            </div>
-            <button
-              onClick={() => navigate('/hospital/patients')}
-              className="text-[11px] font-bold text-blue-600 hover:underline cursor-pointer border-none bg-transparent"
-            >
-              All Patients
-            </button>
-          </div>
-
-          <div className="overflow-x-auto max-h-72">
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-slate-100 text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">
-                  <th className="pb-1.5 font-bold">Patient</th>
-                  <th className="pb-1.5 font-bold">Doctor</th>
-                  <th className="pb-1.5 font-bold">Token</th>
-                  <th className="pb-1.5 font-bold">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {todayTokens.slice(0, 6).map(t => (
-                  <tr key={t.id} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="py-2.5">
-                      <span className="font-extrabold text-slate-800 block leading-tight">{t.patientName}</span>
-                      <span className="text-[10px] text-slate-400 block">{t.patientPhone || '—'}</span>
-                    </td>
-                    <td className="py-2.5 text-slate-600 font-semibold truncate max-w-[100px]">{t.doctorName}</td>
-                    <td className="py-2.5 font-black text-blue-600">#{t.tokenNo}</td>
-                    <td className="py-2.5">
-                      <span className={`text-[9.5px] font-black px-2 py-0.5 rounded-full ${
-                        t.status === 'completed' ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700'
-                      }`}>
-                        {t.status === 'completed' ? 'Done' : 'Waiting'}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* 4C. OPD Schedule & Notifications (Image 75 style) */}
-        <div className="lg:col-span-3 space-y-4">
-          
-          {/* Doctor Sessions Mini Schedule */}
-          <div className="bg-white rounded-3xl border border-slate-150 p-4 sm:p-5 shadow-2xs space-y-2.5">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-black text-slate-800 uppercase tracking-wide">Doctor Schedule</h3>
-              <button
-                onClick={() => navigate('/hospital/tokens/manage')}
-                className="text-[11px] font-bold text-blue-600 hover:underline cursor-pointer border-none bg-transparent"
-              >
-                Schedule
-              </button>
-            </div>
-
-            <div className="space-y-1.5 text-xs">
-              {doctors.slice(0, 3).map(d => {
-                const docTokensCount = todayTokens.filter(t => t.doctorId === d.id).length;
-                const limit = d.maxTokensPerDay || 40;
-                const remaining = Math.max(0, limit - docTokensCount);
-
-                return (
-                  <div key={d.id} className="p-2 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between">
-                    <div>
-                      <span className="font-extrabold text-slate-800 block text-[11px] truncate max-w-[120px]">{d.name}</span>
-                      <span className="text-[9.5px] text-slate-400">Morning &amp; Evening</span>
-                    </div>
-                    <div className="text-right">
-                      <span className="font-black text-blue-600 text-xs">{docTokensCount}/{limit}</span>
-                      <span className="text-[9px] text-emerald-600 font-bold block">{remaining} slots left</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Real Operational Alerts */}
-          <div className="bg-white rounded-3xl border border-slate-150 p-4 sm:p-5 shadow-2xs space-y-2">
-            <h3 className="text-xs font-black text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
-              <Bell size={13} className="text-amber-500" />
-              <span>Queue Alerts &amp; Notes</span>
+      {/* ─── 4. TODAY'S LIVE QUEUE TABLE (Comprehensive & Functional) ──────── */}
+      <div className="bg-white rounded-3xl border border-slate-100 shadow-2xs overflow-hidden p-5 space-y-4">
+        
+        {/* Table Header & Controls */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-2 border-b border-slate-100">
+          <div>
+            <h3 className="text-sm font-black text-slate-800 uppercase tracking-wide flex items-center gap-2">
+              <Ticket size={16} className="text-blue-600" />
+              <span>Today's Live Queue ({filteredQueue.length} Tokens)</span>
             </h3>
-
-            <div className="space-y-1.5 text-xs">
-              <div className="p-2 bg-amber-50/70 border border-amber-200/60 rounded-xl text-amber-900 text-[11px] font-bold flex items-center gap-2">
-                <AlertTriangle size={13} className="text-amber-600 shrink-0" />
-                <span>{waitingTokens.length} patients currently waiting in queue.</span>
-              </div>
-              <div className="p-2 bg-blue-50/70 border border-blue-200/60 rounded-xl text-blue-900 text-[11px] font-bold flex items-center gap-2">
-                <CheckCircle2 size={13} className="text-blue-600 shrink-0" />
-                <span>{completedTokensCount} patients attended today.</span>
-              </div>
-            </div>
+            <p className="text-[11px] text-slate-400 font-semibold mt-0.5">
+              Live patient registration and status across all consultations today
+            </p>
           </div>
 
+          {/* Search & Doctor Filter */}
+          <div className="flex items-center gap-2.5 flex-wrap">
+            {/* Search Input */}
+            <div className="relative w-full sm:w-64">
+              <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search token #, patient, phone..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-3.5 py-2 border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-blue-500 bg-slate-50"
+              />
+            </div>
+
+            {/* Doctor Filter Dropdown */}
+            <select
+              value={selectedDoctorFilter}
+              onChange={e => setSelectedDoctorFilter(e.target.value)}
+              className="px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold outline-none bg-white text-slate-700 cursor-pointer"
+            >
+              <option value="all">All Doctors ({doctors.length})</option>
+              {doctors.map(d => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
+            </select>
+
+            {/* Status Filter Dropdown */}
+            <select
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value as any)}
+              className="px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold outline-none bg-white text-slate-700 cursor-pointer"
+            >
+              <option value="all">All Statuses</option>
+              <option value="waiting">Waiting ({waitingTokens.length})</option>
+              <option value="in-cabin">In Cabin ({inCabinTokens.length})</option>
+              <option value="completed">Visited ({completedTokens.length})</option>
+            </select>
+          </div>
         </div>
 
+        {/* Live Queue Table */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead>
+              <tr className="bg-slate-50/80 border-b border-slate-100 text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                <th className="py-3 px-4">Token #</th>
+                <th className="py-3 px-4">Patient Details</th>
+                <th className="py-3 px-4">Doctor</th>
+                <th className="py-3 px-4">Session & Time</th>
+                <th className="py-3 px-4">Source</th>
+                <th className="py-3 px-4">Status</th>
+                <th className="py-3 px-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 font-semibold">
+              {filteredQueue.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-12 text-center text-slate-400 font-bold">
+                    No tokens match the active search or filters for today.
+                  </td>
+                </tr>
+              ) : (
+                filteredQueue.map(t => {
+                  const isDone = t.status === 'completed';
+                  const isCabin = ['checked-in', 'in-consultation', 'in-consult', 'calling'].includes(t.status as string);
+                  const isNotVisited = ['not-visited', 'skipped'].includes(t.status as string);
+                  const isCancelled = t.status === 'cancelled';
+
+                  return (
+                    <tr key={t.id} className="hover:bg-slate-50/70 transition-colors">
+                      {/* Token # */}
+                      <td className="py-3.5 px-4 font-black text-slate-900 text-sm">
+                        #{t.tokenNo || (t as any).tokenNumber}
+                      </td>
+
+                      {/* Patient Details */}
+                      <td className="py-3.5 px-4">
+                        <span className="font-extrabold text-slate-800 block leading-tight">{t.patientName}</span>
+                        <span className="text-[10px] text-slate-400 block mt-0.5">
+                          {t.patientAgeDisplay || (t.patientAge ? `${t.patientAge}y` : '')} {t.patientGender ? `· ${t.patientGender}` : ''} {t.patientPhone ? `· ${t.patientPhone}` : ''}
+                        </span>
+                      </td>
+
+                      {/* Doctor */}
+                      <td className="py-3.5 px-4">
+                        <span className="font-bold text-slate-700 block truncate max-w-[150px]">
+                          {t.doctorName || 'Doctor Assigned'}
+                        </span>
+                        <span className="text-[10px] text-slate-400 block">
+                          {t.departmentName || 'General OPD'}
+                        </span>
+                      </td>
+
+                      {/* Session & Time */}
+                      <td className="py-3.5 px-4">
+                        <span className="font-bold text-slate-700 capitalize block">
+                          {t.session || 'Morning'}
+                        </span>
+                        <span className="text-[10px] text-slate-400 block">
+                          {t.time || t.bookingDate || 'Today'}
+                        </span>
+                      </td>
+
+                      {/* Source */}
+                      <td className="py-3.5 px-4">
+                        <span className={`inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full ${
+                          t.type === 'online'
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                            : 'bg-blue-50 text-blue-700 border border-blue-100'
+                        }`}>
+                          {t.type === 'online' ? <Wifi size={10} /> : <Users size={10} />}
+                          <span>{t.type === 'online' ? 'Online App' : 'Walk-in'}</span>
+                        </span>
+                      </td>
+
+                      {/* Status */}
+                      <td className="py-3.5 px-4">
+                        <span className={`inline-block text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider ${
+                          isDone
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : isCabin
+                            ? 'bg-blue-600 text-white'
+                            : isNotVisited
+                            ? 'bg-amber-100 text-amber-800'
+                            : isCancelled
+                            ? 'bg-red-100 text-red-700'
+                            : 'bg-amber-50 text-amber-700 border border-amber-200/80'
+                        }`}>
+                          {isDone ? 'Visited' : isCabin ? 'In Cabin' : isNotVisited ? 'Not Visited' : isCancelled ? 'Cancelled' : 'Waiting'}
+                        </span>
+                      </td>
+
+                      {/* Actions */}
+                      <td className="py-3.5 px-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => setSelectedTokenDetail(t)}
+                            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg cursor-pointer transition-colors"
+                            title="View Patient Details"
+                          >
+                            <Eye size={14} />
+                          </button>
+                          {t.doctorId && (
+                            <button
+                              onClick={() => navigate(`/hospital/tokens/doctor/${t.doctorId}`)}
+                              className="px-2 py-1 bg-slate-100 hover:bg-blue-50 text-slate-600 hover:text-blue-600 rounded-lg text-[10.5px] font-bold cursor-pointer transition-colors"
+                              title="Go to Doctor Cabin"
+                            >
+                              Cabin →
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* ─── 5. WALK-IN TOKEN MODAL ────────────────────────────────────────── */}
@@ -806,6 +668,65 @@ export const HospitalDashboard: React.FC = () => {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ─── 6. TOKEN DETAIL MODAL ─────────────────────────────────────────── */}
+      {selectedTokenDetail && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 w-full max-w-sm p-6 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-blue-600 text-white font-black text-sm flex items-center justify-center">
+                  #{selectedTokenDetail.tokenNo || selectedTokenDetail.tokenNumber}
+                </div>
+                <div>
+                  <h3 className="font-black text-slate-800 text-sm">Token Details</h3>
+                  <span className="text-[10px] text-slate-400 font-bold uppercase">{selectedTokenDetail.type} Token</span>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedTokenDetail(null)}
+                className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 cursor-pointer border-none"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="space-y-2.5 text-xs">
+              <div className="flex justify-between py-1 border-b border-slate-50">
+                <span className="text-slate-400 font-bold">Patient Name:</span>
+                <span className="font-black text-slate-800">{selectedTokenDetail.patientName}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-slate-50">
+                <span className="text-slate-400 font-bold">Phone Number:</span>
+                <span className="font-bold text-slate-700">{selectedTokenDetail.patientPhone || '—'}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-slate-50">
+                <span className="text-slate-400 font-bold">Doctor:</span>
+                <span className="font-bold text-blue-600">{selectedTokenDetail.doctorName || 'Doctor'}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-slate-50">
+                <span className="text-slate-400 font-bold">Session & Date:</span>
+                <span className="font-bold text-slate-700 capitalize">{selectedTokenDetail.session || 'Morning'} · {selectedTokenDetail.bookingDate || 'Today'}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-slate-50">
+                <span className="text-slate-400 font-bold">Status:</span>
+                <span className="font-black text-slate-800 uppercase">{selectedTokenDetail.status}</span>
+              </div>
+              <div className="flex justify-between py-1">
+                <span className="text-slate-400 font-bold">Fee & Payment:</span>
+                <span className="font-bold text-emerald-600">₹{selectedTokenDetail.consultationFee || 500} · {selectedTokenDetail.paymentStatus || 'pending'}</span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setSelectedTokenDetail(null)}
+              className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-black cursor-pointer border-none"
+            >
+              Close
+            </button>
           </div>
         </div>
       )}
