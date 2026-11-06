@@ -3012,6 +3012,71 @@ app.patch('/api/hospitals/:hospitalId/tokens/:tokenId/status', requireHospitalAu
   res.json({ success: true, hospitalId, tokenId, status, token: targetToken });
 });
 
+// ─── Delete Single Hospital Token from Store & RDS ────────────────────────────
+app.delete('/api/hospitals/:hospitalId/tokens/:tokenId', requireHospitalAuth, async (req, res) => {
+  const { hospitalId, tokenId } = req.params;
+  const store = await getUnifiedStore();
+
+  const targetToken = (store.tokens || []).find(t => t.id === tokenId);
+  store.tokens = (store.tokens || []).filter(t => t.id !== tokenId);
+  store.appointments = (store.appointments || []).filter(a => a.id !== tokenId && !(targetToken && a.hospitalId === targetToken.hospitalId && a.doctorId === targetToken.doctorId && (a.tokenNumber === targetToken.tokenNo || a.tokenNumber === targetToken.tokenNumber)));
+
+  if (isDbConnected) {
+    try {
+      await query(`DELETE FROM tokens WHERE id = $1`, [tokenId]);
+      await query(`DELETE FROM appointments WHERE id = $1`, [tokenId]);
+      if (targetToken && (targetToken.tokenNo || targetToken.tokenNumber)) {
+        const tokNum = String(targetToken.tokenNo || targetToken.tokenNumber);
+        await query(
+          `DELETE FROM tokens WHERE hospital_id = $1 AND doctor_id = $2 AND (token_number = $3 OR data->>'tokenNumber' = $3 OR data->>'tokenNo' = $3)`,
+          [hospitalId, targetToken.doctorId, tokNum]
+        );
+        await query(
+          `DELETE FROM appointments WHERE hospital_id = $1 AND doctor_id = $2 AND (data->>'tokenNumber' = $3 OR data->>'tokenNo' = $3)`,
+          [hospitalId, targetToken.doctorId, tokNum]
+        );
+      }
+    } catch (e) {
+      console.warn('Error deleting token from RDS:', e.message);
+    }
+  }
+
+  await saveUnifiedStore(store);
+  res.json({ success: true, message: 'Token deleted successfully', id: tokenId });
+});
+
+// ─── Bulk Delete Hospital Tokens (e.g. End of Day Unvisited Clearance) ────────
+app.delete('/api/hospitals/:hospitalId/tokens', requireHospitalAuth, async (req, res) => {
+  const { hospitalId } = req.params;
+  const { ids, doctorId, unvisitedOnly } = req.body || {};
+  const store = await getUnifiedStore();
+
+  let targetIds = Array.isArray(ids) ? ids : [];
+  if ((!targetIds || targetIds.length === 0) && unvisitedOnly) {
+    targetIds = (store.tokens || [])
+      .filter(t => (t.hospitalId || 'hosp-apollo') === hospitalId && (!doctorId || t.doctorId === doctorId) && t.status !== 'completed')
+      .map(t => t.id);
+  }
+
+  if (targetIds.length > 0) {
+    const idSet = new Set(targetIds);
+    store.tokens = (store.tokens || []).filter(t => !idSet.has(t.id));
+    store.appointments = (store.appointments || []).filter(a => !idSet.has(a.id));
+
+    if (isDbConnected) {
+      try {
+        await query(`DELETE FROM tokens WHERE id = ANY($1::varchar[])`, [targetIds]);
+        await query(`DELETE FROM appointments WHERE id = ANY($1::varchar[])`, [targetIds]);
+      } catch (e) {
+        console.warn('Error bulk deleting tokens from RDS:', e.message);
+      }
+    }
+  }
+
+  await saveUnifiedStore(store);
+  res.json({ success: true, count: targetIds.length, clearedIds: targetIds });
+});
+
 // ─── Update Appointment Status Directly ──────────────────────────────────────
 app.patch('/api/appointments/:id/status', async (req, res) => {
   const { id } = req.params;

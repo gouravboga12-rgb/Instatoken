@@ -295,6 +295,7 @@ interface HospitalContextType {
   ) => void;
   cancelToken: (id: string) => void;
   deleteToken: (id: string) => void;
+  deleteTokens: (ids: string[]) => void;
 
   // Patients
   addPatient: (p: Omit<PatientRecord, 'id' | 'uhid' | 'registeredOn' | 'totalVisits' | 'lastVisit' | 'tokenHistory'>) => void;
@@ -2011,6 +2012,37 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       broadcastGlobalSync('HOSPITAL_TOKENS_UPDATED', updated);
       return updated;
     });
+
+    // Delete persistently on server & RDS
+    fetch(`/api/hospitals/${targetHospId}/tokens/${id}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` }
+    }).catch(() => {});
+    fetch(`/api/appointments/${id}`, { method: 'DELETE' }).catch(() => {});
+  };
+
+  const deleteTokens = (ids: string[]) => {
+    if (!ids || ids.length === 0) return;
+    const idSet = new Set(ids);
+    setTokens(prev => {
+      const updated = prev.filter(t => !idSet.has(t.id));
+      localStorage.setItem('insta_hospital_tokens', JSON.stringify(updated));
+      localStorage.setItem(`insta_hospital_tokens_${targetHospId}`, JSON.stringify(updated));
+      broadcastGlobalSync('HOSPITAL_TOKENS_UPDATED', updated);
+      return updated;
+    });
+
+    // Bulk delete on server & RDS
+    fetch(`/api/hospitals/${targetHospId}/tokens`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+      body: JSON.stringify({ ids })
+    }).catch(() => {});
+    fetch('/api/appointments', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids })
+    }).catch(() => {});
   };
 
   // Patients (Phase 20)
@@ -2477,7 +2509,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       addDoctor, updateDoctor, deleteDoctor, toggleDoctorActive,
       addDepartment, updateDepartment, deleteDepartment, toggleDepartmentActive,
       addStaffMember, updateStaffMember, deleteStaffMember, markStaffAttendance,
-      generateWalkInToken, updateTokenStatus, updateTokenPayment, cancelToken, deleteToken,
+      generateWalkInToken, updateTokenStatus, updateTokenPayment, cancelToken, deleteToken, deleteTokens,
       addPatient, updatePatient, searchPatients, validateToken,
       updateScheduleConfig, updateSession,
       sendNotification, clearHospitalNotifications,

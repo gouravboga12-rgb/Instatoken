@@ -14,7 +14,7 @@ import { TokenPaymentModal } from '../../components/hospital/TokenPaymentModal';
 export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorIdProp }) => {
   const params = useParams<{ doctorId: string }>();
   const doctorId = doctorIdProp || params.doctorId;
-  const { doctors, tokens, updateTokenStatus, updateTokenPayment, deleteToken, hospitalProfile } = useHospital();
+  const { doctors, tokens, updateTokenStatus, updateTokenPayment, deleteToken, deleteTokens, hospitalProfile } = useHospital();
   const navigate = useNavigate();
 
   const doctor = doctors.find(d => d.id === doctorId) || doctors[0];
@@ -245,11 +245,31 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
     playCallChime();
   };
 
-  const handleReleaseSlot = (id: string) => {
-    if (window.confirm('Release / delete this unvisited token slot so it becomes available to book again?')) {
-      deleteToken(id);
+  // Tokens for this doctor that are NOT visited (can be cleared at the end of the day)
+  const unvisitedDoctorTokens = useMemo(() => {
+    return doctorTokens.filter(t => isDateMatching(t) && t.status !== 'completed');
+  }, [doctorTokens, dateFilter, customDate, todayStr, tomorrowStr, yesterdayStr]);
+
+  const handleDeleteToken = (tok: TokenRecord) => {
+    const patientLabel = tok.patientName ? `${tok.patientName} (Token #${tok.tokenNo})` : `Token #${tok.tokenNo}`;
+    if (window.confirm(`Are you sure you want to delete ${patientLabel}? This will remove the unvisited record permanently.`)) {
+      deleteToken(tok.id);
     }
   };
+
+  const handleClearAllUnvisited = () => {
+    if (unvisitedDoctorTokens.length === 0) {
+      alert('No unvisited or pending tokens found to clear for the selected date filter.');
+      return;
+    }
+    const count = unvisitedDoctorTokens.length;
+    const dateLabel = dateFilter === 'today' ? "today's" : dateFilter === 'all' ? 'all' : dateFilter;
+    if (window.confirm(`Delete all ${count} unvisited / absent / pending tokens for ${doctor?.name || 'this doctor'} (${dateLabel})? This will permanently clear unvisited records at the end of the day.`)) {
+      deleteTokens(unvisitedDoctorTokens.map(t => t.id));
+    }
+  };
+
+
 
   const handleCancelToken = (id: string) => {
     updateTokenStatus(id, 'cancelled');
@@ -518,6 +538,13 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
               <UserX size={13} /> Absent
             </button>
             <button
+              onClick={() => handleDeleteToken(inConsultation)}
+              className="px-3 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 rounded-xl font-bold text-xs cursor-pointer flex items-center gap-1 transition-colors"
+              title="Delete unvisited patient"
+            >
+              <Trash2 size={13} /> Delete
+            </button>
+            <button
               onClick={() => setPrintToken(inConsultation)}
               className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-xl cursor-pointer border-none flex items-center justify-center transition-colors"
               title="Print Token Slip"
@@ -622,6 +649,18 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
               <option value="evening">Evening</option>
             </select>
           </div>
+
+          {/* End of Day Clear Unvisited Button */}
+          {unvisitedDoctorTokens.length > 0 && (
+            <button
+              onClick={handleClearAllUnvisited}
+              className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-xl text-xs font-black cursor-pointer flex items-center gap-1.5 transition-colors shadow-xs ml-auto"
+              title="Delete all unvisited/absent and pending tokens for this doctor at the end of the day"
+            >
+              <Trash2 size={13} />
+              <span>Clear Unvisited ({unvisitedDoctorTokens.length})</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -817,14 +856,18 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
                               >
                                 <Play size={11} /> Call Cabin
                               </button>
-                              <button
-                                onClick={() => handleReleaseSlot(tok.id)}
-                                className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg text-xs font-bold cursor-pointer flex items-center gap-1"
-                                title="Cancel / delete and release slot"
-                              >
-                                <Trash2 size={11} /> Release Slot
-                              </button>
                             </>
+                          )}
+
+                          {/* Delete option for unvisited / absent / cancelled / in-cabin patients */}
+                          {tok.status !== 'completed' && (
+                            <button
+                              onClick={() => handleDeleteToken(tok)}
+                              className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg text-xs font-bold cursor-pointer flex items-center gap-1 transition-colors"
+                              title="Delete unvisited patient token"
+                            >
+                              <Trash2 size={11} /> Delete
+                            </button>
                           )}
 
                           <button
