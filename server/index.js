@@ -2983,6 +2983,10 @@ app.patch('/api/hospitals/:hospitalId/tokens/:tokenId/status', requireHospitalAu
 
   if (isDbConnected) {
     try {
+      const apptStatus = targetToken 
+        ? (targetToken.status === 'completed' ? 'completed' : ['cancelled', 'not-visited', 'skipped'].includes(targetToken.status) ? 'cancelled' : 'booked')
+        : (status === 'completed' ? 'completed' : ['cancelled', 'not-visited', 'skipped'].includes(status) ? 'cancelled' : 'booked');
+
       if (targetToken) {
         await query(
           `UPDATE tokens SET status = $1, session = $2, data = (COALESCE(data, '{}'::jsonb) || $3::jsonb), updated_at = NOW() WHERE id = $4`,
@@ -2995,17 +2999,10 @@ app.patch('/api/hospitals/:hospitalId/tokens/:tokenId/status', requireHospitalAu
         );
       }
       // Update matching appointment in PostgreSQL
-      if (targetToken) {
-        const apptStatus = targetToken.status === 'completed' ? 'completed' : ['cancelled', 'not-visited', 'skipped'].includes(targetToken.status) ? 'cancelled' : 'booked';
-        await query(
-          `UPDATE appointments SET status = $1::varchar, data = (COALESCE(data, '{}'::jsonb) || jsonb_build_object('status', $1::varchar, 'session', $2::varchar)), updated_at = NOW() WHERE id = $3`,
-          [apptStatus, targetToken.session || 'Morning', tokenId]
-        );
-      }
-    } catch (dbErr) {
-      console.error('Error updating token status/session in AWS RDS:', dbErr.message);
-    }
-  }
+      await query(
+        `UPDATE appointments SET status = $1::varchar, data = (COALESCE(data, '{}'::jsonb) || jsonb_build_object('status', $1::varchar, 'session', $2::varchar)), updated_at = NOW() WHERE id = $3`,
+        [apptStatus, targetToken?.session || session || 'Morning', tokenId]
+      );
 
       // Also update by hospital, doctor and token number if ID differs
       if (targetToken && (targetToken.tokenNo || targetToken.tokenNumber)) {
@@ -3017,7 +3014,7 @@ app.patch('/api/hospitals/:hospitalId/tokens/:tokenId/status', requireHospitalAu
         );
       }
     } catch (dbErr) {
-      console.error('Error updating token status in AWS RDS:', dbErr.message);
+      console.error('Error updating token status/session in AWS RDS:', dbErr.message);
     }
   }
 
