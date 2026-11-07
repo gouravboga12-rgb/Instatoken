@@ -594,12 +594,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                 >
                   <Plus size={14} /> Add Hospital
                 </button>
-                <button
-                  onClick={() => setAdminTab('add-doctor')}
-                  className="bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors border-none"
-                >
-                  <Stethoscope size={14} /> Enroll Doctor
-                </button>
                 <div className="bg-slate-50 border border-slate-200 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-700 flex items-center gap-2">
                   <Calendar size={14} className="text-slate-400" />
                   <span>{new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }).format(new Date())}</span>
@@ -859,13 +853,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                     </button>
 
                     <button
-                      onClick={() => setAdminTab('add-doctor')}
+                      onClick={() => setAdminTab('hospitals')}
                       className="p-3 bg-slate-50 hover:bg-blue-50 border border-slate-100 hover:border-blue-200 rounded-xl flex flex-col items-center justify-center gap-1.5 text-center cursor-pointer transition-all group"
                     >
                       <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                        <Stethoscope size={16} />
+                        <Building2 size={16} />
                       </div>
-                      <span className="text-xs font-bold text-slate-700">Enroll Doctor</span>
+                      <span className="text-xs font-bold text-slate-700">Manage Hospitals</span>
                     </button>
 
                     <button
