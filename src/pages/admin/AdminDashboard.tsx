@@ -12,7 +12,7 @@ import {
   Users, UserCheck, UserX,
   AlertTriangle, Download, X, Calendar, Upload, User,
   MapPin, Trash2, Loader2, LogOut, Mail, Phone, PhoneCall, Megaphone,
-  Eye, Settings, Send, ChevronDown
+  Eye, Send, ChevronDown
 } from 'lucide-react';
 import { LocationBanners } from './LocationBanners';
 import { AdsInquiries } from './AdsInquiries';
@@ -135,8 +135,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
   const [ledgerEndDate, setLedgerEndDate] = useState('');
 
   // --- Overview Tab State ---
-  const [overviewChartMetric, setOverviewChartMetric] = useState<'tokens' | 'revenue' | 'customers' | 'hospitals'>('tokens');
-  const [overviewChartPeriod, setOverviewChartPeriod] = useState<'today' | '7days' | '30days' | '3months' | '1year'>('today');
   const [quickNotifyModal, setQuickNotifyModal] = useState(false);
   const [quickNotifyTitle, setQuickNotifyTitle] = useState('');
   const [quickNotifyMessage, setQuickNotifyMessage] = useState('');
@@ -219,8 +217,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
   const todayWalkinCount = todayAppointments.filter(a => a.isWalkin).length;
   const todayConsultationSum = todayAppointments.reduce((sum, a) => sum + (Number(a.fee) || 500), 0);
   const todayCommissionSum = todayAppointments.reduce((sum, a) => sum + (Number(a.platformFee) || Math.max(10, Math.round((Number(a.fee) || 500) * (platformFeePercent / 100)))), 0);
+  const todayWaitingCount = todayAppointments.filter(a => ['waiting', 'booked', 'checked-in'].includes(a.status)).length;
+  const todayInCabinCount = todayAppointments.filter(a => ['in-cabin', 'in_consultation', 'consulting'].includes(a.status)).length;
+  const todayCompletedCount = todayAppointments.filter(a => a.status === 'completed').length;
+  const todayCancelledCount = todayAppointments.filter(a => ['cancelled', 'no-show', 'rejected'].includes(a.status)).length;
   const totalDoctorsCount = safeHospitals.reduce((acc, h) => acc + (h.doctors?.length || 0), 0);
   const totalCustomersCount = safeCustomers.length;
+
+  const recentAppointments = [...safeAppointments].sort((a, b) => {
+    const tA = new Date(a.createdAt || a.bookingDate || a.date || 0).getTime();
+    const tB = new Date(b.createdAt || b.bookingDate || b.date || 0).getTime();
+    return tB - tA;
+  }).slice(0, 6);
 
   const handleCreateHospital = (e: React.FormEvent) => {
     e.preventDefault();
@@ -600,7 +608,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
               </div>
             </div>
 
-            {/* 6 Top KPI Cards (Matching Image 76) */}
+            {/* 6 Top KPI Cards (100% Dynamic Live Platform Metrics) */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
               {/* 1. Total Hospitals */}
               <Card className="p-4 border-none shadow-xs bg-white rounded-2xl flex flex-col justify-between hover:shadow-md transition-shadow">
@@ -608,21 +616,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                   <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
                     <Building2 size={16} />
                   </div>
-                  {/* Mini Bar SVG */}
-                  <div className="flex items-end gap-0.5 h-5">
-                    <span className="w-1 bg-blue-200 rounded-t h-2"></span>
-                    <span className="w-1 bg-blue-300 rounded-t h-3"></span>
-                    <span className="w-1 bg-blue-400 rounded-t h-4"></span>
-                    <span className="w-1 bg-blue-600 rounded-t h-5"></span>
-                  </div>
+                  <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+                    disabledHospitalsCount > 0 ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'
+                  }`}>
+                    {activeHospitalsCount} Active
+                  </span>
                 </div>
                 <div>
                   <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wide block">Total Hospitals</span>
-                  <span className="text-2xl font-black text-slate-900 font-heading block mt-0.5">{hospitals.length}</span>
+                  <span className="text-2xl font-black text-slate-900 font-heading block mt-0.5">{safeHospitals.length}</span>
                 </div>
-                <div className="mt-2 pt-2 border-t border-slate-50 text-[9px] font-bold">
-                  <span className="text-emerald-600 block">▲ +12 this month</span>
-                  <span className="text-slate-400">Active: {activeHospitalsCount} | Inactive: {disabledHospitalsCount}</span>
+                <div className="mt-2 pt-2 border-t border-slate-50 text-[10px] font-semibold text-slate-500">
+                  <span>{disabledHospitalsCount > 0 ? `${disabledHospitalsCount} Inactive / Paused` : 'All Partner Hospitals Active'}</span>
                 </div>
               </Card>
 
@@ -632,43 +637,35 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                   <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
                     <Stethoscope size={16} />
                   </div>
-                  <div className="flex items-end gap-0.5 h-5">
-                    <span className="w-1 bg-emerald-200 rounded-t h-1.5"></span>
-                    <span className="w-1 bg-emerald-300 rounded-t h-3"></span>
-                    <span className="w-1 bg-emerald-500 rounded-t h-4"></span>
-                    <span className="w-1 bg-emerald-600 rounded-t h-5"></span>
-                  </div>
+                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
+                    Live
+                  </span>
                 </div>
                 <div>
                   <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wide block">Total Doctors</span>
                   <span className="text-2xl font-black text-slate-900 font-heading block mt-0.5">{totalDoctorsCount}</span>
                 </div>
-                <div className="mt-2 pt-2 border-t border-slate-50 text-[9px] font-bold">
-                  <span className="text-emerald-600 block">▲ +28 this month</span>
-                  <span className="text-slate-400">Across {hospitals.length} hospitals</span>
+                <div className="mt-2 pt-2 border-t border-slate-50 text-[10px] font-semibold text-slate-500">
+                  <span>Across {safeHospitals.length} network hospitals</span>
                 </div>
               </Card>
 
-              {/* 3. Total Customers */}
+              {/* 3. Total Patients */}
               <Card className="p-4 border-none shadow-xs bg-white rounded-2xl flex flex-col justify-between hover:shadow-md transition-shadow">
                 <div className="flex items-center justify-between mb-2">
                   <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
                     <Users size={16} />
                   </div>
-                  <div className="flex items-end gap-0.5 h-5">
-                    <span className="w-1 bg-purple-200 rounded-t h-2.5"></span>
-                    <span className="w-1 bg-purple-300 rounded-t h-3.5"></span>
-                    <span className="w-1 bg-purple-500 rounded-t h-4"></span>
-                    <span className="w-1 bg-purple-600 rounded-t h-5"></span>
-                  </div>
+                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700">
+                    Registered
+                  </span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wide block">Total Customers</span>
+                  <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wide block">Total Patients</span>
                   <span className="text-2xl font-black text-slate-900 font-heading block mt-0.5">{totalCustomersCount.toLocaleString('en-IN')}</span>
                 </div>
-                <div className="mt-2 pt-2 border-t border-slate-50 text-[9px] font-bold">
-                  <span className="text-emerald-600 block">▲ +8.4%</span>
-                  <span className="text-slate-400">Verified patient logins</span>
+                <div className="mt-2 pt-2 border-t border-slate-50 text-[10px] font-semibold text-slate-500">
+                  <span>Verified patient user accounts</span>
                 </div>
               </Card>
 
@@ -678,20 +675,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                   <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
                     <Activity size={16} />
                   </div>
-                  <div className="flex items-end gap-0.5 h-5">
-                    <span className="w-1 bg-amber-200 rounded-t h-2"></span>
-                    <span className="w-1 bg-amber-300 rounded-t h-4"></span>
-                    <span className="w-1 bg-amber-400 rounded-t h-3"></span>
-                    <span className="w-1 bg-amber-500 rounded-t h-5"></span>
-                  </div>
+                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">
+                    Today
+                  </span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wide block">Tokens Booked Today</span>
+                  <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wide block">Tokens Today</span>
                   <span className="text-2xl font-black text-slate-900 font-heading block mt-0.5">{todayTokensCount.toLocaleString('en-IN')}</span>
                 </div>
-                <div className="mt-2 pt-2 border-t border-slate-50 text-[9px] font-bold">
-                  <span className="text-slate-600 block">Online: {todayOnlineCount} | Walk-in: {todayWalkinCount}</span>
-                  <span className="text-emerald-600">▲ +14% vs yesterday</span>
+                <div className="mt-2 pt-2 border-t border-slate-50 text-[10px] font-semibold text-slate-500">
+                  <span>{todayOnlineCount} Online App · {todayWalkinCount} Walk-in</span>
                 </div>
               </Card>
 
@@ -701,20 +694,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                   <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-black text-sm">
                     ₹
                   </div>
-                  <div className="flex items-end gap-0.5 h-5">
-                    <span className="w-1 bg-emerald-200 rounded-t h-1.5"></span>
-                    <span className="w-1 bg-emerald-300 rounded-t h-2.5"></span>
-                    <span className="w-1 bg-emerald-400 rounded-t h-4"></span>
-                    <span className="w-1 bg-emerald-600 rounded-t h-5"></span>
-                  </div>
+                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
+                    Gross
+                  </span>
                 </div>
                 <div>
                   <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wide block">Today's Revenue</span>
                   <span className="text-2xl font-black text-slate-900 font-heading block mt-0.5">₹{(todayConsultationSum + todayCommissionSum).toLocaleString('en-IN')}</span>
                 </div>
-                <div className="mt-2 pt-2 border-t border-slate-50 text-[9px] font-bold">
-                  <span className="text-emerald-600 block">▲ +12.6%</span>
-                  <span className="text-slate-400">Doctor + token booking</span>
+                <div className="mt-2 pt-2 border-t border-slate-50 text-[10px] font-semibold text-slate-500">
+                  <span>Consultations + token fees</span>
                 </div>
               </Card>
 
@@ -724,159 +713,140 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                   <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-black text-sm">
                     %
                   </div>
-                  <div className="flex items-end gap-0.5 h-5">
-                    <span className="w-1 bg-rose-200 rounded-t h-2"></span>
-                    <span className="w-1 bg-rose-300 rounded-t h-3"></span>
-                    <span className="w-1 bg-rose-400 rounded-t h-4"></span>
-                    <span className="w-1 bg-rose-600 rounded-t h-5"></span>
-                  </div>
+                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700">
+                    Net Fee
+                  </span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wide block">Platform Commission</span>
+                  <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wide block">Platform Earnings</span>
                   <span className="text-2xl font-black text-slate-900 font-heading block mt-0.5">₹{todayCommissionSum.toLocaleString('en-IN')}</span>
                 </div>
-                <div className="mt-2 pt-2 border-t border-slate-50 text-[9px] font-bold">
-                  <span className="text-emerald-600 block">▲ +9.8%</span>
-                  <span className="text-slate-400">{platformFeePercent}% Token booking fee</span>
+                <div className="mt-2 pt-2 border-t border-slate-50 text-[10px] font-semibold text-slate-500">
+                  <span>{platformFeePercent}% Platform booking cut</span>
                 </div>
               </Card>
             </div>
 
-            {/* Split Row: Token & Revenue Analytics (Left 8 cols) + Quick Actions & System Notifications (Right 4 cols) */}
+            {/* Split Row: Live Platform Activity Stream (Left 8 cols) + Super Admin Hub & Infrastructure (Right 4 cols) */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              {/* Analytics Chart (8 cols) */}
-              <div className="lg:col-span-8 space-y-6">
-                <Card className="p-5 border-none shadow-xs bg-white rounded-2xl flex flex-col justify-between">
+              {/* Left Column: Live Platform Activity Stream (8 cols) */}
+              <div className="lg:col-span-8">
+                <Card className="p-5 border-none shadow-xs bg-white rounded-2xl flex flex-col justify-between h-full">
                   <div>
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-                      <h3 className="text-sm font-black text-slate-800 tracking-tight">Token & Revenue Analytics</h3>
-                      
-                      {/* Metric Toggle Buttons */}
-                      <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-bold">
-                        {(['tokens', 'revenue', 'customers', 'hospitals'] as const).map(m => (
-                          <button
-                            key={m}
-                            onClick={() => setOverviewChartMetric(m)}
-                            className={`px-3 py-1 rounded-lg capitalize transition-all border-none cursor-pointer ${
-                              overviewChartMetric === m ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
-                            }`}
-                          >
-                            {m}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Time Range & Export Row */}
-                    <div className="flex flex-wrap items-center justify-between gap-2 mb-4 pt-1 border-t border-slate-100">
-                      <div className="flex items-center gap-1 text-[11px] font-bold text-slate-500">
-                        {(['today', '7days', '30days', '3months', '1year'] as const).map(p => (
-                          <button
-                            key={p}
-                            onClick={() => setOverviewChartPeriod(p)}
-                            className={`px-2.5 py-1 rounded-lg transition-all border-none cursor-pointer ${
-                              overviewChartPeriod === p ? 'bg-slate-900 text-white' : 'hover:bg-slate-100 text-slate-600'
-                            }`}
-                          >
-                            {p === 'today' ? 'Today' : p === '7days' ? '7 Days' : p === '30days' ? '30 Days' : p === '3months' ? '3 Months' : '1 Year'}
-                          </button>
-                        ))}
-                      </div>
-
-                      <div className="flex items-center gap-4 text-xs font-bold">
-                        <div className="flex items-center gap-3 text-[11px]">
-                          <span className="flex items-center gap-1.5 text-blue-600">
-                            <span className="w-2.5 h-2.5 rounded-full bg-blue-600 inline-block"></span> Online Tokens
-                          </span>
-                          <span className="flex items-center gap-1.5 text-emerald-600">
-                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span> Walk-in Tokens
-                          </span>
-                          <span className="flex items-center gap-1.5 text-amber-600">
-                            <span className="w-2.5 h-1 bg-amber-500 rounded inline-block"></span> Revenue (₹)
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <Activity size={16} className="text-blue-600" />
+                          <h3 className="text-sm font-black text-slate-800 tracking-tight">Live Platform Activity Stream</h3>
+                          <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 animate-pulse">
+                            Real-time
                           </span>
                         </div>
+                        <p className="text-xs text-slate-400 font-semibold mt-0.5">
+                          Latest patient token bookings across the network
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
                         <button
                           onClick={exportFinancialCSV}
-                          className="text-xs font-bold text-slate-600 hover:text-blue-600 flex items-center gap-1 border border-slate-200 px-2.5 py-1 rounded-lg cursor-pointer bg-white"
+                          className="text-xs font-bold text-slate-600 hover:text-blue-600 flex items-center gap-1 border border-slate-200 px-2.5 py-1.5 rounded-xl cursor-pointer bg-white transition-colors"
                         >
-                          <Download size={12} /> Export
+                          <Download size={13} /> Export CSV
+                        </button>
+                        <button
+                          onClick={() => setAdminTab('financials')}
+                          className="text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-xl cursor-pointer border-none transition-colors"
+                        >
+                          View All Tokens →
                         </button>
                       </div>
                     </div>
+
+                    {/* Live Stream List */}
+                    {recentAppointments.length === 0 ? (
+                      <div className="py-12 text-center text-slate-400">
+                        <Activity size={32} className="mx-auto mb-2 text-slate-300" />
+                        <p className="text-xs font-bold text-slate-600">No token activity recorded yet</p>
+                        <p className="text-[11px] text-slate-400 mt-0.5">Tokens booked by patients or hospital counters will stream here in real time.</p>
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-slate-100 mt-2">
+                        {recentAppointments.map((appt: any, idx: number) => {
+                          const patientName = appt.patientName || appt.userName || 'Walk-in Patient';
+                          const hospName = appt.hospitalName || 'Network Hospital';
+                          const docName = appt.doctorName || 'Doctor';
+                          const tokenNum = appt.tokenNumber || appt.token || `#${idx + 1}`;
+                          const isWalkin = Boolean(appt.isWalkin);
+                          const fee = Number(appt.fee) || 500;
+                          const platformFee = Number(appt.platformFee) || Math.max(10, Math.round(fee * (platformFeePercent / 100)));
+                          const apptDate = appt.date || appt.bookingDate || (appt.createdAt ? appt.createdAt.split('T')[0] : 'Today');
+                          const apptTime = appt.time || (appt.session ? `${appt.session.toUpperCase()} Session` : 'Scheduled');
+                          const status = appt.status || 'booked';
+
+                          const statusBadgeClass = 
+                            status === 'completed'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : ['in-cabin', 'in_consultation', 'consulting'].includes(status)
+                              ? 'bg-blue-50 text-blue-700 border-blue-200'
+                              : ['cancelled', 'no-show'].includes(status)
+                              ? 'bg-rose-50 text-rose-700 border-rose-200'
+                              : 'bg-amber-50 text-amber-700 border-amber-200';
+
+                          return (
+                            <div key={appt.id || idx} className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 hover:bg-slate-50/70 px-2 rounded-xl transition-colors">
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-800 font-black text-xs flex items-center justify-center shrink-0 border border-slate-200">
+                                  {tokenNum}
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-extrabold text-xs text-slate-800 truncate">{patientName}</span>
+                                    <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-md ${
+                                      isWalkin ? 'bg-slate-100 text-slate-600' : 'bg-blue-50 text-blue-700'
+                                    }`}>
+                                      {isWalkin ? 'Counter' : 'Online App'}
+                                    </span>
+                                    <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded-md border uppercase ${statusBadgeClass}`}>
+                                      {status}
+                                    </span>
+                                  </div>
+                                  <p className="text-[11px] text-slate-500 font-medium truncate mt-0.5">
+                                    {docName} · <span className="font-semibold text-slate-700">{hospName}</span>
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0 text-right">
+                                <div>
+                                  <p className="text-[10px] text-slate-400 font-bold">{apptDate}</p>
+                                  <p className="text-[11px] font-extrabold text-slate-700">{apptTime}</p>
+                                </div>
+                                <div className="min-w-[70px]">
+                                  <span className="text-xs font-black text-slate-900 block">₹{fee}</span>
+                                  <span className="text-[10px] font-bold text-rose-600 block">Cut: ₹{platformFee}</span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
 
-                  {/* Dual Axis Interactive Visual (Matching Image 76) */}
-                  <div className="relative pt-6 pb-2">
-                    {/* SVG Curve for Revenue Overlay */}
-                    <svg className="w-full h-44 overflow-visible" preserveAspectRatio="none" viewBox="0 0 700 180">
-                      <defs>
-                        <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.25" />
-                          <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.0" />
-                        </linearGradient>
-                      </defs>
-                      <path
-                        d="M 50 145 C 100 135, 120 120, 150 115 C 200 108, 220 95, 250 90 C 300 85, 320 80, 350 75 C 400 70, 420 60, 450 55 C 500 50, 520 85, 550 95 C 600 110, 620 130, 650 140"
-                        fill="none"
-                        stroke="#f59e0b"
-                        strokeWidth="3"
-                        strokeLinecap="round"
-                      />
-                      {[
-                        { cx: 50, cy: 145 },
-                        { cx: 150, cy: 115 },
-                        { cx: 250, cy: 90 },
-                        { cx: 350, cy: 75 },
-                        { cx: 450, cy: 55 },
-                        { cx: 550, cy: 95 },
-                        { cx: 650, cy: 140 },
-                      ].map((p, i) => (
-                        <circle key={i} cx={p.cx} cy={p.cy} r="4" fill="#ffffff" stroke="#f59e0b" strokeWidth="2.5" />
-                      ))}
-                    </svg>
-
-                    {/* Dual Columns per Hour checkpoint */}
-                    <div className="grid grid-cols-7 gap-2 h-44 -mt-44 items-end px-4 border-b border-slate-100 pb-2">
-                      {[
-                        { time: '08:00 AM', online: 35, walkin: 18, rev: '₹14K' },
-                        { time: '10:00 AM', online: 68, walkin: 38, rev: '₹22K' },
-                        { time: '12:00 PM', online: 112, walkin: 65, rev: '₹34K' },
-                        { time: '02:00 PM', online: 165, walkin: 88, rev: '₹46K' },
-                        { time: '04:00 PM', online: 178, walkin: 92, rev: '₹52K' },
-                        { time: '06:00 PM', online: 95, walkin: 55, rev: '₹28K' },
-                        { time: '08:00 PM', online: 45, walkin: 24, rev: '₹16K' },
-                      ].map((slot, idx) => (
-                        <div key={idx} className="flex flex-col items-center gap-1.5 group cursor-pointer">
-                          <span className="opacity-0 group-hover:opacity-100 transition-opacity text-[9px] font-black bg-slate-900 text-white px-1.5 py-0.5 rounded shadow">
-                            {slot.rev}
-                          </span>
-                          <div className="flex items-end gap-1 w-full justify-center h-28">
-                            {/* Online Bar */}
-                            <div 
-                              className="w-3.5 bg-blue-600 hover:bg-blue-700 rounded-t transition-all"
-                              style={{ height: `${Math.min(100, slot.online * 0.55)}%` }}
-                              title={`Online: ${slot.online}`}
-                            />
-                            {/* Walk-in Bar */}
-                            <div 
-                              className="w-3.5 bg-emerald-500 hover:bg-emerald-600 rounded-t transition-all"
-                              style={{ height: `${Math.min(100, slot.walkin * 0.55)}%` }}
-                              title={`Walk-in: ${slot.walkin}`}
-                            />
-                          </div>
-                          <span className="text-[10px] font-bold text-slate-500 whitespace-nowrap">{slot.time}</span>
-                        </div>
-                      ))}
-                    </div>
+                  <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-slate-500">
+                    <span>Showing latest {Math.min(recentAppointments.length, 6)} token records</span>
+                    <span className="text-emerald-600 flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span> Live Network Feed
+                    </span>
                   </div>
                 </Card>
               </div>
 
-              {/* Right Column: Quick Actions + System Notifications (4 cols) */}
+              {/* Right Column: Super Admin Hub & Infrastructure (4 cols) */}
               <div className="lg:col-span-4 space-y-6">
-                {/* Quick Actions Card */}
+                {/* Super Admin Quick Operations Hub */}
                 <Card className="p-5 border-none shadow-xs bg-white rounded-2xl">
-                  <h3 className="text-sm font-black text-slate-800 tracking-tight mb-3">Quick Actions</h3>
+                  <h3 className="text-sm font-black text-slate-800 tracking-tight mb-3">Quick Platform Operations</h3>
                   <div className="grid grid-cols-2 gap-2.5">
                     <button
                       onClick={() => setAdminTab('add-hospital')}
@@ -892,7 +862,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                       onClick={() => setAdminTab('add-doctor')}
                       className="p-3 bg-slate-50 hover:bg-blue-50 border border-slate-100 hover:border-blue-200 rounded-xl flex flex-col items-center justify-center gap-1.5 text-center cursor-pointer transition-all group"
                     >
-                      <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
                         <Stethoscope size={16} />
                       </div>
                       <span className="text-xs font-bold text-slate-700">Enroll Doctor</span>
@@ -902,77 +872,75 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                       onClick={() => setQuickNotifyModal(true)}
                       className="p-3 bg-slate-50 hover:bg-blue-50 border border-slate-100 hover:border-blue-200 rounded-xl flex flex-col items-center justify-center gap-1.5 text-center cursor-pointer transition-all group"
                     >
-                      <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center group-hover:scale-110 transition-transform">
                         <Send size={16} />
                       </div>
-                      <span className="text-xs font-bold text-slate-700">Send Notification</span>
+                      <span className="text-xs font-bold text-slate-700">Broadcast Alert</span>
                     </button>
 
                     <button
                       onClick={() => setAdminTab('banners')}
                       className="p-3 bg-slate-50 hover:bg-blue-50 border border-slate-100 hover:border-blue-200 rounded-xl flex flex-col items-center justify-center gap-1.5 text-center cursor-pointer transition-all group"
                     >
-                      <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <div className="w-8 h-8 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center group-hover:scale-110 transition-transform">
                         <MapPin size={16} />
                       </div>
-                      <span className="text-xs font-bold text-slate-700">Create Banner</span>
+                      <span className="text-xs font-bold text-slate-700">Location Banners</span>
                     </button>
 
                     <button
                       onClick={() => setAdminTab('financials')}
                       className="p-3 bg-slate-50 hover:bg-blue-50 border border-slate-100 hover:border-blue-200 rounded-xl flex flex-col items-center justify-center gap-1.5 text-center cursor-pointer transition-all group"
                     >
-                      <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
                         <TrendingUp size={16} />
                       </div>
-                      <span className="text-xs font-bold text-slate-700">View Reports</span>
+                      <span className="text-xs font-bold text-slate-700">Settlements</span>
                     </button>
 
                     <button
-                      onClick={() => setAdminTab('financials')}
+                      onClick={() => setAdminTab('ads-inquiries')}
                       className="p-3 bg-slate-50 hover:bg-blue-50 border border-slate-100 hover:border-blue-200 rounded-xl flex flex-col items-center justify-center gap-1.5 text-center cursor-pointer transition-all group"
                     >
-                      <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                        <Settings size={16} />
+                      <div className="w-8 h-8 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <Megaphone size={16} />
                       </div>
-                      <span className="text-xs font-bold text-slate-700">Platform Settings</span>
+                      <span className="text-xs font-bold text-slate-700">Ad Inquiries</span>
                     </button>
                   </div>
                 </Card>
 
-                {/* System Notifications Card */}
-                <Card className="p-5 border-none shadow-xs bg-white rounded-2xl">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm font-black text-slate-800 tracking-tight">System Notifications</h3>
-                    <button 
-                      onClick={() => setAdminTab('hospitals')}
-                      className="text-xs font-bold text-blue-600 hover:underline cursor-pointer bg-transparent border-none"
-                    >
-                      View All →
-                    </button>
+                {/* Infrastructure & Network Health Card */}
+                <Card className="p-5 border-none shadow-xs bg-white rounded-2xl space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-black text-slate-800 tracking-tight">Platform Infrastructure</h3>
+                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Healthy
+                    </span>
                   </div>
-                  <div className="space-y-3">
-                    {[
-                      { icon: Building2, color: 'text-blue-600 bg-blue-50', title: 'New Hospital Registration', desc: 'Sai Health Care has registered', time: '10:24 AM' },
-                      { icon: Stethoscope, color: 'text-amber-600 bg-amber-50', title: 'Doctor Registration', desc: 'Dr. Priya Sharma joined Gandhi Hospital', time: '09:12 AM' },
-                      { icon: DollarSign, color: 'text-emerald-600 bg-emerald-50', title: 'Payment Alert', desc: '₹5,600 received from Navya Hospital', time: '08:45 AM' },
-                      { icon: AlertTriangle, color: 'text-rose-600 bg-rose-50', title: 'Hospital Token Limit Alert', desc: 'Gandhi Hospital reached 80% daily tokens', time: '08:20 AM' },
-                      { icon: Users, color: 'text-purple-600 bg-purple-50', title: 'New Customer Registration', desc: 'Ramesh Kumar registered from Adoni', time: '07:54 AM' },
-                    ].map((item, idx) => {
-                      const Icon = item.icon;
-                      return (
-                        <div key={idx} className="flex items-start gap-3 p-2 hover:bg-slate-50 rounded-xl transition-colors">
-                          <div className={`w-8 h-8 rounded-lg ${item.color} flex items-center justify-center shrink-0 mt-0.5`}>
-                            <Icon size={14} />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs font-bold text-slate-800 leading-tight">{item.title}</p>
-                            <p className="text-[11px] text-slate-500 truncate">{item.desc}</p>
-                          </div>
-                          <span className="text-[10px] font-semibold text-slate-400 whitespace-nowrap">{item.time}</span>
-                        </div>
-                      );
-                    })}
+
+                  <div className="space-y-2 text-xs">
+                    <div className="p-2.5 bg-slate-50 rounded-xl flex items-center justify-between">
+                      <span className="text-slate-500 font-semibold">Database (PostgreSQL RDS)</span>
+                      <strong className="text-emerald-700 font-extrabold flex items-center gap-1">
+                        <CheckCircle2 size={13} className="text-emerald-600" /> Connected
+                      </strong>
+                    </div>
+
+                    <div className="p-2.5 bg-slate-50 rounded-xl flex items-center justify-between">
+                      <span className="text-slate-500 font-semibold">Platform Commission Rate</span>
+                      <strong className="text-slate-800 font-extrabold">{platformFeePercent}% Per Booking</strong>
+                    </div>
+
+                    <div className="p-2.5 bg-slate-50 rounded-xl flex items-center justify-between">
+                      <span className="text-slate-500 font-semibold">Network Active Hospitals</span>
+                      <strong className="text-slate-800 font-extrabold">{activeHospitalsCount} of {safeHospitals.length}</strong>
+                    </div>
+
+                    <div className="p-2.5 bg-slate-50 rounded-xl flex items-center justify-between">
+                      <span className="text-slate-500 font-semibold">Total Registered Doctors</span>
+                      <strong className="text-slate-800 font-extrabold">{totalDoctorsCount} Specialists</strong>
+                    </div>
                   </div>
                 </Card>
               </div>
@@ -1074,67 +1042,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
               </div>
             </div>
 
-            {/* Bottom 2-Column Row: Customer Overview + Real-time Token Monitoring */}
+            {/* Bottom 2-Column Row: Queue Throughput & Fulfillment + Patient Network & Channel Distribution */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              {/* Customer Overview (6 cols) */}
+              {/* Today's Queue Throughput & Fulfillment (6 cols) */}
               <div className="lg:col-span-6">
                 <Card className="p-5 border-none shadow-xs bg-white rounded-2xl h-full flex flex-col justify-between">
                   <div className="flex items-center justify-between mb-4">
                     <div>
-                      <h3 className="text-sm font-black text-slate-800 tracking-tight">Customer Overview</h3>
-                      <p className="text-xs text-slate-400 font-semibold">User growth & engagement breakdown</p>
-                    </div>
-                    <button
-                      onClick={() => setAdminTab('customers')}
-                      className="text-xs font-bold text-blue-600 hover:underline cursor-pointer bg-transparent border-none"
-                    >
-                      View All Customers →
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl space-y-1">
-                      <span className="text-[10px] font-bold text-slate-400 block uppercase">Total Customers</span>
-                      <p className="text-xl font-black text-slate-900">{totalCustomersCount.toLocaleString('en-IN')}</p>
-                      <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-0.5">
-                        ▲ +8.4%
-                      </span>
-                    </div>
-
-                    <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl space-y-1">
-                      <span className="text-[10px] font-bold text-slate-400 block uppercase">New Customers</span>
-                      <p className="text-xl font-black text-blue-600">1,248</p>
-                      <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-0.5">
-                        ▲ +12.6%
-                      </span>
-                    </div>
-
-                    <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl space-y-1">
-                      <span className="text-[10px] font-bold text-slate-400 block uppercase">Active Customers</span>
-                      <p className="text-xl font-black text-emerald-600">18,420</p>
-                      <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-0.5">
-                        ▲ +6.3%
-                      </span>
-                    </div>
-
-                    <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl space-y-1">
-                      <span className="text-[10px] font-bold text-slate-400 block uppercase">Returning</span>
-                      <p className="text-xl font-black text-purple-600">6,430</p>
-                      <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-0.5">
-                        ▲ +9.8%
-                      </span>
-                    </div>
-                  </div>
-                </Card>
-              </div>
-
-              {/* Real-time Token Monitoring (6 cols) */}
-              <div className="lg:col-span-6">
-                <Card className="p-5 border-none shadow-xs bg-white rounded-2xl h-full flex flex-col justify-between">
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <h3 className="text-sm font-black text-slate-800 tracking-tight">Real-time Token Monitoring</h3>
-                      <p className="text-xs text-slate-400 font-semibold">Active queue status and live patient throughput</p>
+                      <h3 className="text-sm font-black text-slate-800 tracking-tight">Today's Queue Throughput</h3>
+                      <p className="text-xs text-slate-400 font-semibold">Live patient visit progression across all partner clinics</p>
                     </div>
                     <button
                       onClick={() => setAdminTab('financials')}
@@ -1145,28 +1061,123 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                   </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <div className="p-3 bg-blue-50/60 border border-blue-100 rounded-xl space-y-1">
-                      <span className="text-[10px] font-bold text-blue-600 block uppercase">Online Tokens</span>
-                      <p className="text-xl font-black text-blue-900">{todayOnlineCount || 842}</p>
-                      <span className="text-[10px] font-bold text-slate-500">Waiting: 126</span>
+                    <div className="p-3 bg-amber-50/70 border border-amber-200/60 rounded-xl space-y-1">
+                      <span className="text-[10px] font-bold text-amber-700 block uppercase">Waiting</span>
+                      <p className="text-xl font-black text-amber-900">{todayWaitingCount}</p>
+                      <span className="text-[10px] font-semibold text-slate-500">In OPD Queue</span>
                     </div>
 
-                    <div className="p-3 bg-emerald-50/60 border border-emerald-100 rounded-xl space-y-1">
-                      <span className="text-[10px] font-bold text-emerald-600 block uppercase">Walk-in Tokens</span>
-                      <p className="text-xl font-black text-emerald-900">{todayWalkinCount || 442}</p>
-                      <span className="text-[10px] font-bold text-slate-500">Waiting: 98</span>
+                    <div className="p-3 bg-blue-50/70 border border-blue-200/60 rounded-xl space-y-1">
+                      <span className="text-[10px] font-bold text-blue-700 block uppercase">In Cabin</span>
+                      <p className="text-xl font-black text-blue-900">{todayInCabinCount}</p>
+                      <span className="text-[10px] font-semibold text-slate-500">Currently Consulting</span>
                     </div>
 
-                    <div className="p-3 bg-purple-50/60 border border-purple-100 rounded-xl space-y-1">
-                      <span className="text-[10px] font-bold text-purple-600 block uppercase">Completed</span>
-                      <p className="text-xl font-black text-purple-900">1,156</p>
-                      <span className="text-[10px] font-bold text-slate-500">Today</span>
+                    <div className="p-3 bg-emerald-50/70 border border-emerald-200/60 rounded-xl space-y-1">
+                      <span className="text-[10px] font-bold text-emerald-700 block uppercase">Completed</span>
+                      <p className="text-xl font-black text-emerald-900">{todayCompletedCount}</p>
+                      <span className="text-[10px] font-semibold text-slate-500">Finished Today</span>
                     </div>
 
-                    <div className="p-3 bg-rose-50/60 border border-rose-100 rounded-xl space-y-1">
-                      <span className="text-[10px] font-bold text-rose-600 block uppercase">Cancelled</span>
-                      <p className="text-xl font-black text-rose-900">54</p>
-                      <span className="text-[10px] font-bold text-slate-500">Today</span>
+                    <div className="p-3 bg-rose-50/70 border border-rose-200/60 rounded-xl space-y-1">
+                      <span className="text-[10px] font-bold text-rose-700 block uppercase">Cancelled</span>
+                      <p className="text-xl font-black text-rose-900">{todayCancelledCount}</p>
+                      <span className="text-[10px] font-semibold text-slate-500">No-show / Revoked</span>
+                    </div>
+                  </div>
+
+                  {/* Progress bar */}
+                  <div className="mt-4 pt-3 border-t border-slate-100">
+                    <div className="flex justify-between text-xs font-bold text-slate-600 mb-1.5">
+                      <span>Queue Completion Progress</span>
+                      <span>
+                        {todayTokensCount > 0 ? Math.round((todayCompletedCount / todayTokensCount) * 100) : 100}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden flex">
+                      <div
+                        className="bg-emerald-500 h-full transition-all"
+                        style={{ width: `${todayTokensCount > 0 ? (todayCompletedCount / todayTokensCount) * 100 : 100}%` }}
+                        title={`Completed: ${todayCompletedCount}`}
+                      />
+                      <div
+                        className="bg-amber-400 h-full transition-all"
+                        style={{ width: `${todayTokensCount > 0 ? (todayWaitingCount / todayTokensCount) * 100 : 0}%` }}
+                        title={`Waiting: ${todayWaitingCount}`}
+                      />
+                      <div
+                        className="bg-rose-400 h-full transition-all"
+                        style={{ width: `${todayTokensCount > 0 ? (todayCancelledCount / todayTokensCount) * 100 : 0}%` }}
+                        title={`Cancelled: ${todayCancelledCount}`}
+                      />
+                    </div>
+                  </div>
+                </Card>
+              </div>
+
+              {/* Patient Network & Channel Distribution (6 cols) */}
+              <div className="lg:col-span-6">
+                <Card className="p-5 border-none shadow-xs bg-white rounded-2xl h-full flex flex-col justify-between">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="text-sm font-black text-slate-800 tracking-tight">Patient Network & Channel Distribution</h3>
+                      <p className="text-xs text-slate-400 font-semibold">Registered users & online app vs walk-in counter mix</p>
+                    </div>
+                    <button
+                      onClick={() => setAdminTab('customers')}
+                      className="text-xs font-bold text-blue-600 hover:underline cursor-pointer bg-transparent border-none"
+                    >
+                      View All Customers →
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="p-3 bg-purple-50/70 border border-purple-200/60 rounded-xl space-y-1">
+                      <span className="text-[10px] font-bold text-purple-700 block uppercase">Patients</span>
+                      <p className="text-xl font-black text-purple-900">{totalCustomersCount.toLocaleString('en-IN')}</p>
+                      <span className="text-[10px] font-semibold text-slate-500">Total User Base</span>
+                    </div>
+
+                    <div className="p-3 bg-blue-50/70 border border-blue-200/60 rounded-xl space-y-1">
+                      <span className="text-[10px] font-bold text-blue-700 block uppercase">App Tokens</span>
+                      <p className="text-xl font-black text-blue-900">{todayOnlineCount}</p>
+                      <span className="text-[10px] font-semibold text-slate-500">Booked on Mobile</span>
+                    </div>
+
+                    <div className="p-3 bg-emerald-50/70 border border-emerald-200/60 rounded-xl space-y-1">
+                      <span className="text-[10px] font-bold text-emerald-700 block uppercase">Counter</span>
+                      <p className="text-xl font-black text-emerald-900">{todayWalkinCount}</p>
+                      <span className="text-[10px] font-semibold text-slate-500">Hospital Walk-ins</span>
+                    </div>
+
+                    <div className="p-3 bg-indigo-50/70 border border-indigo-200/60 rounded-xl space-y-1">
+                      <span className="text-[10px] font-bold text-indigo-700 block uppercase">App Share</span>
+                      <p className="text-xl font-black text-indigo-900">
+                        {todayTokensCount > 0 ? Math.round((todayOnlineCount / todayTokensCount) * 100) : 0}%
+                      </p>
+                      <span className="text-[10px] font-semibold text-slate-500">Digital Adoption</span>
+                    </div>
+                  </div>
+
+                  {/* Channel split bar */}
+                  <div className="mt-4 pt-3 border-t border-slate-100">
+                    <div className="flex justify-between text-xs font-bold text-slate-600 mb-1.5">
+                      <span>Today's Channel Split</span>
+                      <span>
+                        {todayOnlineCount} Online ({todayTokensCount > 0 ? Math.round((todayOnlineCount / todayTokensCount) * 100) : 0}%) vs {todayWalkinCount} Counter ({todayTokensCount > 0 ? Math.round((todayWalkinCount / todayTokensCount) * 100) : 0}%)
+                      </span>
+                    </div>
+                    <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden flex">
+                      <div
+                        className="bg-blue-600 h-full transition-all"
+                        style={{ width: `${todayTokensCount > 0 ? (todayOnlineCount / todayTokensCount) * 100 : 50}%` }}
+                        title={`Online: ${todayOnlineCount}`}
+                      />
+                      <div
+                        className="bg-emerald-500 h-full transition-all"
+                        style={{ width: `${todayTokensCount > 0 ? (todayWalkinCount / todayTokensCount) * 100 : 50}%` }}
+                        title={`Walk-in: ${todayWalkinCount}`}
+                      />
                     </div>
                   </div>
                 </Card>
