@@ -30,8 +30,9 @@ export const normalizePhoneInput = (phone: string): string => {
  */
 export const sendSmsOtpClient = async (
   phone: string,
-  purpose: 'customer_auth' | 'hospital_auth' = 'customer_auth'
-): Promise<{ success: boolean; message: string; phone?: string }> => {
+  purpose: 'customer_auth' | 'hospital_auth' = 'customer_auth',
+  mode?: 'login' | 'signup'
+): Promise<{ success: boolean; message: string; phone?: string; notFound?: boolean; alreadyExists?: boolean }> => {
   const cleanPhone = normalizePhoneInput(phone);
   if (!cleanPhone || cleanPhone.length !== 10) {
     return { success: false, message: 'Please enter a valid 10-digit Indian mobile number.' };
@@ -41,14 +42,19 @@ export const sendSmsOtpClient = async (
     const res = await fetch('/api/auth/sms/send-otp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone: cleanPhone, purpose }),
+      body: JSON.stringify({ phone: cleanPhone, purpose, mode }),
     });
 
     const data = await res.json();
     if (res.ok && data.success) {
       return { success: true, message: data.message || `OTP sent to +91 ${cleanPhone}`, phone: cleanPhone };
     }
-    return { success: false, message: data.message || 'Failed to send OTP SMS. Please try again.' };
+    return {
+      success: false,
+      message: data.message || 'Failed to send OTP SMS. Please try again.',
+      notFound: Boolean(data.notFound),
+      alreadyExists: Boolean(data.alreadyExists),
+    };
   } catch (err: any) {
     console.error('[SMS Service Client] Error sending SMS OTP:', err);
     return { success: false, message: 'Unable to connect to SMS service. Please check your connection.' };

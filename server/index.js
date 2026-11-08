@@ -1047,10 +1047,53 @@ function requireHospitalAuth(req, res, next) {
 // POST /api/auth/sms/send-otp
 app.post('/api/auth/sms/send-otp', async (req, res) => {
   try {
-    const { phone, purpose } = req.body;
+    const { phone, purpose, mode } = req.body;
     if (!phone) {
       return res.status(400).json({ success: false, message: 'Mobile number is required' });
     }
+
+    const cleanPhone10 = normalizePhone10(phone);
+    if (!cleanPhone10 || cleanPhone10.length !== 10) {
+      return res.status(400).json({ success: false, message: 'Please enter a valid 10-digit Indian mobile number.' });
+    }
+
+    // 1. Guard against wasting SMS OTP credits for unregistered patients trying to login
+    if (purpose === 'customer_auth' && mode === 'login') {
+      const store = await getUnifiedStore();
+      const customers = store.customers || [];
+      let customer = customers.find(c => cleanPhone10 && normalizePhone10(c.phone) === cleanPhone10);
+
+      let patientExists = Boolean(customer);
+      if (!patientExists && isDbConnected) {
+        try {
+          const patRes = await query(`SELECT id FROM hospital_patients WHERE phone LIKE $1 LIMIT 1`, [`%${cleanPhone10}%`]);
+          if (patRes.rows && patRes.rows.length > 0) patientExists = true;
+        } catch (e) { }
+      }
+
+      if (!patientExists) {
+        return res.status(404).json({
+          success: false,
+          notFound: true,
+          message: 'No registered account found with this mobile number. Please click "Register Patient" to sign up first.'
+        });
+      }
+    }
+
+    // 2. Guard against wasting SMS OTP credits for already-registered patients on signup
+    if (purpose === 'customer_auth' && mode === 'signup') {
+      const store = await getUnifiedStore();
+      const customers = store.customers || [];
+      const customer = customers.find(c => cleanPhone10 && normalizePhone10(c.phone) === cleanPhone10);
+      if (customer) {
+        return res.status(409).json({
+          success: false,
+          alreadyExists: true,
+          message: 'An account with this mobile number already exists. Please switch to "Sign In" to continue.'
+        });
+      }
+    }
+
     const result = await sendSmsOtp(phone, purpose || 'auth');
     if (!result.success) {
       return res.status(400).json(result);

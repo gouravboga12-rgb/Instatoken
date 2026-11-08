@@ -72,9 +72,15 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
 
     setLoading(true);
     try {
-      const res = await sendSmsOtpClient(clean10, 'customer_auth');
+      const res = await sendSmsOtpClient(clean10, 'customer_auth', mode);
       if (!res.success) {
-        setError(res.message || 'Failed to send OTP SMS. Please try again.');
+        if (res.notFound) {
+          setError('No registered account found with this mobile number. Please click "Register Patient" to sign up first.');
+        } else if (res.alreadyExists) {
+          setError('An account with this mobile number already exists. Please switch to "Sign In" to continue.');
+        } else {
+          setError(res.message || 'Failed to send OTP SMS. Please try again.');
+        }
         return;
       }
       setStep('otp');
@@ -365,9 +371,31 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
             </div>
 
             {error && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-xl text-red-600 text-xs flex items-start gap-2">
-                <AlertCircle size={16} className="shrink-0 mt-0.5" />
-                <span className="leading-relaxed">{error}</span>
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs flex flex-col gap-2">
+                <div className="flex items-start gap-2">
+                  <AlertCircle size={16} className="shrink-0 mt-0.5 text-red-600" />
+                  <span className="leading-relaxed font-medium">{error}</span>
+                </div>
+                {step === 'form' && mode === 'login' && error.includes('Register Patient') && (
+                  <button
+                    type="button"
+                    onClick={() => switchMode('signup')}
+                    className="self-start text-[11px] font-bold text-blue-700 hover:text-blue-800 bg-white border border-blue-200 px-3 py-1.5 rounded-lg shadow-sm hover:shadow transition-all cursor-pointer flex items-center gap-1.5 mt-1"
+                  >
+                    <span>Click here to Register as Patient</span>
+                    <ArrowRight size={13} />
+                  </button>
+                )}
+                {step === 'form' && mode === 'signup' && error.includes('Sign In') && (
+                  <button
+                    type="button"
+                    onClick={() => switchMode('login')}
+                    className="self-start text-[11px] font-bold text-blue-700 hover:text-blue-800 bg-white border border-blue-200 px-3 py-1.5 rounded-lg shadow-sm hover:shadow transition-all cursor-pointer flex items-center gap-1.5 mt-1"
+                  >
+                    <span>Click here to Sign In</span>
+                    <ArrowRight size={13} />
+                  </button>
+                )}
               </div>
             )}
 
