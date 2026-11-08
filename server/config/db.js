@@ -8,9 +8,9 @@ const pool = new Pool({
   database: process.env.DB_NAME || 'instatoken_prod',
   user: process.env.DB_USER || 'postgres',
   password: process.env.DB_PASSWORD,
-  ssl: {
+  ssl: (process.env.DB_SSL === 'true' || (process.env.DB_HOST && !['localhost', '127.0.0.1'].includes(process.env.DB_HOST))) ? {
     rejectUnauthorized: false, // Required for AWS RDS SSL connections
-  },
+  } : false,
   max: 20, // Max concurrent connections in pool
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 10000,
