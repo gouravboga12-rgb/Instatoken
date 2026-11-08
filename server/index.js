@@ -1,5 +1,7 @@
 require('dotenv').config();
 const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
 const nodemailer = require('nodemailer');
 const cors = require('cors');
 const path = require('path');
@@ -17,6 +19,38 @@ const { generateUploadUrl, uploadFile, deleteFile } = require('./config/s3');
 const { normalizePhone10, sendSmsOtp, verifySmsOtp, clearSmsOtp } = require('./services/smsService');
 
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST', 'PATCH', 'DELETE']
+  }
+});
+
+// Socket.io Hospital Room Management
+io.on('connection', (socket) => {
+  socket.on('join_hospital', (data) => {
+    const hospitalId = typeof data === 'string' ? data : data?.hospitalId;
+    if (hospitalId) {
+      socket.join(`hospital_${hospitalId}`);
+      console.log(`📡 Socket ${socket.id} joined room hospital_${hospitalId}`);
+      socket.emit('joined_hospital', { hospitalId, status: 'connected' });
+    }
+  });
+
+  socket.on('leave_hospital', (data) => {
+    const hospitalId = typeof data === 'string' ? data : data?.hospitalId;
+    if (hospitalId) {
+      socket.leave(`hospital_${hospitalId}`);
+      console.log(`📡 Socket ${socket.id} left room hospital_${hospitalId}`);
+    }
+  });
+
+  socket.on('disconnect', () => {
+    // client disconnected
+  });
+});
+
 const PORT = process.env.PORT || 5000;
 
 app.use(cors());
@@ -169,7 +203,7 @@ function ensureDefaultDepartments(existingDepts) {
   if (!Array.isArray(existingDepts) || existingDepts.length === 0) {
     return INITIAL_DEPARTMENTS.map(d => ({ ...d }));
   }
-  const isOnlyOldPlaceholders = existingDepts.length <= 2 && existingDepts.every(d => 
+  const isOnlyOldPlaceholders = existingDepts.length <= 2 && existingDepts.every(d =>
     (d.id?.includes('gen') || d.id?.includes('opd')) && d.name !== 'General Medicine'
   );
   if (isOnlyOldPlaceholders) {
@@ -807,7 +841,7 @@ app.post('/api/sync', async (req, res) => {
   ensureHospitalProfilesSynced(store);
 
   if (hospitalDepartments) store.hospitalDepartments = { ...store.hospitalDepartments, ...hospitalDepartments };
-  
+
   if (tokens && Array.isArray(tokens) && tokens.length > 0) {
     store.tokens = store.tokens || [];
     const validTokens = tokens.filter(t => !isDummyTokenRecord(t));
@@ -879,7 +913,7 @@ app.post('/api/sync', async (req, res) => {
     customers.forEach(incoming => {
       if (!incoming || (!incoming.id && !incoming.phone && !incoming.email)) return;
       const incomingNorm = (incoming.phone || '').replace(/\D/g, '').slice(-10);
-      const idx = store.customers.findIndex(c => 
+      const idx = store.customers.findIndex(c =>
         (incoming.id && c.id === incoming.id) ||
         (incomingNorm && (c.phone || '').replace(/\D/g, '').slice(-10) === incomingNorm) ||
         (incoming.email && c.email && c.email.toLowerCase() === incoming.email.toLowerCase())
@@ -1634,14 +1668,14 @@ app.delete('/api/hospitals/:id', async (req, res) => {
 app.get('/api/hospitals/:id/doctors', requireHospitalAuth, async (req, res) => {
   const { id } = req.params;
   let doctors = [];
-  
+
   if (isDbConnected) {
     try {
       const dbRes = await query(`SELECT * FROM hospital_doctors WHERE hospital_id = $1 ORDER BY created_at ASC`, [id]);
       if (dbRes.rows && dbRes.rows.length > 0) {
         doctors = dbRes.rows.map(r => {
           let extra = {};
-          try { extra = typeof r.data === 'string' ? JSON.parse(r.data) : (r.data || {}); } catch(e){}
+          try { extra = typeof r.data === 'string' ? JSON.parse(r.data) : (r.data || {}); } catch (e) { }
           return {
             id: r.id,
             hospitalId: r.hospital_id,
@@ -1843,7 +1877,7 @@ app.get('/api/hospitals/:id/departments', requireHospitalAuth, async (req, res) 
       if (dbRes.rows && dbRes.rows.length > 0) {
         departments = dbRes.rows.map(r => {
           let extra = {};
-          try { extra = typeof r.data === 'string' ? JSON.parse(r.data) : (r.data || {}); } catch(e){}
+          try { extra = typeof r.data === 'string' ? JSON.parse(r.data) : (r.data || {}); } catch (e) { }
           return {
             id: r.id,
             hospitalId: r.hospital_id,
@@ -2937,6 +2971,10 @@ app.post('/api/hospitals/:hospitalId/tokens', requireHospitalAuth, async (req, r
   }
 
   await saveUnifiedStore(store);
+  if (newToken && hospitalId) {
+    io.to(`hospital_${hospitalId}`).emit('token_booked', newToken);
+    console.log(`📡 [Socket.io] Emitted walk-in token_booked to hospital_${hospitalId}`);
+  }
   res.status(201).json({ success: true, hospitalId, token: newToken });
 });
 
@@ -2950,8 +2988,8 @@ app.patch('/api/hospitals/:hospitalId/tokens/:tokenId/status', requireHospitalAu
     if (t.id === tokenId) {
       const newStatus = status || t.status;
       const newSession = session || t.session;
-      const computedPayStatus = paymentStatus !== undefined 
-        ? paymentStatus 
+      const computedPayStatus = paymentStatus !== undefined
+        ? paymentStatus
         : (status === 'cancelled' ? 'refunded' : status === 'completed' ? (t.paymentStatus || 'paid') : t.paymentStatus);
       const computedPayMethod = paymentMethod !== undefined ? paymentMethod : t.paymentMethod;
 
@@ -2983,7 +3021,7 @@ app.patch('/api/hospitals/:hospitalId/tokens/:tokenId/status', requireHospitalAu
 
   if (isDbConnected) {
     try {
-      const apptStatus = targetToken 
+      const apptStatus = targetToken
         ? (targetToken.status === 'completed' ? 'completed' : ['cancelled', 'not-visited', 'skipped'].includes(targetToken.status) ? 'cancelled' : 'booked')
         : (status === 'completed' ? 'completed' : ['cancelled', 'not-visited', 'skipped'].includes(status) ? 'cancelled' : 'booked');
 
@@ -3019,6 +3057,10 @@ app.patch('/api/hospitals/:hospitalId/tokens/:tokenId/status', requireHospitalAu
   }
 
   await saveUnifiedStore(store);
+  if (targetToken && hospitalId) {
+    io.to(`hospital_${hospitalId}`).emit('token_status_changed', targetToken);
+    console.log(`📡 [Socket.io] Emitted token_status_changed to hospital_${hospitalId} for token ${targetToken.id}: ${targetToken.status}`);
+  }
   res.json({ success: true, hospitalId, tokenId, status, token: targetToken });
 });
 
@@ -3052,6 +3094,10 @@ app.delete('/api/hospitals/:hospitalId/tokens/:tokenId', requireHospitalAuth, as
   }
 
   await saveUnifiedStore(store);
+  if (hospitalId) {
+    io.to(`hospital_${hospitalId}`).emit('token_deleted', { tokenId });
+    console.log(`📡 [Socket.io] Emitted token_deleted to hospital_${hospitalId} for token ${tokenId}`);
+  }
   res.json({ success: true, message: 'Token deleted successfully', id: tokenId });
 });
 
@@ -3084,6 +3130,10 @@ app.delete('/api/hospitals/:hospitalId/tokens', requireHospitalAuth, async (req,
   }
 
   await saveUnifiedStore(store);
+  if (hospitalId && targetIds.length > 0) {
+    io.to(`hospital_${hospitalId}`).emit('tokens_bulk_deleted', { ids: targetIds });
+    console.log(`📡 [Socket.io] Emitted tokens_bulk_deleted to hospital_${hospitalId} (${targetIds.length} tokens)`);
+  }
   res.json({ success: true, count: targetIds.length, clearedIds: targetIds });
 });
 
@@ -3456,6 +3506,10 @@ app.post('/api/appointments', async (req, res) => {
   }
 
   await saveUnifiedStore(store);
+  if (tokenRecord && tokenRecord.hospitalId) {
+    io.to(`hospital_${tokenRecord.hospitalId}`).emit('token_booked', tokenRecord);
+    console.log(`📡 [Socket.io] Emitted online token_booked to hospital_${tokenRecord.hospitalId} for token #${tokenRecord.tokenNo || tokenRecord.tokenNumber}`);
+  }
   res.status(201).json({ success: true, appointment: appt, token: tokenRecord });
 });
 
@@ -3693,7 +3747,7 @@ app.post('/api/customers/login', async (req, res) => {
           VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
           ON CONFLICT (id) DO UPDATE SET updated_at = NOW()
         `, [newCustomer.id, newCustomer.name, newCustomer.phone, newCustomer.email, newCustomer.location, JSON.stringify(newCustomer)]);
-      } catch (e) {}
+      } catch (e) { }
     }
     await saveUnifiedStore(store);
 
@@ -3971,7 +4025,7 @@ app.post('/api/records/upload', upload.single('file'), async (req, res) => {
     const safeBase = path.basename(req.file.originalname, ext).replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 30);
     const filename = `record-${Date.now()}-${safeBase}${cleanExt}`;
     const key = `records/${filename}`;
-    
+
     let fileType = 'PDF';
     if (req.file.mimetype && req.file.mimetype.startsWith('image/')) {
       fileType = 'IMAGE';
@@ -4469,7 +4523,7 @@ app.delete('/api/ads-inquiries/:id', async (req, res) => {
 app.post('/api/ads-inquiries', async (req, res) => {
   const store = await getUnifiedStore();
   store.adsInquiries = store.adsInquiries || [];
-  
+
   const inquiry = {
     id: `ad-inq-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
     hospitalId: req.body.hospitalId || '',
@@ -4821,9 +4875,10 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(distPath, 'index.html'));
 });
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`🚀 Insta Token Unified Express Server running on port ${PORT}`);
   console.log(`🌐 Health check endpoint: http://localhost:${PORT}/health`);
+  console.log(`📡 WebSocket (Socket.io) service initialized and listening`);
 });
 
 module.exports = app;

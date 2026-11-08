@@ -58,10 +58,16 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
     } catch (e) {}
   };
 
-  // Filter Tokens strictly for this Doctor
+  // Filter Tokens strictly for this Doctor (matching both ID and normalized Doctor Name)
   const doctorTokens = useMemo(() => {
-    return tokens.filter(t => t.doctorId === doctor?.id);
-  }, [tokens, doctor?.id]);
+    if (!doctor) return [];
+    const docName = (doctor.name || '').toLowerCase().trim();
+    return tokens.filter(t => {
+      if (t.doctorId === doctor.id) return true;
+      if (docName && t.doctorName && t.doctorName.toLowerCase().trim() === docName) return true;
+      return false;
+    });
+  }, [tokens, doctor?.id, doctor?.name]);
 
   const filteredTokens = useMemo(() => {
     return doctorTokens.filter(t => {

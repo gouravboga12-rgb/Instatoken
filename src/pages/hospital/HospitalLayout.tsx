@@ -180,7 +180,7 @@ const Sidebar: React.FC<{ collapsed: boolean; onToggle: () => void }> = ({ colla
 
 // ─── Top Header ───────────────────────────────────────────────────────────────
 const TopHeader: React.FC<{ onMenuToggle: () => void }> = ({ onMenuToggle }) => {
-  const { hospitalUser, hospitalLogout, tokens, hospitalProfile, notifications } = useHospital();
+  const { hospitalUser, hospitalLogout, tokens, hospitalProfile, notifications, refreshHospitalData, isRefreshingData } = useHospital();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const todayStr = new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
@@ -190,9 +190,12 @@ const TopHeader: React.FC<{ onMenuToggle: () => void }> = ({ onMenuToggle }) => 
   const notifsCount = (notifications || []).length;
 
   const handleManualRefresh = async () => {
-    if (isRefreshing) return;
+    if (isRefreshing || isRefreshingData) return;
     setIsRefreshing(true);
     try {
+      if (refreshHospitalData) {
+        await refreshHospitalData();
+      }
       await triggerManualSync();
     } finally {
       setTimeout(() => setIsRefreshing(false), 500);
@@ -267,14 +270,15 @@ const TopHeader: React.FC<{ onMenuToggle: () => void }> = ({ onMenuToggle }) => 
         <span className="text-[11px] font-extrabold text-emerald-700">{todayTokens} Active</span>
       </div>
 
-      {/* Manual Sync / Refresh Button */}
+      {/* Manual Sync / Refresh Button (In-Place, Never Navigates Away) */}
       <button 
+        type="button"
         onClick={handleManualRefresh}
-        title="Sync latest hospital appointments and queues"
+        title="Refresh appointments and queues in-place (stays on current screen)"
         className="flex items-center gap-1.5 text-xs font-bold text-slate-650 hover:text-blue-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl px-2.5 py-1.5 transition-all cursor-pointer shadow-2xs"
       >
-        <RefreshCw size={13} className={isRefreshing ? 'animate-spin text-blue-600' : 'text-slate-500'} />
-        <span className="text-[11px] hidden sm:inline">{isRefreshing ? 'Syncing...' : 'Sync'}</span>
+        <RefreshCw size={13} className={isRefreshing || isRefreshingData ? 'animate-spin text-blue-600' : 'text-slate-500'} />
+        <span className="text-[11px] hidden sm:inline">{isRefreshing || isRefreshingData ? 'Syncing...' : 'Sync'}</span>
       </button>
 
       {/* Notification Bell & Dropdown */}

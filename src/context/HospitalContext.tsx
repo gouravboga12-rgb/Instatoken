@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { io, Socket } from 'socket.io-client';
 import { useApp } from './AppContext';
 import type { Doctor } from '../utils/mockData';
 import { broadcastGlobalSync, subscribeGlobalSync } from '../utils/syncBus';
@@ -333,6 +334,8 @@ interface HospitalContextType {
   authToken: string;
   fetchPatients: (doctorId?: string, search?: string, status?: string) => Promise<PatientRecord[]>;
   fetchHospitalRevenue: (filter?: string, startDate?: string, endDate?: string, doctorId?: string) => Promise<{ totals: any; doctorStats: any[] }>;
+  refreshHospitalData: () => Promise<void>;
+  isRefreshingData: boolean;
 }
 
 // ─── Mock credentials (Single Official Reference Demo Hospital) ───────────────
@@ -882,6 +885,136 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
     return { totals: null, doctorStats: [] };
   };
+
+  const [isRefreshingData, setIsRefreshingData] = useState(false);
+
+  // In-place manual refresh callable from any screen / header button without navigating
+  const refreshHospitalData = async () => {
+    if (!targetHospId) return;
+    setIsRefreshingData(true);
+    try {
+      // 1. Fetch live tokens
+      const tokRes = await fetch(`/api/hospitals/${targetHospId}/tokens`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'x-hospital-token': authToken
+        }
+      });
+      const tokData = await tokRes.json();
+      if (tokData.success && Array.isArray(tokData.tokens)) {
+        setTokens(tokData.tokens.filter((t: any) => !isDummyToken(t)));
+        localStorage.setItem(`insta_hospital_tokens_${targetHospId}`, JSON.stringify(tokData.tokens));
+      }
+
+      // 2. Fetch live doctors
+      const docRes = await fetch(`/api/hospitals/${targetHospId}/doctors`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'x-hospital-token': authToken
+        }
+      });
+      const docData = await docRes.json();
+      if (docData.success && Array.isArray(docData.doctors)) {
+        setDoctors(docData.doctors);
+        localStorage.setItem(`insta_hospital_doctors_${targetHospId}`, JSON.stringify(docData.doctors));
+      }
+
+      // 3. Fetch live schedules
+      const schedRes = await fetch(`/api/hospitals/${targetHospId}/schedules`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'x-hospital-token': authToken
+        }
+      });
+      const schedData = await schedRes.json();
+      if (schedData.success && schedData.schedule) {
+        setScheduleConfig(schedData.schedule);
+      }
+    } catch (err) {
+      console.warn('Error refreshing hospital data in-place:', err);
+    } finally {
+      setTimeout(() => setIsRefreshingData(false), 500);
+    }
+  };
+
+  // ─── Socket.io Real-Time Event Listener (Zero-DB Idle Load) ─────────────────
+  useEffect(() => {
+    if (!targetHospId || typeof window === 'undefined') return;
+
+    // Connect directly to EC2 host to avoid Vercel proxy connection timeouts
+    const socketBackendUrl = 
+      window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        ? 'http://localhost:5000'
+        : 'https://testcodtech.shop';
+
+    let socket: Socket | null = null;
+    try {
+      socket = io(socketBackendUrl, {
+        transports: ['websocket', 'polling'],
+        reconnection: true,
+        reconnectionAttempts: 20,
+        reconnectionDelay: 2000
+      });
+
+      socket.on('connect', () => {
+        console.log('📡 [Socket.io] Connected to InstaToken live server:', socket?.id);
+        socket?.emit('join_hospital', { hospitalId: targetHospId });
+      });
+
+      // 1. Live Token Booked (Online & Counter)
+      socket.on('token_booked', (newTok: any) => {
+        if (!newTok || isDummyToken(newTok)) return;
+        console.log('🔔 [Socket.io] Live token_booked received:', newTok);
+        const newTokNo = newTok.tokenNo || newTok.tokenNumber;
+        setTokens(prev => {
+          const exists = prev.some(t => t.id === newTok.id || (t.hospitalId === newTok.hospitalId && t.doctorId === newTok.doctorId && t.tokenNo === newTokNo));
+          if (exists) {
+            return prev.map(t => (t.id === newTok.id || (t.hospitalId === newTok.hospitalId && t.doctorId === newTok.doctorId && t.tokenNo === newTokNo)) ? { ...t, ...newTok } : t);
+          }
+          return [newTok, ...prev];
+        });
+      });
+
+      // 2. Live Token Status Changed (Waiting -> In-Cabin -> Completed -> Paid)
+      socket.on('token_status_changed', (updatedTok: any) => {
+        if (!updatedTok) return;
+        console.log('🔔 [Socket.io] Live token_status_changed received:', updatedTok);
+        const upTokNo = updatedTok.tokenNo || updatedTok.tokenNumber;
+        setTokens(prev => prev.map(t => (t.id === updatedTok.id || (t.hospitalId === updatedTok.hospitalId && t.doctorId === updatedTok.doctorId && t.tokenNo === upTokNo)) ? { ...t, ...updatedTok } : t));
+      });
+
+      // 3. Live Token Session Shifted (Morning -> Evening)
+      socket.on('token_session_shifted', (shiftedTok: any) => {
+        if (!shiftedTok) return;
+        console.log('🔔 [Socket.io] Live token_session_shifted received:', shiftedTok);
+        setTokens(prev => prev.map(t => (t.id === shiftedTok.id) ? { ...t, ...shiftedTok } : t));
+      });
+
+      // 4. Live Token Deleted
+      socket.on('token_deleted', ({ tokenId }: { tokenId: string }) => {
+        if (!tokenId) return;
+        console.log('🔔 [Socket.io] Live token_deleted received:', tokenId);
+        setTokens(prev => prev.filter(t => t.id !== tokenId));
+      });
+
+      // 5. Live Tokens Bulk Deleted (Clear unvisited)
+      socket.on('tokens_bulk_deleted', ({ ids }: { ids: string[] }) => {
+        if (!Array.isArray(ids)) return;
+        console.log('🔔 [Socket.io] Live tokens_bulk_deleted received:', ids.length);
+        const idSet = new Set(ids);
+        setTokens(prev => prev.filter(t => !idSet.has(t.id)));
+      });
+    } catch (err) {
+      console.warn('Socket.io connection initialization error:', err);
+    }
+
+    return () => {
+      if (socket) {
+        socket.emit('leave_hospital', { hospitalId: targetHospId });
+        socket.disconnect();
+      }
+    };
+  }, [targetHospId]);
 
   // Auto-fetch patients, tokens, doctors, departments, schedules for current hospital directly from AWS RDS
   useEffect(() => {
@@ -2562,7 +2695,9 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       deleteDoctorReference,
       authToken,
       fetchPatients,
-      fetchHospitalRevenue
+      fetchHospitalRevenue,
+      refreshHospitalData,
+      isRefreshingData
     }}>
       {children}
     </HospitalContext.Provider>
