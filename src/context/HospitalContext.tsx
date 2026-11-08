@@ -285,7 +285,7 @@ interface HospitalContextType {
     notes?: string;
   }) => TokenRecord;
   updateTokenStatus: (
-    id: string, 
+    id: string,
     status: TokenRecord['status'],
     paymentUpdates?: { paymentStatus?: 'paid' | 'pending' | 'refunded'; paymentMethod?: string }
   ) => void;
@@ -391,7 +391,7 @@ export function ensureDefaultDepartments(existingDepts?: HospitalDepartment[] | 
   if (!Array.isArray(existingDepts) || existingDepts.length === 0) {
     return INITIAL_DEPARTMENTS.map(d => ({ ...d }));
   }
-  const isOnlyOldPlaceholders = existingDepts.length <= 2 && existingDepts.every(d => 
+  const isOnlyOldPlaceholders = existingDepts.length <= 2 && existingDepts.every(d =>
     (d.id?.includes('gen') || d.id?.includes('opd')) && d.name !== 'General Medicine'
   );
   if (isOnlyOldPlaceholders) {
@@ -586,7 +586,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [hospitalUser, setHospitalUser] = useState<HospitalUser | null>(() => {
     const saved = localStorage.getItem('insta_hospital_user');
     if (saved) {
-      try { return JSON.parse(saved); } catch (e) {}
+      try { return JSON.parse(saved); } catch (e) { }
     }
     return null;
   });
@@ -633,7 +633,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       try {
         const prof = JSON.parse(saved);
         if (prof.id === curHospId) return prof;
-      } catch (e) {}
+      } catch (e) { }
     }
     if (curHospId === 'hosp-apollo') {
       return INITIAL_PROFILE;
@@ -690,7 +690,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           }));
           return ensureDefaultDepartments(mapped);
         }
-      } catch (e) {}
+      } catch (e) { }
     }
     return ensureDefaultDepartments([]);
   });
@@ -705,7 +705,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         if (Array.isArray(parsed)) {
           return parsed;
         }
-      } catch (e) {}
+      } catch (e) { }
     }
     // Only City Care Multi-Specialty Hospital has default reference doctors
     if (curHospId === 'hosp-apollo') {
@@ -720,7 +720,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (!curHospId) return [];
     const saved = localStorage.getItem(`insta_hospital_staff_${curHospId}`);
     if (saved) {
-      try { return JSON.parse(saved); } catch (e) {}
+      try { return JSON.parse(saved); } catch (e) { }
     }
     return curHospId === 'hosp-apollo' ? INITIAL_STAFF : [];
   });
@@ -736,7 +736,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           const clean = parsed.filter(t => !isDummyToken(t));
           return clean;
         }
-      } catch (e) {}
+      } catch (e) { }
     }
     return [];
   });
@@ -752,7 +752,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           const clean = parsed.filter(p => !isDummyPatient(p));
           return clean;
         }
-      } catch (e) {}
+      } catch (e) { }
     }
     return [];
   });
@@ -770,7 +770,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (saved) {
       try {
         return JSON.parse(saved);
-      } catch (e) {}
+      } catch (e) { }
     }
     return [];
   });
@@ -791,7 +791,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         // Clean out legacy demo references (doc-ref-1 to doc-ref-10)
         return Array.isArray(parsed) ? parsed.filter(d => !/^doc-ref-([1-9]|10)$/.test(d.id)) : [];
       }
-    } catch (e) {}
+    } catch (e) { }
     return [];
   });
 
@@ -807,7 +807,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const next = [newRecord, ...prev];
       try {
         localStorage.setItem(`insta_hospital_doctor_references_${curHospId}`, JSON.stringify(next));
-      } catch (e) {}
+      } catch (e) { }
       return next;
     });
   };
@@ -818,7 +818,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const next = prev.map(d => d.id === id ? { ...d, ...updates } : d);
       try {
         localStorage.setItem(`insta_hospital_doctor_references_${curHospId}`, JSON.stringify(next));
-      } catch (e) {}
+      } catch (e) { }
       return next;
     });
   };
@@ -829,7 +829,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const next = prev.filter(d => d.id !== id);
       try {
         localStorage.setItem(`insta_hospital_doctor_references_${curHospId}`, JSON.stringify(next));
-      } catch (e) {}
+      } catch (e) { }
       return next;
     });
   };
@@ -942,10 +942,10 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (!targetHospId || typeof window === 'undefined') return;
 
     // Connect directly to EC2 host to avoid Vercel proxy connection timeouts
-    const socketBackendUrl = 
+    const socketBackendUrl =
       window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
         ? 'http://localhost:5000'
-        : 'https://testcodtech.shop';
+        : 'https://16.113.86.236.nip.io';
 
     let socket: Socket | null = null;
     try {
@@ -965,11 +965,11 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       socket.on('token_booked', (newTok: any) => {
         if (!newTok || isDummyToken(newTok)) return;
         console.log('🔔 [Socket.io] Live token_booked received:', newTok);
-        const newTokNo = newTok.tokenNo || newTok.tokenNumber;
+        const incomingNo = String(newTok.tokenNo || newTok.tokenNumber || '');
         setTokens(prev => {
-          const exists = prev.some(t => t.id === newTok.id || (t.hospitalId === newTok.hospitalId && t.doctorId === newTok.doctorId && t.tokenNo === newTokNo));
+          const exists = prev.some(t => t.id === newTok.id || (t.hospitalId === newTok.hospitalId && t.doctorId === newTok.doctorId && String(t.tokenNo) === incomingNo));
           if (exists) {
-            return prev.map(t => (t.id === newTok.id || (t.hospitalId === newTok.hospitalId && t.doctorId === newTok.doctorId && t.tokenNo === newTokNo)) ? { ...t, ...newTok } : t);
+            return prev.map(t => (t.id === newTok.id || (t.hospitalId === newTok.hospitalId && t.doctorId === newTok.doctorId && String(t.tokenNo) === incomingNo)) ? { ...t, ...newTok } : t);
           }
           return [newTok, ...prev];
         });
@@ -979,8 +979,8 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       socket.on('token_status_changed', (updatedTok: any) => {
         if (!updatedTok) return;
         console.log('🔔 [Socket.io] Live token_status_changed received:', updatedTok);
-        const upTokNo = updatedTok.tokenNo || updatedTok.tokenNumber;
-        setTokens(prev => prev.map(t => (t.id === updatedTok.id || (t.hospitalId === updatedTok.hospitalId && t.doctorId === updatedTok.doctorId && t.tokenNo === upTokNo)) ? { ...t, ...updatedTok } : t));
+        const incomingNo = String(updatedTok.tokenNo || updatedTok.tokenNumber || '');
+        setTokens(prev => prev.map(t => (t.id === updatedTok.id || (t.hospitalId === updatedTok.hospitalId && t.doctorId === updatedTok.doctorId && String(t.tokenNo) === incomingNo)) ? { ...t, ...updatedTok } : t));
       });
 
       // 3. Live Token Session Shifted (Morning -> Evening)
@@ -1116,7 +1116,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           localStorage.setItem(`insta_hospital_notifications_${targetHospId}`, JSON.stringify(data.notifications));
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [targetHospId, authToken, hospitalUser]);
 
   // ─── Cross-tab & Real-time Global Sync ─────────────────────────────────────
@@ -1143,7 +1143,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             time: payload.time || '10:00 AM',
             bookingDate: payload.bookingDate || payload.date || new Date().toISOString().split('T')[0],
             status: payload.status || 'booked',
-            queuePosition: Math.max(1, prev.filter(t => t.doctorId === payload.doctorId && ['booked','waiting','checked-in'].includes(t.status)).length + 1),
+            queuePosition: Math.max(1, prev.filter(t => t.doctorId === payload.doctorId && ['booked', 'waiting', 'checked-in'].includes(t.status)).length + 1),
             estimatedWait: payload.estimatedWait || payload.estimatedWaitTime || 15,
             consultationFee: payload.consultationFee || payload.fee || 500,
             paymentStatus: payload.paymentStatus || 'paid',
@@ -1216,15 +1216,15 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             if (Array.isArray(parsed)) {
               setDoctors(prev => (JSON.stringify(prev) !== savedDocs ? parsed : prev));
             }
-          } catch (e) {}
+          } catch (e) { }
         }
 
         const savedProfile = localStorage.getItem(`insta_hospital_profile_${curHospId}`);
         if (savedProfile) {
-          try { 
+          try {
             const parsedProf = JSON.parse(savedProfile);
             setHospitalProfile(prev => (JSON.stringify(prev) !== savedProfile ? parsedProf : prev));
-          } catch (e) {}
+          } catch (e) { }
         }
         const savedDepts = localStorage.getItem(`insta_hospital_departments_${curHospId}`);
         if (savedDepts) {
@@ -1237,7 +1237,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                 active: d.active !== false
               })) : prev));
             }
-          } catch (e) {}
+          } catch (e) { }
         }
         const savedToks = localStorage.getItem(`insta_hospital_tokens_${curHospId}`);
         if (savedToks) {
@@ -1247,7 +1247,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
               const clean = parsed.filter(t => !isDummyToken(t));
               setTokens(prev => (JSON.stringify(prev) !== JSON.stringify(clean) ? clean : prev));
             }
-          } catch (e) {}
+          } catch (e) { }
         }
       }
     });
@@ -1468,9 +1468,9 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const docSessions = (d.sessions && d.sessions.length > 0)
         ? d.sessions
         : [
-            { id: `sess-${d.id}-1`, name: 'Morning', startTime: d.opdStartTime || '09:00 AM', endTime: '01:00 PM', maxTokens: Math.round(((Number(d.maxTokensPerDay) || 50) * 0.6)) || 30, consultationDuration: Number(d.consultationDuration) || 15, breakTime: 5, active: true },
-            { id: `sess-${d.id}-2`, name: 'Evening', startTime: '05:00 PM', endTime: d.opdEndTime || '09:00 PM', maxTokens: Math.round(((Number(d.maxTokensPerDay) || 50) * 0.4)) || 20, consultationDuration: Number(d.consultationDuration) || 15, breakTime: 5, active: true }
-          ];
+          { id: `sess-${d.id}-1`, name: 'Morning', startTime: d.opdStartTime || '09:00 AM', endTime: '01:00 PM', maxTokens: Math.round(((Number(d.maxTokensPerDay) || 50) * 0.6)) || 30, consultationDuration: Number(d.consultationDuration) || 15, breakTime: 5, active: true },
+          { id: `sess-${d.id}-2`, name: 'Evening', startTime: '05:00 PM', endTime: d.opdEndTime || '09:00 PM', maxTokens: Math.round(((Number(d.maxTokensPerDay) || 50) * 0.4)) || 20, consultationDuration: Number(d.consultationDuration) || 15, breakTime: 5, active: true }
+        ];
 
       return {
         id: d.id,
@@ -1533,7 +1533,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       body: JSON.stringify({
         hospitalDoctors: { [hospId]: updatedDocs }
       })
-    }).catch(() => {});
+    }).catch(() => { });
 
     broadcastGlobalSync('HOSPITAL_DOCTORS_UPDATED', {
       hospitalId: hospId,
@@ -1582,7 +1582,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       body: JSON.stringify({
         hospitalDepartments: { [hospId]: updatedDepts }
       })
-    }).catch(() => {});
+    }).catch(() => { });
 
     broadcastGlobalSync('HOSPITAL_DEPARTMENTS_UPDATED', {
       hospitalId: hospId,
@@ -1843,7 +1843,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const maxToken = tokens.length > 0 ? Math.max(...tokens.map(t => t.tokenNo || 0)) : 0;
     const doctor = doctors.find(d => d.id === form.doctorId);
     const dept = departments.find(d => d.id === form.departmentId);
-    const waitingInSession = tokens.filter(t => t.session === form.session && ['booked','waiting','checked-in'].includes(t.status)).length;
+    const waitingInSession = tokens.filter(t => t.session === form.session && ['booked', 'waiting', 'checked-in'].includes(t.status)).length;
     const todayStr = new Date().toISOString().split('T')[0];
     const timeStr = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
 
@@ -1898,7 +1898,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         'Authorization': `Bearer ${authToken}`
       },
       body: JSON.stringify(newToken)
-    }).catch(() => {});
+    }).catch(() => { });
 
     // Automatically create / link patient customer account
     if (getOrCreateCustomerAccount) {
@@ -1943,10 +1943,10 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ appointment: newAppt })
-      }).catch(() => {});
+      }).catch(() => { });
 
       broadcastGlobalSync('APPOINTMENT_ADDED', newAppt);
-    } catch (e) {}
+    } catch (e) { }
 
     // Register / update hospital patient record (Phase 20)
     setPatients(prev => {
@@ -1998,7 +1998,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
         body: JSON.stringify(newPat)
-      }).catch(() => {});
+      }).catch(() => { });
 
       return updatedPatients;
     });
@@ -2008,7 +2008,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const updateTokenStatus = (
-    id: string, 
+    id: string,
     status: TokenRecord['status'],
     paymentUpdates?: { paymentStatus?: 'paid' | 'pending' | 'refunded'; paymentMethod?: string }
   ) => {
@@ -2020,8 +2020,8 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const updated = prev.map(t => t.id === id ? {
         ...t,
         status,
-        paymentStatus: paymentUpdates?.paymentStatus 
-          ? paymentUpdates.paymentStatus 
+        paymentStatus: paymentUpdates?.paymentStatus
+          ? paymentUpdates.paymentStatus
           : (status === 'cancelled' ? ('refunded' as const) : status === 'completed' ? ('paid' as const) : t.paymentStatus),
         paymentMethod: paymentUpdates?.paymentMethod ? paymentUpdates.paymentMethod : t.paymentMethod
       } : t);
@@ -2034,9 +2034,9 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     // Map hospital token status to customer appointment status
     const apptStatus: 'booked' | 'in-cabin' | 'checked-in' | 'completed' | 'cancelled' =
       status === 'completed' ? 'completed' :
-      ['cancelled', 'not-visited', 'skipped'].includes(status) ? 'cancelled' :
-      status === 'in-consultation' ? 'in-cabin' :
-      ['calling', 'checked-in'].includes(status) ? 'checked-in' : 'booked';
+        ['cancelled', 'not-visited', 'skipped'].includes(status) ? 'cancelled' :
+          status === 'in-consultation' ? 'in-cabin' :
+            ['calling', 'checked-in'].includes(status) ? 'checked-in' : 'booked';
 
     // Synchronize customer appointment store
     try {
@@ -2085,7 +2085,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         doctorId: targetDoctorId,
         hospitalId: targetHospId
       });
-    } catch (e) {}
+    } catch (e) { }
 
     // Post status update to backend (tokens + appointments)
     fetch(`/api/hospitals/${targetHospId}/tokens/${id}/status`, {
@@ -2094,17 +2094,17 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${authToken}`
       },
-      body: JSON.stringify({ 
+      body: JSON.stringify({
         status,
         ...(paymentUpdates || {})
       })
-    }).catch(() => {});
+    }).catch(() => { });
 
     fetch(`/api/appointments/${id}/status`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: apptStatus })
-    }).catch(() => {});
+    }).catch(() => { });
   };
 
   const updateTokenSession = (id: string, newSession: string) => {
@@ -2134,7 +2134,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         const next = appts.map((a: any) => a.id === id ? { ...a, session: newSession, status: 'booked' } : a);
         localStorage.setItem('insta_appointments', JSON.stringify(next));
       }
-    } catch (e) {}
+    } catch (e) { }
 
     fetch(`/api/hospitals/${targetHospId}/tokens/${id}/status`, {
       method: 'PATCH',
@@ -2143,7 +2143,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         'Authorization': `Bearer ${authToken}`
       },
       body: JSON.stringify({ session: newSession, status: 'waiting' })
-    }).catch(() => {});
+    }).catch(() => { });
   };
 
   const updateTokenPayment = (
@@ -2170,7 +2170,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         'Authorization': `Bearer ${authToken}`
       },
       body: JSON.stringify({ paymentStatus, paymentMethod })
-    }).catch(() => {});
+    }).catch(() => { });
   };
 
   const cancelToken = (id: string) => {
@@ -2190,8 +2190,8 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     fetch(`/api/hospitals/${targetHospId}/tokens/${id}`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` }
-    }).catch(() => {});
-    fetch(`/api/appointments/${id}`, { method: 'DELETE' }).catch(() => {});
+    }).catch(() => { });
+    fetch(`/api/appointments/${id}`, { method: 'DELETE' }).catch(() => { });
   };
 
   const deleteTokens = (ids: string[]) => {
@@ -2210,12 +2210,12 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
       body: JSON.stringify({ ids })
-    }).catch(() => {});
+    }).catch(() => { });
     fetch('/api/appointments', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ids })
-    }).catch(() => {});
+    }).catch(() => { });
   };
 
   // Patients (Phase 20)
@@ -2241,7 +2241,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
       body: JSON.stringify(newPat)
-    }).catch(() => {});
+    }).catch(() => { });
   };
   const updatePatient = (id: string, updates: Partial<PatientRecord>) =>
     setPatients(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
@@ -2276,7 +2276,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         body: JSON.stringify({
           hospitalSchedules: { [targetHospId]: updated }
         })
-      }).catch(() => {});
+      }).catch(() => { });
 
       broadcastGlobalSync('HOSPITAL_SCHEDULE_UPDATED', { hospitalId: targetHospId, schedule: updated });
       return updated;
@@ -2306,12 +2306,12 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const sendNotification = (msg: Omit<NotificationMessage, 'id' | 'sentAt' | 'status'>) => {
     const hospId = targetHospId || hospitalUser?.hospitalId || localStorage.getItem('insta_current_hospital_id') || 'hosp-apollo';
     const newNotif: NotificationMessage = { ...msg, id: `notif-${Date.now()}`, sentAt: new Date().toISOString(), status: 'sent' };
-    
+
     setNotifications(prev => {
       const updated = [newNotif, ...prev];
       try {
         localStorage.setItem(`insta_hospital_notifications_${hospId}`, JSON.stringify(updated.slice(0, 50)));
-      } catch (e) {}
+      } catch (e) { }
       return updated;
     });
 
@@ -2374,7 +2374,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setNotifications([]);
     try {
       localStorage.setItem(`insta_hospital_notifications_${hospId}`, JSON.stringify([]));
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const availableHospitals = (hospitals || []).map(h => ({ id: h.id, name: h.name, category: h.category }));
@@ -2390,7 +2390,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     let customProf: HospitalProfile | null = null;
     const savedCustom = localStorage.getItem(`insta_hospital_profile_${hospId}`);
     if (savedCustom) {
-      try { customProf = JSON.parse(savedCustom); } catch (e) {}
+      try { customProf = JSON.parse(savedCustom); } catch (e) { }
     }
 
     const newProfile: HospitalProfile = customProf || (hospId === 'hosp-apollo' ? {
@@ -2499,7 +2499,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           localStorage.setItem(`insta_hospital_tokens_${hospId}`, JSON.stringify(data.tokens));
         }
       })
-      .catch(() => {});
+      .catch(() => { });
 
     localStorage.setItem('insta_current_hospital_id', hospId);
 
@@ -2566,7 +2566,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           localStorage.setItem(`insta_hospital_doctors_${hospId}`, JSON.stringify(data.doctors));
         }
       })
-      .catch(() => {});
+      .catch(() => { });
 
     // Isolate departments strictly for this hospital
     const savedDepts = localStorage.getItem(`insta_hospital_departments_${hospId}`);
@@ -2611,7 +2611,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           localStorage.setItem(`insta_hospital_departments_${hospId}`, JSON.stringify(finalDepts));
         }
       })
-      .catch(() => {});
+      .catch(() => { });
 
     broadcastGlobalSync('HOSPITAL_PROFILE_UPDATED', newProfile);
   };
@@ -2665,7 +2665,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         body: JSON.stringify({
           hospitalProfiles: { [activeId]: updated }
         })
-      }).catch(() => {});
+      }).catch(() => { });
 
       broadcastGlobalSync('HOSPITAL_PROFILE_UPDATED', { hospitalId: activeId, profile: updated });
       broadcastGlobalSync('HOSPITAL_UPDATED', { hospitalId: activeId, updates: updated });
