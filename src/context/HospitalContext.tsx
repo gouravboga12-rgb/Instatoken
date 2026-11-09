@@ -1166,7 +1166,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             doctorId: appt.doctorId,
             doctorName: appt.doctorName,
             departmentName: appt.departmentName,
-            session: 'morning',
+            session: (appt.session || 'morning').toLowerCase() as any,
             time: appt.time,
             bookingDate: appt.date,
             status: 'booked',

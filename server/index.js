@@ -3043,11 +3043,28 @@ app.get('/api/hospitals/:hospitalId/tokens', requireHospitalAuth, async (req, re
     }
   }
 
-  if (doctorId && doctorId !== 'all') tokens = tokens.filter(t => t.doctorId === doctorId);
-  if (session && session !== 'all') tokens = tokens.filter(t => t.session === session);
-  if (status && status !== 'all') tokens = tokens.filter(t => t.status === status);
-  if (date) tokens = tokens.filter(t => t.bookingDate === date);
-  if (type && type !== 'all') tokens = tokens.filter(t => t.type === type);
+  if (doctorId && doctorId !== 'all') {
+    const docLower = String(doctorId).toLowerCase();
+    tokens = tokens.filter(t => t.doctorId === doctorId || (t.doctorName && String(t.doctorName).toLowerCase() === docLower));
+  }
+  if (session && session !== 'all') {
+    const sessLower = String(session).toLowerCase();
+    tokens = tokens.filter(t => String(t.session || '').toLowerCase() === sessLower);
+  }
+  if (status && status !== 'all') {
+    const statLower = String(status).toLowerCase();
+    tokens = tokens.filter(t => String(t.status || '').toLowerCase() === statLower);
+  }
+  if (date) {
+    tokens = tokens.filter(t => {
+      const bDate = (t.bookingDate || t.token_date || t.date || '').split('T')[0];
+      return bDate === date;
+    });
+  }
+  if (type && type !== 'all') {
+    const typeLower = String(type).toLowerCase();
+    tokens = tokens.filter(t => String(t.type || '').toLowerCase() === typeLower);
+  }
 
   res.json({ success: true, hospitalId, total: tokens.length, tokens });
 });

@@ -58,6 +58,7 @@ export interface Appointment {
   gstFee?: number;
   totalFee?: number;
   status: 'booked' | 'checked-in' | 'in-cabin' | 'completed' | 'cancelled';
+  session?: 'morning' | 'afternoon' | 'evening';
   paymentId: string;
   paymentMethod: string;
   estimatedWaitTime: number; // in minutes
@@ -1456,6 +1457,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Ensure customer account exists & is updated
     getOrCreateCustomerAccount(patientDetails.name, patientDetails.phone, patientDetails.email);
 
+    const lowerTime = (time || '').toLowerCase();
+    const resolvedSession: 'morning' | 'afternoon' | 'evening' = (() => {
+      if (lowerTime.includes('morn')) return 'morning';
+      if (lowerTime.includes('after') || lowerTime.includes('noon')) return 'afternoon';
+      if (lowerTime.includes('eve') || lowerTime.includes('night')) return 'evening';
+      const match = lowerTime.match(/(\d{1,2}):?(\d{2})?\s*(am|pm)?/);
+      if (match) {
+        let h = parseInt(match[1], 10);
+        const meridiem = match[3];
+        if (meridiem === 'pm' && h < 12) h += 12;
+        if (meridiem === 'am' && h === 12) h = 0;
+        if (h < 12) return 'morning';
+        if (h < 17) return 'afternoon';
+        return 'evening';
+      }
+      return 'morning';
+    })();
+
     const newAppt: Appointment = {
       id: `tok-${Date.now().toString().slice(-4)}`,
       tokenNumber: tokenAssigned,
@@ -1472,6 +1491,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       departmentName: DEPARTMENTS.find(d => d.id === targetDoc.departmentId)?.name || "General Medicine",
       date,
       time,
+      session: resolvedSession,
       fee: targetDoc.consultationFee,
       platformFee,
       gatewayFee,
@@ -1505,7 +1525,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       doctorName: newAppt.doctorName,
       departmentId: targetDoc.departmentId || 'dept-general',
       departmentName: newAppt.departmentName,
-      session: parseInt(newAppt.time.split(':')[0], 10) < 12 ? ('morning' as const) : parseInt(newAppt.time.split(':')[0], 10) < 17 ? ('afternoon' as const) : ('evening' as const),
+      session: resolvedSession,
       time: newAppt.time,
       bookingDate: newAppt.date || todayStr,
       status: 'booked' as const,

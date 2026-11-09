@@ -163,3 +163,4 @@ async function restoreGandhi() {
 restoreGandhi().catch(err => {
   console.error('Fatal error during restoration:', err);
 }).finally(() => pool.end());
+

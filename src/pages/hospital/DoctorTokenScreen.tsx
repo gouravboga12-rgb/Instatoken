@@ -72,9 +72,9 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
   const filteredTokens = useMemo(() => {
     return doctorTokens.filter(t => {
       // 1. Status Tab
-      if (statusTab === 'active' && !['booked', 'waiting', 'checked-in'].includes(t.status)) return false;
+      if (statusTab === 'active' && !['booked', 'waiting', 'checked-in', 'calling', 'in-consultation', 'arrived'].includes(t.status)) return false;
       if (statusTab === 'completed' && t.status !== 'completed') return false;
-      if (statusTab === 'not-visited' && !['not-visited', 'skipped'].includes(t.status)) return false;
+      if (statusTab === 'not-visited' && !['not-visited', 'skipped', 'late-coming'].includes(t.status)) return false;
       if (statusTab === 'cancelled' && t.status !== 'cancelled') return false;
 
       // 2. Date Filter
@@ -154,15 +154,15 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
       if (!isDateMatching(t)) return;
 
       stats.all.total++;
-      if (['booked', 'waiting'].includes(t.status)) stats.all.waiting++;
-      if (t.status === 'checked-in') stats.all.inCabin++;
+      if (['booked', 'waiting', 'calling', 'arrived'].includes(t.status)) stats.all.waiting++;
+      if (['checked-in', 'in-consultation'].includes(t.status)) stats.all.inCabin++;
       if (t.status === 'completed') stats.all.completed++;
 
       const sKey = (t.session || 'morning').toLowerCase();
       if (!stats[sKey]) stats[sKey] = { waiting: 0, inCabin: 0, completed: 0, total: 0 };
       stats[sKey].total++;
-      if (['booked', 'waiting'].includes(t.status)) stats[sKey].waiting++;
-      if (t.status === 'checked-in') stats[sKey].inCabin++;
+      if (['booked', 'waiting', 'calling', 'arrived'].includes(t.status)) stats[sKey].waiting++;
+      if (['checked-in', 'in-consultation'].includes(t.status)) stats[sKey].inCabin++;
       if (t.status === 'completed') stats[sKey].completed++;
     });
     return stats;
@@ -172,7 +172,7 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
   const activeQueue = useMemo(() => {
     return doctorTokens.filter(t => {
       if (!isDateMatching(t)) return false;
-      const isActive = ['booked', 'waiting', 'checked-in'].includes(t.status);
+      const isActive = ['booked', 'waiting', 'checked-in', 'calling', 'in-consultation', 'arrived'].includes(t.status);
       if (!isActive) return false;
       if (selectedSessionFilter !== 'all') {
         const sKey = (t.session || 'morning').toLowerCase();
@@ -182,7 +182,7 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
     });
   }, [doctorTokens, dateFilter, customDate, selectedSessionFilter, todayStr, tomorrowStr, yesterdayStr]);
 
-  const inConsultation = activeQueue.find(t => t.status === 'checked-in');
+  const inConsultation = activeQueue.find(t => t.status === 'checked-in' || t.status === 'in-consultation');
   const nextInLine = activeQueue.filter(t => t.id !== inConsultation?.id);
   const completedToday = doctorTokens.filter(t => {
     if (!isDateMatching(t) || t.status !== 'completed') return false;
@@ -836,7 +836,7 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
                         <span className={`inline-flex items-center gap-1 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider ${
                           tok.status === 'completed'
                             ? 'bg-emerald-100 text-emerald-700'
-                            : tok.status === 'checked-in'
+                            : (tok.status === 'checked-in' || tok.status === 'in-consultation')
                             ? 'bg-blue-600 text-white'
                             : isNotVisited
                             ? 'bg-amber-100 text-amber-700'
@@ -844,13 +844,13 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
                             ? 'bg-red-100 text-red-700'
                             : 'bg-blue-50 text-blue-700'
                         }`}>
-                          {tok.status === 'checked-in' ? 'In Cabin' : tok.status === 'completed' ? 'Visited' : isNotVisited ? 'Not Visited' : tok.status}
+                          {tok.status === 'checked-in' || tok.status === 'in-consultation' ? 'In Cabin' : tok.status === 'completed' ? 'Visited' : isNotVisited ? 'Not Visited' : tok.status}
                         </span>
                       </td>
 
                       <td className="py-3.5 px-4 text-right">
                         <div className="flex items-center justify-end gap-1.5 flex-wrap">
-                          {['booked', 'waiting'].includes(tok.status) && (
+                          {['booked', 'waiting', 'calling', 'arrived'].includes(tok.status) && (
                             <button
                               onClick={() => handleCallNext(tok.id)}
                               className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold cursor-pointer border-none shadow-xs flex items-center gap-1"
@@ -860,7 +860,7 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
                             </button>
                           )}
 
-                          {tok.status === 'checked-in' && (
+                          {(tok.status === 'checked-in' || tok.status === 'in-consultation') && (
                             <button
                               onClick={() => handleCompleteToken(tok.id)}
                               className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold cursor-pointer border-none shadow-xs flex items-center gap-1"
@@ -870,7 +870,7 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
                             </button>
                           )}
 
-                          {['booked', 'waiting', 'checked-in'].includes(tok.status) && (
+                          {['booked', 'waiting', 'checked-in', 'calling', 'in-consultation', 'arrived'].includes(tok.status) && (
                             <button
                               onClick={() => handleMarkNotVisited(tok.id)}
                               className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-lg text-xs font-bold cursor-pointer flex items-center gap-1"
