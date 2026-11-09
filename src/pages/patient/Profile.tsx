@@ -23,8 +23,7 @@ export const Profile: React.FC = () => {
     currentLocation,
     userCoords,
     detectAndSetLocation,
-    updateUserProfile,
-    updateUserLocation
+    updateUserProfile
   } = useApp();
   const unreadNotifs = (notifications || []).filter(n => !n.read).length;
   const navigate = useNavigate();
@@ -79,13 +78,13 @@ export const Profile: React.FC = () => {
   };
 
   useEffect(() => {
-    if (user) {
-      setEditName(user.name);
+    if (user && isEditProfileOpen) {
+      setEditName(user.name || '');
       setEditPhone(user.phone && !isDummyPhone(user.phone) ? user.phone : '');
-      setEditEmail(user.email);
+      setEditEmail(user.email || '');
       setEditLocation(user.location || currentLocation || '');
     }
-  }, [user, currentLocation]);
+  }, [isEditProfileOpen, user]);
 
   if (!user) {
     return (
@@ -490,11 +489,8 @@ export const Profile: React.FC = () => {
                 name: editName.trim(),
                 phone: editPhone.trim(),
                 email: editEmail.trim(),
-                location: editLocation
+                location: editLocation.trim()
               });
-              if (editLocation && editLocation !== user.location) {
-                await updateUserLocation(editLocation);
-              }
               setIsEditProfileOpen(false);
             } catch (err: any) {
               alert("Error saving profile: " + (err?.message || err));

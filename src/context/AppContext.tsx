@@ -697,18 +697,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                   const resolvedPhone = (matched.phone && !isDummyPhone(matched.phone))
                     ? matched.phone
                     : ((parsed.phone && !isDummyPhone(parsed.phone)) ? parsed.phone : '');
+                  const resolvedEmail = (matched.email && !matched.email.endsWith('@patient.instatoken.in'))
+                    ? matched.email
+                    : ((parsed.email && !parsed.email.endsWith('@patient.instatoken.in')) ? parsed.email : (matched.email || parsed.email));
                   setUser(prev => prev ? {
                     ...prev,
                     name: matched.name || prev.name,
                     phone: resolvedPhone,
-                    email: matched.email || prev.email,
+                    email: resolvedEmail,
                     location: matched.location || prev.location
                   } : null);
                   localStorage.setItem('insta_user', JSON.stringify({
                     ...parsed,
                     name: matched.name || parsed.name,
                     phone: resolvedPhone,
-                    email: matched.email || parsed.email,
+                    email: resolvedEmail,
                     location: matched.location || parsed.location
                   }));
                 }
@@ -1225,7 +1228,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const cust = res.customer;
       const profile: UserProfile = {
         name: cust.name || 'Valued Patient',
-        email: cust.email || `${cleanPhone}@patient.instatoken.in`,
+        email: (cust.email && !cust.email.endsWith('@patient.instatoken.in'))
+          ? cust.email
+          : ((email && email.trim()) ? email.trim().toLowerCase() : (cust.email || `${cleanPhone}@patient.instatoken.in`)),
         phone: (cust.phone && !isDummyPhone(cust.phone)) ? cust.phone : `+91 ${cleanPhone}`,
         role: 'patient',
         savedHospitals: cust.savedHospitals || [],
@@ -2126,76 +2131,111 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateUserProfile = async (updates: Partial<UserProfile>) => {
     const oldUser = user;
 
-    setUser(prev => {
-      if (!prev) return null;
-      const updated = { ...prev, ...updates };
-      localStorage.setItem('insta_user', JSON.stringify(updated));
+    let targetLat = updates.lat;
+    let targetLng = updates.lng;
+    if (updates.location && (targetLat === undefined || targetLng === undefined)) {
+      try {
+        const geo = await geocodeLocation(updates.location);
+        if (geo) {
+          targetLat = geo.lat;
+          targetLng = geo.lng;
+        }
+      } catch (geoErr) {}
+    }
+
+    const defaultUser: UserProfile = {
+      role: 'patient',
+      name: 'Valued Patient',
+      phone: '',
+      email: '',
+      savedHospitals: [],
+      savedDoctors: [],
+      familyMembers: [],
+      subscription: {
+        planName: "3-Day Pass",
+        expiresAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+        price: 10
+      }
+    };
+
+    const updatedProfile: UserProfile = {
+      ...(oldUser || defaultUser),
+      ...updates,
+      savedHospitals: updates.savedHospitals || oldUser?.savedHospitals || [],
+      savedDoctors: updates.savedDoctors || oldUser?.savedDoctors || [],
+      familyMembers: updates.familyMembers || oldUser?.familyMembers || [],
+      subscription: updates.subscription !== undefined ? updates.subscription : (oldUser?.subscription ?? defaultUser.subscription),
+      ...(targetLat !== undefined ? { lat: targetLat } : {}),
+      ...(targetLng !== undefined ? { lng: targetLng } : {})
+    };
+
+    setUser(updatedProfile);
+    localStorage.setItem('insta_user', JSON.stringify(updatedProfile));
+
+    if (targetLat !== undefined && targetLng !== undefined) {
+      setUserCoords({ lat: targetLat, lng: targetLng });
+      localStorage.setItem('insta_user_coords', JSON.stringify({ lat: targetLat, lng: targetLng }));
+    }
+    if (updates.location) {
+      setCurrentLocationState(updates.location);
+      localStorage.setItem('insta_location', updates.location);
+    }
+
+    setCustomers(prev => {
+      const normOldPhone = (oldUser?.phone || '').replace(/\D/g, '').slice(-10);
+      const normOldEmail = (oldUser?.email || '').trim().toLowerCase();
+      let found = false;
+      const updated = prev.map(c => {
+        const cPhoneNorm = (c.phone || '').replace(/\D/g, '').slice(-10);
+        const cEmailNorm = (c.email || '').trim().toLowerCase();
+        if (
+          (normOldPhone && cPhoneNorm === normOldPhone) ||
+          (normOldEmail && cEmailNorm === normOldEmail) ||
+          (oldUser?.name && c.name === oldUser.name)
+        ) {
+          found = true;
+          return {
+            ...c,
+            name: updates.name !== undefined ? updates.name : c.name,
+            phone: updates.phone !== undefined ? updates.phone : c.phone,
+            email: updates.email !== undefined ? updates.email : c.email,
+            location: updates.location !== undefined ? updates.location : c.location,
+            lat: targetLat ?? c.lat,
+            lng: targetLng ?? c.lng
+          };
+        }
+        return c;
+      });
+
+      if (!found && (updates.name || oldUser?.name) && (updates.phone || updates.email || oldUser?.phone || oldUser?.email)) {
+        const newCust: CustomerAccount = {
+          id: `cust-${Date.now()}`,
+          name: updates.name || oldUser?.name || 'Patient',
+          phone: updates.phone || oldUser?.phone || '',
+          email: updates.email || oldUser?.email || '',
+          location: updates.location || oldUser?.location || currentLocation,
+          lat: targetLat,
+          lng: targetLng,
+          joinedDate: new Date().toISOString().split('T')[0],
+          status: 'active',
+          bookings: []
+        };
+        updated.unshift(newCust);
+      }
+
+      localStorage.setItem('insta_customers', JSON.stringify(updated));
       return updated;
     });
-
-    if (updates.location || updates.lat || updates.lng || updates.name || updates.phone || updates.email) {
-      if (updates.lat && updates.lng) {
-        setUserCoords({ lat: updates.lat, lng: updates.lng });
-        localStorage.setItem('insta_user_coords', JSON.stringify({ lat: updates.lat, lng: updates.lng }));
-      }
-      if (updates.location) {
-        setCurrentLocationState(updates.location);
-        localStorage.setItem('insta_location', updates.location);
-      }
-      setCustomers(prev => {
-        const normOldPhone = (oldUser?.phone || '').replace(/\D/g, '').slice(-10);
-        const normOldEmail = (oldUser?.email || '').trim().toLowerCase();
-        let found = false;
-        const updated = prev.map(c => {
-          const cPhoneNorm = (c.phone || '').replace(/\D/g, '').slice(-10);
-          const cEmailNorm = (c.email || '').trim().toLowerCase();
-          if (
-            (normOldPhone && cPhoneNorm === normOldPhone) ||
-            (normOldEmail && cEmailNorm === normOldEmail) ||
-            (oldUser?.name && c.name === oldUser.name)
-          ) {
-            found = true;
-            return {
-              ...c,
-              name: updates.name || c.name,
-              phone: updates.phone || c.phone,
-              email: updates.email || c.email,
-              location: updates.location || c.location,
-              lat: updates.lat ?? c.lat,
-              lng: updates.lng ?? c.lng
-            };
-          }
-          return c;
-        });
-
-        if (!found && updates.name && (updates.phone || updates.email || oldUser?.phone || oldUser?.email)) {
-          const newCust: CustomerAccount = {
-            id: `cust-${Date.now()}`,
-            name: updates.name,
-            phone: updates.phone || oldUser?.phone || '',
-            email: updates.email || oldUser?.email || '',
-            location: updates.location || oldUser?.location || currentLocation,
-            joinedDate: new Date().toISOString().split('T')[0],
-            status: 'active',
-            bookings: []
-          };
-          updated.unshift(newCust);
-        }
-
-        localStorage.setItem('insta_customers', JSON.stringify(updated));
-        return updated;
-      });
-    }
 
     // Persist directly to AWS RDS PostgreSQL
     try {
       const payload = {
-        name: updates.name || oldUser?.name,
-        phone: updates.phone || oldUser?.phone,
-        email: updates.email || oldUser?.email,
-        location: updates.location || oldUser?.location || currentLocation,
-        lat: updates.lat ?? oldUser?.lat,
-        lng: updates.lng ?? oldUser?.lng,
+        name: updates.name !== undefined ? updates.name : oldUser?.name,
+        phone: updates.phone !== undefined ? updates.phone : oldUser?.phone,
+        email: updates.email !== undefined ? updates.email : oldUser?.email,
+        location: updates.location !== undefined ? updates.location : (oldUser?.location || currentLocation),
+        lat: targetLat !== undefined ? targetLat : oldUser?.lat,
+        lng: targetLng !== undefined ? targetLng : oldUser?.lng,
         familyMembers: updates.familyMembers || oldUser?.familyMembers,
         savedDoctors: updates.savedDoctors || oldUser?.savedDoctors,
         savedHospitals: updates.savedHospitals || oldUser?.savedHospitals,
@@ -2214,27 +2254,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const data = await res.json();
         if (data.success && data.customer) {
           const cust = data.customer;
-          setUser(prev => prev ? {
-            ...prev,
-            name: cust.name,
-            phone: cust.phone,
-            email: cust.email,
-            location: cust.location,
-            lat: cust.lat,
-            lng: cust.lng
-          } : null);
-          localStorage.setItem('insta_user', JSON.stringify({
-            ...(oldUser || {}),
+          const finalProfile: UserProfile = {
+            ...(oldUser || defaultUser),
             ...updates,
-            name: cust.name,
-            phone: cust.phone,
-            email: cust.email,
-            location: cust.location
-          }));
+            name: cust.name || updates.name || oldUser?.name || 'Valued Patient',
+            phone: cust.phone || updates.phone || oldUser?.phone || '',
+            email: cust.email || updates.email || oldUser?.email || '',
+            location: cust.location || updates.location || oldUser?.location || currentLocation,
+            lat: cust.lat ?? targetLat ?? oldUser?.lat,
+            lng: cust.lng ?? targetLng ?? oldUser?.lng,
+            role: oldUser?.role || 'patient',
+            savedHospitals: cust.savedHospitals || updates.savedHospitals || oldUser?.savedHospitals || [],
+            savedDoctors: cust.savedDoctors || updates.savedDoctors || oldUser?.savedDoctors || [],
+            familyMembers: cust.familyMembers || updates.familyMembers || oldUser?.familyMembers || [],
+            subscription: cust.subscription !== undefined ? cust.subscription : (updates.subscription !== undefined ? updates.subscription : (oldUser?.subscription ?? defaultUser.subscription))
+          };
+          setUser(finalProfile);
+          localStorage.setItem('insta_user', JSON.stringify(finalProfile));
         }
+      } else {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.message || 'Failed to update customer profile on server');
       }
-    } catch (e) {
+    } catch (e: any) {
       console.warn('Customer profile cloud sync error:', e);
+      throw e;
     }
 
     addNotification("Profile Updated", "Your customer account details were saved to AWS cloud.", "success");

@@ -399,7 +399,7 @@ function saveStore(data) {
 }
 
 // ─── Health Check Endpoint for ECS ALB ─────────────────────────────────────────
-app.get('/health', async (req, res) => {
+app.get(['/health', '/api/health'], async (req, res) => {
   res.json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
@@ -574,6 +574,34 @@ async function getUnifiedStore() {
           }
         } catch (tokErr) {
           console.warn('Error merging tokens from RDS:', tokErr.message);
+        }
+
+        // Merge live customers from PostgreSQL customers table into store.customers
+        try {
+          const custRows = await query(`SELECT id, name, phone, email, location, data FROM customers ORDER BY updated_at DESC LIMIT 500`);
+          if (custRows.rows.length > 0) {
+            store.customers = store.customers || [];
+            custRows.rows.forEach(r => {
+              const custData = r.data || { id: r.id, name: r.name, phone: r.phone, email: r.email, location: r.location };
+              const rPhoneNorm = normalizeCustomerPhone(r.phone);
+              const rEmailNorm = (r.email || '').trim().toLowerCase();
+              const idx = store.customers.findIndex(c => {
+                if (c.id === r.id) return true;
+                const cPhoneNorm = normalizeCustomerPhone(c.phone);
+                if (rPhoneNorm && cPhoneNorm === rPhoneNorm) return true;
+                const cEmailNorm = (c.email || '').trim().toLowerCase();
+                if (rEmailNorm && cEmailNorm === rEmailNorm) return true;
+                return false;
+              });
+              if (idx === -1) {
+                store.customers.push(custData);
+              } else {
+                store.customers[idx] = { ...store.customers[idx], ...custData };
+              }
+            });
+          }
+        } catch (custErr) {
+          console.warn('Error merging customers from RDS:', custErr.message);
         }
 
 
@@ -1364,10 +1392,14 @@ app.post('/api/customers/otp-auth', async (req, res) => {
       }
 
       const cleanName = name.trim();
+      const cleanEmail = (email && typeof email === 'string' && email.trim()) 
+        ? email.trim().toLowerCase() 
+        : `${normPhone}@patient.instatoken.in`;
+
       customer = {
         id: `cust-${Date.now()}`,
         name: cleanName,
-        email: `${normPhone}@patient.instatoken.in`,
+        email: cleanEmail,
         phone: `+91 ${normPhone}`,
         password: '',
         location: 'Hyderabad, Telangana',
@@ -1391,9 +1423,9 @@ app.post('/api/customers/otp-auth', async (req, res) => {
       if (isDbConnected) {
         try {
           await query(`
-            INSERT INTO customers (id, name, phone, email, location, data)
-            VALUES ($1, $2, $3, $4, $5, $6)
-            ON CONFLICT (id) DO UPDATE SET name = $2, phone = $3, data = $6
+            INSERT INTO customers (id, name, phone, email, location, data, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+            ON CONFLICT (id) DO UPDATE SET name = $2, phone = $3, email = $4, data = $6, updated_at = NOW()
           `, [customer.id, customer.name, customer.phone, customer.email, customer.location, JSON.stringify(customer)]);
         } catch (dbErr) {
           console.warn('[DB Sync Warn] Failed to insert customer into Postgres:', dbErr.message);
@@ -1401,7 +1433,7 @@ app.post('/api/customers/otp-auth', async (req, res) => {
       }
 
       clearSmsOtp(normPhone);
-      console.log(`✅ [DLT OTP] Auto-registered new customer: ${customer.name} (${customer.phone})`);
+      console.log(`✅ [DLT OTP] Auto-registered new customer: ${customer.name} (${customer.phone}, ${customer.email})`);
       return res.json({
         success: true,
         customer,
@@ -1411,13 +1443,33 @@ app.post('/api/customers/otp-auth', async (req, res) => {
     }
 
     // Existing customer found
+    let custChanged = false;
     if (name && name.trim() && (!customer.name || customer.name === 'Patient' || customer.name === 'Valued Patient')) {
       customer.name = name.trim();
+      custChanged = true;
+    }
+    if (email && typeof email === 'string' && email.trim() && (!customer.email || customer.email.endsWith('@patient.instatoken.in'))) {
+      customer.email = email.trim().toLowerCase();
+      custChanged = true;
+    }
+
+    if (custChanged) {
       await saveUnifiedStore(store);
+      if (isDbConnected) {
+        try {
+          await query(`
+            INSERT INTO customers (id, name, phone, email, location, data, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+            ON CONFLICT (id) DO UPDATE SET name = $2, phone = $3, email = $4, data = $6, updated_at = NOW()
+          `, [customer.id, customer.name, customer.phone, customer.email, customer.location, JSON.stringify(customer)]);
+        } catch (dbErr) {
+          console.warn('[DB Sync Warn] Failed to update customer in Postgres:', dbErr.message);
+        }
+      }
     }
 
     clearSmsOtp(normPhone);
-    console.log(`✅ [DLT OTP] Logged in customer: ${customer.name} (${customer.phone})`);
+    console.log(`✅ [DLT OTP] Logged in customer: ${customer.name} (${customer.phone}, ${customer.email})`);
     return res.json({
       success: true,
       customer,
@@ -2614,14 +2666,18 @@ app.post('/api/customers/profile', async (req, res) => {
 
     const existing = idx !== -1 ? store.customers[idx] : null;
 
+    const resolvedEmail = (email !== undefined && String(email).trim())
+      ? String(email).trim().toLowerCase()
+      : (existing?.email || (normPhone ? `${normPhone}@patient.instatoken.in` : ''));
+
     const updatedCustomer = {
       id: existing?.id || id || `cust-${Date.now()}`,
       name: (name || existing?.name || 'Patient').trim(),
       phone: (phone || existing?.phone || '').trim(),
-      email: (email || existing?.email || '').trim(),
+      email: resolvedEmail,
       location: location !== undefined ? location : (existing?.location || 'Hyderabad, Telangana'),
-      lat: lat !== undefined ? Number(lat) : existing?.lat,
-      lng: lng !== undefined ? Number(lng) : existing?.lng,
+      lat: lat !== undefined && lat !== null ? Number(lat) : (existing?.lat || null),
+      lng: lng !== undefined && lng !== null ? Number(lng) : (existing?.lng || null),
       joinedDate: existing?.joinedDate || new Date().toISOString().split('T')[0],
       status: existing?.status || 'active',
       avatar: existing?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
@@ -2634,7 +2690,8 @@ app.post('/api/customers/profile', async (req, res) => {
         price: 10
       }),
       medicalRecords: medicalRecords !== undefined ? medicalRecords : (existing?.medicalRecords || []),
-      bookings: existing?.bookings || []
+      bookings: existing?.bookings || [],
+      updatedAt: new Date().toISOString()
     };
 
     if (idx !== -1) {
@@ -2643,8 +2700,28 @@ app.post('/api/customers/profile', async (req, res) => {
       store.customers.unshift(updatedCustomer);
     }
 
+    if (isDbConnected) {
+      try {
+        await query(`
+          INSERT INTO customers (id, name, phone, email, location, data, created_at, updated_at)
+          VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+          ON CONFLICT (id) DO UPDATE 
+          SET name = $2, phone = $3, email = $4, location = $5, data = $6, updated_at = NOW()
+        `, [
+          updatedCustomer.id,
+          updatedCustomer.name,
+          updatedCustomer.phone,
+          updatedCustomer.email,
+          updatedCustomer.location,
+          JSON.stringify(updatedCustomer)
+        ]);
+      } catch (dbErr) {
+        console.warn('Error saving customer profile in RDS:', dbErr.message);
+      }
+    }
+
     await saveUnifiedStore(store);
-    console.log(`✅ Saved customer profile to AWS RDS: ${updatedCustomer.name} (${updatedCustomer.phone})`);
+    console.log(`✅ Saved customer profile to AWS RDS: ${updatedCustomer.name} (${updatedCustomer.phone}, ${updatedCustomer.email})`);
     res.json({ success: true, customer: updatedCustomer, message: 'Customer profile saved to AWS RDS' });
   } catch (err) {
     console.error('Error saving customer profile in AWS RDS:', err);
@@ -3656,72 +3733,6 @@ app.get('/api/appointments', async (req, res) => {
 
   const store = await getUnifiedStore();
   res.json({ success: true, appointments: store.appointments || [] });
-});
-
-// ─── Customer Account Profile & Persistence ──────────────────────────────────
-app.post('/api/customers/profile', async (req, res) => {
-  try {
-    const { name, phone, email, location, lat, lng, familyMembers, savedDoctors, savedHospitals, subscription, oldPhone, oldEmail } = req.body;
-    const store = await getUnifiedStore();
-    store.customers = store.customers || [];
-
-    const cleanPhone = (phone || oldPhone || '').replace(/\D/g, '').slice(-10);
-    const cleanEmail = (email || oldEmail || '').trim().toLowerCase();
-
-    let custIdx = store.customers.findIndex(c => {
-      const cPhone = (c.phone || '').replace(/\D/g, '').slice(-10);
-      const cEmail = (c.email || '').trim().toLowerCase();
-      return (cleanPhone && cPhone === cleanPhone) || (cleanEmail && cEmail === cleanEmail) || (c.name && c.name === name);
-    });
-
-    const updatedCust = {
-      id: custIdx !== -1 ? store.customers[custIdx].id : `cust-${Date.now()}`,
-      name: name || (custIdx !== -1 ? store.customers[custIdx].name : 'Patient'),
-      phone: phone || (custIdx !== -1 ? store.customers[custIdx].phone : ''),
-      email: email || (custIdx !== -1 ? store.customers[custIdx].email : ''),
-      location: location || (custIdx !== -1 ? store.customers[custIdx].location : ''),
-      lat: lat ?? (custIdx !== -1 ? store.customers[custIdx].lat : null),
-      lng: lng ?? (custIdx !== -1 ? store.customers[custIdx].lng : null),
-      familyMembers: familyMembers || (custIdx !== -1 ? store.customers[custIdx].familyMembers : []),
-      savedDoctors: savedDoctors || (custIdx !== -1 ? store.customers[custIdx].savedDoctors : []),
-      savedHospitals: savedHospitals || (custIdx !== -1 ? store.customers[custIdx].savedHospitals : []),
-      subscription: subscription || (custIdx !== -1 ? store.customers[custIdx].subscription : null),
-      status: 'active',
-      updatedAt: new Date().toISOString()
-    };
-
-    if (custIdx !== -1) {
-      store.customers[custIdx] = { ...store.customers[custIdx], ...updatedCust };
-    } else {
-      store.customers.push(updatedCust);
-    }
-
-    if (isDbConnected) {
-      try {
-        await query(`
-          INSERT INTO customers (id, name, phone, email, location, data, created_at, updated_at)
-          VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
-          ON CONFLICT (id) DO UPDATE 
-          SET name = $2, phone = $3, email = $4, location = $5, data = $6, updated_at = NOW()
-        `, [
-          updatedCust.id,
-          updatedCust.name,
-          updatedCust.phone,
-          updatedCust.email,
-          updatedCust.location,
-          JSON.stringify(updatedCust)
-        ]);
-      } catch (dbErr) {
-        console.warn('Error saving customer profile in RDS:', dbErr.message);
-      }
-    }
-
-    await saveUnifiedStore(store);
-    res.json({ success: true, customer: updatedCust });
-  } catch (err) {
-    console.error('Error in /api/customers/profile:', err.message);
-    res.status(500).json({ success: false, message: err.message });
-  }
 });
 
 // ─── Customer Login & Lookup ─────────────────────────────────────────────────
