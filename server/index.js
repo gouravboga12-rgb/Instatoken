@@ -934,7 +934,8 @@ app.post('/api/sync', async (req, res) => {
 // ─── Hospital Auth & Access Control (Phase 22) ───────────────────────────────
 
 const DEFAULT_HOSPITAL_CREDENTIALS = [
-  { hospitalId: 'hosp-apollo', email: 'admin@instatoken.in', phone: '9876543210', password: 'password', role: 'owner', name: 'Dr. Rajesh Kumar', hospitalName: 'City Care Multi-Specialty Hospital' }
+  { hospitalId: 'hosp-apollo', email: 'admin@instatoken.in', phone: '9876543210', password: 'password', role: 'owner', name: 'Dr. Rajesh Kumar', hospitalName: 'City Care Multi-Specialty Hospital' },
+  { hospitalId: 'hosp-mu0838sg', email: 'bogagourav5@gmail.com', phone: '6302970625', password: 'password', role: 'owner', name: 'Dr. Gaurav Boga', hospitalName: 'Gandi Hospital ' }
 ];
 
 const ACTIVE_SESSIONS = new Map();
