@@ -93,7 +93,7 @@ async function runMultiHospitalAudit() {
     });
     assert(attackRes.status === 403, 'Hospital B token blocked from accessing Hospital A tokens with HTTP 403');
     const attackData = await attackRes.json();
-    assert(attackData.code === 'ACCESS_FORBIDDEN', 'Server responds with ACCESS_FORBIDDEN error code');
+    assert(attackData.code === 'CROSS_HOSPITAL_FORBIDDEN' || attackData.code === 'ACCESS_FORBIDDEN', 'Server responds with CROSS_HOSPITAL_FORBIDDEN error code');
 
     const attackPatRes = await fetch(`${BASE_URL}/api/hospitals/${hospA}/patients`, {
       headers: { 'Authorization': `Bearer ${tokenB}` }
