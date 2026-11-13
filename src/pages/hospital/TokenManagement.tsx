@@ -437,8 +437,9 @@ const WalkInGenerator: React.FC<{
       });
     });
 
-    // 4. Past Appointments
-    (appointments || []).forEach(a => {
+    // 4. Past Appointments (strictly scoped to this hospital)
+    const currentHospId = hospitalProfile?.id;
+    (appointments || []).filter(a => !currentHospId || a.hospitalId === currentHospId).forEach(a => {
       if (a.patientName && a.phone) {
         addEntry({
           id: `appt-${a.id}`,

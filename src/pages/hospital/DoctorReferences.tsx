@@ -78,7 +78,7 @@ export const DoctorReferences: React.FC = () => {
           tokenNo: t.tokenNo ? `T${String(t.tokenNo).padStart(3, '0')}` : `#${t.queuePosition || 1}`,
           patientName: t.patientName || 'Patient',
           patientPhone: t.patientPhone || '',
-          place: (t as any).address || ref.place || hospitalProfile?.city || 'Adoni',
+          place: (t as any).address || ref.place || hospitalProfile?.city || 'Hyderabad',
           referralDate: t.bookingDate || todayStr,
           doctorRefName: ref.name.trim(),
           doctorRefPhone: ref.phone || '',
@@ -89,8 +89,9 @@ export const DoctorReferences: React.FC = () => {
       }
     });
 
-    // 2. Online App Appointments
-    (appointments || []).forEach(a => {
+    // 2. Online App Appointments (strictly scoped to this hospital)
+    const curHospId = hospitalProfile?.id;
+    (appointments || []).filter(a => !curHospId || a.hospitalId === curHospId).forEach(a => {
       const ref = (a as any).doctorReference || (a as any).rmpReference;
       if (ref && ref.name && ref.name.trim() && !seenIds.has(a.id)) {
         seenIds.add(a.id);
@@ -99,7 +100,7 @@ export const DoctorReferences: React.FC = () => {
           tokenNo: `T${String(a.tokenNumber).padStart(3, '0')}`,
           patientName: a.patientName,
           patientPhone: a.phone,
-          place: a.address || ref.place || 'Adoni',
+          place: a.address || ref.place || hospitalProfile?.city || 'Hyderabad',
           referralDate: a.date || (a.createdAt ? a.createdAt.split('T')[0] : todayStr),
           doctorRefName: ref.name.trim(),
           doctorRefPhone: ref.phone || '',

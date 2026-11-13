@@ -67,8 +67,7 @@ export const HospitalDashboard: React.FC = () => {
   };
 
   const todayTokens = useMemo(() => {
-    const filtered = tokens.filter(isTodayToken);
-    return filtered.length > 0 ? filtered : tokens;
+    return tokens.filter(isTodayToken);
   }, [tokens, todayStr]);
 
   // Operational metrics (100% dynamic)
@@ -78,7 +77,7 @@ export const HospitalDashboard: React.FC = () => {
 
   const waitingTokens = todayTokens.filter(t => ['waiting', 'booked'].includes(t.status as string));
   const inCabinTokens = todayTokens.filter(t =>
-    ['checked-in', 'in-consultation', 'in-consult', 'calling'].includes(t.status as string)
+    ['checked-in', 'in-consultation', 'in-consult', 'calling', 'arrived'].includes(t.status as string)
   );
   const completedTokens = todayTokens.filter(t => t.status === 'completed');
   const activeDoctors = doctors.filter(d => d.active !== false);
@@ -95,7 +94,7 @@ export const HospitalDashboard: React.FC = () => {
       if (statusFilter === 'waiting' && !['waiting', 'booked'].includes(t.status as string)) {
         return false;
       }
-      if (statusFilter === 'in-cabin' && !['checked-in', 'in-consultation', 'in-consult', 'calling'].includes(t.status as string)) {
+      if (statusFilter === 'in-cabin' && !['checked-in', 'in-consultation', 'in-consult', 'calling', 'arrived'].includes(t.status as string)) {
         return false;
       }
       if (statusFilter === 'completed' && t.status !== 'completed') {

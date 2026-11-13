@@ -2180,9 +2180,42 @@ app.get('/api/hospitals/:hospitalId/patients', requireHospitalAuth, async (req, 
   const { doctorId, search, status } = req.query;
   const store = await getUnifiedStore();
 
-  // 1. Gather all tokens and bookings belonging exclusively to this hospital
+  const patientMap = new Map();
+
+  // 1. First load from RDS PostgreSQL hospital_patients table if connected
+  if (isDbConnected) {
+    try {
+      const dbPatRes = await query(`
+        SELECT id, hospital_id as "hospitalId", uhid, name, phone, email, age, gender, blood_group as "bloodGroup",
+               address, city, pin_code as "pinCode", total_visits as "totalVisits", last_visit as "lastVisit", data
+        FROM hospital_patients
+        WHERE hospital_id = $1
+        ORDER BY last_visit DESC
+      `, [hospitalId]);
+
+      dbPatRes.rows.forEach(r => {
+        const extra = r.data && typeof r.data === 'object' ? r.data : {};
+        const cleanPhone = (r.phone || '').replace(/\D/g, '').slice(-10);
+        const phoneKey = cleanPhone || (r.name || '').trim().toLowerCase();
+        if (phoneKey) {
+          patientMap.set(phoneKey, {
+            ...r,
+            familyMembers: extra.familyMembers || [],
+            medicalHistory: extra.medicalHistory || [],
+            allergies: extra.allergies || [],
+            doctorVisits: extra.doctorVisits || [],
+            tokenHistory: extra.tokenHistory || []
+          });
+        }
+      });
+    } catch (dbErr) {
+      console.warn('Error reading hospital_patients from RDS:', dbErr.message);
+    }
+  }
+
+  // 2. Gather all tokens and bookings belonging exclusively to this hospital
   const allHospitalTokens = [
-    ...(store.tokens || []).filter(t => (t.hospitalId || 'hosp-apollo') === hospitalId && !isDummyTokenRecord(t)),
+    ...(store.tokens || []).filter(t => t.hospitalId === hospitalId && !isDummyTokenRecord(t)),
     ...(store.appointments || []).filter(a => a.hospitalId === hospitalId && !isDummyApptRecord(a)).map(a => ({
       id: a.id,
       tokenNo: a.tokenNumber,
@@ -2195,7 +2228,7 @@ app.get('/api/hospitals/:hospitalId/patients', requireHospitalAuth, async (req, 
       doctorName: a.doctorName,
       departmentId: a.departmentId || 'dept-general',
       departmentName: a.departmentName,
-      session: parseInt((a.time || '09:00').split(':')[0], 10) < 12 ? 'morning' : 'evening',
+      session: a.session || 'morning',
       time: a.time,
       bookingDate: a.date,
       status: a.status,
@@ -2205,9 +2238,6 @@ app.get('/api/hospitals/:hospitalId/patients', requireHospitalAuth, async (req, 
       hospitalId
     }))
   ];
-
-  // 2. Build unique patient map from actual bookings & tokens
-  const patientMap = new Map();
 
   allHospitalTokens.forEach(tok => {
     if (!tok.patientPhone && !tok.patientName) return;
@@ -2226,79 +2256,92 @@ app.get('/api/hospitals/:hospitalId/patients', requireHospitalAuth, async (req, 
         gender: tok.patientGender || 'Male',
         bloodGroup: 'B+',
         address: tok.address || '',
-        city: store.hospitalProfiles?.[hospitalId]?.city || 'Bengaluru',
+        city: store.hospitalProfiles?.[hospitalId]?.city || 'Hyderabad',
         pinCode: store.hospitalProfiles?.[hospitalId]?.pinCode || '',
         registeredOn: tok.bookingDate || new Date().toISOString().split('T')[0],
         totalVisits: 0,
         lastVisit: tok.bookingDate || '',
-        doctorVisits: new Map(), // doctorId -> { doctorId, doctorName, departmentName, visitCount, lastVisitDate }
+        doctorVisits: new Map(),
         tokenHistory: []
       });
     }
 
     const p = patientMap.get(phoneKey);
-    p.totalVisits += 1;
+    p.totalVisits = (p.totalVisits || 0) + 1;
     if (!p.lastVisit || new Date(tok.bookingDate) > new Date(p.lastVisit)) {
       p.lastVisit = tok.bookingDate;
     }
 
-    // Connect Doctor Relationship
+    // Ensure doctorVisits is handled whether it is Map or Array
+    if (!Array.isArray(p.doctorVisits) && !(p.doctorVisits instanceof Map)) {
+      p.doctorVisits = new Map();
+    }
+
     if (tok.doctorId) {
-      if (!p.doctorVisits.has(tok.doctorId)) {
-        p.doctorVisits.set(tok.doctorId, {
-          doctorId: tok.doctorId,
-          doctorName: tok.doctorName || 'Attending Doctor',
-          departmentName: tok.departmentName || 'General Medicine',
-          visitCount: 0,
-          lastVisitDate: tok.bookingDate
-        });
-      }
-      const docVisit = p.doctorVisits.get(tok.doctorId);
-      docVisit.visitCount += 1;
-      if (new Date(tok.bookingDate) >= new Date(docVisit.lastVisitDate)) {
-        docVisit.lastVisitDate = tok.bookingDate;
+      if (p.doctorVisits instanceof Map) {
+        if (!p.doctorVisits.has(tok.doctorId)) {
+          p.doctorVisits.set(tok.doctorId, {
+            doctorId: tok.doctorId,
+            doctorName: tok.doctorName || 'Attending Doctor',
+            departmentName: tok.departmentName || 'General Medicine',
+            visitCount: 0,
+            lastVisitDate: tok.bookingDate
+          });
+        }
+        const docVisit = p.doctorVisits.get(tok.doctorId);
+        docVisit.visitCount += 1;
+        if (new Date(tok.bookingDate) >= new Date(docVisit.lastVisitDate)) {
+          docVisit.lastVisitDate = tok.bookingDate;
+        }
+      } else if (Array.isArray(p.doctorVisits)) {
+        const found = p.doctorVisits.find(d => d.doctorId === tok.doctorId);
+        if (found) {
+          found.visitCount += 1;
+          if (new Date(tok.bookingDate) >= new Date(found.lastVisitDate)) {
+            found.lastVisitDate = tok.bookingDate;
+          }
+        } else {
+          p.doctorVisits.push({
+            doctorId: tok.doctorId,
+            doctorName: tok.doctorName || 'Attending Doctor',
+            departmentName: tok.departmentName || 'General Medicine',
+            visitCount: 1,
+            lastVisitDate: tok.bookingDate
+          });
+        }
       }
     }
 
-    p.tokenHistory.push({
-      id: tok.id,
-      tokenNo: tok.tokenNo,
-      type: tok.type || 'online',
-      doctorId: tok.doctorId,
-      doctorName: tok.doctorName,
-      departmentName: tok.departmentName,
-      session: tok.session || 'morning',
-      time: tok.time,
-      bookingDate: tok.bookingDate,
-      status: tok.status,
-      consultationFee: tok.consultationFee,
-      paymentStatus: tok.paymentStatus || 'paid',
-      paymentMethod: tok.paymentMethod || 'Online'
-    });
+    p.tokenHistory = p.tokenHistory || [];
+    if (!p.tokenHistory.some(t => t.id === tok.id)) {
+      p.tokenHistory.push({
+        id: tok.id,
+        tokenNo: tok.tokenNo,
+        type: tok.type || 'online',
+        doctorId: tok.doctorId,
+        doctorName: tok.doctorName,
+        departmentName: tok.departmentName,
+        session: tok.session || 'morning',
+        time: tok.time,
+        bookingDate: tok.bookingDate,
+        status: tok.status,
+        consultationFee: tok.consultationFee,
+        paymentStatus: tok.paymentStatus || 'paid',
+        paymentMethod: tok.paymentMethod || 'Online'
+      });
+    }
   });
 
-  // Also include manually registered hospital patients
+  // Also include manually registered hospital patients from cache
   const manualPatients = store.hospitalPatients?.[hospitalId] || [];
   manualPatients.forEach(mp => {
     const cleanDigits = (mp.phone || '').replace(/\D/g, '').slice(-10);
     const phoneKey = cleanDigits || (mp.name || '').trim().toLowerCase();
     if (!patientMap.has(phoneKey)) {
-      const docMap = new Map();
-      if (Array.isArray(mp.doctorVisits)) {
-        mp.doctorVisits.forEach(v => docMap.set(v.doctorId, v));
-      } else if (mp.doctorId) {
-        docMap.set(mp.doctorId, {
-          doctorId: mp.doctorId,
-          doctorName: mp.doctorName || 'Attending Doctor',
-          departmentName: mp.departmentName || 'General Medicine',
-          visitCount: 1,
-          lastVisitDate: mp.registeredOn || new Date().toISOString().split('T')[0]
-        });
-      }
       patientMap.set(phoneKey, {
         ...mp,
         hospitalId,
-        doctorVisits: docMap,
+        doctorVisits: Array.isArray(mp.doctorVisits) ? mp.doctorVisits : [],
         tokenHistory: mp.tokenHistory || []
       });
     }
@@ -2327,9 +2370,9 @@ app.get('/api/hospitals/:hospitalId/patients', requireHospitalAuth, async (req, 
   if (search && search.trim()) {
     const q = search.trim().toLowerCase();
     resultPatients = resultPatients.filter(p =>
-      p.name.toLowerCase().includes(q) ||
-      p.phone.includes(q) ||
-      p.uhid.toLowerCase().includes(q) ||
+      (p.name && p.name.toLowerCase().includes(q)) ||
+      (p.phone && p.phone.includes(q)) ||
+      (p.uhid && p.uhid.toLowerCase().includes(q)) ||
       p.tokenHistory.some(t => t.tokenNo?.toString() === q || t.doctorName?.toLowerCase().includes(q))
     );
   }
@@ -2351,13 +2394,15 @@ app.post('/api/hospitals/:hospitalId/patients', requireHospitalAuth, async (req,
   store.hospitalPatients = store.hospitalPatients || {};
   store.hospitalPatients[hospitalId] = store.hospitalPatients[hospitalId] || [];
 
+  let savedRecord = null;
   const existingIdx = store.hospitalPatients[hospitalId].findIndex(p => p.phone === patientData.phone);
   if (existingIdx >= 0) {
-    store.hospitalPatients[hospitalId][existingIdx] = {
+    savedRecord = {
       ...store.hospitalPatients[hospitalId][existingIdx],
       ...patientData,
       hospitalId
     };
+    store.hospitalPatients[hospitalId][existingIdx] = savedRecord;
   } else {
     let initialDocVisits = [];
     if (Array.isArray(patientData.doctorVisits)) {
@@ -2371,9 +2416,9 @@ app.post('/api/hospitals/:hospitalId/patients', requireHospitalAuth, async (req,
         lastVisitDate: new Date().toISOString().split('T')[0]
       }];
     }
-    const newPat = {
+    savedRecord = {
       ...patientData,
-      id: `pat-${Date.now()}`,
+      id: patientData.id || `pat-${Date.now()}`,
       uhid: patientData.uhid || `APS${String(store.hospitalPatients[hospitalId].length + 1001).padStart(6, '0')}`,
       hospitalId,
       registeredOn: new Date().toISOString().split('T')[0],
@@ -2382,11 +2427,59 @@ app.post('/api/hospitals/:hospitalId/patients', requireHospitalAuth, async (req,
       doctorVisits: initialDocVisits,
       tokenHistory: patientData.tokenHistory || []
     };
-    store.hospitalPatients[hospitalId].unshift(newPat);
+    store.hospitalPatients[hospitalId].unshift(savedRecord);
+  }
+
+  // Persist directly to RDS PostgreSQL table hospital_patients
+  if (isDbConnected && savedRecord) {
+    try {
+      await query(`
+        INSERT INTO hospital_patients (id, hospital_id, uhid, name, phone, email, age, gender, blood_group, address, city, pin_code, total_visits, last_visit, data, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW(), NOW())
+        ON CONFLICT (id) DO UPDATE SET
+          name = $4,
+          phone = $5,
+          email = $6,
+          age = $7,
+          gender = $8,
+          blood_group = $9,
+          address = $10,
+          city = $11,
+          pin_code = $12,
+          total_visits = $13,
+          last_visit = $14,
+          data = $15,
+          updated_at = NOW()
+      `, [
+        savedRecord.id,
+        hospitalId,
+        savedRecord.uhid,
+        savedRecord.name,
+        savedRecord.phone,
+        savedRecord.email || '',
+        Number(savedRecord.age) || 30,
+        savedRecord.gender || 'Male',
+        savedRecord.bloodGroup || 'B+',
+        savedRecord.address || '',
+        savedRecord.city || '',
+        savedRecord.pinCode || '',
+        Number(savedRecord.totalVisits) || 1,
+        savedRecord.lastVisit || new Date().toISOString().split('T')[0],
+        JSON.stringify({
+          familyMembers: savedRecord.familyMembers || [],
+          medicalHistory: savedRecord.medicalHistory || [],
+          allergies: savedRecord.allergies || [],
+          doctorVisits: savedRecord.doctorVisits || [],
+          tokenHistory: savedRecord.tokenHistory || []
+        })
+      ]);
+    } catch (dbErr) {
+      console.warn('Error saving patient to RDS hospital_patients:', dbErr.message);
+    }
   }
 
   await saveUnifiedStore(store);
-  res.json({ success: true, hospitalId, message: 'Patient record saved successfully' });
+  res.json({ success: true, hospitalId, patient: savedRecord, message: 'Patient record saved successfully' });
 });
 
 // ─── Customer / Patient Account & Profile APIs (AWS RDS Synchronized) ────────
@@ -2903,27 +2996,71 @@ app.get('/api/hospitals/:hospitalId/revenue', requireHospitalAuth, async (req, r
     return true;
   };
 
-  // Hospital tokens filtered by date
-  const hospitalTokens = [
-    ...(store.tokens || []).filter(t => (t.hospitalId || 'hosp-apollo') === hospitalId && !isDummyTokenRecord(t)),
-    ...(store.appointments || []).filter(a => a.hospitalId === hospitalId && !isDummyApptRecord(a)).map(a => ({
-      id: a.id,
-      tokenNo: a.tokenNumber,
-      patientName: a.patientName,
-      patientPhone: a.phone,
-      doctorId: a.doctorId,
-      doctorName: a.doctorName,
-      departmentName: a.departmentName,
-      bookingDate: a.date,
-      time: a.time,
-      status: a.status,
-      consultationFee: a.fee,
-      hospitalId
-    }))
-  ].filter(t => isDateInRange(t.bookingDate));
+  // Hospital tokens filtered by date and strictly scoped to hospitalId
+  let hospitalTokens = [];
+  if (isDbConnected) {
+    try {
+      const dbTokensRes = await query(`
+        SELECT id, token_number as "tokenNo", patient_name as "patientName", patient_phone as "patientPhone",
+               doctor_id as "doctorId", session, token_date as "bookingDate", status,
+               data->>'departmentName' as "departmentName",
+               COALESCE((data->>'consultationFee')::numeric, 500) as "consultationFee",
+               hospital_id as "hospitalId"
+        FROM tokens
+        WHERE hospital_id = $1
+      `, [hospitalId]);
+      if (dbTokensRes.rows && dbTokensRes.rows.length > 0) {
+        hospitalTokens = dbTokensRes.rows;
+      }
+    } catch (e) {
+      console.warn('Error fetching tokens from RDS for revenue calculation:', e.message);
+    }
+  }
 
-  // Hospital doctors (including any active doctors assigned in tokens/bookings)
-  const baseDoctors = store.hospitalDoctors?.[hospitalId] || INITIAL_DOCTORS;
+  if (hospitalTokens.length === 0) {
+    hospitalTokens = [
+      ...(store.tokens || []).filter(t => t.hospitalId === hospitalId && !isDummyTokenRecord(t)),
+      ...(store.appointments || []).filter(a => a.hospitalId === hospitalId && !isDummyApptRecord(a)).map(a => ({
+        id: a.id,
+        tokenNo: a.tokenNumber,
+        patientName: a.patientName,
+        patientPhone: a.phone,
+        doctorId: a.doctorId,
+        doctorName: a.doctorName,
+        departmentName: a.departmentName,
+        bookingDate: a.date,
+        time: a.time,
+        status: a.status,
+        consultationFee: a.fee,
+        hospitalId
+      }))
+    ];
+  }
+  hospitalTokens = hospitalTokens.filter(t => isDateInRange(t.bookingDate));
+
+  // Hospital doctors strictly for this hospital (Never fall back to other hospitals' doctors)
+  let baseDoctors = [];
+  if (isDbConnected) {
+    try {
+      const dbDocRes = await query(`
+        SELECT id, name, department_id as "departmentId", department_name as "departmentName",
+               consultation_fee as "consultationFee", active
+        FROM hospital_doctors
+        WHERE hospital_id = $1
+        ORDER BY name ASC
+      `, [hospitalId]);
+      if (dbDocRes.rows && dbDocRes.rows.length > 0) {
+        baseDoctors = dbDocRes.rows;
+      }
+    } catch (e) {
+      console.warn('Error fetching doctors from RDS for revenue:', e.message);
+    }
+  }
+
+  if (baseDoctors.length === 0) {
+    baseDoctors = store.hospitalDoctors?.[hospitalId] || (hospitalId === 'hosp-apollo' ? INITIAL_DOCTORS : []);
+  }
+
   const knownDoctors = [...baseDoctors];
   hospitalTokens.forEach(t => {
     if (t.doctorId && !knownDoctors.some(d => d.id === t.doctorId)) {
@@ -4052,6 +4189,55 @@ app.post('/api/hospitals/:hospitalId/notifications', async (req, res) => {
 
   await saveUnifiedStore(store);
   res.json({ success: true, hospitalId, notification: newRecord });
+});
+
+// ─── Hospital Doctor References / RMP Referrals ─────────────────────────────
+app.get('/api/hospitals/:hospitalId/doctor-references', requireHospitalAuth, async (req, res) => {
+  const { hospitalId } = req.params;
+  const store = await getUnifiedStore();
+  store.hospitalDoctorReferences = store.hospitalDoctorReferences || {};
+  const references = store.hospitalDoctorReferences[hospitalId] || [];
+  res.json({ success: true, hospitalId, references });
+});
+
+app.post('/api/hospitals/:hospitalId/doctor-references', requireHospitalAuth, async (req, res) => {
+  const { hospitalId } = req.params;
+  const { reference, references } = req.body;
+  const store = await getUnifiedStore();
+  store.hospitalDoctorReferences = store.hospitalDoctorReferences || {};
+  store.hospitalDoctorReferences[hospitalId] = store.hospitalDoctorReferences[hospitalId] || [];
+
+  if (Array.isArray(references)) {
+    store.hospitalDoctorReferences[hospitalId] = references;
+  } else if (reference && reference.name) {
+    const newRef = {
+      ...reference,
+      id: reference.id || `doc-ref-${Date.now()}`,
+      hospitalId,
+      registeredDate: reference.registeredDate || new Date().toISOString().split('T')[0]
+    };
+    const existingIdx = store.hospitalDoctorReferences[hospitalId].findIndex(r => r.id === newRef.id || (r.phone && r.phone === newRef.phone));
+    if (existingIdx >= 0) {
+      store.hospitalDoctorReferences[hospitalId][existingIdx] = {
+        ...store.hospitalDoctorReferences[hospitalId][existingIdx],
+        ...newRef
+      };
+    } else {
+      store.hospitalDoctorReferences[hospitalId].unshift(newRef);
+    }
+  }
+
+  await saveUnifiedStore(store);
+  res.json({ success: true, hospitalId, references: store.hospitalDoctorReferences[hospitalId] });
+});
+
+app.delete('/api/hospitals/:hospitalId/doctor-references/:refId', requireHospitalAuth, async (req, res) => {
+  const { hospitalId, refId } = req.params;
+  const store = await getUnifiedStore();
+  store.hospitalDoctorReferences = store.hospitalDoctorReferences || {};
+  store.hospitalDoctorReferences[hospitalId] = (store.hospitalDoctorReferences[hospitalId] || []).filter(r => r.id !== refId);
+  await saveUnifiedStore(store);
+  res.json({ success: true, hospitalId, references: store.hospitalDoctorReferences[hospitalId] });
 });
 
 // ─── Direct Media Upload Endpoint (S3 with Base64 fallback) ───────────────────

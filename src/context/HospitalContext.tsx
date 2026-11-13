@@ -397,14 +397,7 @@ export function ensureDefaultDepartments(existingDepts?: HospitalDepartment[] | 
   if (isOnlyOldPlaceholders) {
     return INITIAL_DEPARTMENTS.map(d => ({ ...d }));
   }
-  const result = [...existingDepts];
-  INITIAL_DEPARTMENTS.forEach(defDept => {
-    const exists = result.some(d => d.id === defDept.id || d.name?.toLowerCase() === defDept.name.toLowerCase());
-    if (!exists) {
-      result.push({ ...defDept });
-    }
-  });
-  return result;
+  return existingDepts.map(d => ({ ...d }));
 }
 
 const INITIAL_DOCTORS: HospitalDoctor[] = [
@@ -810,17 +803,46 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       } catch (e) { }
       return next;
     });
+
+    fetch(`/api/hospitals/${curHospId}/doctor-references`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`,
+        'x-hospital-token': authToken
+      },
+      body: JSON.stringify({ reference: newRecord })
+    }).catch(e => console.warn('Could not persist doctor reference to backend:', e));
   };
 
   const updateDoctorReference = (id: string, updates: Partial<DoctorReferenceRecord>) => {
     const curHospId = targetHospId || localStorage.getItem('insta_current_hospital_id') || 'hosp-apollo';
+    let targetRef: DoctorReferenceRecord | null = null;
     setDoctorReferences(prev => {
-      const next = prev.map(d => d.id === id ? { ...d, ...updates } : d);
+      const next = prev.map(d => {
+        if (d.id === id) {
+          targetRef = { ...d, ...updates };
+          return targetRef;
+        }
+        return d;
+      });
       try {
         localStorage.setItem(`insta_hospital_doctor_references_${curHospId}`, JSON.stringify(next));
       } catch (e) { }
       return next;
     });
+
+    if (targetRef) {
+      fetch(`/api/hospitals/${curHospId}/doctor-references`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`,
+          'x-hospital-token': authToken
+        },
+        body: JSON.stringify({ reference: targetRef })
+      }).catch(e => console.warn('Could not update doctor reference on backend:', e));
+    }
   };
 
   const deleteDoctorReference = (id: string) => {
@@ -832,6 +854,14 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       } catch (e) { }
       return next;
     });
+
+    fetch(`/api/hospitals/${curHospId}/doctor-references/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+        'x-hospital-token': authToken
+      }
+    }).catch(e => console.warn('Could not delete doctor reference on backend:', e));
   };
 
   // Dynamic fetch of hospital patients strictly for current hospital (Phase 20)
@@ -1114,6 +1144,22 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         if (data.success && Array.isArray(data.notifications)) {
           setNotifications(data.notifications);
           localStorage.setItem(`insta_hospital_notifications_${targetHospId}`, JSON.stringify(data.notifications));
+        }
+      })
+      .catch(() => { });
+
+    // 6. Fetch doctor references
+    fetch(`/api/hospitals/${targetHospId}/doctor-references`, {
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+        'x-hospital-token': authToken
+      }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.references)) {
+          setDoctorReferences(data.references);
+          localStorage.setItem(`insta_hospital_doctor_references_${targetHospId}`, JSON.stringify(data.references));
         }
       })
       .catch(() => { });

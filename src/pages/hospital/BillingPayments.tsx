@@ -6,21 +6,41 @@ export const BillingPayments: React.FC = () => {
   const { tokens, doctors } = useHospital();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [dateFilter, setDateFilter] = useState<'today' | 'week' | 'month' | 'all'>('today');
+
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  const dateFilteredTokens = tokens.filter(t => {
+    if (dateFilter === 'all') return true;
+    const bDate = (t.bookingDate || '').split('T')[0];
+    if (dateFilter === 'today') return bDate === todayStr;
+    const tokDate = new Date(bDate || todayStr);
+    const now = new Date();
+    if (dateFilter === 'week') {
+      const oneWeekAgo = new Date(now.getTime() - 7 * 86400000);
+      return tokDate >= oneWeekAgo && tokDate <= now;
+    }
+    if (dateFilter === 'month') {
+      const oneMonthAgo = new Date(now.getTime() - 30 * 86400000);
+      return tokDate >= oneMonthAgo && tokDate <= now;
+    }
+    return true;
+  });
 
   // Calculating dynamic finance metrics
-  const totalRevenue = tokens
+  const totalRevenue = dateFilteredTokens
     .filter(t => t.paymentStatus === 'paid')
-    .reduce((acc, curr) => acc + curr.consultationFee, 0);
+    .reduce((acc, curr) => acc + (Number(curr.consultationFee) || 0), 0);
 
-  const pendingRevenue = tokens
+  const pendingRevenue = dateFilteredTokens
     .filter(t => t.paymentStatus === 'pending')
-    .reduce((acc, curr) => acc + curr.consultationFee, 0);
+    .reduce((acc, curr) => acc + (Number(curr.consultationFee) || 0), 0);
 
-  const refundedRevenue = tokens
+  const refundedRevenue = dateFilteredTokens
     .filter(t => t.paymentStatus === 'refunded')
-    .reduce((acc, curr) => acc + curr.consultationFee, 0);
+    .reduce((acc, curr) => acc + (Number(curr.consultationFee) || 0), 0);
 
-  const filteredPayments = tokens.filter(t => {
+  const filteredPayments = dateFilteredTokens.filter(t => {
     const matchesSearch = t.patientName.toLowerCase().includes(search.toLowerCase()) ||
                           t.patientPhone.includes(search) ||
                           t.id.includes(search);
@@ -34,18 +54,43 @@ export const BillingPayments: React.FC = () => {
     refunded: 'bg-red-100 text-red-750 border-red-200'
   };
 
+  const dateLabel = dateFilter === 'today' ? "Today's" : dateFilter === 'week' ? "This Week's" : dateFilter === 'month' ? "This Month's" : "Total";
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div>
-        <h2 className="text-xl font-black text-slate-800">Billing & Transactions</h2>
-        <p className="text-xs text-slate-400 mt-1">Manage consultation fee collections and patient refunds</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-black text-slate-800">Billing & Transactions</h2>
+          <p className="text-xs text-slate-400 mt-1">Manage consultation fee collections and patient refunds</p>
+        </div>
+
+        {/* Date Filter Buttons */}
+        <div className="flex bg-slate-100 rounded-xl p-1 shrink-0 self-start sm:self-auto">
+          {[
+            { key: 'today', label: 'Today' },
+            { key: 'week', label: 'This Week' },
+            { key: 'month', label: 'This Month' },
+            { key: 'all', label: 'All Time' }
+          ].map(d => (
+            <button
+              key={d.key}
+              type="button"
+              onClick={() => setDateFilter(d.key as any)}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg cursor-pointer transition-all border-none ${
+                dateFilter === d.key ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              {d.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Finance Stats Row */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {[
-          { label: 'Today\'s Total Revenue', val: `₹${totalRevenue.toLocaleString()}`, sub: 'Direct Settlement', icon: <DollarSign size={18} />, color: 'bg-emerald-500/10 text-emerald-600' },
+          { label: `${dateLabel} Total Revenue`, val: `₹${totalRevenue.toLocaleString()}`, sub: 'Direct Settlement', icon: <DollarSign size={18} />, color: 'bg-emerald-500/10 text-emerald-600' },
           { label: 'Pending Collections', val: `₹${pendingRevenue.toLocaleString()}`, sub: 'Pay-at-Hospital Cabin', icon: <Clock size={18} />, color: 'bg-amber-500/10 text-amber-600' },
           { label: 'Refunded Tokens', val: `₹${refundedRevenue.toLocaleString()}`, sub: 'Cancelled Appointments', icon: <RefreshCw size={18} />, color: 'bg-red-500/10 text-red-600' }
         ].map(s => (
