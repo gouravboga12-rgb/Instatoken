@@ -1,10 +1,10 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useHospital } from '../../context/HospitalContext';
 import { geocodeLocation, reverseGeocodeAddressDetails } from '../../utils/googleMaps';
 import {
   Building2, Save, Check, MapPin, Layers, Compass,
   ExternalLink, Sparkles, Loader2, Upload, ImageIcon, Phone,
-  AlertCircle, Video, Trash2, Plus, Film, Star
+  AlertCircle, Video, Trash2, Plus, Film, Star, Banknote, CheckCircle2
 } from 'lucide-react';
 
 const COMMON_FACILITIES = [
@@ -24,7 +24,7 @@ const COMMON_FACILITIES = [
 
 export const HospitalSettings: React.FC = () => {
   const { hospitalProfile, updateHospitalProfile, authToken } = useHospital();
-  const [activeTab, setActiveTab] = useState<'basic' | 'contact' | 'location' | 'about'>('basic');
+  const [activeTab, setActiveTab] = useState<'basic' | 'contact' | 'location' | 'about' | 'payouts'>('basic');
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
@@ -39,6 +39,83 @@ export const HospitalSettings: React.FC = () => {
   const [customMediaCaption, setCustomMediaCaption] = useState('');
 
   const isApollo = hospitalProfile?.id === 'hosp-apollo';
+
+  // ─── Payout / Payment Settings State ────────────────────────────────────────
+  const [paymentMode, setPaymentMode] = useState<'token_only' | 'full_online'>('token_only');
+  const [bankForm, setBankForm] = useState({ bank_account_holder: '', bank_account_number: '', bank_account_confirm: '', bank_name: '', bank_ifsc: '', upi_id: '', upi_phone: '' });
+  const [payoutSaving, setPayoutSaving] = useState(false);
+  const [payoutSuccess, setPayoutSuccess] = useState('');
+  const [payoutError, setPayoutError] = useState('');
+
+  // Load payout settings on mount
+  useEffect(() => {
+    const loadPayoutSettings = async () => {
+      if (!hospitalProfile?.id) return;
+      try {
+        const headers: HeadersInit = { 'Content-Type': 'application/json' };
+        if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+        const res = await fetch(`/api/hospitals/${hospitalProfile.id}/payment-settings`, { headers });
+        const data = await res.json();
+        if (data.success) {
+          setPaymentMode(data.payment_mode || 'token_only');
+          setBankForm({
+            bank_account_holder: data.bank_account_holder || '',
+            bank_account_number: data.bank_account_number || '',
+            bank_account_confirm: data.bank_account_number || '',
+            bank_name: data.bank_name || '',
+            bank_ifsc: data.bank_ifsc || '',
+            upi_id: data.upi_id || '',
+            upi_phone: data.upi_phone || ''
+          });
+        }
+      } catch (e) {
+        // Profile may not have been persisted yet; silently fail
+      }
+    };
+    loadPayoutSettings();
+  }, [hospitalProfile?.id]);
+
+  const handlePayoutSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPayoutError(''); setPayoutSuccess('');
+    if (paymentMode === 'full_online') {
+      if (!bankForm.bank_account_holder || !bankForm.bank_account_number || !bankForm.bank_name || !bankForm.bank_ifsc) {
+        setPayoutError('Please fill all required bank details before enabling Full Online Payment.');
+        return;
+      }
+      if (bankForm.bank_account_number !== bankForm.bank_account_confirm) {
+        setPayoutError('Account number and confirmation do not match.');
+        return;
+      }
+    }
+    setPayoutSaving(true);
+    try {
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+      const res = await fetch(`/api/hospitals/${hospitalProfile?.id}/payment-settings`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({
+          payment_mode: paymentMode,
+          bank_account_holder: bankForm.bank_account_holder,
+          bank_account_number: bankForm.bank_account_number,
+          bank_name: bankForm.bank_name,
+          bank_ifsc: bankForm.bank_ifsc,
+          upi_id: bankForm.upi_id,
+          upi_phone: bankForm.upi_phone
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPayoutSuccess('Payment settings saved successfully! Changes are live for new bookings.');
+      } else {
+        setPayoutError(data.message || 'Failed to save payment settings.');
+      }
+    } catch (e) {
+      setPayoutError('Network error. Please try again.');
+    }
+    setPayoutSaving(false);
+  };
 
   const [form, setForm] = useState({
     name: hospitalProfile?.name || (isApollo ? 'City Care Multi-Specialty Hospital' : ''),
@@ -396,7 +473,8 @@ export const HospitalSettings: React.FC = () => {
             { id: 'basic', label: 'Basic Profile & Photo', desc: 'Name, photo, registration', icon: <Building2 size={16} /> },
             { id: 'contact', label: 'Contacts & Emergency', desc: 'Phone, WhatsApp, helpline', icon: <Phone size={16} /> },
             { id: 'location', label: 'GPS Location & Maps', desc: 'Address, geocoding, coordinates', icon: <MapPin size={16} /> },
-            { id: 'about', label: 'About & Amenities', desc: 'Facilities, mission, description', icon: <Layers size={16} /> }
+            { id: 'about', label: 'About & Amenities', desc: 'Facilities, mission, description', icon: <Layers size={16} /> },
+            { id: 'payouts', label: 'Payout & Online Payments', desc: 'Bank details, payment mode', icon: <Banknote size={16} /> }
           ].map(t => (
             <button
               key={t.id}
@@ -418,7 +496,7 @@ export const HospitalSettings: React.FC = () => {
 
         {/* Main Content */}
         <div className="xl:col-span-3">
-          <form onSubmit={handleSubmit} className="bg-white border border-slate-100 rounded-3xl p-6 sm:p-8 shadow-xs space-y-6">
+          <form onSubmit={activeTab === 'payouts' ? handlePayoutSave : handleSubmit} className="bg-white border border-slate-100 rounded-3xl p-6 sm:p-8 shadow-xs space-y-6">
 
             {/* ─── BASIC PROFILE & PHOTO ─── */}
             {activeTab === 'basic' && (
@@ -872,16 +950,183 @@ export const HospitalSettings: React.FC = () => {
               </div>
             )}
 
+            {/* ─── PAYOUT & ONLINE PAYMENTS TAB ─── */}
+            {activeTab === 'payouts' && (
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Patient Payment Collection Mode</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">Select how doctor consultation fees should be collected from booking patients</p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div
+                    onClick={() => setPaymentMode('token_only')}
+                    className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${
+                      paymentMode === 'token_only'
+                        ? 'border-blue-600 bg-blue-50/60 shadow-xs'
+                        : 'border-slate-200 bg-white hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-black text-slate-900">Pay at Hospital (Standard)</span>
+                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${paymentMode === 'token_only' ? 'border-blue-600 bg-blue-600' : 'border-slate-300'}`}>
+                        {paymentMode === 'token_only' && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-slate-500 font-medium leading-relaxed">
+                      Patients pay only the online platform token fee on InstaToken. Doctor consultation fee is collected by your hospital at the reception counter.
+                    </p>
+                  </div>
+
+                  <div
+                    onClick={() => setPaymentMode('full_online')}
+                    className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${
+                      paymentMode === 'full_online'
+                        ? 'border-emerald-600 bg-emerald-50/60 shadow-xs'
+                        : 'border-slate-200 bg-white hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-black text-emerald-950 flex items-center gap-1.5">
+                        <Banknote size={14} className="text-emerald-600" />
+                        Full Online Payment (Advance)
+                      </span>
+                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${paymentMode === 'full_online' ? 'border-emerald-600 bg-emerald-600' : 'border-slate-300'}`}>
+                        {paymentMode === 'full_online' && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-slate-500 font-medium leading-relaxed">
+                      Both platform fee and doctor consultation fee are paid online via Razorpay. InstaToken remits doctor consultation fees directly to your hospital bank account.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Bank & UPI Details Form */}
+                <div className={`space-y-4 pt-4 border-t border-slate-100 transition-opacity ${paymentMode === 'full_online' ? 'opacity-100' : 'opacity-60'}`}>
+                  <div>
+                    <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <Building2 size={13} className="text-blue-600" />
+                      Hospital Settlement Bank Details {paymentMode === 'full_online' && <span className="text-red-500">*</span>}
+                    </h4>
+                    <p className="text-[11px] text-slate-400 font-medium">InstaToken will disburse collected consultation fees to this account</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div>
+                      <label className={labelCls}>Bank Name *</label>
+                      <input
+                        type="text"
+                        value={bankForm.bank_name}
+                        onChange={e => setBankForm({ ...bankForm, bank_name: e.target.value })}
+                        placeholder="e.g. State Bank of India / HDFC Bank"
+                        className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:border-blue-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className={labelCls}>Account Holder Name *</label>
+                      <input
+                        type="text"
+                        value={bankForm.bank_account_holder}
+                        onChange={e => setBankForm({ ...bankForm, bank_account_holder: e.target.value })}
+                        placeholder="e.g. Gandi Hospital Private Limited"
+                        className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:border-blue-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className={labelCls}>Bank Account Number *</label>
+                      <input
+                        type="text"
+                        value={bankForm.bank_account_number}
+                        onChange={e => setBankForm({ ...bankForm, bank_account_number: e.target.value })}
+                        placeholder="e.g. 50200012345678"
+                        className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 font-mono outline-none focus:border-blue-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className={labelCls}>Confirm Account Number *</label>
+                      <input
+                        type="text"
+                        value={bankForm.bank_account_confirm}
+                        onChange={e => setBankForm({ ...bankForm, bank_account_confirm: e.target.value })}
+                        placeholder="Re-enter bank account number"
+                        className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 font-mono outline-none focus:border-blue-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className={labelCls}>Bank IFSC Code *</label>
+                      <input
+                        type="text"
+                        value={bankForm.bank_ifsc}
+                        onChange={e => setBankForm({ ...bankForm, bank_ifsc: e.target.value.toUpperCase() })}
+                        placeholder="e.g. HDFC0001234"
+                        className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 font-mono uppercase outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* UPI Details */}
+                  <div className="pt-3 border-t border-slate-100">
+                    <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider mb-2">
+                      Hospital UPI Settlement Details (Optional / Instant Transfer)
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                      <div>
+                        <label className={labelCls}>UPI ID (VPA)</label>
+                        <input
+                          type="text"
+                          value={bankForm.upi_id}
+                          onChange={e => setBankForm({ ...bankForm, upi_id: e.target.value })}
+                          placeholder="e.g. hospitalname@okhdfcbank"
+                          className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:border-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className={labelCls}>UPI Registered Phone Number</label>
+                        <input
+                          type="tel"
+                          value={bankForm.upi_phone}
+                          onChange={e => setBankForm({ ...bankForm, upi_phone: e.target.value })}
+                          placeholder="e.g. 9876543210"
+                          className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:border-blue-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {payoutError && (
+                    <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-600 px-3.5 py-2.5 rounded-xl text-xs font-bold">
+                      <AlertCircle size={14} />
+                      {payoutError}
+                    </div>
+                  )}
+
+                  {payoutSuccess && (
+                    <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-700 px-3.5 py-2.5 rounded-xl text-xs font-bold">
+                      <CheckCircle2 size={14} />
+                      {payoutSuccess}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Save Button */}
             <div className="flex items-center gap-3 pt-4 border-t border-slate-100">
               <button
                 type="submit"
+                disabled={activeTab === 'payouts' ? payoutSaving : false}
                 className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold px-6 py-3 rounded-xl cursor-pointer border-none flex items-center gap-2 text-xs shadow-md shadow-blue-500/20 transition-colors"
               >
                 <Save size={14} />
-                Save & Publish Globally
+                {activeTab === 'payouts'
+                  ? (payoutSaving ? 'Saving Payment Settings...' : 'Save Payout & Payment Settings')
+                  : 'Save & Publish Globally'}
               </button>
-              {saveSuccess && (
+              {saveSuccess && activeTab !== 'payouts' && (
                 <span className="text-xs font-bold text-emerald-600 flex items-center gap-1 bg-emerald-50 px-3 py-2 rounded-xl border border-emerald-200">
                   <Check size={16} /> Profile saved & published to all patients!
                 </span>

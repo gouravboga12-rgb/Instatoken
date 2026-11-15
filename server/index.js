@@ -100,6 +100,68 @@ testConnection().then(async (connected) => {
     } catch (e) {
       console.warn('Could not auto-create customers table in RDS:', e.message);
     }
+    // Auto-migrate: add payment columns to hospitals table if not present
+    try {
+      await query(`
+        ALTER TABLE hospitals
+          ADD COLUMN IF NOT EXISTS payment_mode VARCHAR(50) DEFAULT 'token_only',
+          ADD COLUMN IF NOT EXISTS bank_account_holder VARCHAR(255),
+          ADD COLUMN IF NOT EXISTS bank_account_number VARCHAR(100),
+          ADD COLUMN IF NOT EXISTS bank_name VARCHAR(255),
+          ADD COLUMN IF NOT EXISTS bank_ifsc VARCHAR(50),
+          ADD COLUMN IF NOT EXISTS upi_id VARCHAR(100),
+          ADD COLUMN IF NOT EXISTS upi_phone VARCHAR(50);
+      `);
+    } catch (e) {
+      console.warn('Could not auto-add payment columns to hospitals:', e.message);
+    }
+    // Create hospital_payout_settlements table
+    try {
+      await query(`
+        CREATE TABLE IF NOT EXISTS hospital_payout_settlements (
+          id VARCHAR(100) PRIMARY KEY,
+          hospital_id VARCHAR(100) NOT NULL,
+          hospital_name VARCHAR(255) NOT NULL,
+          payout_amount NUMERIC(10,2) NOT NULL,
+          tokens_count INTEGER NOT NULL DEFAULT 0,
+          token_ids JSONB NOT NULL DEFAULT '[]',
+          payment_method VARCHAR(50) NOT NULL DEFAULT 'NEFT',
+          utr_reference VARCHAR(100) NOT NULL,
+          beneficiary_bank_account VARCHAR(100),
+          beneficiary_ifsc VARCHAR(50),
+          beneficiary_upi VARCHAR(100),
+          settled_by_admin VARCHAR(100) NOT NULL DEFAULT 'super-admin',
+          notes TEXT,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          created_at_ist VARCHAR(100)
+        );
+        CREATE INDEX IF NOT EXISTS idx_payout_settlements_hosp ON hospital_payout_settlements(hospital_id);
+        CREATE INDEX IF NOT EXISTS idx_payout_settlements_utr ON hospital_payout_settlements(utr_reference);
+      `);
+    } catch (e) {
+      console.warn('Could not auto-create hospital_payout_settlements table:', e.message);
+    }
+    // Create hospital_payout_requests table (for hospital-initiated requests)
+    try {
+      await query(`
+        CREATE TABLE IF NOT EXISTS hospital_payout_requests (
+          id VARCHAR(100) PRIMARY KEY,
+          hospital_id VARCHAR(100) NOT NULL,
+          hospital_name VARCHAR(255) NOT NULL,
+          requested_amount NUMERIC(10,2) NOT NULL,
+          status VARCHAR(50) NOT NULL DEFAULT 'pending',
+          notes TEXT,
+          admin_notes TEXT,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          created_at_ist VARCHAR(100)
+        );
+        CREATE INDEX IF NOT EXISTS idx_payout_requests_hosp ON hospital_payout_requests(hospital_id);
+        CREATE INDEX IF NOT EXISTS idx_payout_requests_status ON hospital_payout_requests(status);
+      `);
+    } catch (e) {
+      console.warn('Could not auto-create hospital_payout_requests table:', e.message);
+    }
   } else {
     console.log('📁 Active Data Layer: Local File Store (Fallback)');
   }
@@ -1523,7 +1585,7 @@ app.post('/api/auth/hospital-login', async (req, res) => {
 
 // POST /api/auth/hospital-signup
 app.post('/api/auth/hospital-signup', async (req, res) => {
-  const { name, email, password, phone, city, address, category, registrationNumber } = req.body;
+  const { name, email, password, phone, city, address, category, registrationNumber, payment_mode, bank_account_holder, bank_account_number, bank_name, bank_ifsc, upi_id, upi_phone } = req.body;
   if (!name || !email || !password) {
     return res.status(400).json({ success: false, message: 'Name, email, and password are required' });
   }
@@ -1581,7 +1643,14 @@ app.post('/api/auth/hospital-signup', async (req, res) => {
       { day: 'Fri', open: '09:00', close: '18:00' },
       { day: 'Sat', open: '09:00', close: '14:00' },
       { day: 'Sun', open: '10:00', close: '13:00' },
-    ]
+    ],
+    payment_mode: payment_mode || 'token_only',
+    bank_account_holder: bank_account_holder || '',
+    bank_account_number: bank_account_number || '',
+    bank_name: bank_name || '',
+    bank_ifsc: bank_ifsc || '',
+    upi_id: upi_id || '',
+    upi_phone: upi_phone || ''
   };
 
   store.hospitalProfiles = store.hospitalProfiles || {};
@@ -1600,10 +1669,10 @@ app.post('/api/auth/hospital-signup', async (req, res) => {
   if (isDbConnected) {
     try {
       await query(
-        `INSERT INTO hospitals (id, name, email, phone, city, state, data) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
-         ON CONFLICT (id) DO UPDATE SET name = $2, email = $3, phone = $4, city = $5, state = $6, data = $7`,
-        [newHospitalId, name, email.trim().toLowerCase(), phone || '', city || '', '', JSON.stringify(newProfile)]
+        `INSERT INTO hospitals (id, name, email, phone, city, state, payment_mode, bank_account_holder, bank_account_number, bank_name, bank_ifsc, upi_id, upi_phone, data) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+         ON CONFLICT (id) DO UPDATE SET name = $2, email = $3, phone = $4, city = $5, state = $6, payment_mode=$7, bank_account_holder=$8, bank_account_number=$9, bank_name=$10, bank_ifsc=$11, upi_id=$12, upi_phone=$13, data = $14`,
+        [newHospitalId, name, email.trim().toLowerCase(), phone || '', city || '', '', payment_mode||'token_only', bank_account_holder||null, bank_account_number||null, bank_name||null, bank_ifsc||null, upi_id||null, upi_phone||null, JSON.stringify(newProfile)]
       );
       await query(
         `INSERT INTO hospital_profiles (hospital_id, profile_data) 
@@ -4238,6 +4307,443 @@ app.delete('/api/hospitals/:hospitalId/doctor-references/:refId', requireHospita
   store.hospitalDoctorReferences[hospitalId] = (store.hospitalDoctorReferences[hospitalId] || []).filter(r => r.id !== refId);
   await saveUnifiedStore(store);
   res.json({ success: true, hospitalId, references: store.hospitalDoctorReferences[hospitalId] });
+});
+
+// ─── Hospital Payment Settings ────────────────────────────────────────────────
+
+// PUT /api/hospitals/:hospitalId/payment-settings
+app.put('/api/hospitals/:hospitalId/payment-settings', requireHospitalAuth, async (req, res) => {
+  const { hospitalId } = req.params;
+  const {
+    payment_mode,
+    bank_account_holder,
+    bank_account_number,
+    bank_name,
+    bank_ifsc,
+    upi_id,
+    upi_phone
+  } = req.body;
+
+  if (!['token_only', 'full_online'].includes(payment_mode)) {
+    return res.status(400).json({ success: false, message: 'payment_mode must be token_only or full_online' });
+  }
+  if (payment_mode === 'full_online') {
+    if (!bank_account_holder || !bank_account_number || !bank_ifsc || !bank_name) {
+      return res.status(400).json({ success: false, message: 'Bank details are required for Full Online Payment mode.' });
+    }
+  }
+
+  const store = await getUnifiedStore();
+  const paymentSettings = { payment_mode, bank_account_holder, bank_account_number, bank_name, bank_ifsc, upi_id, upi_phone };
+
+  // Update in-memory store
+  if (store.hospitalProfiles && store.hospitalProfiles[hospitalId]) {
+    store.hospitalProfiles[hospitalId] = { ...store.hospitalProfiles[hospitalId], ...paymentSettings };
+  }
+  // Also update in hospitals list
+  if (store.hospitals && Array.isArray(store.hospitals)) {
+    const idx = store.hospitals.findIndex(h => h.id === hospitalId);
+    if (idx !== -1) {
+      store.hospitals[idx] = { ...store.hospitals[idx], ...paymentSettings };
+    }
+  }
+
+  // Update in RDS
+  if (isDbConnected) {
+    try {
+      await query(
+        `UPDATE hospitals SET payment_mode=$1, bank_account_holder=$2, bank_account_number=$3, bank_name=$4, bank_ifsc=$5, upi_id=$6, upi_phone=$7, updated_at=NOW()
+         WHERE id=$8`,
+        [payment_mode, bank_account_holder||null, bank_account_number||null, bank_name||null, bank_ifsc||null, upi_id||null, upi_phone||null, hospitalId]
+      );
+      // Also keep the profile_data JSONB in sync
+      if (store.hospitalProfiles && store.hospitalProfiles[hospitalId]) {
+        await query(
+          `INSERT INTO hospital_profiles (hospital_id, profile_data) VALUES ($1, $2)
+           ON CONFLICT (hospital_id) DO UPDATE SET profile_data=$2, updated_at=NOW()`,
+          [hospitalId, JSON.stringify(store.hospitalProfiles[hospitalId])]
+        );
+      }
+    } catch (dbErr) {
+      console.warn('Error updating hospital payment settings in RDS:', dbErr.message);
+    }
+  }
+
+  await saveUnifiedStore(store);
+  res.json({ success: true, message: 'Payment settings updated successfully', paymentSettings });
+});
+
+// GET /api/hospitals/:hospitalId/payment-settings
+app.get('/api/hospitals/:hospitalId/payment-settings', requireHospitalAuth, async (req, res) => {
+  const { hospitalId } = req.params;
+  let settings = { payment_mode: 'token_only', bank_account_holder: '', bank_account_number: '', bank_name: '', bank_ifsc: '', upi_id: '', upi_phone: '' };
+
+  if (isDbConnected) {
+    try {
+      const r = await query(
+        `SELECT payment_mode, bank_account_holder, bank_account_number, bank_name, bank_ifsc, upi_id, upi_phone FROM hospitals WHERE id=$1`,
+        [hospitalId]
+      );
+      if (r.rows.length > 0) {
+        const row = r.rows[0];
+        settings = {
+          payment_mode: row.payment_mode || 'token_only',
+          bank_account_holder: row.bank_account_holder || '',
+          bank_account_number: row.bank_account_number || '',
+          bank_name: row.bank_name || '',
+          bank_ifsc: row.bank_ifsc || '',
+          upi_id: row.upi_id || '',
+          upi_phone: row.upi_phone || ''
+        };
+      }
+    } catch (dbErr) {
+      console.warn('Error fetching payment settings from RDS:', dbErr.message);
+    }
+  } else {
+    const store = await getUnifiedStore();
+    const prof = store.hospitalProfiles?.[hospitalId] || {};
+    settings = {
+      payment_mode: prof.payment_mode || 'token_only',
+      bank_account_holder: prof.bank_account_holder || '',
+      bank_account_number: prof.bank_account_number || '',
+      bank_name: prof.bank_name || '',
+      bank_ifsc: prof.bank_ifsc || '',
+      upi_id: prof.upi_id || '',
+      upi_phone: prof.upi_phone || ''
+    };
+  }
+  res.json({ success: true, ...settings });
+});
+
+// ─── Hospital Payout Requests (Hospital → Super Admin) ─────────────────────────
+
+// POST /api/hospitals/:hospitalId/payout-requests
+app.post('/api/hospitals/:hospitalId/payout-requests', requireHospitalAuth, async (req, res) => {
+  const { hospitalId } = req.params;
+  const { requested_amount, notes } = req.body;
+  if (!requested_amount || Number(requested_amount) <= 0) {
+    return res.status(400).json({ success: false, message: 'Invalid amount requested.' });
+  }
+  const store = await getUnifiedStore();
+  const hospitalName = store.hospitalProfiles?.[hospitalId]?.name || hospitalId;
+  const reqId = `preq-${Date.now().toString(36)}`;
+  const nowIST = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true, day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+  if (isDbConnected) {
+    try {
+      await query(
+        `INSERT INTO hospital_payout_requests (id, hospital_id, hospital_name, requested_amount, status, notes, created_at_ist) VALUES ($1,$2,$3,$4,'pending',$5,$6)`,
+        [reqId, hospitalId, hospitalName, Number(requested_amount), notes || '', nowIST]
+      );
+    } catch (dbErr) {
+      console.warn('Error saving payout request to RDS:', dbErr.message);
+    }
+  }
+  // Also store in memory as fallback
+  store.payoutRequests = store.payoutRequests || [];
+  store.payoutRequests.push({ id: reqId, hospitalId, hospital_name: hospitalName, requested_amount: Number(requested_amount), status: 'pending', notes: notes || '', created_at: new Date().toISOString(), created_at_ist: nowIST });
+  await saveUnifiedStore(store);
+
+  res.json({ success: true, message: 'Payout request submitted successfully.', requestId: reqId });
+});
+
+// GET /api/hospitals/:hospitalId/payout-requests
+app.get('/api/hospitals/:hospitalId/payout-requests', requireHospitalAuth, async (req, res) => {
+  const { hospitalId } = req.params;
+  let requests = [];
+  if (isDbConnected) {
+    try {
+      const r = await query(`SELECT * FROM hospital_payout_requests WHERE hospital_id=$1 ORDER BY created_at DESC`, [hospitalId]);
+      requests = r.rows;
+    } catch (dbErr) {
+      console.warn('Error fetching payout requests from RDS:', dbErr.message);
+    }
+  }
+  if (requests.length === 0) {
+    const store = await getUnifiedStore();
+    requests = (store.payoutRequests || []).filter(r => r.hospitalId === hospitalId);
+  }
+  res.json({ success: true, requests });
+});
+
+// GET /api/hospitals/:hospitalId/payout-settlements (hospital sees its own settled payments)
+app.get('/api/hospitals/:hospitalId/payout-settlements', requireHospitalAuth, async (req, res) => {
+  const { hospitalId } = req.params;
+  let settlements = [];
+  if (isDbConnected) {
+    try {
+      const r = await query(`SELECT * FROM hospital_payout_settlements WHERE hospital_id=$1 ORDER BY created_at DESC`, [hospitalId]);
+      settlements = r.rows;
+    } catch (dbErr) {
+      console.warn('Error fetching settlements from RDS:', dbErr.message);
+    }
+  }
+  if (settlements.length === 0) {
+    const store = await getUnifiedStore();
+    settlements = (store.payoutSettlements || []).filter(s => s.hospital_id === hospitalId);
+  }
+  res.json({ success: true, settlements });
+});
+
+// GET /api/hospitals/:hospitalId/payout-summary
+app.get('/api/hospitals/:hospitalId/payout-summary', requireHospitalAuth, async (req, res) => {
+  const { hospitalId } = req.params;
+  const store = await getUnifiedStore();
+
+  // Get payment mode
+  let paymentMode = 'token_only';
+  let bankDetails = {};
+  if (isDbConnected) {
+    try {
+      const r = await query(`SELECT payment_mode, bank_account_holder, bank_account_number, bank_name, bank_ifsc, upi_id, upi_phone FROM hospitals WHERE id=$1`, [hospitalId]);
+      if (r.rows.length > 0) {
+        paymentMode = r.rows[0].payment_mode || 'token_only';
+        bankDetails = r.rows[0];
+      }
+    } catch (e) {}
+  } else {
+    const prof = store.hospitalProfiles?.[hospitalId] || {};
+    paymentMode = prof.payment_mode || 'token_only';
+    bankDetails = prof;
+  }
+
+  // Get completed tokens with full_online payment collection
+  let totalCollectedOnline = 0;
+  let totalSettled = 0;
+  let unsettledTokens = [];
+
+  const allTokens = [...(store.tokens || []), ...(store.appointments || []).map(a => ({ ...a, status: a.status }))];
+  const hospTokens = allTokens.filter(t => t.hospitalId === hospitalId && t.status === 'completed');
+
+  hospTokens.forEach(t => {
+    const pc = t.paymentCollection || {};
+    if (pc.mode === 'full_online') {
+      const docFee = Number(pc.consultationFee || t.consultationFee || 0);
+      totalCollectedOnline += docFee;
+      if (pc.settlementStatus === 'settled') {
+        totalSettled += docFee;
+      } else {
+        unsettledTokens.push(t);
+      }
+    }
+  });
+
+  // Also count settled from settlement records
+  let settledCount = 0;
+  if (isDbConnected) {
+    try {
+      const sr = await query(`SELECT SUM(payout_amount) as total FROM hospital_payout_settlements WHERE hospital_id=$1`, [hospitalId]);
+      if (sr.rows[0]?.total) settledCount = Number(sr.rows[0].total);
+    } catch (e) {}
+  }
+
+  const pendingDue = Math.max(0, totalCollectedOnline - (settledCount || totalSettled));
+
+  res.json({
+    success: true,
+    paymentMode,
+    bankDetails,
+    totalCollectedOnline,
+    totalSettled: settledCount || totalSettled,
+    pendingDue,
+    unsettledCount: unsettledTokens.length
+  });
+});
+
+// ─── Super Admin: Hospital Payouts Management ───────────────────────────────────
+
+// GET /api/admin/hospital-settlements (all full-online hospitals + their dues)
+app.get('/api/admin/hospital-settlements', async (req, res) => {
+  const store = await getUnifiedStore();
+
+  // Fetch all hospitals with payment_mode = 'full_online'
+  let hospitals = [];
+  if (isDbConnected) {
+    try {
+      const r = await query(`SELECT id, name, city, payment_mode, bank_account_holder, bank_account_number, bank_name, bank_ifsc, upi_id, upi_phone FROM hospitals WHERE payment_mode='full_online'`);
+      hospitals = r.rows;
+    } catch (e) {
+      console.warn('Error fetching full-online hospitals:', e.message);
+    }
+  }
+  if (hospitals.length === 0) {
+    hospitals = (store.hospitals || []).filter(h => h.payment_mode === 'full_online');
+  }
+
+  // For each hospital, calculate dues
+  const result = await Promise.all(hospitals.map(async (h) => {
+    let totalCollected = 0;
+    let totalSettled = 0;
+    let tokenCount = 0;
+
+    // Collect from tokens
+    const hospTokens = (store.tokens || []).filter(t => t.hospitalId === h.id && t.status === 'completed');
+    hospTokens.forEach(t => {
+      const pc = t.paymentCollection || {};
+      if (pc.mode === 'full_online') {
+        totalCollected += Number(pc.consultationFee || t.consultationFee || 0);
+        tokenCount++;
+        if (pc.settlementStatus === 'settled') totalSettled += Number(pc.consultationFee || t.consultationFee || 0);
+      }
+    });
+
+    // Get settled from records
+    if (isDbConnected) {
+      try {
+        const sr = await query(`SELECT SUM(payout_amount) as total FROM hospital_payout_settlements WHERE hospital_id=$1`, [h.id]);
+        if (sr.rows[0]?.total) totalSettled = Number(sr.rows[0].total);
+      } catch (e) {}
+    }
+
+    // Pending payout requests
+    let pendingRequests = [];
+    if (isDbConnected) {
+      try {
+        const rr = await query(`SELECT * FROM hospital_payout_requests WHERE hospital_id=$1 AND status='pending' ORDER BY created_at DESC`, [h.id]);
+        pendingRequests = rr.rows;
+      } catch (e) {}
+    }
+
+    return {
+      ...h,
+      totalCollected,
+      totalSettled,
+      pendingDue: Math.max(0, totalCollected - totalSettled),
+      tokenCount,
+      pendingRequests
+    };
+  }));
+
+  // Also fetch pending payout requests count
+  let totalPendingRequests = 0;
+  if (isDbConnected) {
+    try {
+      const rr = await query(`SELECT COUNT(*) as cnt FROM hospital_payout_requests WHERE status='pending'`);
+      totalPendingRequests = Number(rr.rows[0]?.cnt || 0);
+    } catch (e) {}
+  }
+
+  const totalDue = result.reduce((acc, h) => acc + h.pendingDue, 0);
+  const totalCollectedAll = result.reduce((acc, h) => acc + h.totalCollected, 0);
+  const totalSettledAll = result.reduce((acc, h) => acc + h.totalSettled, 0);
+
+  res.json({ success: true, hospitals: result, totalDue, totalCollectedAll, totalSettledAll, totalPendingRequests });
+});
+
+// GET /api/admin/hospital-settlements/:hospitalId/statement
+app.get('/api/admin/hospital-settlements/:hospitalId/statement', async (req, res) => {
+  const { hospitalId } = req.params;
+  const store = await getUnifiedStore();
+
+  const hospTokens = (store.tokens || []).filter(t => t.hospitalId === hospitalId && t.status === 'completed');
+  const fullOnlineTokens = hospTokens.filter(t => (t.paymentCollection?.mode === 'full_online'));
+
+  let settlements = [];
+  if (isDbConnected) {
+    try {
+      const sr = await query(`SELECT * FROM hospital_payout_settlements WHERE hospital_id=$1 ORDER BY created_at DESC`, [hospitalId]);
+      settlements = sr.rows;
+    } catch (e) {}
+  }
+
+  res.json({ success: true, tokens: fullOnlineTokens, settlements });
+});
+
+// POST /api/admin/hospital-settlements/:hospitalId/settle
+app.post('/api/admin/hospital-settlements/:hospitalId/settle', async (req, res) => {
+  const { hospitalId } = req.params;
+  const { payout_amount, payment_method, utr_reference, token_ids, notes, settled_by_admin } = req.body;
+
+  if (!payout_amount || !utr_reference || !payment_method) {
+    return res.status(400).json({ success: false, message: 'payout_amount, utr_reference, and payment_method are required.' });
+  }
+
+  const store = await getUnifiedStore();
+  const hospitalName = store.hospitalProfiles?.[hospitalId]?.name || hospitalId;
+
+  // Get bank/UPI details
+  let bankAccount = '', ifsc = '', upiId = '';
+  if (isDbConnected) {
+    try {
+      const r = await query(`SELECT bank_account_number, bank_ifsc, upi_id FROM hospitals WHERE id=$1`, [hospitalId]);
+      if (r.rows.length > 0) {
+        bankAccount = r.rows[0].bank_account_number || '';
+        ifsc = r.rows[0].bank_ifsc || '';
+        upiId = r.rows[0].upi_id || '';
+      }
+    } catch (e) {}
+  }
+
+  const settlementId = `settle-${Date.now().toString(36)}`;
+  const nowIST = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true, day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+  if (isDbConnected) {
+    try {
+      // Check for duplicate UTR
+      const existing = await query(`SELECT id FROM hospital_payout_settlements WHERE utr_reference=$1`, [utr_reference]);
+      if (existing.rows.length > 0) {
+        return res.status(409).json({ success: false, message: `UTR Reference "${utr_reference}" already recorded. Duplicate settlement prevented.` });
+      }
+      await query(
+        `INSERT INTO hospital_payout_settlements (id, hospital_id, hospital_name, payout_amount, tokens_count, token_ids, payment_method, utr_reference, beneficiary_bank_account, beneficiary_ifsc, beneficiary_upi, settled_by_admin, notes, created_at_ist)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+        [settlementId, hospitalId, hospitalName, Number(payout_amount), (token_ids || []).length, JSON.stringify(token_ids || []), payment_method, utr_reference, bankAccount, ifsc, upiId, settled_by_admin || 'super-admin', notes || '', nowIST]
+      );
+
+      // Mark tokens as settled in paymentCollection
+      if (token_ids && token_ids.length > 0) {
+        for (const tid of token_ids) {
+          const tidx = store.tokens?.findIndex(t => t.id === tid);
+          if (tidx !== undefined && tidx !== -1) {
+            store.tokens[tidx].paymentCollection = {
+              ...(store.tokens[tidx].paymentCollection || {}),
+              settlementStatus: 'settled',
+              settlementId,
+              settledAt: nowIST
+            };
+          }
+        }
+        await saveUnifiedStore(store);
+      }
+
+      // Mark pending payout requests as fulfilled
+      await query(
+        `UPDATE hospital_payout_requests SET status='fulfilled', admin_notes=$1, updated_at=NOW() WHERE hospital_id=$2 AND status='pending'`,
+        [`Settled via UTR: ${utr_reference}`, hospitalId]
+      );
+    } catch (dbErr) {
+      if (dbErr.message?.includes('duplicate')) {
+        return res.status(409).json({ success: false, message: 'Duplicate UTR Reference detected.' });
+      }
+      return res.status(500).json({ success: false, message: dbErr.message });
+    }
+  } else {
+    // Fallback: in-memory
+    store.payoutSettlements = store.payoutSettlements || [];
+    store.payoutSettlements.push({ id: settlementId, hospital_id: hospitalId, hospital_name: hospitalName, payout_amount: Number(payout_amount), tokens_count: (token_ids||[]).length, token_ids: token_ids||[], payment_method, utr_reference, beneficiary_bank_account: bankAccount, beneficiary_ifsc: ifsc, beneficiary_upi: upiId, settled_by_admin: settled_by_admin||'super-admin', notes: notes||'', created_at: new Date().toISOString(), created_at_ist: nowIST });
+    await saveUnifiedStore(store);
+  }
+
+  res.json({ success: true, message: `Settlement of ₹${payout_amount} recorded successfully with UTR ${utr_reference}.`, settlementId });
+});
+
+// GET /api/admin/payout-requests (super admin sees all pending requests)
+app.get('/api/admin/payout-requests', async (req, res) => {
+  let requests = [];
+  if (isDbConnected) {
+    try {
+      const r = await query(`SELECT * FROM hospital_payout_requests ORDER BY created_at DESC LIMIT 100`);
+      requests = r.rows;
+    } catch (e) {
+      console.warn('Error fetching payout requests:', e.message);
+    }
+  }
+  if (requests.length === 0) {
+    const store = await getUnifiedStore();
+    requests = store.payoutRequests || [];
+  }
+  const pendingCount = requests.filter(r => r.status === 'pending').length;
+  res.json({ success: true, requests, pendingCount });
 });
 
 // ─── Direct Media Upload Endpoint (S3 with Base64 fallback) ───────────────────

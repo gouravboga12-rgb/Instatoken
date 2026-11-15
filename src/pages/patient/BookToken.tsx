@@ -401,12 +401,14 @@ export const BookToken: React.FC = () => {
     const ageVal = parseInt(age) || 0;
     const computedAgeDisplay = age ? `${age} ${ageUnit}` : '28 Years';
 
+    const isFullOnline = hospital?.payment_mode === 'full_online' || (hospital as any)?.paymentMode === 'full_online';
     const docFee = doctor.consultationFee || 500;
     const platFee = Math.max(10, Math.round(docFee * ((platformFeePercent || 5) / 100)));
     const gatewayFee = 1.5;
     const taxableSum = platFee + gatewayFee;
     const gstFee = parseFloat((taxableSum * 0.18).toFixed(2));
-    const totalPayable = parseFloat((taxableSum + gstFee).toFixed(2));
+    const tokenCharges = parseFloat((taxableSum + gstFee).toFixed(2));
+    const totalPayable = isFullOnline ? parseFloat((docFee + tokenCharges).toFixed(2)) : tokenCharges;
 
     const ref = showRmpFields && rmpName.trim() ? { 
       name: rmpName.trim(), 
@@ -435,7 +437,7 @@ export const BookToken: React.FC = () => {
     const activeSessionObj = sessionOptions.find(s => s.id === selectedSession);
     const slotTime = activeSessionObj ? `${activeSessionObj.title} (${activeSessionObj.timing})` : '10:00 AM - 12:00 PM';
 
-    // Navigate to Razorpay/UPI Payment Gateway - collecting online token charges including GST
+    // Navigate to Razorpay/UPI Payment Gateway - collecting online charges including GST
     navigate('/payment', {
       state: {
         patientDetails,
@@ -449,7 +451,9 @@ export const BookToken: React.FC = () => {
         gatewayFee,
         gstFee,
         totalBookingCharges: totalPayable,
-        subscriptionPlan: { name: "InstaToken Booking Charges", price: totalPayable, days: 3 }
+        isFullOnline,
+        collectionMode: isFullOnline ? 'full_online' : 'token_only',
+        subscriptionPlan: { name: isFullOnline ? "Doctor Consultation + Booking Fee" : "InstaToken Booking Charges", price: totalPayable, days: 3 }
       }
     });
   };
@@ -836,19 +840,25 @@ export const BookToken: React.FC = () => {
 
           {/* Exact fee breakdown matching Image copy 78.png */}
           {(() => {
+            const isFullOnline = hospital?.payment_mode === 'full_online' || (hospital as any)?.paymentMode === 'full_online';
             const docFee = doctor.consultationFee || 500;
             const platFee = Math.max(10, Math.round(docFee * ((platformFeePercent || 5) / 100)));
             const gatewayFee = 1.5;
             const taxableSum = platFee + gatewayFee;
             const gstFee = parseFloat((taxableSum * 0.18).toFixed(2));
-            const totalPayable = parseFloat((taxableSum + gstFee).toFixed(2));
+            const tokenCharges = parseFloat((taxableSum + gstFee).toFixed(2));
+            const totalPayable = isFullOnline ? parseFloat((docFee + tokenCharges).toFixed(2)) : tokenCharges;
 
             return (
               <div className="space-y-3">
-                {/* 1. Doctor Consultation Fee (Green Card) */}
-                <div className="bg-emerald-50/80 border border-emerald-200/90 rounded-2xl p-3.5 sm:p-4 flex items-center justify-between shadow-2xs">
+                {/* 1. Doctor Consultation Fee Card */}
+                <div className={`border rounded-2xl p-3.5 sm:p-4 flex items-center justify-between shadow-2xs ${
+                  isFullOnline ? 'bg-blue-50/80 border-blue-200/90' : 'bg-emerald-50/80 border-emerald-200/90'
+                }`}>
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                    <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${
+                      isFullOnline ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'
+                    }`}>
                       <Stethoscope size={20} />
                     </div>
                     <div>
@@ -856,14 +866,19 @@ export const BookToken: React.FC = () => {
                         <h4 className="text-sm font-black text-slate-900">Doctor Consultation Fee</h4>
                         <Info size={13} className="text-slate-400" />
                       </div>
-                      <p className="text-[11px] text-slate-500 font-semibold mt-0.5">Pay directly at the hospital.</p>
+                      <p className="text-[11px] text-slate-500 font-semibold mt-0.5">
+                        {isFullOnline ? 'Paid online now with InstaToken.' : 'Pay directly at the hospital.'}
+                      </p>
                     </div>
                   </div>
 
                   <div className="text-right">
                     <span className="text-lg font-black text-slate-900 font-heading block">₹{docFee.toFixed(2)}</span>
-                    <span className="inline-flex items-center gap-1 bg-emerald-700 text-white text-[9px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider mt-0.5">
-                      <Building2 size={10} /> Pay at Hospital
+                    <span className={`inline-flex items-center gap-1 text-[9px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider mt-0.5 ${
+                      isFullOnline ? 'bg-blue-700 text-white' : 'bg-emerald-700 text-white'
+                    }`}>
+                      {isFullOnline ? <ShieldCheck size={10} /> : <Building2 size={10} />}
+                      {isFullOnline ? 'Paid Online' : 'Pay at Hospital'}
                     </span>
                   </div>
                 </div>
@@ -875,12 +890,25 @@ export const BookToken: React.FC = () => {
                       <Receipt size={20} />
                     </div>
                     <div>
-                      <h4 className="text-sm font-black text-slate-900">InstaToken Booking Charges</h4>
-                      <p className="text-[11px] text-slate-500 font-medium">This is for our token booking service.</p>
+                      <h4 className="text-sm font-black text-slate-900">
+                        {isFullOnline ? 'Full Booking Breakdown' : 'InstaToken Booking Charges'}
+                      </h4>
+                      <p className="text-[11px] text-slate-500 font-medium">
+                        {isFullOnline ? 'Doctor consultation fee + token charges' : 'This is for our token booking service.'}
+                      </p>
                     </div>
                   </div>
 
                   <div className="space-y-2.5 text-xs">
+                    {isFullOnline && (
+                      <div className="flex justify-between items-center text-slate-700 font-bold">
+                        <div className="flex items-center gap-1.5">
+                          <span>Doctor Consultation Fee</span>
+                        </div>
+                        <span className="font-black text-slate-900">₹{docFee.toFixed(2)}</span>
+                      </div>
+                    )}
+
                     <div className="flex justify-between items-center text-slate-700 font-bold">
                       <div className="flex items-center gap-1.5">
                         <span>Platform Fee ({platformFeePercent || 5}%)</span>
@@ -908,7 +936,9 @@ export const BookToken: React.FC = () => {
                     <div className="flex justify-between items-center border-t border-blue-200 pt-3">
                       <div>
                         <span className="text-sm font-black text-slate-900 block leading-tight">Total Payable Now</span>
-                        <span className="text-[10px] text-slate-500 font-semibold">(InstaToken Booking Charges)</span>
+                        <span className="text-[10px] text-slate-500 font-semibold">
+                          {isFullOnline ? '(Consultation + Token Charges)' : '(InstaToken Booking Charges)'}
+                        </span>
                       </div>
                       <span className="text-2xl font-black text-blue-700 font-heading">₹{totalPayable.toFixed(2)}</span>
                     </div>

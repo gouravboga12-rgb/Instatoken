@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useHospital } from '../../context/HospitalContext';
-import { Activity, Eye, EyeOff, AlertCircle, ArrowRight, Building2, Shield, CheckCircle2 } from 'lucide-react';
+import { Activity, Eye, EyeOff, AlertCircle, ArrowRight, Building2, Shield, CheckCircle2, Banknote } from 'lucide-react';
 import { OTPModal } from '../../components/common/OTPModal';
 
 export const HospitalSignup: React.FC = () => {
@@ -23,6 +23,15 @@ export const HospitalSignup: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState(false);
   const [showOtpModal, setShowOtpModal] = useState(false);
+
+  // Payment Collection & Payout details state
+  const [paymentMode, setPaymentMode] = useState<'token_only' | 'full_online'>('token_only');
+  const [bankName, setBankName] = useState('');
+  const [bankAccountHolder, setBankAccountHolder] = useState('');
+  const [bankAccountNumber, setBankAccountNumber] = useState('');
+  const [bankIfsc, setBankIfsc] = useState('');
+  const [upiId, setUpiId] = useState('');
+  const [upiPhone, setUpiPhone] = useState('');
 
   const handleNextStep = (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,6 +56,13 @@ export const HospitalSignup: React.FC = () => {
       return;
     }
 
+    if (paymentMode === 'full_online') {
+      if (!bankName.trim() || !bankAccountHolder.trim() || !bankAccountNumber.trim() || !bankIfsc.trim()) {
+        setError('Please enter complete Bank Details (Bank Name, Holder, Account #, IFSC) for Full Online Payment.');
+        return;
+      }
+    }
+
     // Open OTP verification modal
     setShowOtpModal(true);
   };
@@ -68,7 +84,14 @@ export const HospitalSignup: React.FC = () => {
           city,
           address,
           category,
-          registrationNumber: regNo || `KA/HOS/2026/${Math.floor(1000 + Math.random() * 9000)}`
+          registrationNumber: regNo || `KA/HOS/2026/${Math.floor(1000 + Math.random() * 9000)}`,
+          payment_mode: paymentMode,
+          bank_account_holder: bankAccountHolder,
+          bank_account_number: bankAccountNumber,
+          bank_name: bankName,
+          bank_ifsc: bankIfsc.toUpperCase(),
+          upi_id: upiId,
+          upi_phone: upiPhone
         })
       });
 
@@ -102,6 +125,13 @@ export const HospitalSignup: React.FC = () => {
         city,
         address,
         registrationNumber: regNo || `KA/HOS/2026/${Math.floor(1000 + Math.random() * 9000)}`,
+        payment_mode: paymentMode,
+        bank_account_holder: bankAccountHolder,
+        bank_account_number: bankAccountNumber,
+        bank_name: bankName,
+        bank_ifsc: bankIfsc.toUpperCase(),
+        upi_id: upiId,
+        upi_phone: upiPhone
       });
 
       setLoading(false);
@@ -343,6 +373,111 @@ export const HospitalSignup: React.FC = () => {
                   required
                   className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none bg-slate-50"
                 />
+              </div>
+
+              {/* Patient Payment Collection Mode */}
+              <div className="pt-2 border-t border-slate-100">
+                <label className="text-xs font-black text-slate-800 block mb-1.5 uppercase tracking-wider">
+                  Patient Payment Collection Mode
+                </label>
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  <div
+                    onClick={() => setPaymentMode('token_only')}
+                    className={`p-2.5 rounded-xl border-2 cursor-pointer transition-all text-left ${
+                      paymentMode === 'token_only' ? 'border-blue-600 bg-blue-50/60' : 'border-slate-200 bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[11px] font-black text-slate-900">Pay at Hospital</span>
+                      <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${paymentMode === 'token_only' ? 'border-blue-600 bg-blue-600' : 'border-slate-300'}`}>
+                        {paymentMode === 'token_only' && <div className="w-1 h-1 bg-white rounded-full" />}
+                      </div>
+                    </div>
+                    <p className="text-[9.5px] text-slate-500 font-medium leading-tight">Patient pays doctor fee at cabin</p>
+                  </div>
+
+                  <div
+                    onClick={() => setPaymentMode('full_online')}
+                    className={`p-2.5 rounded-xl border-2 cursor-pointer transition-all text-left ${
+                      paymentMode === 'full_online' ? 'border-emerald-600 bg-emerald-50/60' : 'border-slate-200 bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[11px] font-black text-emerald-950 flex items-center gap-1">
+                        <Banknote size={12} className="text-emerald-600" />
+                        Full Online
+                      </span>
+                      <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${paymentMode === 'full_online' ? 'border-emerald-600 bg-emerald-600' : 'border-slate-300'}`}>
+                        {paymentMode === 'full_online' && <div className="w-1 h-1 bg-white rounded-full" />}
+                      </div>
+                    </div>
+                    <p className="text-[9.5px] text-slate-500 font-medium leading-tight">Full fee collected via Razorpay</p>
+                  </div>
+                </div>
+
+                {paymentMode === 'full_online' && (
+                  <div className="bg-emerald-50/50 border border-emerald-200/80 rounded-2xl p-3.5 space-y-2.5 animate-in fade-in duration-200 mb-2">
+                    <div className="flex items-center gap-1.5 text-emerald-800 text-xs font-black">
+                      <Building2 size={13} className="text-emerald-600" />
+                      <span>Settlement Bank Details (for receiving fees) *</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="text"
+                        value={bankName}
+                        onChange={e => setBankName(e.target.value)}
+                        placeholder="Bank Name (e.g. HDFC)"
+                        required={paymentMode === 'full_online'}
+                        className="w-full px-2.5 py-2 border border-slate-200 rounded-xl text-xs bg-white text-slate-800 outline-none"
+                      />
+                      <input
+                        type="text"
+                        value={bankAccountHolder}
+                        onChange={e => setBankAccountHolder(e.target.value)}
+                        placeholder="A/C Holder Name"
+                        required={paymentMode === 'full_online'}
+                        className="w-full px-2.5 py-2 border border-slate-200 rounded-xl text-xs bg-white text-slate-800 outline-none"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="text"
+                        value={bankAccountNumber}
+                        onChange={e => setBankAccountNumber(e.target.value)}
+                        placeholder="Account Number"
+                        required={paymentMode === 'full_online'}
+                        className="w-full px-2.5 py-2 border border-slate-200 rounded-xl text-xs bg-white text-slate-800 font-mono outline-none"
+                      />
+                      <input
+                        type="text"
+                        value={bankIfsc}
+                        onChange={e => setBankIfsc(e.target.value.toUpperCase())}
+                        placeholder="IFSC Code"
+                        required={paymentMode === 'full_online'}
+                        className="w-full px-2.5 py-2 border border-slate-200 rounded-xl text-xs bg-white text-slate-800 font-mono uppercase outline-none"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 pt-1 border-t border-emerald-100">
+                      <input
+                        type="text"
+                        value={upiId}
+                        onChange={e => setUpiId(e.target.value)}
+                        placeholder="UPI ID (e.g. hosp@okhdfc)"
+                        className="w-full px-2.5 py-2 border border-slate-200 rounded-xl text-xs bg-white text-slate-800 outline-none"
+                      />
+                      <input
+                        type="tel"
+                        value={upiPhone}
+                        onChange={e => setUpiPhone(e.target.value)}
+                        placeholder="UPI Phone (Optional)"
+                        className="w-full px-2.5 py-2 border border-slate-200 rounded-xl text-xs bg-white text-slate-800 outline-none"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               {error && (

@@ -471,6 +471,7 @@ const AppContent: React.FC = () => {
           <Route path="/admin-login" element={<AdminGuard><Navigate to="/admin" replace /></AdminGuard>} />
           <Route path="/admin/banners" element={<AdminGuard><AdminDashboard initialTab="banners" /></AdminGuard>} />
           <Route path="/admin/ads-inquiries" element={<AdminGuard><AdminDashboard initialTab="ads-inquiries" /></AdminGuard>} />
+          <Route path="/admin/payouts" element={<AdminGuard><AdminDashboard initialTab="hospital-payouts" /></AdminGuard>} />
 
           {/* Hospital Panel routes */}
           <Route path="/hospital-login" element={<HospitalLogin />} />

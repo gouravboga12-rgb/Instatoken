@@ -1440,6 +1440,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const patientsAhead = Math.max(0, tokenAssigned - targetDoc.currentQueue - 1);
     const computedWaitTime = Math.max(0, patientsAhead * targetDoc.estimatedWaitPerPatient);
 
+    const isFullOnline = targetHosp.payment_mode === 'full_online' || (targetHosp as any).paymentMode === 'full_online';
+
     // Calculate dynamic booking charges breakdown matching Image 78
     const baseConsultation = targetDoc.consultationFee || 500;
     const platformFee = patientDetails.platformFee !== undefined
@@ -1448,9 +1450,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const gatewayFee = patientDetails.gatewayFee !== undefined ? patientDetails.gatewayFee : 1.5;
     const taxableAmount = platformFee + gatewayFee;
     const gstFee = patientDetails.gstFee !== undefined ? patientDetails.gstFee : parseFloat((taxableAmount * 0.18).toFixed(2));
+    const tokenCharges = parseFloat((taxableAmount + gstFee).toFixed(2));
     const totalFee = patientDetails.totalBookingCharges !== undefined
       ? patientDetails.totalBookingCharges
-      : parseFloat((taxableAmount + gstFee).toFixed(2));
+      : (isFullOnline ? parseFloat((baseConsultation + tokenCharges).toFixed(2)) : tokenCharges);
 
     const ref = patientDetails.doctorReference || patientDetails.rmpReference || null;
 
@@ -1532,8 +1535,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       queuePosition: patientsAhead + 1,
       estimatedWait: computedWaitTime,
       consultationFee: newAppt.fee,
-      paymentStatus: 'pending' as const, // Consultation fee collected at hospital desk/cabin
-      paymentMethod: 'Pay at Hospital',
+      paymentStatus: isFullOnline ? ('paid' as const) : ('pending' as const), // Full online marks as paid in advance
+      paymentMethod: isFullOnline ? 'Razorpay (Full Online)' : 'Pay at Hospital',
+      paymentCollection: {
+        mode: isFullOnline ? 'full_online' : 'token_only',
+        consultationFee: newAppt.fee,
+        platformFee,
+        totalAmountPaid: totalFee,
+        settlementStatus: isFullOnline ? 'unsettled' : 'not_applicable',
+        settlementId: null,
+        settledAt: null
+      },
       isRevisit: Boolean(patientDetails.isExisting),
       isExisting: Boolean(patientDetails.isExisting),
       doctorReference: ref,

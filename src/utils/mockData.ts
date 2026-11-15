@@ -66,6 +66,14 @@ export interface Hospital {
   village?: string;
   area?: string;
   status?: 'active' | 'disabled';
+  payment_mode?: 'token_only' | 'full_online' | string;
+  paymentMode?: 'token_only' | 'full_online' | string;
+  bank_account_holder?: string;
+  bank_account_number?: string;
+  bank_name?: string;
+  bank_ifsc?: string;
+  upi_id?: string;
+  upi_phone?: string;
 }
 
 export interface CustomerBooking {

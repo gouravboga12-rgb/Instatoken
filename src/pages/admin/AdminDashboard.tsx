@@ -12,13 +12,14 @@ import {
   Users, UserCheck, UserX,
   AlertTriangle, Download, X, Calendar, Upload, User,
   MapPin, Trash2, Loader2, LogOut, Mail, Phone, PhoneCall, Megaphone,
-  Eye, Send, ChevronDown
+  Eye, Send, ChevronDown, Banknote
 } from 'lucide-react';
 import { LocationBanners } from './LocationBanners';
 import { AdsInquiries } from './AdsInquiries';
+import { HospitalPayoutsManagement } from './HospitalPayoutsManagement';
 
 interface AdminDashboardProps {
-  initialTab?: 'stats' | 'hospitals' | 'customers' | 'financials' | 'add-hospital' | 'add-doctor' | 'banners' | 'ads-inquiries';
+  initialTab?: 'stats' | 'hospitals' | 'customers' | 'financials' | 'add-hospital' | 'add-doctor' | 'banners' | 'ads-inquiries' | 'hospital-payouts';
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) => {
@@ -34,11 +35,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
   const [isDeletingHosp, setIsDeletingHosp] = useState(false);
 
   const [adminTab, setAdminTab] = useState<
-    'stats' | 'hospitals' | 'customers' | 'financials' | 'add-hospital' | 'add-doctor' | 'banners' | 'ads-inquiries'
+    'stats' | 'hospitals' | 'customers' | 'financials' | 'add-hospital' | 'add-doctor' | 'banners' | 'ads-inquiries' | 'hospital-payouts'
   >(() => {
     if (initialTab) return initialTab;
     if (location.pathname === '/admin/banners') return 'banners';
     if (location.pathname === '/admin/ads-inquiries') return 'ads-inquiries';
+    if (location.pathname === '/admin/payouts') return 'hospital-payouts';
     return 'stats';
   });
 
@@ -487,6 +489,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
             </button>
 
             <button
+              onClick={() => setAdminTab('hospital-payouts')}
+              className={`w-full text-left px-3.5 py-2 text-xs font-bold rounded-xl flex items-center justify-between transition-all cursor-pointer border-none ${
+                adminTab === 'hospital-payouts' ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <Banknote size={15} /> Hospital Payouts
+              </div>
+              <span className="bg-emerald-500/20 text-[9px] font-extrabold px-2 py-0.5 rounded-full text-emerald-300">
+                Escrow
+              </span>
+            </button>
+
+            <button
               onClick={() => setAdminTab('banners')}
               className={`w-full text-left px-3.5 py-2 text-xs font-bold rounded-xl flex items-center justify-between transition-all cursor-pointer border-none ${
                 adminTab === 'banners' ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
@@ -560,7 +576,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
 
           {/* Mobile Nav Tabs */}
           <div className="flex overflow-x-auto px-2 border-b border-slate-800 text-[10px] font-bold uppercase tracking-wider no-scrollbar">
-            {(['stats', 'hospitals', 'customers', 'banners', 'ads-inquiries', 'financials'] as const).map(tab => (
+            {(['stats', 'hospitals', 'customers', 'banners', 'ads-inquiries', 'financials', 'hospital-payouts'] as const).map(tab => (
               <button
                 key={tab}
                 onClick={() => setAdminTab(tab)}
@@ -568,7 +584,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                   adminTab === tab ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400'
                 }`}
               >
-                {tab === 'stats' ? 'Overview' : tab === 'hospitals' ? 'Hospitals' : tab === 'customers' ? 'Customers' : tab === 'banners' ? 'Banners' : tab === 'ads-inquiries' ? 'Ads Inquiries' : 'Revenue'}
+                {tab === 'stats' ? 'Overview' : tab === 'hospitals' ? 'Hospitals' : tab === 'customers' ? 'Customers' : tab === 'banners' ? 'Banners' : tab === 'ads-inquiries' ? 'Ads Inquiries' : tab === 'financials' ? 'Revenue' : 'Payouts'}
               </button>
             ))}
           </div>
@@ -2233,7 +2249,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
           </div>
         )}
 
-
+        {/* ── TAB: HOSPITAL FULL ONLINE PAYOUTS & SETTLEMENTS ───────────── */}
+        {adminTab === 'hospital-payouts' && (
+          <div className="animate-in fade-in duration-200">
+            <HospitalPayoutsManagement />
+          </div>
+        )}
 
         {/* ── TAB 7: REGISTER HOSPITAL FORM ───────────────────────────── */}
         {adminTab === 'add-hospital' && (
