@@ -867,7 +867,7 @@ export const BookToken: React.FC = () => {
                         <Info size={13} className="text-slate-400" />
                       </div>
                       <p className="text-[11px] text-slate-500 font-semibold mt-0.5">
-                        {isFullOnline ? 'Paid online now with InstaToken.' : 'Pay directly at the hospital.'}
+                        {isFullOnline ? 'Pay online now with InstaToken.' : 'Pay directly at the hospital.'}
                       </p>
                     </div>
                   </div>
@@ -878,7 +878,7 @@ export const BookToken: React.FC = () => {
                       isFullOnline ? 'bg-blue-700 text-white' : 'bg-emerald-700 text-white'
                     }`}>
                       {isFullOnline ? <ShieldCheck size={10} /> : <Building2 size={10} />}
-                      {isFullOnline ? 'Paid Online' : 'Pay at Hospital'}
+                      {isFullOnline ? 'Pay Online' : 'Pay at Hospital'}
                     </span>
                   </div>
                 </div>
