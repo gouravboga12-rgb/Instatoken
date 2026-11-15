@@ -4,9 +4,9 @@ import { useHospital } from '../../context/HospitalContext';
 import type { TokenRecord } from '../../context/HospitalContext';
 import {
   CheckCircle, Clock, Play,
-  XCircle, Calendar, Search, Tv,
+  XCircle, Calendar, Search,
   Printer, Eye, Phone, Wifi, WifiOff,
-  Volume2, Stethoscope, Sparkles, X, UserX, Trash2,
+  Volume2, Stethoscope, Sparkles, UserX, Trash2,
   Wallet
 } from 'lucide-react';
 import { TokenPaymentModal } from '../../components/hospital/TokenPaymentModal';
@@ -27,12 +27,11 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSessionFilter, setSelectedSessionFilter] = useState('all');
 
-  // Modals & Full-Screen TV Display Mode
+  // Modals
   const [viewToken, setViewToken] = useState<TokenRecord | null>(null);
   const [printToken, setPrintToken] = useState<TokenRecord | null>(null);
   const [visitingToken, setVisitingToken] = useState<TokenRecord | null>(null);
   const [paymentTargetToken, setPaymentTargetToken] = useState<TokenRecord | null>(null);
-  const [tvMode, setTvMode] = useState(false);
 
   const todayStr = new Date().toISOString().split('T')[0];
   const tomorrowStr = new Date(Date.now() + 86400000).toISOString().split('T')[0];
@@ -323,12 +322,6 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
             <Stethoscope size={14} className="text-blue-600" />
             <span>Doctor Cabin Token Monitors ({doctors.length} Doctors Available)</span>
           </span>
-          <button
-            onClick={() => setTvMode(true)}
-            className="text-xs font-bold px-3 py-1 bg-slate-900 hover:bg-slate-800 text-white rounded-xl flex items-center gap-1.5 cursor-pointer border-none transition-colors"
-          >
-            <Tv size={13} /> Fullscreen TV Display
-          </button>
         </div>
 
         <div className="flex items-center gap-2.5 overflow-x-auto pb-1">
@@ -957,103 +950,6 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
           </table>
         </div>
       </div>
-
-      {/* ── Waiting Room / TV Display Modal ───────────────────────────────── */}
-      {tvMode && (
-        <div className="fixed inset-0 bg-slate-950 text-white z-50 p-8 flex flex-col justify-between overflow-hidden">
-          <div className="flex items-center justify-between border-b border-white/10 pb-4">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center font-black text-2xl">
-                🏥
-              </div>
-              <div>
-                <h1 className="text-2xl font-black text-white">{hospitalProfile?.name || 'City Care Multi-Specialty Hospital'}</h1>
-                <p className="text-sm text-blue-300 font-bold">OPD Cabin Monitor · {doctor.name} ({doctor.specialization})</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <div className="text-right">
-                <div className="text-xl font-black text-emerald-400">
-                  {new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
-                </div>
-                <div className="text-xs text-slate-400 font-bold">{new Date().toDateString()}</div>
-              </div>
-              <button
-                onClick={() => setTvMode(false)}
-                className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold cursor-pointer border-none"
-              >
-                <X size={20} />
-              </button>
-            </div>
-          </div>
-
-          {/* Big TV Screen Center Display */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 my-auto">
-            {/* Now Serving Big Box (8 cols) */}
-            <div className="lg:col-span-8 bg-linear-to-br from-blue-900/60 to-slate-900 border-2 border-blue-500/40 rounded-3xl p-10 flex flex-col justify-center items-center text-center space-y-4 shadow-2xl">
-              <span className="px-4 py-1.5 rounded-full bg-emerald-500/20 text-emerald-400 font-black text-sm uppercase tracking-widest border border-emerald-500/30 animate-pulse">
-                NOW SERVING IN CABIN
-              </span>
-
-              {inConsultation ? (
-                <>
-                  <div className="text-9xl font-black tracking-tight text-white drop-shadow-lg">
-                    #{inConsultation.tokenNo}
-                  </div>
-                  <h2 className="text-4xl font-black text-white">{inConsultation.patientName}</h2>
-                  <p className="text-lg text-blue-200 font-bold">
-                    Session: {inConsultation.session.toUpperCase()} OPD · Doctor: {doctor.name}
-                  </p>
-                </>
-              ) : (
-                <div className="py-12">
-                  <div className="text-6xl font-black text-slate-500">CABIN READY</div>
-                  <p className="text-lg text-slate-400 font-bold mt-2">Doctor will call the next patient shortly</p>
-                </div>
-              )}
-            </div>
-
-            {/* Next in line column (4 cols) */}
-            <div className="lg:col-span-4 bg-white/5 border border-white/10 rounded-3xl p-6 flex flex-col justify-between">
-              <div>
-                <h3 className="text-sm font-black uppercase tracking-widest text-slate-400 mb-4 pb-2 border-b border-white/10">
-                  NEXT IN LINE ({nextInLine.length})
-                </h3>
-
-                <div className="space-y-3">
-                  {nextInLine.slice(0, 5).map((tok, idx) => (
-                    <div key={tok.id} className="flex items-center justify-between p-3.5 rounded-2xl bg-white/5 border border-white/5">
-                      <div className="flex items-center gap-3">
-                        <span className="w-8 h-8 rounded-xl bg-blue-600/30 text-blue-300 font-black flex items-center justify-center text-sm">
-                          {idx + 1}
-                        </span>
-                        <div>
-                          <div className="font-extrabold text-sm text-white">#{tok.tokenNo} · {tok.patientName}</div>
-                          <div className="text-[10px] text-slate-400">{tok.patientAge}y · {tok.patientGender}</div>
-                        </div>
-                      </div>
-                      <span className="text-xs font-bold text-amber-400">Waiting</span>
-                    </div>
-                  ))}
-
-                  {nextInLine.length === 0 && (
-                    <p className="text-xs text-slate-500 font-bold text-center py-6">No more patients waiting in queue.</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="text-center pt-4 border-t border-white/10 text-xs text-slate-400 font-medium">
-                Please be seated. Your token will be called on this screen.
-              </div>
-            </div>
-          </div>
-
-          <div className="text-center text-xs text-slate-500 font-semibold border-t border-white/10 pt-3">
-            InstaToken Live Cabin Queue System · Turn-by-Turn Real-Time Sync
-          </div>
-        </div>
-      )}
 
       {/* ── Token Detail Modal ────────────────────────────────────────────── */}
       {viewToken && (
