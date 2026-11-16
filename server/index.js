@@ -4572,7 +4572,18 @@ app.get('/api/hospitals/:hospitalId/payout-summary', requireHospitalAuth, async 
     totalCollectedOnline,
     totalSettled: settledCount || totalSettled,
     pendingDue,
-    unsettledCount: unsettledTokens.length
+    unsettledCount: unsettledTokens.length,
+    unsettledTokens: unsettledTokens.map(t => ({
+      id: t.id,
+      tokenNo: t.tokenNo || t.tokenNumber || 1,
+      patientName: t.patientName || (t.data && t.data.patientName) || 'Patient',
+      doctorName: t.doctorName || (t.data && t.data.doctorName) || 'Doctor',
+      departmentName: t.departmentName || (t.data && t.data.departmentName) || 'General',
+      consultationFee: Number(t.paymentCollection?.consultationFee || t.consultationFee || t.fee || 0),
+      bookingDate: t.bookingDate || t.date || (t.createdAt ? t.createdAt.split('T')[0] : 'Today'),
+      paymentMethod: t.paymentMethod || 'Razorpay (Full Online)',
+      status: t.status || 'booked'
+    }))
   });
 });
 

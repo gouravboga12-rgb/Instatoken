@@ -393,12 +393,12 @@ export const TokenConfirmation: React.FC = () => {
             {/* 3. Doctor Consultation Fee Card */}
             {(() => {
               const fee = Number(appointment.fee) || 250;
-              const totalPaid = Number(appointment.totalFee) || (fee + 17.11);
-              const isFullOnlineBooking = (hospitalObj as any)?.payment_mode === 'full_online' ||
-                (appointment as any)?.collectionMode === 'full_online' ||
-                (appointment as any)?.paymentCollection?.mode === 'full_online' ||
-                (appointment as any)?.paymentMethod?.toLowerCase().includes('full online') ||
-                totalPaid > (fee + 5);
+              const totalPaid = Number(appointment.totalFee || 0);
+              const pc = (appointment as any)?.paymentCollection;
+              const isFullOnlineBooking = (appointment as any)?.collectionMode === 'full_online' ||
+                (pc && pc.mode === 'full_online') ||
+                ((appointment as any)?.paymentMethod && (appointment as any).paymentMethod.toLowerCase().includes('full online')) ||
+                (fee > 0 && totalPaid >= fee && totalPaid > 60);
 
               return (
                 <div className="space-y-3">

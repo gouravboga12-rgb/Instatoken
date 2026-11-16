@@ -2055,13 +2055,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
               const ledgerAppts = filterByDateRange(allHospAppts, ledgerDateFilter, ledgerStartDate, ledgerEndDate);
 
               const isFullOnlineBooking = (a: any) => {
-                return a.collectionMode === 'full_online' ||
-                  (a.data && a.data.collectionMode === 'full_online') ||
-                  (a.data && a.data.paymentCollection && a.data.paymentCollection.mode === 'full_online') ||
-                  (a.paymentCollection && a.paymentCollection.mode === 'full_online') ||
-                  (a.paymentMethod && a.paymentMethod.toLowerCase().includes('full online')) ||
-                  (Number(a.totalFee || 0) > (Number(a.fee || 0) + 5)) ||
-                  hosp.payment_mode === 'full_online';
+                const pc = a.paymentCollection || (a.data && a.data.paymentCollection);
+                if (pc && pc.mode === 'full_online') return true;
+                if (a.collectionMode === 'full_online' || (a.data && a.data.collectionMode === 'full_online')) return true;
+                if (a.paymentMethod && a.paymentMethod.toLowerCase().includes('full online')) return true;
+                const totFee = Number(a.totalFee || (a.data && a.data.totalFee) || 0);
+                const docFee = Number(a.fee || (a.data && a.data.fee) || 0);
+                if (docFee > 0 && totFee >= docFee && totFee > 60) return true;
+                return false;
               };
 
               const ledgerDocTotal = ledgerAppts.reduce((sum, a) => sum + (Number(a.fee) || 500), 0);

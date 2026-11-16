@@ -13,6 +13,17 @@ interface PayoutSummary {
   totalSettled: number;
   pendingDue: number;
   unsettledCount: number;
+  unsettledTokens?: Array<{
+    id: string;
+    tokenNo: number | string;
+    patientName: string;
+    doctorName: string;
+    departmentName: string;
+    consultationFee: number;
+    bookingDate: string;
+    paymentMethod: string;
+    status: string;
+  }>;
 }
 
 interface Settlement {
@@ -289,14 +300,40 @@ export const HospitalPayouts: React.FC = () => {
                     <p className="text-xs text-slate-400 mt-1">InstaToken has settled all pending doctor consultation fees.</p>
                   </div>
                 ) : (
-                  <div className="space-y-1">
-                    <p className="text-xs text-slate-500 font-semibold mb-3">
+                  <div className="space-y-3">
+                    <p className="text-xs text-slate-500 font-semibold mb-2">
                       These are doctor consultation fees collected online from patients, pending transfer to your bank.
                     </p>
-                    <div className="text-center py-8 text-xs text-slate-400 font-semibold">
-                      <TrendingUp size={24} className="mx-auto mb-2 text-slate-300" />
-                      Detailed per-token breakdown will appear here once visits are marked Completed by your doctors.
-                    </div>
+                    {summary?.unsettledTokens && summary.unsettledTokens.length > 0 ? (
+                      <div className="divide-y divide-slate-100 border border-slate-200 rounded-2xl overflow-hidden bg-white">
+                        {summary.unsettledTokens.map((t) => (
+                          <div key={t.id} className="p-3.5 sm:p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                            <div className="flex items-center gap-3">
+                              <span className="font-extrabold text-blue-600 bg-blue-50 border border-blue-100 px-2.5 py-1 rounded-xl text-xs shrink-0">
+                                #{t.tokenNo}
+                              </span>
+                              <div>
+                                <h4 className="font-black text-slate-900 text-sm">{t.patientName}</h4>
+                                <p className="text-[11px] text-slate-500 font-medium">
+                                  {t.doctorName} · <span className="text-blue-600 font-semibold">{t.departmentName}</span>
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <span className="font-black text-slate-900 text-base">₹{t.consultationFee}</span>
+                              <span className="text-[9.5px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full block mt-0.5 border border-blue-100">
+                                ● Due to Hospital
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-xs text-slate-400 font-semibold">
+                        <TrendingUp size={24} className="mx-auto mb-2 text-slate-300" />
+                        Detailed per-token breakdown will appear here.
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
