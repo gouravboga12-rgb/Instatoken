@@ -57,6 +57,7 @@ export interface Appointment {
   gatewayFee?: number;
   gstFee?: number;
   totalFee?: number;
+  collectionMode?: 'full_online' | 'token_only';
   status: 'booked' | 'checked-in' | 'in-cabin' | 'completed' | 'cancelled';
   session?: 'morning' | 'afternoon' | 'evening';
   paymentId: string;
@@ -1501,6 +1502,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       gstFee,
       totalFee,
       status: 'booked',
+      collectionMode: isFullOnline ? 'full_online' : 'token_only',
       paymentId: customPaymentId || `PAYID-${Math.floor(1000000 + Math.random() * 9000000)}`,
       paymentMethod,
       estimatedWaitTime: computedWaitTime,

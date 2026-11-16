@@ -2054,7 +2054,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
               // Filter ledger appointments by ledger date filter
               const ledgerAppts = filterByDateRange(allHospAppts, ledgerDateFilter, ledgerStartDate, ledgerEndDate);
 
+              const isFullOnlineBooking = (a: any) => {
+                return a.collectionMode === 'full_online' ||
+                  (a.data && a.data.collectionMode === 'full_online') ||
+                  (a.data && a.data.paymentCollection && a.data.paymentCollection.mode === 'full_online') ||
+                  (a.paymentCollection && a.paymentCollection.mode === 'full_online') ||
+                  (a.paymentMethod && a.paymentMethod.toLowerCase().includes('full online')) ||
+                  (Number(a.totalFee || 0) > (Number(a.fee || 0) + 5)) ||
+                  hosp.payment_mode === 'full_online';
+              };
+
               const ledgerDocTotal = ledgerAppts.reduce((sum, a) => sum + (Number(a.fee) || 500), 0);
+              const ledgerOnlineDocTotal = ledgerAppts.filter(isFullOnlineBooking).reduce((sum, a) => sum + (Number(a.fee) || 500), 0);
+              const ledgerOfflineDocTotal = ledgerDocTotal - ledgerOnlineDocTotal;
               const ledgerPlatTotal = ledgerAppts.reduce((sum, a) => 
                 sum + (Number(a.platformFee) || Math.max(10, Math.round((Number(a.fee) || 500) * (platformFeePercent / 100)))), 0);
 
@@ -2139,10 +2151,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                       <div className="p-4 bg-emerald-50/70 border border-emerald-100 rounded-2xl space-y-1">
                         <div className="flex items-center justify-between">
                           <span className="text-[10px] font-black text-emerald-800 uppercase tracking-wide">Doctor Fees Volume</span>
-                          <span className="text-[9px] font-bold bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">Hospital Desk</span>
+                          <span className="text-[9px] font-bold bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">
+                            {ledgerOnlineDocTotal > 0 ? 'Full Online + Desk' : 'Hospital Desk'}
+                          </span>
                         </div>
                         <p className="text-2xl font-black text-emerald-900 font-heading">₹{ledgerDocTotal.toLocaleString('en-IN')}</p>
-                        <span className="text-[10px] text-emerald-700 font-semibold block">Collected at hospital OPD counter</span>
+                        <span className="text-[10px] text-emerald-700 font-semibold block">
+                          {ledgerOnlineDocTotal > 0 
+                            ? `₹${ledgerOnlineDocTotal.toLocaleString('en-IN')} Online (Due to Hosp) · ₹${ledgerOfflineDocTotal.toLocaleString('en-IN')} OPD Desk` 
+                            : 'Collected at hospital OPD counter'}
+                        </span>
                       </div>
 
                       <div className="p-4 bg-blue-50/70 border border-blue-100 rounded-2xl space-y-1">
@@ -2186,6 +2204,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                             ledgerAppts.map((appt) => {
                               const fee = Number(appt.fee) || 500;
                               const platFee = Number(appt.platformFee) || Math.max(10, Math.round(fee * (platformFeePercent / 100)));
+                              const isFullOnline = isFullOnlineBooking(appt);
                               const istDate = new Intl.DateTimeFormat('en-IN', {
                                 timeZone: 'Asia/Kolkata',
                                 day: '2-digit',
@@ -2213,15 +2232,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                                   </td>
                                   <td className="py-2.5 px-3">
                                     <span className="font-black text-slate-900">₹{fee}</span>
-                                    <span className="text-[10px] text-slate-400 block">At Hospital OPD</span>
+                                    {isFullOnline ? (
+                                      <span className="text-[9.5px] font-black text-blue-600 block bg-blue-50 px-1.5 py-0.5 rounded mt-0.5 w-fit">
+                                        ● Paid Online (Due)
+                                      </span>
+                                    ) : (
+                                      <span className="text-[10px] text-slate-400 block">At Hospital OPD</span>
+                                    )}
                                   </td>
                                   <td className="py-2.5 px-3">
                                     <span className="font-black text-blue-600">₹{platFee}</span>
                                     <span className="text-[10px] text-emerald-600 block">Paid Online</span>
                                   </td>
                                   <td className="py-2.5 px-3">
-                                    <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full text-[10px] font-extrabold">
-                                      <CheckCircle2 size={10} /> Paid · {appt.paymentMethod || 'Razorpay / UPI'}
+                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+                                      isFullOnline ? 'bg-blue-50 text-blue-700' : 'bg-emerald-50 text-emerald-700'
+                                    }`}>
+                                      <CheckCircle2 size={10} /> {isFullOnline ? 'Full Online · RAZORPAY' : `Paid · ${appt.paymentMethod || 'RAZORPAY'}`}
                                     </span>
                                   </td>
                                   <td className="py-2.5 px-3 text-right">

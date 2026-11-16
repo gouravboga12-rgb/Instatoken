@@ -391,45 +391,83 @@ export const TokenConfirmation: React.FC = () => {
             </div>
 
             {/* 3. Doctor Consultation Fee Card */}
-            <div className="bg-gradient-to-r from-emerald-50/80 to-teal-50/80 border border-emerald-200 rounded-2xl p-4 flex items-center justify-between">
-              <div className="space-y-0.5">
-                <span className="text-[9px] font-black text-emerald-800 uppercase tracking-wider flex items-center gap-1">
-                  <CreditCard size={12} className="text-emerald-600" /> DOCTOR CONSULTATION FEE
-                </span>
-                <span className="text-3xl font-black text-slate-900 block font-heading">₹{appointment.fee || 500}</span>
-                <p className="text-[10px] text-emerald-900/70 font-semibold">Pay directly at doctor's cabin / OPD desk</p>
-              </div>
+            {(() => {
+              const fee = Number(appointment.fee) || 250;
+              const totalPaid = Number(appointment.totalFee) || (fee + 17.11);
+              const isFullOnlineBooking = (hospitalObj as any)?.payment_mode === 'full_online' ||
+                (appointment as any)?.collectionMode === 'full_online' ||
+                (appointment as any)?.paymentCollection?.mode === 'full_online' ||
+                (appointment as any)?.paymentMethod?.toLowerCase().includes('full online') ||
+                totalPaid > (fee + 5);
 
-              <div className="text-right">
-                <span className="bg-emerald-700 text-white text-[10px] font-black px-3 py-1 rounded-md inline-block uppercase shadow-sm">
-                  PAY AT HOSPITAL
-                </span>
-                <h5 className="text-[10px] font-black text-slate-700 mt-1">
-                  Pay at Doctor Cabin / OPD Desk
-                </h5>
-              </div>
-            </div>
+              return (
+                <div className="space-y-3">
+                  <div className={`border rounded-2xl p-4 flex items-center justify-between shadow-2xs ${
+                    isFullOnlineBooking 
+                      ? 'bg-blue-50/80 border-blue-200' 
+                      : 'bg-gradient-to-r from-emerald-50/80 to-teal-50/80 border-emerald-200'
+                  }`}>
+                    <div className="space-y-0.5">
+                      <span className={`text-[9px] font-black uppercase tracking-wider flex items-center gap-1 ${
+                        isFullOnlineBooking ? 'text-blue-800' : 'text-emerald-800'
+                      }`}>
+                        <CreditCard size={12} className={isFullOnlineBooking ? 'text-blue-600' : 'text-emerald-600'} /> 
+                        DOCTOR CONSULTATION FEE
+                      </span>
+                      <span className="text-3xl font-black text-slate-900 block font-heading">₹{fee}</span>
+                      <p className={`text-[10.5px] font-semibold ${isFullOnlineBooking ? 'text-blue-900/80' : 'text-emerald-900/70'}`}>
+                        {isFullOnlineBooking 
+                          ? 'Paid in advance online via InstaToken Razorpay.' 
+                          : 'Pay directly at doctor\'s cabin / OPD desk.'}
+                      </p>
+                    </div>
 
-            {/* Token Booking Charges Paid Online with GST */}
-            <div className="bg-blue-50/80 border border-blue-200/80 rounded-2xl p-3.5 space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <ShieldCheck size={16} className="text-blue-600 shrink-0" />
-                  <div>
-                    <span className="text-xs font-black text-slate-800 block">InstaToken Booking Charges (Paid Online)</span>
-                    <span className="text-[10px] text-slate-500 font-semibold">Ref: {appointment.paymentId}</span>
+                    <div className="text-right">
+                      <span className={`text-[10px] font-black px-3 py-1 rounded-md inline-flex items-center gap-1 uppercase shadow-sm ${
+                        isFullOnlineBooking 
+                          ? 'bg-blue-700 text-white' 
+                          : 'bg-emerald-700 text-white'
+                      }`}>
+                        {isFullOnlineBooking && <ShieldCheck size={11} />}
+                        {isFullOnlineBooking ? 'PAID ONLINE (ADVANCE)' : 'PAY AT HOSPITAL'}
+                      </span>
+                      <h5 className="text-[10px] font-black text-slate-600 mt-1">
+                        {isFullOnlineBooking ? 'No counter payment needed' : 'Pay at Doctor Cabin / OPD Desk'}
+                      </h5>
+                    </div>
+                  </div>
+
+                  {/* Token Booking Charges Paid Online with GST */}
+                  <div className="bg-blue-50/80 border border-blue-200/80 rounded-2xl p-3.5 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <ShieldCheck size={16} className="text-blue-600 shrink-0" />
+                        <div>
+                          <span className="text-xs font-black text-slate-800 block">
+                            {isFullOnlineBooking ? 'Total Payment Summary (Paid Online)' : 'InstaToken Booking Charges (Paid Online)'}
+                          </span>
+                          <span className="text-[10px] text-slate-500 font-semibold">Ref: {appointment.paymentId}</span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-base font-black text-blue-700 block">₹{totalPaid.toFixed(2)}</span>
+                        <span className="text-[9px] font-black text-emerald-700 uppercase">
+                          Paid Online ({appointment.paymentMethod || 'Razorpay'})
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-[10px] text-slate-500 font-medium border-t border-blue-100 pt-1.5 flex justify-between">
+                      <span>
+                        {isFullOnlineBooking 
+                          ? `Doctor Fee (₹${fee}) + Booking Charges & GST (₹${(totalPaid - fee).toFixed(2)})`
+                          : 'Includes Platform Fee + Gateway Fee + 18% GST'}
+                      </span>
+                      <span className="font-bold text-slate-700">Official InstaToken Digital Pass</span>
+                    </div>
                   </div>
                 </div>
-                <div className="text-right">
-                  <span className="text-base font-black text-blue-700 block">₹{appointment.totalFee || appointment.platformFee || 19.47}</span>
-                  <span className="text-[9px] font-black text-emerald-700 uppercase">Paid Online ({appointment.paymentMethod || 'Online'})</span>
-                </div>
-              </div>
-              <div className="text-[10px] text-slate-500 font-medium border-t border-blue-100 pt-1.5 flex justify-between">
-                <span>Includes Platform Fee + Gateway Fee + 18% GST</span>
-                <span className="font-bold text-slate-700">Official InstaToken Digital Pass</span>
-              </div>
-            </div>
+              );
+            })()}
 
             {/* 4. Consultation Validity Dates Banner */}
             <div className="bg-emerald-50 border border-emerald-200/80 rounded-2xl p-3 flex items-center justify-between">

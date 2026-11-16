@@ -3772,6 +3772,10 @@ app.post('/api/appointments', async (req, res) => {
 
   store.appointments = [appt, ...store.appointments.filter(a => a.id !== appt.id)];
 
+  const isFullOnlineBooking = appt.collectionMode === 'full_online' || 
+    appt.paymentMethod?.toLowerCase().includes('full online') ||
+    (Number(appt.totalFee || 0) > (Number(appt.fee || 0) + 5));
+
   const tokenRecord = {
     id: appt.id,
     tokenNo: appt.tokenNumber,
@@ -3794,8 +3798,15 @@ app.post('/api/appointments', async (req, res) => {
     gatewayFee: appt.gatewayFee || 1.5,
     gstFee: appt.gstFee || 2.97,
     totalFee: appt.totalFee || appt.totalBookingCharges || 19.47,
-    paymentStatus: 'pending',
-    paymentMethod: 'Pay at Hospital',
+    paymentStatus: isFullOnlineBooking ? 'paid' : 'pending',
+    paymentMethod: isFullOnlineBooking ? 'Razorpay (Full Online)' : (appt.paymentMethod || 'Pay at Hospital'),
+    paymentCollection: {
+      mode: isFullOnlineBooking ? 'full_online' : 'token_only',
+      consultationFee: appt.fee || 500,
+      platformFee: appt.platformFee || 15,
+      totalAmountPaid: appt.totalFee || 19.47,
+      settlementStatus: isFullOnlineBooking ? 'unsettled' : 'not_applicable'
+    },
     paymentId: appt.paymentId,
     hospitalId: appt.hospitalId,
     hospitalName: appt.hospitalName,
@@ -4507,18 +4518,33 @@ app.get('/api/hospitals/:hospitalId/payout-summary', requireHospitalAuth, async 
     bankDetails = prof;
   }
 
-  // Get completed tokens with full_online payment collection
+  // Get tokens with full_online payment collection (both booked and completed)
   let totalCollectedOnline = 0;
   let totalSettled = 0;
   let unsettledTokens = [];
 
-  const allTokens = [...(store.tokens || []), ...(store.appointments || []).map(a => ({ ...a, status: a.status }))];
-  const hospTokens = allTokens.filter(t => t.hospitalId === hospitalId && t.status === 'completed');
+  const allTokens = [...(store.tokens || []), ...(store.appointments || []).map(a => ({ ...a, consultationFee: a.fee }))];
+  const seenIds = new Set();
+  const hospTokens = [];
+  allTokens.forEach(t => {
+    // Match this hospital, or if hosp-mu0838sg and hosp-gandhi are aliases of Gandi Hospital
+    const matchesHosp = t.hospitalId === hospitalId || 
+      ((hospitalId === 'hosp-mu0838sg' || hospitalId === 'hosp-gandhi') && (t.hospitalId === 'hosp-mu0838sg' || t.hospitalId === 'hosp-gandhi'));
+    if (matchesHosp && t.id && !seenIds.has(t.id)) {
+      seenIds.add(t.id);
+      hospTokens.push(t);
+    }
+  });
 
   hospTokens.forEach(t => {
     const pc = t.paymentCollection || {};
-    if (pc.mode === 'full_online') {
-      const docFee = Number(pc.consultationFee || t.consultationFee || 0);
+    const isFullOnline = pc.mode === 'full_online' || 
+      t.collectionMode === 'full_online' || 
+      (t.paymentMethod && t.paymentMethod.toLowerCase().includes('full online')) ||
+      (Number(t.totalFee || 0) > (Number(t.consultationFee || t.fee || 0) + 5));
+
+    if (isFullOnline && t.status !== 'cancelled') {
+      const docFee = Number(pc.consultationFee || t.consultationFee || t.fee || 0);
       totalCollectedOnline += docFee;
       if (pc.settlementStatus === 'settled') {
         totalSettled += docFee;
@@ -4576,14 +4602,31 @@ app.get('/api/admin/hospital-settlements', async (req, res) => {
     let totalSettled = 0;
     let tokenCount = 0;
 
-    // Collect from tokens
-    const hospTokens = (store.tokens || []).filter(t => t.hospitalId === h.id && t.status === 'completed');
+    // Collect from tokens (all non-cancelled full_online bookings)
+    const allTokens = [...(store.tokens || []), ...(store.appointments || []).map(a => ({ ...a, consultationFee: a.fee }))];
+    const seenTokenIds = new Set();
+    const hospTokens = [];
+    allTokens.forEach(t => {
+      const matchesHosp = t.hospitalId === h.id || 
+        ((h.id === 'hosp-mu0838sg' || h.id === 'hosp-gandhi') && (t.hospitalId === 'hosp-mu0838sg' || t.hospitalId === 'hosp-gandhi'));
+      if (matchesHosp && t.id && !seenTokenIds.has(t.id)) {
+        seenTokenIds.add(t.id);
+        hospTokens.push(t);
+      }
+    });
+
     hospTokens.forEach(t => {
       const pc = t.paymentCollection || {};
-      if (pc.mode === 'full_online') {
-        totalCollected += Number(pc.consultationFee || t.consultationFee || 0);
+      const isFullOnline = pc.mode === 'full_online' || 
+        t.collectionMode === 'full_online' || 
+        (t.paymentMethod && t.paymentMethod.toLowerCase().includes('full online')) ||
+        (Number(t.totalFee || 0) > (Number(t.consultationFee || t.fee || 0) + 5));
+
+      if (isFullOnline && t.status !== 'cancelled') {
+        const docFee = Number(pc.consultationFee || t.consultationFee || t.fee || 0);
+        totalCollected += docFee;
         tokenCount++;
-        if (pc.settlementStatus === 'settled') totalSettled += Number(pc.consultationFee || t.consultationFee || 0);
+        if (pc.settlementStatus === 'settled') totalSettled += docFee;
       }
     });
 
