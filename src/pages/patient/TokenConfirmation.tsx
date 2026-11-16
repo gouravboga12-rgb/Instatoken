@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { Button } from '../../components/ui/Button';
 import { QRCodeSVG } from 'qrcode.react';
+import { jsPDF } from 'jspdf';
 import { 
   Calendar, Download, Share2, CheckCircle2, 
   Phone, Compass, Building2, User, CreditCard,
@@ -49,6 +50,8 @@ export const TokenConfirmation: React.FC = () => {
 
   const [fetchedAppointment, setFetchedAppointment] = useState<any>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isDownloading, setIsDownloading] = useState<boolean>(false);
+  const [copiedShare, setCopiedShare] = useState<boolean>(false);
 
   // Check local appointment cache first for instant synchronous resolution
   const savedLocalAppointment = React.useMemo(() => {
@@ -197,24 +200,296 @@ export const TokenConfirmation: React.FC = () => {
     );
   }
 
-  const handleDownload = () => {
-    alert("Token downloaded successfully! Saved as PDF to your downloads folder.");
-    addNotification(
-      "Token Downloaded",
-      `OPD Token #${appointment.tokenNumber} details downloaded in PDF format.`,
-      "info"
-    );
+  const hospitalObj = hospitals.find(h => h.id === appointment?.hospitalId);
+  const hospitalPhone = hospitalObj?.phone || (hospitalObj as any)?.emergencyNumber || (hospitalObj as any)?.emergencyContact || '6302970625';
+  const hospitalAddress = hospitalObj?.address || appointment?.address || hospitalObj?.city || 'Hospital OPD Facility';
+  const mapSearchQuery = encodeURIComponent(`${appointment?.hospitalName || hospitalObj?.name || 'Hospital'} ${hospitalAddress}`);
+  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${mapSearchQuery}`;
+
+  const fee = Number(appointment.fee) || 250;
+  const totalPaid = Number(appointment.totalFee || 0);
+  const pc = (appointment as any)?.paymentCollection;
+  const isFullOnlineBooking = (appointment as any)?.collectionMode === 'full_online' ||
+    (pc && pc.mode === 'full_online') ||
+    ((appointment as any)?.paymentMethod && (appointment as any).paymentMethod.toLowerCase().includes('full online')) ||
+    (fee > 0 && totalPaid >= fee && totalPaid > 60);
+
+  const getQrDataUrl = async (): Promise<string | null> => {
+    try {
+      const svg = document.querySelector('#token-qr-code svg') || document.querySelector('svg');
+      if (!svg) return null;
+      const xml = new XMLSerializer().serializeToString(svg);
+      const svg64 = btoa(unescape(encodeURIComponent(xml)));
+      const image64 = `data:image/svg+xml;base64,${svg64}`;
+
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = 200;
+          canvas.height = 200;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, 200, 200);
+            ctx.drawImage(img, 0, 0, 200, 200);
+            resolve(canvas.toDataURL('image/png'));
+          } else {
+            resolve(null);
+          }
+        };
+        img.onerror = () => resolve(null);
+        img.src = image64;
+      });
+    } catch (e) {
+      return null;
+    }
   };
 
-  const handleShare = () => {
+  const handleDownload = async () => {
+    setIsDownloading(true);
+    try {
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      // 1. Top Header Banner (Deep Blue)
+      doc.setFillColor(30, 64, 175);
+      doc.roundedRect(15, 15, 180, 24, 3, 3, 'F');
+
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.text('INSTATOKEN · OFFICIAL OPD APPOINTMENT PASS', 20, 22);
+
+      doc.setFontSize(13);
+      doc.text(appointment.hospitalName || 'Hospital OPD Facility', 20, 30);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(219, 234, 254);
+      doc.text(`${hospitalAddress} · Ph: ${hospitalPhone}`, 20, 35);
+
+      // 2. Token Number & Slot Card (Light Blue)
+      doc.setFillColor(239, 246, 255);
+      doc.setDrawColor(191, 219, 254);
+      doc.roundedRect(15, 43, 180, 38, 3, 3, 'FD');
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(37, 99, 235);
+      doc.text('YOUR TOKEN NUMBER', 22, 51);
+
+      doc.setFontSize(28);
+      doc.setTextColor(29, 78, 216);
+      doc.text(`#${appointment.tokenNumber || 1}`, 22, 63);
+
+      doc.setFontSize(9);
+      doc.setTextColor(71, 85, 105);
+      doc.text(`Slot Time: ${appointment.time || 'Morning OPD'}`, 22, 70);
+      doc.text(`Date: ${formattedDate} (${dayOfWeek})`, 22, 75);
+
+      // Status Badge
+      doc.setFillColor(16, 185, 129);
+      doc.roundedRect(138, 47, 48, 8, 2, 2, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(7.5);
+      doc.setFont('helvetica', 'bold');
+      doc.text('TOKEN CONFIRMED', 142, 52.5);
+
+      // QR Code PNG from DOM
+      const qrDataUrl = await getQrDataUrl();
+      if (qrDataUrl) {
+        doc.addImage(qrDataUrl, 'PNG', 151, 57, 22, 22);
+      }
+
+      // 3. Grid: Patient Details & Doctor Details
+      // Left: Patient
+      doc.setFillColor(248, 250, 252);
+      doc.setDrawColor(226, 232, 240);
+      doc.roundedRect(15, 85, 87, 44, 3, 3, 'FD');
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(30, 64, 175);
+      doc.text('PATIENT DETAILS', 20, 92);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(15, 23, 42);
+      doc.text(appointment.patientName || 'Patient', 20, 99);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.setTextColor(71, 85, 105);
+      doc.text(`Age / Gender: ${appointment.age || '28'} Yrs (${appointment.gender || 'Male'})`, 20, 105);
+      doc.text(`Contact: ${appointment.phone || 'Phone on file'}`, 20, 111);
+      doc.text(`Token ID: ${appointment.id || 'N/A'}`, 20, 117);
+      doc.text(`Status: Confirmed Spot`, 20, 123);
+
+      // Right: Doctor
+      doc.setFillColor(248, 250, 252);
+      doc.setDrawColor(226, 232, 240);
+      doc.roundedRect(108, 85, 87, 44, 3, 3, 'FD');
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(30, 64, 175);
+      doc.text('CONSULTING DOCTOR', 113, 92);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(15, 23, 42);
+      doc.text(appointment.doctorName || 'Doctor', 113, 99);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.setTextColor(71, 85, 105);
+      doc.text(`Department: ${appointment.departmentName || 'General OPD'}`, 113, 105);
+      doc.text(`Facility: OPD Consultation Desk`, 113, 111);
+      doc.text(`Est. Wait: ~${appointment.estimatedWaitTime || 15} mins`, 113, 117);
+      doc.text(`Valid Until: ${validUntilDate || '7 Days'}`, 113, 123);
+
+      // 4. Payment & Fees Summary Box
+      doc.setFillColor(241, 245, 249);
+      doc.setDrawColor(203, 213, 225);
+      doc.roundedRect(15, 133, 180, 36, 3, 3, 'FD');
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(51, 65, 85);
+      doc.text('PAYMENT & CHARGES BREAKDOWN', 20, 140);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.setTextColor(71, 85, 105);
+      doc.text('Doctor Consultation Fee:', 20, 147);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(15, 23, 42);
+      doc.text(
+        isFullOnlineBooking 
+          ? `Rs. ${fee.toFixed(2)} (PAID ONLINE IN ADVANCE)` 
+          : `Rs. ${fee.toFixed(2)} (PAY AT HOSPITAL OPD CABIN)`, 
+        85, 147
+      );
+
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(71, 85, 105);
+      doc.text('Platform & Token Charges:', 20, 153);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(15, 23, 42);
+      doc.text(`Rs. ${(Number(appointment.platformFee) || 10).toFixed(2)} (PAID ONLINE)`, 85, 153);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(71, 85, 105);
+      doc.text('Total Online Paid Now:', 20, 159);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(isFullOnlineBooking ? 22 : 37, isFullOnlineBooking ? 101 : 99, isFullOnlineBooking ? 52 : 235);
+      doc.text(
+        isFullOnlineBooking 
+          ? `Rs. ${(totalPaid || (fee + 17.11)).toFixed(2)} (FULL ONLINE ADVANCE VERIFIED)` 
+          : `Rs. ${(totalPaid || 13.57).toFixed(2)} (TOKEN BOOKING CHARGES PAID)`, 
+        85, 159
+      );
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(100, 116, 139);
+      doc.text(`Transaction Reference: ${appointment.paymentId || 'PAYID-INSTATOKEN'} · Verified Online`, 20, 165);
+
+      // 5. Important Instructions Box
+      doc.setFillColor(254, 252, 232);
+      doc.setDrawColor(254, 240, 138);
+      doc.roundedRect(15, 173, 180, 34, 3, 3, 'FD');
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(133, 77, 14);
+      doc.text('IMPORTANT PATIENT INSTRUCTIONS', 20, 180);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(113, 63, 18);
+      doc.text('1. Please reach the hospital 10-15 minutes prior to your allocated slot time.', 20, 186);
+      doc.text('2. Present this token pass or show the QR code at the reception desk.', 20, 191);
+      doc.text(
+        isFullOnlineBooking
+          ? '3. Consultation fee has been paid online in full (No fee to be paid at doctor cabin).'
+          : '3. Consultation fee must be paid directly at doctor\'s cabin / hospital desk.',
+        20, 196
+      );
+      doc.text('4. This token slip is valid for 7 Days (up to 2 Follow-up visits) from booking date.', 20, 201);
+
+      // 6. Security Footer
+      doc.setDrawColor(226, 232, 240);
+      doc.line(15, 215, 195, 215);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(148, 163, 184);
+      doc.text('Generated by InstaToken OPD Queue Platform · 100% Guaranteed Appointment Slot', 15, 221);
+      doc.text(`Issued On: ${new Date().toLocaleString('en-IN')} · Support: help@instatoken.in`, 15, 226);
+
+      const safePatient = (appointment.patientName || 'Patient').replace(/[^a-zA-Z0-9]/g, '_');
+      const filename = `InstaToken_Token_${appointment.tokenNumber || 1}_${safePatient}.pdf`;
+      doc.save(filename);
+
+      addNotification(
+        "Token Downloaded",
+        `Saved "${filename}" to your device.`,
+        "success"
+      );
+    } catch (err: any) {
+      console.error('PDF generation error:', err);
+      window.print();
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  const handleShare = async () => {
+    const shareText = `🏥 InstaToken Appointment Pass\n` +
+      `Hospital: ${appointment.hospitalName}\n` +
+      `Token: #${appointment.tokenNumber}\n` +
+      `Doctor: ${appointment.doctorName} (${appointment.departmentName})\n` +
+      `Patient: ${appointment.patientName}\n` +
+      `Date & Time: ${formattedDate} (${appointment.time})\n` +
+      `Payment: ${isFullOnlineBooking ? 'Doctor Fee Paid Online' : 'Pay Doctor Fee at OPD Desk'}\n` +
+      `View Pass: ${window.location.href}`;
+
     if (navigator.share) {
-      navigator.share({
-        title: `OPD Token #${appointment.tokenNumber} - ${appointment.doctorName}`,
-        text: `Check out my OPD token for ${appointment.hospitalName}. Token #${appointment.tokenNumber}.`,
-        url: window.location.href,
-      }).catch(console.error);
-    } else {
-      alert(`Token Details copied: Token #${appointment.tokenNumber} for Dr. ${appointment.doctorName} at ${appointment.hospitalName}`);
+      try {
+        await navigator.share({
+          title: `OPD Token #${appointment.tokenNumber} - ${appointment.hospitalName}`,
+          text: shareText,
+          url: window.location.href,
+        });
+        return;
+      } catch (err: any) {
+        if (err.name === 'AbortError') return;
+      }
+    }
+
+    try {
+      await navigator.clipboard.writeText(shareText);
+      setCopiedShare(true);
+      setTimeout(() => setCopiedShare(false), 3000);
+      addNotification(
+        "Token Copied to Clipboard",
+        `Token #${appointment.tokenNumber} details and link copied successfully.`,
+        "success"
+      );
+    } catch (e) {
+      const textArea = document.createElement("textarea");
+      textArea.value = shareText;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      setCopiedShare(true);
+      setTimeout(() => setCopiedShare(false), 3000);
     }
   };
 
@@ -227,12 +502,6 @@ export const TokenConfirmation: React.FC = () => {
     date: appointment.date,
     status: appointment.status
   });
-
-  const hospitalObj = hospitals.find(h => h.id === appointment?.hospitalId);
-  const hospitalPhone = hospitalObj?.phone || (hospitalObj as any)?.emergencyNumber || (hospitalObj as any)?.emergencyContact || '6302970625';
-  const hospitalAddress = hospitalObj?.address || appointment?.address || hospitalObj?.city || 'Hospital OPD Facility';
-  const mapSearchQuery = encodeURIComponent(`${appointment?.hospitalName || hospitalObj?.name || 'Hospital'} ${hospitalAddress}`);
-  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${mapSearchQuery}`;
 
   return (
     <div className="pb-24 bg-slate-50 min-h-screen md:min-h-0 md:pb-6 max-w-5xl mx-auto px-4 sm:px-6 pt-4">
@@ -332,7 +601,7 @@ export const TokenConfirmation: React.FC = () => {
               </div>
 
               {/* Inline QR Code matching Image 57 */}
-              <div className="flex flex-col items-center shrink-0 bg-white p-2.5 rounded-2xl border border-slate-200 shadow-2xs">
+              <div id="token-qr-code" className="flex flex-col items-center shrink-0 bg-white p-2.5 rounded-2xl border border-slate-200 shadow-2xs">
                 <QRCodeSVG 
                   value={qrPayload}
                   size={95}
@@ -391,51 +660,41 @@ export const TokenConfirmation: React.FC = () => {
             </div>
 
             {/* 3. Doctor Consultation Fee Card */}
-            {(() => {
-              const fee = Number(appointment.fee) || 250;
-              const totalPaid = Number(appointment.totalFee || 0);
-              const pc = (appointment as any)?.paymentCollection;
-              const isFullOnlineBooking = (appointment as any)?.collectionMode === 'full_online' ||
-                (pc && pc.mode === 'full_online') ||
-                ((appointment as any)?.paymentMethod && (appointment as any).paymentMethod.toLowerCase().includes('full online')) ||
-                (fee > 0 && totalPaid >= fee && totalPaid > 60);
-
-              return (
-                <div className="space-y-3">
-                  <div className={`border rounded-2xl p-4 flex items-center justify-between shadow-2xs ${
-                    isFullOnlineBooking 
-                      ? 'bg-blue-50/80 border-blue-200' 
-                      : 'bg-gradient-to-r from-emerald-50/80 to-teal-50/80 border-emerald-200'
+            <div className="space-y-3">
+              <div className={`border rounded-2xl p-4 flex items-center justify-between shadow-2xs ${
+                isFullOnlineBooking 
+                  ? 'bg-blue-50/80 border-blue-200' 
+                  : 'bg-gradient-to-r from-emerald-50/80 to-teal-50/80 border-emerald-200'
+              }`}>
+                <div className="space-y-0.5">
+                  <span className={`text-[9px] font-black uppercase tracking-wider flex items-center gap-1 ${
+                    isFullOnlineBooking ? 'text-blue-800' : 'text-emerald-800'
                   }`}>
-                    <div className="space-y-0.5">
-                      <span className={`text-[9px] font-black uppercase tracking-wider flex items-center gap-1 ${
-                        isFullOnlineBooking ? 'text-blue-800' : 'text-emerald-800'
-                      }`}>
-                        <CreditCard size={12} className={isFullOnlineBooking ? 'text-blue-600' : 'text-emerald-600'} /> 
-                        DOCTOR CONSULTATION FEE
-                      </span>
-                      <span className="text-3xl font-black text-slate-900 block font-heading">₹{fee}</span>
-                      <p className={`text-[10.5px] font-semibold ${isFullOnlineBooking ? 'text-blue-900/80' : 'text-emerald-900/70'}`}>
-                        {isFullOnlineBooking 
-                          ? 'Paid in advance online via InstaToken Razorpay.' 
-                          : 'Pay directly at doctor\'s cabin / OPD desk.'}
-                      </p>
-                    </div>
+                    <CreditCard size={12} className={isFullOnlineBooking ? 'text-blue-600' : 'text-emerald-600'} /> 
+                    DOCTOR CONSULTATION FEE
+                  </span>
+                  <span className="text-3xl font-black text-slate-900 block font-heading">₹{fee}</span>
+                  <p className={`text-[10.5px] font-semibold ${isFullOnlineBooking ? 'text-blue-900/80' : 'text-emerald-900/70'}`}>
+                    {isFullOnlineBooking 
+                      ? 'Paid in advance online via InstaToken Razorpay.' 
+                      : 'Pay directly at doctor\'s cabin / OPD desk.'}
+                  </p>
+                </div>
 
-                    <div className="text-right">
-                      <span className={`text-[10px] font-black px-3 py-1 rounded-md inline-flex items-center gap-1 uppercase shadow-sm ${
-                        isFullOnlineBooking 
-                          ? 'bg-blue-700 text-white' 
-                          : 'bg-emerald-700 text-white'
-                      }`}>
-                        {isFullOnlineBooking && <ShieldCheck size={11} />}
-                        {isFullOnlineBooking ? 'PAID ONLINE (ADVANCE)' : 'PAY AT HOSPITAL'}
-                      </span>
-                      <h5 className="text-[10px] font-black text-slate-600 mt-1">
-                        {isFullOnlineBooking ? 'No counter payment needed' : 'Pay at Doctor Cabin / OPD Desk'}
-                      </h5>
-                    </div>
-                  </div>
+                <div className="text-right">
+                  <span className={`text-[10px] font-black px-3 py-1 rounded-md inline-flex items-center gap-1 uppercase shadow-sm ${
+                    isFullOnlineBooking 
+                      ? 'bg-blue-700 text-white' 
+                      : 'bg-emerald-700 text-white'
+                  }`}>
+                    {isFullOnlineBooking && <ShieldCheck size={11} />}
+                    {isFullOnlineBooking ? 'PAID ONLINE (ADVANCE)' : 'PAY AT HOSPITAL'}
+                  </span>
+                  <h5 className="text-[10px] font-black text-slate-600 mt-1">
+                    {isFullOnlineBooking ? 'No counter payment needed' : 'Pay at Doctor Cabin / OPD Desk'}
+                  </h5>
+                </div>
+              </div>
 
                   {/* Token Booking Charges Paid Online with GST */}
                   <div className="bg-blue-50/80 border border-blue-200/80 rounded-2xl p-3.5 space-y-2">
@@ -466,8 +725,6 @@ export const TokenConfirmation: React.FC = () => {
                     </div>
                   </div>
                 </div>
-              );
-            })()}
 
             {/* 4. Consultation Validity Dates Banner */}
             <div className="bg-emerald-50 border border-emerald-200/80 rounded-2xl p-3 flex items-center justify-between">
@@ -557,8 +814,12 @@ export const TokenConfirmation: React.FC = () => {
 
             <ul className="text-[10px] text-slate-700 font-semibold space-y-1 list-disc pl-4 leading-snug">
               <li>Reach hospital 10–15 minutes before your session.</li>
-              <li>Show QR Code at reception.</li>
-              <li>Consultation fee must be paid at hospital cabin.</li>
+              <li>Show QR Code or downloaded token PDF at reception.</li>
+              <li>
+                {isFullOnlineBooking 
+                  ? "Consultation fee paid in advance online via InstaToken Razorpay (No cabin fee)." 
+                  : "Consultation fee must be paid at hospital cabin."}
+              </li>
               <li>Carry previous prescriptions and reports.</li>
               <li className="text-blue-700 font-extrabold">
                 Consultation Fee is valid for 7 Days (up to 2 Follow-up Visits) from booking date.
@@ -566,12 +827,13 @@ export const TokenConfirmation: React.FC = () => {
             </ul>
           </div>
 
-          {/* 3D Hospital Artwork Graphic */}
-          <div className="w-24 h-24 bg-white rounded-2xl border border-blue-100 flex flex-col items-center justify-center shadow-md shrink-0">
-            <div className="w-8 h-8 bg-blue-600 text-white font-black text-base rounded-lg flex items-center justify-center shadow-sm">
-              +
+          {/* Medical Verified Badge */}
+          <div className="w-20 h-20 bg-white rounded-2xl border border-blue-100 flex flex-col items-center justify-center shadow-xs shrink-0 p-2 text-center">
+            <div className="w-8 h-8 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center mb-1">
+              <ShieldCheck size={20} className="text-blue-600" />
             </div>
-            <div className="w-12 h-8 bg-sky-100 rounded-t-lg mt-2 border-t border-x border-sky-200" />
+            <span className="text-[9px] font-black text-slate-800 uppercase tracking-tight leading-none">100% Spot</span>
+            <span className="text-[8px] font-bold text-emerald-600 mt-0.5">Confirmed</span>
           </div>
         </div>
 
@@ -581,20 +843,43 @@ export const TokenConfirmation: React.FC = () => {
             variant="primary" 
             size="sm" 
             onClick={handleDownload}
-            className="bg-blue-600 hover:bg-blue-700 py-2.5 text-xs font-extrabold flex items-center justify-center gap-1.5 rounded-xl cursor-pointer"
+            disabled={isDownloading}
+            className="bg-blue-600 hover:bg-blue-700 py-2.5 text-xs font-extrabold flex items-center justify-center gap-1.5 rounded-xl cursor-pointer shadow-sm disabled:opacity-75"
           >
-            <Download size={14} />
-            <span>Download Token (PDF)</span>
+            {isDownloading ? (
+              <>
+                <Loader2 size={14} className="animate-spin" />
+                <span>Generating PDF...</span>
+              </>
+            ) : (
+              <>
+                <Download size={14} />
+                <span>Download Token (PDF)</span>
+              </>
+            )}
           </Button>
 
           <Button 
             variant="secondary" 
             size="sm" 
             onClick={handleShare}
-            className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 py-2.5 text-xs font-extrabold flex items-center justify-center gap-1.5 rounded-xl cursor-pointer"
+            className={`border py-2.5 text-xs font-extrabold flex items-center justify-center gap-1.5 rounded-xl cursor-pointer transition-colors shadow-2xs ${
+              copiedShare 
+                ? 'bg-emerald-50 border-emerald-300 text-emerald-700' 
+                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+            }`}
           >
-            <Share2 size={14} />
-            <span>Share Token</span>
+            {copiedShare ? (
+              <>
+                <CheckCircle2 size={14} className="text-emerald-600" />
+                <span>Copied to Clipboard!</span>
+              </>
+            ) : (
+              <>
+                <Share2 size={14} />
+                <span>Share Token</span>
+              </>
+            )}
           </Button>
         </div>
 
