@@ -6,7 +6,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { 
   Calendar, Download, Share2, CheckCircle2, 
   Phone, Compass, Building2, User, CreditCard,
-  AlertCircle, ArrowLeft, Loader2, ExternalLink,
+  AlertCircle, ArrowLeft, Loader2,
   Clock, MapPin, ShieldCheck
 } from 'lucide-react';
 
@@ -228,6 +228,12 @@ export const TokenConfirmation: React.FC = () => {
     status: appointment.status
   });
 
+  const hospitalObj = hospitals.find(h => h.id === appointment?.hospitalId);
+  const hospitalPhone = hospitalObj?.phone || (hospitalObj as any)?.emergencyNumber || (hospitalObj as any)?.emergencyContact || '6302970625';
+  const hospitalAddress = hospitalObj?.address || appointment?.address || hospitalObj?.city || 'Hospital OPD Facility';
+  const mapSearchQuery = encodeURIComponent(`${appointment?.hospitalName || hospitalObj?.name || 'Hospital'} ${hospitalAddress}`);
+  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${mapSearchQuery}`;
+
   return (
     <div className="pb-24 bg-slate-50 min-h-screen md:min-h-0 md:pb-6 max-w-5xl mx-auto px-4 sm:px-6 pt-4">
       
@@ -447,69 +453,62 @@ export const TokenConfirmation: React.FC = () => {
         </div>
         </div>
 
-        {/* Right Column (Live Queue CTA, Directions, Instructions & History) */}
+        {/* Right Column (Directions, Call Desk, Instructions & History) */}
         <div className="md:col-span-6 space-y-4">
-          {/* Quick Contact Action Buttons Row - Fully Responsive & Aligned for Mobile/Tab */}
-          <div className="grid grid-cols-3 gap-2 sm:gap-3">
-          <button 
-            onClick={() => alert("Calling hospital desk...")}
-            className="bg-white border border-slate-200 rounded-2xl p-2.5 sm:p-3 flex items-center gap-2 sm:gap-2.5 shadow-2xs hover:border-blue-300 transition-all cursor-pointer min-w-0"
-          >
-            <div className="w-8 h-8 sm:w-9 sm:h-9 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center shrink-0">
-              <Phone size={16} />
-            </div>
-            <div className="text-left min-w-0">
-              <h5 className="text-[10.5px] sm:text-xs font-extrabold text-slate-900 leading-tight truncate">Call Hospital</h5>
-              <p className="text-[8.5px] sm:text-[9px] text-slate-400 font-medium truncate">Tap to call</p>
-            </div>
-          </button>
+          {/* Highlighted Navigation & Call Action Cards */}
+          <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+            {/* Call Hospital Card - Prominently Highlighted */}
+            <a 
+              href={`tel:${hospitalPhone.replace(/\s+/g, '')}`}
+              className="bg-gradient-to-br from-emerald-500 to-teal-600 text-white rounded-2xl p-3 sm:p-3.5 flex items-center gap-2.5 sm:gap-3 shadow-md hover:shadow-lg hover:from-emerald-600 hover:to-teal-700 transition-all cursor-pointer group no-underline"
+            >
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white/20 backdrop-blur-sm text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
+                <Phone size={18} className="text-white" />
+              </div>
+              <div className="text-left min-w-0">
+                <span className="text-[9px] font-black uppercase tracking-wider text-emerald-100 block">Instant Call</span>
+                <h5 className="text-xs sm:text-sm font-black text-white leading-tight truncate">Call Hospital</h5>
+                <p className="text-[10px] text-emerald-100/90 font-medium truncate mt-0.5">{hospitalPhone}</p>
+              </div>
+            </a>
 
-          <button 
-            onClick={() => window.open("https://maps.google.com")}
-            className="bg-white border border-slate-200 rounded-2xl p-2.5 sm:p-3 flex items-center gap-2 sm:gap-2.5 shadow-2xs hover:border-blue-300 transition-all cursor-pointer min-w-0"
-          >
-            <div className="w-8 h-8 sm:w-9 sm:h-9 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center shrink-0">
-              <Compass size={16} />
-            </div>
-            <div className="text-left min-w-0">
-              <h5 className="text-[10.5px] sm:text-xs font-extrabold text-slate-900 leading-tight truncate">Directions</h5>
-              <p className="text-[8.5px] sm:text-[9px] text-slate-400 font-medium truncate">Navigate</p>
-            </div>
-          </button>
-
-          <button 
-            onClick={() => navigate(`/hospital-details/${appointment.hospitalId}`)}
-            className="bg-white border border-slate-200 rounded-2xl p-2.5 sm:p-3 flex items-center gap-2 sm:gap-2.5 shadow-2xs hover:border-blue-300 transition-all cursor-pointer min-w-0"
-          >
-            <div className="w-8 h-8 sm:w-9 sm:h-9 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center shrink-0">
-              <Building2 size={16} />
-            </div>
-            <div className="text-left min-w-0">
-              <h5 className="text-[10.5px] sm:text-xs font-extrabold text-slate-900 leading-tight truncate">Hospital Info</h5>
-              <p className="text-[8.5px] sm:text-[9px] text-slate-400 font-medium truncate">Doctor details</p>
-            </div>
-          </button>
-        </div>
-
-        {/* Hospital Panel Direct Redirection / Tracking Banner */}
-        <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl p-3 flex items-center justify-between shadow-2xs">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 bg-emerald-600 text-white rounded-xl flex items-center justify-center font-bold text-xs shrink-0">
-              🏥
-            </div>
-            <div className="min-w-0">
-              <h5 className="text-xs font-black text-slate-900 truncate">Hospital Live Queue Panel</h5>
-              <p className="text-[9.5px] text-emerald-700 font-medium truncate">View your token moving live in OPD doctor cabin queue</p>
-            </div>
+            {/* Navigation / Directions Card - Prominently Highlighted */}
+            <a 
+              href={mapsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bg-gradient-to-br from-blue-600 to-indigo-600 text-white rounded-2xl p-3 sm:p-3.5 flex items-center gap-2.5 sm:gap-3 shadow-md hover:shadow-lg hover:from-blue-700 hover:to-indigo-700 transition-all cursor-pointer group no-underline"
+            >
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white/20 backdrop-blur-sm text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
+                <Compass size={18} className="text-white" />
+              </div>
+              <div className="text-left min-w-0">
+                <span className="text-[9px] font-black uppercase tracking-wider text-blue-100 block">GPS Route</span>
+                <h5 className="text-xs sm:text-sm font-black text-white leading-tight truncate">Navigation</h5>
+                <p className="text-[10px] text-blue-100/90 font-medium truncate mt-0.5">Open Maps</p>
+              </div>
+            </a>
           </div>
-          <button
-            onClick={() => navigate('/hospital/tokens/all')}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black px-3 py-1.5 rounded-xl uppercase tracking-wider shadow-sm shrink-0 flex items-center gap-1 cursor-pointer"
+
+          {/* Clean Hospital Info & OPD Doctor Profile Link */}
+          <button 
+            type="button"
+            onClick={() => navigate(`/hospital-details/${appointment.hospitalId}`)}
+            className="w-full py-2.5 px-3 bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-300 rounded-2xl flex items-center justify-between text-slate-700 transition-all cursor-pointer shadow-2xs group"
           >
-            <span>Track In Hospital</span>
-            <ExternalLink size={12} />
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
+                <Building2 size={15} />
+              </div>
+              <div className="text-left min-w-0">
+                <p className="text-xs font-black text-slate-800 truncate">{appointment.hospitalName}</p>
+                <p className="text-[10px] text-slate-400 font-medium truncate">{hospitalAddress}</p>
+              </div>
+            </div>
+            <span className="text-[11px] font-bold text-blue-600 shrink-0 ml-2 group-hover:translate-x-0.5 transition-transform">
+              Hospital Details →
+            </span>
           </button>
-        </div>
 
         {/* Important Instructions Card with Hospital Artwork & Audio Validity Note */}
         <div className="bg-gradient-to-r from-blue-50 to-sky-50 border border-blue-150 rounded-3xl p-4 flex items-center justify-between">
