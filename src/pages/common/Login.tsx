@@ -540,16 +540,16 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
           ========================================================================= */}
       <div className="w-full flex-1 flex flex-col items-center justify-between lg:hidden">
         {/* Top Hero Banner matching Reference UI template */}
-        <div className="w-full relative overflow-hidden bg-gradient-to-r from-[#0052cc] via-[#0066ee] to-[#0052cc]">
+        <div className="w-full relative overflow-hidden bg-gradient-to-r from-[#0047b3] via-[#005cdb] to-[#0047b3]">
           <img 
             src="/mobile_login_hero.png" 
             alt="InstaToken - Smart Queue. Better Care" 
-            className="w-full max-w-xl mx-auto object-cover object-top h-[190px] sm:h-[230px] select-none"
+            className="w-full max-w-xl mx-auto h-auto block select-none"
           />
         </div>
 
         {/* Floating White Card Overlapping Hero Header */}
-        <div className="w-full max-w-[440px] px-4 -mt-8 sm:-mt-10 relative z-10">
+        <div className="w-full max-w-[440px] px-4 -mt-5 sm:-mt-8 relative z-10">
           <div className="bg-white rounded-[28px] sm:rounded-[32px] p-6 sm:p-7 shadow-[0_16px_45px_-8px_rgba(15,45,130,0.14)] border border-blue-100/80">
             {renderFormContent()}
           </div>
@@ -611,16 +611,16 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
           
           {/* Left Graphic Panel */}
           <div className="col-span-5 bg-gradient-to-b from-[#eaf2fc] to-slate-50 flex flex-col justify-between overflow-hidden border-r border-slate-100 pb-8">
-            <div className="relative overflow-hidden bg-[#0052cc]">
+            <div className="relative overflow-hidden bg-gradient-to-r from-[#0047b3] via-[#005cdb] to-[#0047b3]">
               <img 
                 src="/mobile_login_hero.png" 
                 alt="InstaToken - Smart Queue. Better Care" 
-                className="w-full h-[200px] object-cover object-top" 
+                className="w-full h-auto block select-none" 
               />
             </div>
 
             {/* Overlapping Carousel of Specialties */}
-            <div className="-mt-8 relative z-10 px-4 pointer-events-none">
+            <div className="-mt-6 relative z-10 px-4 pointer-events-none">
               <div className="w-full overflow-hidden bg-white/95 backdrop-blur-md rounded-2xl p-3 border border-blue-100 shadow-lg">
                 <div className="relative w-full overflow-hidden py-1">
                   <style>{`
