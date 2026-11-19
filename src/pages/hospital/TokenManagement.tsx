@@ -2,13 +2,13 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { useHospital } from '../../context/HospitalContext';
 import { useApp } from '../../context/AppContext';
-import type { TokenRecord, PatientRecord } from '../../context/HospitalContext';
+import type { TokenRecord, PatientRecord, HospitalDoctor } from '../../context/HospitalContext';
 import {
   Plus, Search, XCircle, CheckCircle, Wifi, WifiOff,
   Printer, X, Calendar, AlertCircle, UserPlus, User, Phone, Mail,
   MapPin, Droplets, FileText, Check, ArrowRight, Volume2, Eye, Clock,
   RotateCcw, CheckCircle2, Stethoscope, MessageSquare,
-  Wallet, CreditCard, Banknote, Trash2
+  Wallet, CreditCard, Banknote, UserCheck, UserX, ShieldCheck
 } from 'lucide-react';
 import { TokenPaymentModal } from '../../components/hospital/TokenPaymentModal';
 import { broadcastGlobalSync } from '../../utils/syncBus';
@@ -25,6 +25,8 @@ const statusColors: Record<string, string> = {
   cancelled: 'bg-red-50 text-red-700 border border-red-200',
   skipped: 'bg-slate-100 text-slate-600 border border-slate-200',
   'not-visited': 'bg-rose-50 text-rose-700 border border-rose-200',
+  unvisited: 'bg-rose-50 text-rose-700 border border-rose-200',
+  're-admitted': 'bg-blue-50 text-blue-700 border border-blue-200 font-bold',
 };
 
 // ─── Create Customer / Patient Account Modal ─────────────────────────────────
@@ -1268,6 +1270,245 @@ const CallConfirmationModal: React.FC<{
   );
 };
 
+// ─── Smart Re-Admission Modal Component ──────────────────────────────────────
+const ReadmissionModal: React.FC<{
+  token: TokenRecord;
+  doctors: HospitalDoctor[];
+  tokens: TokenRecord[];
+  onClose: () => void;
+  onSuccess: (updated: TokenRecord) => void;
+}> = ({ token, doctors, tokens, onClose, onSuccess }) => {
+  const { readmitToken } = useHospital();
+  const activeDoctors = doctors.filter(d => d.active !== false);
+
+  const [selectedDoctorId, setSelectedDoctorId] = useState(() => {
+    const isDocActive = activeDoctors.some(d => d.id === token.doctorId);
+    return isDocActive ? token.doctorId : (activeDoctors[0]?.id || token.doctorId);
+  });
+  const [selectedSession, setSelectedSession] = useState<'morning' | 'afternoon' | 'evening'>(
+    token.session === 'evening' ? 'evening' : 'morning'
+  );
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const selectedDoctor = doctors.find(d => d.id === selectedDoctorId);
+  const origFee = Number(token.consultationFee || 0);
+  const targetFee = Number(selectedDoctor?.consultationFee || origFee);
+  const feeDifference = Math.max(0, targetFee - origFee);
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  const targetDocQueueCount = tokens.filter(t => 
+    t.doctorId === selectedDoctorId && 
+    (t.bookingDate === todayStr || (!t.bookingDate && t.status !== 'not-visited')) &&
+    t.session === selectedSession &&
+    ['booked', 'waiting', 'checked-in', 'calling'].includes(t.status)
+  ).length;
+
+  const handleConfirmReadmit = async () => {
+    if (!selectedDoctorId) {
+      setError('Please select a doctor to re-admit.');
+      return;
+    }
+    setIsSubmitting(true);
+    setError('');
+    try {
+      const updated = await readmitToken(token.id, selectedDoctorId, selectedSession, feeDifference);
+      onSuccess(updated);
+    } catch (err: any) {
+      setError(err.message || 'Failed to re-admit patient. Please try again.');
+      setIsSubmitting(false);
+    }
+  };
+
+  const isSameDoctor = selectedDoctorId === token.doctorId;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+      <div className="bg-white rounded-3xl max-w-lg w-full p-5 sm:p-7 shadow-2xl space-y-5 my-6 max-h-[90vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-start justify-between border-b border-slate-100 pb-3.5">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-black">
+              <UserCheck size={20} />
+            </div>
+            <div>
+              <h3 className="font-black text-slate-900 text-base leading-tight">Smart Patient Re-Admission</h3>
+              <p className="text-xs text-slate-400 font-medium mt-0.5">
+                Re-assign missed token into today's active OPD queue
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 border-none bg-transparent cursor-pointer transition-colors"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {error && (
+          <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs font-bold flex items-center gap-2">
+            <AlertCircle size={15} className="shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        <div className="space-y-4 flex-1 overflow-y-auto pr-1">
+          {/* Patient Card */}
+          <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-100 space-y-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="font-extrabold text-slate-900 text-sm">{token.patientName}</span>
+                <span className="text-xs text-slate-500 ml-2 font-medium">({token.patientAge} {token.patientAgeUnit || 'Yrs'} · {token.patientGender})</span>
+              </div>
+              <span className="text-[10px] font-black bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+                Original #{token.tokenNo}
+              </span>
+            </div>
+            <div className="text-[11px] text-slate-500 font-medium flex flex-wrap items-center gap-x-4 gap-y-1">
+              <span>📞 {token.patientPhone}</span>
+              {(token.patientAddress || token.address || token.place) && (
+                <span className="truncate max-w-[200px]">📍 {token.patientAddress || token.address || token.place}</span>
+              )}
+            </div>
+            <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-[11px]">
+              <span className="text-slate-500 font-medium">
+                Booked on: <strong className="text-slate-800">{token.bookingDate || 'Past date'}</strong> (Dr. {token.doctorName})
+              </span>
+              <span className={`font-bold px-2 py-0.5 rounded ${
+                token.paymentStatus === 'paid' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+              }`}>
+                {token.paymentStatus === 'paid' ? `Paid ₹${origFee}` : `Pay at Desk (₹${origFee})`}
+              </span>
+            </div>
+          </div>
+
+          {/* Doctor Selection */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-black text-slate-700 uppercase tracking-wide">
+              Select Doctor for Consultation Today
+            </label>
+            <select
+              value={selectedDoctorId}
+              onChange={e => setSelectedDoctorId(e.target.value)}
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-800 outline-none focus:border-blue-500"
+            >
+              {activeDoctors.map(doc => (
+                <option key={doc.id} value={doc.id}>
+                  Dr. {doc.name} ({doc.departmentName || 'General'}) — Fee: ₹{doc.consultationFee || 500} {doc.id === token.doctorId ? '(Original Doctor)' : ''}
+                </option>
+              ))}
+            </select>
+            {!isSameDoctor && (
+              <p className="text-[11px] text-amber-700 font-semibold bg-amber-50 p-2 rounded-xl border border-amber-100">
+                ⚠️ Switching from Dr. {token.doctorName} to Dr. {selectedDoctor?.name}.
+              </p>
+            )}
+          </div>
+
+          {/* Session Selection */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-black text-slate-700 uppercase tracking-wide">
+              Select OPD Session Today
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedSession('morning')}
+                className={`p-3 rounded-xl border text-xs font-bold cursor-pointer transition-all flex flex-col items-center gap-0.5 ${
+                  selectedSession === 'morning'
+                    ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-2xs font-black'
+                    : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                }`}
+              >
+                <span>Morning OPD</span>
+                <span className="text-[10px] text-slate-400 font-semibold">10:00 AM - 01:00 PM</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedSession('evening')}
+                className={`p-3 rounded-xl border text-xs font-bold cursor-pointer transition-all flex flex-col items-center gap-0.5 ${
+                  selectedSession === 'evening'
+                    ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-2xs font-black'
+                    : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                }`}
+              >
+                <span>Evening OPD</span>
+                <span className="text-[10px] text-slate-400 font-semibold">05:00 PM - 09:00 PM</span>
+              </button>
+            </div>
+            <p className="text-[10px] text-slate-400 font-semibold text-center mt-1">
+              Active Queue: {targetDocQueueCount} patients currently waiting today
+            </p>
+          </div>
+
+          {/* Financial Calculation Card */}
+          <div className="p-3.5 bg-gradient-to-br from-blue-50/60 to-slate-50 border border-blue-100 rounded-2xl space-y-2">
+            <div className="flex items-center justify-between text-xs font-bold">
+              <span className="text-slate-600">Original Consultation Fee Credited</span>
+              <span className="text-emerald-700 font-mono font-black">₹{origFee}</span>
+            </div>
+            <div className="flex items-center justify-between text-xs font-bold">
+              <span className="text-slate-600">New Doctor Consultation Fee</span>
+              <span className="text-slate-900 font-mono font-black">₹{targetFee}</span>
+            </div>
+            <div className="flex items-center justify-between text-xs font-bold">
+              <span className="text-slate-600 flex items-center gap-1">
+                <ShieldCheck size={13} className="text-emerald-600" />
+                InstaToken Platform Fee
+              </span>
+              <span className="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded text-[10px]">
+                ₹0.00 (Zero Penalty / Free Revisit)
+              </span>
+            </div>
+
+            <div className="pt-2 border-t border-blue-200/60 flex items-center justify-between">
+              <div>
+                <span className="text-xs font-black text-slate-900 block">Difference Payable at Desk</span>
+                <span className="text-[10px] text-slate-500 font-medium">
+                  {feeDifference > 0 ? 'Collect cash difference from patient' : 'Previous online payment fully covers visit'}
+                </span>
+              </div>
+              <span className={`text-base font-black font-mono px-2.5 py-1 rounded-xl ${
+                feeDifference > 0 ? 'bg-amber-100 text-amber-900' : 'bg-emerald-100 text-emerald-800'
+              }`}>
+                {feeDifference > 0 ? `₹${feeDifference}` : '₹0.00'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex items-center gap-2.5 pt-2 border-t border-slate-100">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isSubmitting}
+            className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl cursor-pointer border-none transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleConfirmReadmit}
+            disabled={isSubmitting}
+            className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs rounded-xl cursor-pointer border-none shadow-md shadow-blue-500/25 flex items-center justify-center gap-2 transition-all disabled:opacity-60"
+          >
+            {isSubmitting ? (
+              <span>Re-Admitting...</span>
+            ) : (
+              <>
+                <UserCheck size={15} />
+                <span>Confirm Re-Admission</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── Patient File Modal Component ──────────────────────────────────────────
 const PatientFileModal: React.FC<{
   token: TokenRecord;
@@ -1473,6 +1714,7 @@ const TokenTable: React.FC<{
   onAddClick: () => void;
   defaultDateFilter?: string;
   isRevisitView?: boolean;
+  isUnvisitedView?: boolean;
   onIssueFollowUp?: (pat: any) => void;
 }> = ({
   tokens: toks,
@@ -1481,9 +1723,10 @@ const TokenTable: React.FC<{
   onAddClick,
   defaultDateFilter,
   isRevisitView,
+  isUnvisitedView,
   onIssueFollowUp
 }) => {
-  const { updateTokenStatus, updateTokenPayment, cancelToken, deleteToken, deleteTokens, departments, doctors, hospitalProfile, patients } = useHospital();
+  const { updateTokenStatus, updateTokenPayment, cancelToken, markTokensUnvisited, departments, doctors, hospitalProfile, patients } = useHospital();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [deptFilter, setDeptFilter] = useState('all');
@@ -1495,10 +1738,13 @@ const TokenTable: React.FC<{
   const [selectedPatientToken, setSelectedPatientToken] = useState<TokenRecord | null>(null);
   const [paymentModalToken, setPaymentModalToken] = useState<TokenRecord | null>(null);
   const [completingPaymentToken, setCompletingPaymentToken] = useState<TokenRecord | null>(null);
+  const [readmitTokenTarget, setReadmitTokenTarget] = useState<TokenRecord | null>(null);
 
   const filteredDocList = deptFilter === 'all'
     ? doctors
     : doctors.filter(d => d.departmentId === deptFilter);
+
+  const todayStr = new Date().toISOString().split('T')[0];
 
   const filtered = toks.filter(t => {
     const matchesSearch =
@@ -1510,7 +1756,7 @@ const TokenTable: React.FC<{
     const matchesStatus = statusFilter === 'all' || t.status === statusFilter;
     const matchesDept = deptFilter === 'all' || t.departmentId === deptFilter;
     const matchesDoc = docFilter === 'all' || t.doctorId === docFilter;
-    const matchesDate = !dateFilter || t.bookingDate === dateFilter || (!t.bookingDate && dateFilter === new Date().toISOString().split('T')[0]);
+    const matchesDate = !dateFilter || t.bookingDate === dateFilter || (!t.bookingDate && dateFilter === todayStr);
 
     return matchesSearch && matchesStatus && matchesDept && matchesDoc && matchesDate;
   });
@@ -1521,21 +1767,14 @@ const TokenTable: React.FC<{
   const inCabinCount = filtered.filter(t => ['checked-in', 'arrived', 'in-consultation'].includes(t.status)).length;
   const lateComingCount = filtered.filter(t => t.status === 'late-coming').length;
 
-  const handleDeleteToken = (tok: TokenRecord) => {
-    const patientLabel = tok.patientName ? `${tok.patientName} (Token #${tok.tokenNo})` : `Token #${tok.tokenNo}`;
-    if (window.confirm(`Are you sure you want to delete ${patientLabel}? This will remove the unvisited record permanently.`)) {
-      deleteToken(tok.id);
-    }
-  };
-
-  const unvisitedTokensInView = filtered.filter(t => t.status !== 'completed');
-  const handleClearUnvisited = () => {
+  const unvisitedTokensInView = filtered.filter(t => t.status !== 'completed' && t.status !== 'cancelled');
+  const handleRouteToUnvisited = () => {
     if (unvisitedTokensInView.length === 0) {
-      alert('No unvisited or pending tokens found to clear in this view.');
+      alert('No unvisited or pending tokens found to route in this view.');
       return;
     }
-    if (window.confirm(`Delete all ${unvisitedTokensInView.length} unvisited / absent / pending tokens from this view? This will permanently clear them.`)) {
-      deleteTokens(unvisitedTokensInView.map(t => t.id));
+    if (window.confirm(`Route all ${unvisitedTokensInView.length} absent tokens to the Unvisited Directory? This preserves full payment credit and patient history for future re-admission.`)) {
+      markTokensUnvisited(unvisitedTokensInView.map(t => t.id));
     }
   };
 
@@ -1560,15 +1799,21 @@ const TokenTable: React.FC<{
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            {unvisitedTokensInView.length > 0 && (
-              <button
-                type="button"
-                onClick={handleClearUnvisited}
-                className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 font-bold text-xs rounded-xl cursor-pointer border border-red-200 inline-flex items-center gap-1.5 transition-colors"
-                title="Bulk delete unvisited/pending tokens at end of day"
-              >
-                <Trash2 size={13} /> Clear Unvisited ({unvisitedTokensInView.length})
-              </button>
+            {isUnvisitedView ? (
+              <span className="text-[11px] font-bold text-blue-700 bg-blue-50 px-3 py-1.5 rounded-xl border border-blue-200 flex items-center gap-1.5">
+                <ShieldCheck size={14} className="text-blue-600" /> Zero-Delete Protected • Click "Re-Admit" on any row to assign patient to today's queue
+              </span>
+            ) : (
+              unvisitedTokensInView.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleRouteToUnvisited}
+                  className="px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold text-xs rounded-xl cursor-pointer border border-amber-200 inline-flex items-center gap-1.5 transition-colors"
+                  title="Route absent tokens to Unvisited Directory"
+                >
+                  <UserX size={13} /> Route to Unvisited ({unvisitedTokensInView.length})
+                </button>
+              )
             )}
             <button
               onClick={onAddClick}
@@ -1978,13 +2223,25 @@ const TokenTable: React.FC<{
                         </span>
                       )}
 
-                      {/* Stage 6: Not-Visited or Skipped -> Allow Reopen if patient shows up late */}
-                      {['not-visited', 'skipped'].includes(t.status) && (
+                      {/* Re-Admit Button for Unvisited / Missed Patients */}
+                      {(isUnvisitedView || ['not-visited', 'unvisited', 'skipped'].includes(t.status) || (t.bookingDate && t.bookingDate < todayStr && t.status !== 'completed')) && (
+                        <button
+                          type="button"
+                          onClick={() => setReadmitTokenTarget(t)}
+                          className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[10px] font-black cursor-pointer border-none flex items-center gap-1 shadow-xs transition-colors"
+                          title="Re-admit patient to today's active OPD queue"
+                        >
+                          <UserCheck size={11} /> Re-Admit
+                        </button>
+                      )}
+
+                      {/* Stage 6: Reopen if patient shows up late today */}
+                      {['not-visited', 'skipped'].includes(t.status) && (!t.bookingDate || t.bookingDate === todayStr) && (
                         <button
                           type="button"
                           onClick={() => setCallConfirmToken(t)}
                           className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[10px] font-bold cursor-pointer border-none flex items-center gap-1"
-                          title="Patient arrived very late: reopen token"
+                          title="Patient arrived late today: reopen token"
                         >
                           <RotateCcw size={10} /> Re-Open
                         </button>
@@ -1994,23 +2251,15 @@ const TokenTable: React.FC<{
                       {t.status !== 'completed' && t.status !== 'cancelled' && (
                         <button
                           type="button"
-                          onClick={() => cancelToken(t.id)}
+                          onClick={() => {
+                            if (window.confirm(`Cancel token #${t.tokenNo} for ${t.patientName}? This will be recorded in the audit log.`)) {
+                              cancelToken(t.id);
+                            }
+                          }}
                           className="p-1 text-slate-300 hover:text-red-600 rounded-lg cursor-pointer transition-colors"
-                          title="Cancel token"
+                          title="Cancel token (recorded in audit log)"
                         >
                           <XCircle size={13} />
-                        </button>
-                      )}
-
-                      {/* Delete unvisited / absent / cancelled token permanently */}
-                      {t.status !== 'completed' && (
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteToken(t)}
-                          className="p-1 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-lg cursor-pointer transition-colors"
-                          title="Delete unvisited token permanently"
-                        >
-                          <Trash2 size={13} />
                         </button>
                       )}
                     </div>
@@ -2174,6 +2423,20 @@ const TokenTable: React.FC<{
           }}
         />
       )}
+
+      {/* Smart Re-Admission Modal */}
+      {readmitTokenTarget && (
+        <ReadmissionModal
+          token={readmitTokenTarget}
+          doctors={doctors}
+          tokens={toks}
+          onClose={() => setReadmitTokenTarget(null)}
+          onSuccess={(updated) => {
+            setReadmitTokenTarget(null);
+            alert(`Token re-admitted successfully! Patient ${updated.patientName} has been assigned Token #${updated.tokenNo} in today's active queue for Dr. ${updated.doctorName}.`);
+          }}
+        />
+      )}
     </div>
   );
 };
@@ -2264,7 +2527,19 @@ export const TokenManagement: React.FC = () => {
         subtitle: 'Directory of returning patients, follow-up consultations, and valid revisit records',
         toks: tokens.filter(t => Boolean(t.isRevisit || t.isExisting)),
         defaultDateFilter: '',
-        isRevisitView: true
+        isRevisitView: true,
+        isUnvisitedView: false
+      };
+    }
+    if (path.includes('unvisited')) {
+      const today = new Date().toISOString().split('T')[0];
+      return {
+        title: 'Unvisited & Missed Patient Tokens',
+        subtitle: 'Directory of absent past tokens eligible for smart re-admission without repayment penalty',
+        toks: tokens.filter(t => t.status === 'not-visited' || t.status === 'unvisited' || (['booked', 'waiting'].includes(t.status) && t.bookingDate && t.bookingDate < today)),
+        defaultDateFilter: '',
+        isRevisitView: false,
+        isUnvisitedView: true
       };
     }
     if (path.includes('add')) {
@@ -2352,6 +2627,7 @@ export const TokenManagement: React.FC = () => {
         subtitle={tokenSet.subtitle}
         defaultDateFilter={tokenSet.defaultDateFilter}
         isRevisitView={tokenSet.isRevisitView}
+        isUnvisitedView={tokenSet.isUnvisitedView}
         onIssueFollowUp={(pat) => {
           setFollowUpPatient(pat);
           setShowWalkInModal(true);

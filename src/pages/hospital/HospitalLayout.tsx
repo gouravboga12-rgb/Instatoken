@@ -23,7 +23,7 @@ import { DoctorReferences } from './DoctorReferences';
 import { HospitalPayouts } from './HospitalPayouts';
 import {
   LayoutDashboard, Plus, List, Wifi, WifiOff, Calendar, RefreshCw,
-  Users, Stethoscope, Building2, UserCheck,
+  Users, Stethoscope, Building2, UserCheck, UserX,
   BarChart2, Download, Settings,
   ChevronLeft, ChevronRight, Bell, Search, LogOut, Menu, X, Activity,
   CreditCard, DollarSign, Sliders, Megaphone, Banknote
@@ -31,9 +31,9 @@ import {
 
 // ─── RBAC permission map ──────────────────────────────────────────────────────
 const ROLE_SECTIONS: Record<string, string[]> = {
-  owner:        ['dashboard','doctor-screens','token-manage','tokens','add-token','all-tokens','online-tokens','offline-tokens','today-tokens','upcoming-tokens','completed-tokens','cancelled-tokens','revisit-tokens','revenue','doctors','departments','doctor-references','sessions','staff','patients','communication','ads-promotion','billing','reports','settings','payouts'],
-  admin:        ['dashboard','doctor-screens','token-manage','tokens','add-token','all-tokens','online-tokens','offline-tokens','today-tokens','upcoming-tokens','completed-tokens','cancelled-tokens','revisit-tokens','revenue','doctors','departments','doctor-references','sessions','staff','patients','communication','ads-promotion','reports','payouts'],
-  receptionist: ['dashboard','doctor-screens','token-manage','add-token','all-tokens','today-tokens','doctor-references','staff','patients'],
+  owner:        ['dashboard','doctor-screens','token-manage','tokens','add-token','all-tokens','online-tokens','offline-tokens','today-tokens','upcoming-tokens','completed-tokens','cancelled-tokens','revisit-tokens','unvisited-tokens','revenue','doctors','departments','doctor-references','sessions','staff','patients','communication','ads-promotion','billing','reports','settings','payouts'],
+  admin:        ['dashboard','doctor-screens','token-manage','tokens','add-token','all-tokens','online-tokens','offline-tokens','today-tokens','upcoming-tokens','completed-tokens','cancelled-tokens','revisit-tokens','unvisited-tokens','revenue','doctors','departments','doctor-references','sessions','staff','patients','communication','ads-promotion','reports','payouts'],
+  receptionist: ['dashboard','doctor-screens','token-manage','add-token','all-tokens','today-tokens','unvisited-tokens','doctor-references','staff','patients'],
   doctor:       ['dashboard','doctor-screens','today-tokens','doctor-references','patients'],
   accountant:   ['dashboard','revenue','billing','doctor-references','reports','payouts'],
   nurse:        ['dashboard','doctor-screens','today-tokens','staff'],
@@ -46,6 +46,12 @@ interface NavItem {
 
 const buildNav = (doctors: HospitalDoctor[], tokens: TokenRecord[]): { section: string; items: NavItem[] }[] => {
   const activeDoctors = doctors.filter(d => d.active);
+  const todayStr = new Date().toISOString().split('T')[0];
+  const unvisitedCount = tokens.filter(t => 
+    t.status === 'not-visited' || 
+    t.status === 'unvisited' || 
+    (['booked', 'waiting'].includes(t.status) && t.bookingDate && t.bookingDate < todayStr)
+  ).length;
 
   // Generate Doctor Screens dynamically based on active doctors
   const doctorScreenItems: NavItem[] = activeDoctors.map(doc => {
@@ -73,6 +79,7 @@ const buildNav = (doctors: HospitalDoctor[], tokens: TokenRecord[]): { section: 
       { id: 'offline-tokens', label: 'Offline Tokens', icon: <WifiOff size={15} />, path: '/hospital/tokens/offline' },
       { id: 'today-tokens', label: "Today's Tokens", icon: <Calendar size={15} />, path: '/hospital/tokens/today' },
       { id: 'revisit-tokens', label: 'Revisit Tokens', icon: <RefreshCw size={15} />, path: '/hospital/tokens/revisit' },
+      { id: 'unvisited-tokens', label: 'Unvisited Tokens', icon: <UserX size={15} />, path: '/hospital/tokens/unvisited', badge: unvisitedCount > 0 ? `${unvisitedCount}` : undefined },
     ]},
     { section: 'Revenue & Finance', items: [
       { id: 'revenue', label: 'Revenue Overview', icon: <DollarSign size={15} />, path: '/hospital/revenue' },

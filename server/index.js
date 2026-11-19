@@ -3419,6 +3419,130 @@ app.patch('/api/hospitals/:hospitalId/tokens/:tokenId/status', requireHospitalAu
   res.json({ success: true, hospitalId, tokenId, status, token: targetToken });
 });
 
+// ─── Re-Admit Unvisited / Missed Token ─────────────────────────────────────────
+app.post('/api/hospitals/:hospitalId/tokens/:tokenId/readmit', requireHospitalAuth, async (req, res) => {
+  const { hospitalId, tokenId } = req.params;
+  const { targetDoctorId, targetDoctorName, departmentId, departmentName, session, tokenNo, feeDifference } = req.body;
+  const store = await getUnifiedStore();
+
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  let updatedToken = null;
+  store.tokens = (store.tokens || []).map(t => {
+    if (t.id === tokenId || (t.appointmentId && t.appointmentId === tokenId)) {
+      const origBookingDate = t.bookingDate;
+      const origTokNo = t.tokenNo || t.tokenNumber;
+      const origDocId = t.doctorId;
+      const origDocName = t.doctorName;
+      const origFee = Number(t.consultationFee || 0);
+
+      updatedToken = {
+        ...t,
+        doctorId: targetDoctorId || t.doctorId,
+        doctorName: targetDoctorName || t.doctorName,
+        departmentId: departmentId || t.departmentId,
+        departmentName: departmentName || t.departmentName,
+        session: session || t.session || 'morning',
+        bookingDate: todayStr,
+        tokenNo: Number(tokenNo) || t.tokenNo,
+        tokenNumber: Number(tokenNo) || t.tokenNumber,
+        status: 'booked',
+        isRevisit: true,
+        revisitDetails: {
+          originalBookingDate: origBookingDate,
+          originalTokenNo: origTokNo,
+          originalDoctorId: origDocId,
+          originalDoctorName: origDocName,
+          originalFee: origFee,
+          feeDifference: Number(feeDifference || 0),
+          deskCollectedDifference: Number(feeDifference || 0),
+          readmittedAt: new Date().toISOString()
+        }
+      };
+      return updatedToken;
+    }
+    return t;
+  });
+
+  if (updatedToken) {
+    store.appointments = (store.appointments || []).map(a => {
+      if (a.id === tokenId || (a.hospitalId === hospitalId && (a.id === updatedToken.id || a.id === updatedToken.appointmentId))) {
+        return {
+          ...a,
+          doctorId: updatedToken.doctorId,
+          doctorName: updatedToken.doctorName,
+          departmentName: updatedToken.departmentName,
+          date: todayStr,
+          bookingDate: todayStr,
+          session: updatedToken.session,
+          tokenNumber: updatedToken.tokenNo,
+          status: 'booked',
+          isExisting: true,
+          revisitDetails: updatedToken.revisitDetails
+        };
+      }
+      return a;
+    });
+
+    if (isDbConnected) {
+      try {
+        await query(
+          `UPDATE tokens 
+           SET status = 'booked', session = $1, doctor_id = $2, doctor_name = $3, booking_date = $4, token_no = $5,
+               data = (COALESCE(data, '{}'::jsonb) || $6::jsonb), updated_at = NOW() 
+           WHERE id = $7`,
+          [
+            updatedToken.session,
+            updatedToken.doctorId,
+            updatedToken.doctorName,
+            todayStr,
+            updatedToken.tokenNo,
+            JSON.stringify(updatedToken),
+            tokenId
+          ]
+        );
+
+        await query(
+          `UPDATE appointments 
+           SET status = 'booked', appointment_date = $1, doctor_id = $2,
+               data = (COALESCE(data, '{}'::jsonb) || jsonb_build_object(
+                 'status', 'booked',
+                 'date', $1::varchar,
+                 'doctorId', $2::varchar,
+                 'doctorName', $3::varchar,
+                 'tokenNumber', $4::numeric,
+                 'session', $5::varchar,
+                 'isExisting', true,
+                 'revisitDetails', $6::jsonb
+               )), 
+               updated_at = NOW() 
+           WHERE id = $7`,
+          [
+            todayStr,
+            updatedToken.doctorId,
+            updatedToken.doctorName,
+            updatedToken.tokenNo,
+            updatedToken.session,
+            JSON.stringify(updatedToken.revisitDetails),
+            tokenId
+          ]
+        );
+      } catch (dbErr) {
+        console.error('Error re-admitting token in DB:', dbErr.message);
+      }
+    }
+
+    await saveUnifiedStore(store);
+
+    io.to(`hospital_${hospitalId}`).emit('token_status_changed', updatedToken);
+    io.to(`hospital_${hospitalId}`).emit('token_readmitted', { tokenId, token: updatedToken });
+    io.emit('token_readmitted', { tokenId, token: updatedToken });
+    console.log(`📡 [Socket.io] Emitted token_readmitted for token ${tokenId} into doctor ${updatedToken.doctorName} (#${updatedToken.tokenNo})`);
+  }
+
+  res.json({ success: true, token: updatedToken });
+});
+
 // ─── Delete Single Hospital Token from Store & RDS ────────────────────────────
 app.delete('/api/hospitals/:hospitalId/tokens/:tokenId', requireHospitalAuth, async (req, res) => {
   const { hospitalId, tokenId } = req.params;

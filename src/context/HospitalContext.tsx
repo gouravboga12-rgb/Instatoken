@@ -71,7 +71,7 @@ export interface TokenRecord {
   session: 'morning' | 'afternoon' | 'evening';
   time: string;
   bookingDate: string;
-  status: 'booked' | 'checked-in' | 'completed' | 'cancelled' | 'waiting' | 'skipped' | 'not-visited' | 'calling' | 'late-coming' | 'arrived' | 'in-consultation';
+  status: 'booked' | 'checked-in' | 'completed' | 'cancelled' | 'waiting' | 'skipped' | 'not-visited' | 'unvisited' | 'calling' | 'late-coming' | 'arrived' | 'in-consultation';
   queuePosition: number;
   estimatedWait: number; // minutes
   consultationFee: number;
@@ -90,6 +90,16 @@ export interface TokenRecord {
   address?: string;
   place?: string;
   hospitalName?: string;
+  revisitDetails?: {
+    originalBookingDate?: string;
+    originalTokenNo?: number;
+    originalDoctorId?: string;
+    originalDoctorName?: string;
+    originalFee?: number;
+    feeDifference?: number;
+    deskCollectedDifference?: number;
+    readmittedAt?: string;
+  };
 }
 
 export interface DoctorVisitSummary {
@@ -308,6 +318,13 @@ interface HospitalContextType {
   cancelToken: (id: string) => void;
   deleteToken: (id: string) => void;
   deleteTokens: (ids: string[]) => void;
+  markTokensUnvisited: (tokenIds: string[]) => Promise<void>;
+  readmitToken: (
+    tokenId: string, 
+    targetDoctorId: string, 
+    session: 'morning' | 'afternoon' | 'evening', 
+    deskDifference?: number
+  ) => Promise<TokenRecord>;
   updateTokenSession: (id: string, newSession: string) => void;
 
   // Patients
@@ -2332,6 +2349,116 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }).catch(() => { });
   };
 
+  const markTokensUnvisited = async (tokenIds: string[]) => {
+    if (!tokenIds || tokenIds.length === 0) return;
+    const idSet = new Set(tokenIds);
+    setTokens(prev => {
+      const updated = prev.map(t => {
+        if (idSet.has(t.id) || idSet.has((t as any).appointmentId)) {
+          return { ...t, status: 'not-visited' as const };
+        }
+        return t;
+      });
+      localStorage.setItem('insta_hospital_tokens', JSON.stringify(updated));
+      if (targetHospId) {
+        localStorage.setItem(`insta_hospital_tokens_${targetHospId}`, JSON.stringify(updated));
+      }
+      broadcastGlobalSync('HOSPITAL_TOKENS_UPDATED', updated);
+      return updated;
+    });
+
+    for (const id of tokenIds) {
+      updateTokenStatus(id, 'not-visited');
+    }
+  };
+
+  const readmitToken = async (
+    tokenId: string,
+    targetDoctorId: string,
+    session: 'morning' | 'afternoon' | 'evening',
+    deskDifference?: number
+  ): Promise<TokenRecord> => {
+    const targetToken = tokens.find(t => t.id === tokenId || (t as any).appointmentId === tokenId);
+    if (!targetToken) throw new Error("Token not found");
+
+    const targetDoc = doctors.find(d => d.id === targetDoctorId);
+    if (!targetDoc) throw new Error("Target doctor not found");
+
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    // Compute next available token number for target doctor on today's date in this session
+    const docTodayTokens = tokens.filter(t => 
+      t.doctorId === targetDoctorId && 
+      (t.bookingDate === todayStr || (!t.bookingDate && t.status !== 'not-visited')) &&
+      t.session === session
+    );
+    const maxTokNo = docTodayTokens.reduce((max, t) => Math.max(max, Number(t.tokenNo || 0)), 0);
+    const newTokNo = maxTokNo + 1;
+
+    const origFee = Number(targetToken.consultationFee || 0);
+    const newDocFee = Number(targetDoc.consultationFee || origFee);
+    const computedFeeDiff = deskDifference !== undefined ? deskDifference : Math.max(0, newDocFee - origFee);
+
+    const updatedToken: TokenRecord = {
+      ...targetToken,
+      doctorId: targetDoc.id,
+      doctorName: targetDoc.name,
+      departmentId: targetDoc.departmentId || targetToken.departmentId,
+      departmentName: targetDoc.departmentName || targetToken.departmentName,
+      session,
+      bookingDate: todayStr,
+      tokenNo: newTokNo,
+      status: 'booked',
+      queuePosition: docTodayTokens.length + 1,
+      isRevisit: true,
+      revisitDetails: {
+        originalBookingDate: targetToken.bookingDate,
+        originalTokenNo: targetToken.tokenNo,
+        originalDoctorId: targetToken.doctorId,
+        originalDoctorName: targetToken.doctorName,
+        originalFee: origFee,
+        feeDifference: computedFeeDiff,
+        deskCollectedDifference: computedFeeDiff,
+        readmittedAt: new Date().toISOString()
+      }
+    };
+
+    setTokens(prev => {
+      const updated = prev.map(t => (t.id === tokenId || (t as any).appointmentId === tokenId ? updatedToken : t));
+      localStorage.setItem('insta_hospital_tokens', JSON.stringify(updated));
+      if (targetHospId) {
+        localStorage.setItem(`insta_hospital_tokens_${targetHospId}`, JSON.stringify(updated));
+      }
+      broadcastGlobalSync('HOSPITAL_TOKENS_UPDATED', updated);
+      return updated;
+    });
+
+    // Notify backend
+    try {
+      await fetch(`/api/hospitals/${targetHospId}/tokens/${tokenId}/readmit`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({
+          targetDoctorId,
+          targetDoctorName: targetDoc.name,
+          departmentId: targetDoc.departmentId,
+          departmentName: targetDoc.departmentName,
+          session,
+          tokenNo: newTokNo,
+          feeDifference: computedFeeDiff,
+          originalToken: targetToken
+        })
+      });
+    } catch (e) {
+      console.warn('Backend readmit API notification:', e);
+    }
+
+    return updatedToken;
+  };
+
   // Patients (Phase 20)
   const addPatient = (p: Omit<PatientRecord, 'id' | 'uhid' | 'registeredOn' | 'totalVisits' | 'lastVisit' | 'tokenHistory'>) => {
     const uhid = `APS${String(patients.length + 1001).padStart(6, '0')}`;
@@ -2796,7 +2923,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       addDoctor, updateDoctor, deleteDoctor, toggleDoctorActive,
       addDepartment, updateDepartment, deleteDepartment, toggleDepartmentActive,
       addStaffMember, updateStaffMember, deleteStaffMember, markStaffAttendance,
-      generateWalkInToken, updateTokenStatus, updateTokenPayment, cancelToken, deleteToken, deleteTokens, updateTokenSession,
+      generateWalkInToken, updateTokenStatus, updateTokenPayment, cancelToken, deleteToken, deleteTokens, markTokensUnvisited, readmitToken, updateTokenSession,
       addPatient, updatePatient, searchPatients, validateToken,
       updateScheduleConfig, updateSession,
       sendNotification, clearHospitalNotifications,
