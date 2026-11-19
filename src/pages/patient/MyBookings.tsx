@@ -111,7 +111,13 @@ export const MyBookings: React.FC = () => {
     return Array.from(map.values());
   }, [appointments, user]);
 
-  const activeAppts = dedupedAppts.filter(a => a.status === 'booked' || a.status === 'checked-in' || a.status === 'in-cabin');
+  const activeAppts = dedupedAppts
+    .filter(a => ['booked', 'waiting', 'checked-in', 'in-cabin', 'calling'].includes(a.status))
+    .sort((a, b) => {
+      if (a.status === 'calling' && b.status !== 'calling') return -1;
+      if (b.status === 'calling' && a.status !== 'calling') return 1;
+      return 0;
+    });
   const pastAppts = dedupedAppts.filter(a => a.status === 'completed' || a.status === 'cancelled');
 
   const handleCancelClick = async (id: string) => {

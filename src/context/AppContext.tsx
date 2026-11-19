@@ -61,7 +61,7 @@ export interface Appointment {
   gstFee?: number;
   totalFee?: number;
   collectionMode?: 'full_online' | 'token_only';
-  status: 'booked' | 'checked-in' | 'in-cabin' | 'completed' | 'cancelled';
+  status: 'booked' | 'waiting' | 'calling' | 'checked-in' | 'in-cabin' | 'completed' | 'cancelled';
   session?: 'morning' | 'afternoon' | 'evening';
   paymentId: string;
   paymentMethod: string;

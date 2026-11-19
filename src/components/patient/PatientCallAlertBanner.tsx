@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Volume2, VolumeX, Bell, ChevronRight, X } from 'lucide-react';
+import { Volume2, VolumeX, Bell, X } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { subscribeGlobalSync } from '../../utils/syncBus';
 import io, { Socket } from 'socket.io-client';
@@ -22,7 +21,6 @@ interface CallAlertPayload {
 
 export const PatientCallAlertBanner: React.FC = () => {
   const { user } = useApp();
-  const navigate = useNavigate();
   const [activeCall, setActiveCall] = useState<CallAlertPayload | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const audioIntervalRef = useRef<any>(null);
@@ -101,12 +99,6 @@ export const PatientCallAlertBanner: React.FC = () => {
   const handleDismiss = () => {
     if (audioIntervalRef.current) clearInterval(audioIntervalRef.current);
     setActiveCall(null);
-  };
-
-  const handleProceed = () => {
-    if (audioIntervalRef.current) clearInterval(audioIntervalRef.current);
-    setActiveCall(null);
-    navigate('/bookings');
   };
 
   // Unlock mobile browser Web Audio on first user interaction
@@ -291,11 +283,10 @@ export const PatientCallAlertBanner: React.FC = () => {
         {/* Action Controls */}
         <div className="mt-3.5 flex items-center gap-2">
           <button
-            onClick={handleProceed}
-            className="flex-1 py-2.5 px-3.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs rounded-xl shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer border-none"
+            onClick={handleDismiss}
+            className="flex-1 py-2 px-3.5 bg-white/15 hover:bg-white/25 text-white font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer border border-white/20"
           >
-            <span>I'm Here • Step In</span>
-            <ChevronRight size={14} />
+            <span>Dismiss Alert</span>
           </button>
           
           <button
@@ -303,7 +294,7 @@ export const PatientCallAlertBanner: React.FC = () => {
               if (audioIntervalRef.current) clearInterval(audioIntervalRef.current);
               setIsMuted(prev => !prev);
             }}
-            className="p-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-colors cursor-pointer border-none"
+            className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-colors cursor-pointer border-none"
             title={isMuted ? "Unmute alert" : "Mute audio chime"}
           >
             {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
