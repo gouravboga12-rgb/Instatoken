@@ -25,8 +25,8 @@ export const PatientCallAlertBanner: React.FC = () => {
   const [isMuted, setIsMuted] = useState(false);
   const audioIntervalRef = useRef<any>(null);
 
-  // Play pleasant, high-clarity calling chime using Web Audio API
-  const playAlertChime = () => {
+  // Play soothing, crystal-clear hospital OPD chime (Ding-Dong) using Web Audio API
+  const playBellChime = () => {
     if (isMuted) return;
     try {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
@@ -36,35 +36,64 @@ export const PatientCallAlertBanner: React.FC = () => {
         ctx.resume().catch(() => {});
       }
 
-      // Pleasant 4-tone chime: E5 (659Hz) -> G#5 (830Hz) -> B5 (987Hz) -> E6 (1318Hz)
-      const notes = [659.25, 830.61, 987.77, 1318.51];
-      notes.forEach((freq, idx) => {
+      // Classic hospital OPD 2-tone bell chime: F5 (698Hz) -> C6 (1046Hz)
+      const tones = [
+        { freq: 698.46, start: 0, dur: 0.45 },
+        { freq: 1046.50, start: 0.22, dur: 0.65 }
+      ];
+
+      tones.forEach(t => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
-        const start = ctx.currentTime + (idx * 0.18);
+        const start = ctx.currentTime + t.start;
 
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq, start);
-        gain.gain.setValueAtTime(0.3, start);
-        gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.5);
+        osc.frequency.setValueAtTime(t.freq, start);
+        gain.gain.setValueAtTime(0.28, start);
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + t.dur);
 
         osc.connect(gain);
         gain.connect(ctx.destination);
         osc.start(start);
-        osc.stop(start + 0.55);
+        osc.stop(start + t.dur + 0.05);
       });
     } catch (e) {
       console.warn('Audio chime play error:', e);
     }
+  };
 
-    // Voice announcement for mobile accessibility
+  // Professional hospital announcement voice
+  const speakAnnouncement = (payload: CallAlertPayload) => {
+    if (isMuted) return;
     try {
       if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
         window.speechSynthesis.cancel();
-        const docClean = (activeCall?.doctorName || 'Doctor').replace(/^Dr\.?\s*/i, '');
-        const msg = new SpeechSynthesisUtterance(`Token ${activeCall?.tokenNo || ''}, Dr. ${docClean} is calling.`);
-        msg.rate = 1.0;
-        window.speechSynthesis.speak(msg);
+
+        const tokNum = payload.tokenNo || (payload as any).tokenNumber || '';
+        const docClean = (payload.doctorName || 'Doctor').replace(/^Dr\.?\s*/i, '');
+        
+        // Professional, clear hospital OPD announcement phrasing
+        const text = `Token number ${tokNum}. Please proceed to Dr. ${docClean}'s cabin.`;
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.rate = 0.92; // Measured, calm pacing
+        utter.pitch = 1.05; // Friendly, clear hospital announcement pitch
+        utter.lang = 'en-IN'; // Indian English pronunciation if available
+
+        const voices = window.speechSynthesis.getVoices();
+        const preferredVoice = voices.find(v => 
+          (v.lang === 'en-IN' || v.lang === 'en-GB' || v.lang === 'en-US') &&
+          (v.name.includes('Google') || v.name.includes('Natural') || v.name.includes('Samantha') || v.name.includes('Zira'))
+        );
+        if (preferredVoice) {
+          utter.voice = preferredVoice;
+        }
+
+        // Delay voice slightly (550ms) so the pleasant Ding-Dong bell chime sounds first
+        setTimeout(() => {
+          try {
+            window.speechSynthesis.speak(utter);
+          } catch (e) {}
+        }, 550);
       }
     } catch (e) {}
   };
@@ -73,8 +102,9 @@ export const PatientCallAlertBanner: React.FC = () => {
     setActiveCall(payload);
     setIsMuted(false);
 
-    // Initial chime
-    playAlertChime();
+    // Initial chime + voice announcement
+    playBellChime();
+    speakAnnouncement(payload);
 
     // Haptic vibration on mobile devices
     try {
@@ -83,17 +113,17 @@ export const PatientCallAlertBanner: React.FC = () => {
       }
     } catch (e) { }
 
-    // Repeat chime every 2.8s up to 4 times (11 seconds total)
+    // Repeat gentle bell chime every 3.5s up to 3 times (without repeating voice over itself)
     if (audioIntervalRef.current) clearInterval(audioIntervalRef.current);
     let chimeCount = 0;
     audioIntervalRef.current = setInterval(() => {
       chimeCount++;
-      if (chimeCount >= 4) {
+      if (chimeCount >= 3) {
         if (audioIntervalRef.current) clearInterval(audioIntervalRef.current);
       } else {
-        playAlertChime();
+        playBellChime();
       }
-    }, 2800);
+    }, 3500);
   };
 
   const handleDismiss = () => {
