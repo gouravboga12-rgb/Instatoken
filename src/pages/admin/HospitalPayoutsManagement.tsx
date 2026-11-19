@@ -35,7 +35,7 @@ export const HospitalPayoutsManagement: React.FC = () => {
   // Settle Modal State
   const [settleTarget, setSettleTarget] = useState<HospitalSettlementRecord | null>(null);
   const [payoutAmount, setPayoutAmount] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'NEFT' | 'IMPS' | 'RTGS' | 'UPI'>('NEFT');
+  const [paymentMethod, setPaymentMethod] = useState<string>('Bank Transfer');
   const [utrReference, setUtrReference] = useState('');
   const [settleNotes, setSettleNotes] = useState('');
   const [settleLoading, setSettleLoading] = useState(false);
@@ -84,7 +84,7 @@ export const HospitalPayoutsManagement: React.FC = () => {
   const openSettleModal = (h: HospitalSettlementRecord, prefilledAmt?: number) => {
     setSettleTarget(h);
     setPayoutAmount(String(prefilledAmt !== undefined ? prefilledAmt : h.pendingDue));
-    setPaymentMethod('NEFT');
+    setPaymentMethod(h.upi_id && !h.bank_account_number ? 'UPI' : 'Bank Transfer');
     setUtrReference('');
     setSettleNotes('');
     setSettleError('');
@@ -101,7 +101,7 @@ export const HospitalPayoutsManagement: React.FC = () => {
       return;
     }
     if (!utrReference.trim()) {
-      setSettleError('Bank UTR / Transaction Reference Number is strictly required.');
+      setSettleError(`Please enter the ${paymentMethod === 'UPI' ? 'UPI Reference Number' : paymentMethod === 'Cheque / DD' ? 'Cheque / DD Number' : paymentMethod === 'Cash' ? 'Voucher Number' : 'Bank UTR / Transaction Reference Number'}.`);
       return;
     }
 
@@ -507,13 +507,55 @@ export const HospitalPayoutsManagement: React.FC = () => {
             ) : (
               <form onSubmit={handleConfirmSettlement} className="space-y-3.5">
                 {/* Beneficiary Details Box */}
-                <div className="bg-slate-800/80 rounded-2xl p-3.5 text-xs space-y-1.5 border border-slate-700">
-                  <div className="text-[10px] uppercase font-black text-slate-400">Target Beneficiary Account</div>
-                  <div className="text-white font-bold">{settleTarget.bank_name || 'Bank'} · A/C: {settleTarget.bank_account_number}</div>
-                  <div className="text-emerald-400 font-mono text-[11px]">IFSC: {settleTarget.bank_ifsc}</div>
-                  {settleTarget.upi_id && <div className="text-blue-300 font-mono text-[11px]">UPI: {settleTarget.upi_id}</div>}
-                  <div className="text-amber-400 font-black pt-1 border-t border-slate-700/60">
-                    Outstanding Due: ₹{settleTarget.pendingDue.toLocaleString('en-IN')}
+                <div className="bg-slate-800/80 rounded-2xl p-3.5 text-xs space-y-2 border border-slate-700">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] uppercase font-black text-slate-400">Target Beneficiary Details</span>
+                    <span className="text-[10px] font-bold text-slate-400">{settleTarget.city}</span>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    {/* Bank Transfer info */}
+                    <div className="flex items-center justify-between text-white font-bold bg-slate-900/50 p-2.5 rounded-xl border border-slate-700/60">
+                      <div>
+                        <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Bank Transfer Account</div>
+                        <div className="font-mono text-xs text-white mt-0.5">{settleTarget.bank_name || 'Bank'} · A/C: {settleTarget.bank_account_number || 'Not added'}</div>
+                        <div className="text-emerald-400 font-mono text-[10px]">IFSC: {settleTarget.bank_ifsc || 'N/A'}</div>
+                      </div>
+                      {settleTarget.bank_account_number && (
+                        <button
+                          type="button"
+                          onClick={() => copyText(settleTarget.bank_account_number!, 'modal-bank')}
+                          className="text-blue-400 hover:text-blue-300 text-[10px] flex items-center gap-1 cursor-pointer bg-slate-800 hover:bg-slate-700 px-2 py-1 rounded-md border border-slate-600 transition-colors"
+                        >
+                          <Copy size={11} />
+                          <span>{copiedKey === 'modal-bank' ? 'Copied!' : 'Copy A/C'}</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* UPI info */}
+                    <div className="flex items-center justify-between text-blue-300 font-mono text-[11px] bg-slate-900/50 p-2.5 rounded-xl border border-slate-700/60">
+                      <div>
+                        <div className="text-[10px] uppercase tracking-wider text-slate-400 font-sans font-bold">UPI ID</div>
+                        <div className="font-bold text-white text-xs mt-0.5">{settleTarget.upi_id || 'Not registered'}</div>
+                        {settleTarget.upi_phone && <div className="text-[10px] text-slate-400 font-sans">UPI Phone: {settleTarget.upi_phone}</div>}
+                      </div>
+                      {settleTarget.upi_id && (
+                        <button
+                          type="button"
+                          onClick={() => copyText(settleTarget.upi_id!, 'modal-upi')}
+                          className="text-blue-400 hover:text-blue-300 text-[10px] flex items-center gap-1 cursor-pointer bg-slate-800 hover:bg-slate-700 px-2 py-1 rounded-md border border-slate-600 transition-colors"
+                        >
+                          <Copy size={11} />
+                          <span>{copiedKey === 'modal-upi' ? 'Copied!' : 'Copy UPI'}</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="text-amber-400 font-black pt-1.5 border-t border-slate-700/60 flex items-center justify-between">
+                    <span>Outstanding Due:</span>
+                    <span className="text-sm font-mono font-black text-amber-300">₹{settleTarget.pendingDue.toLocaleString('en-IN')}</span>
                   </div>
                 </div>
 
@@ -530,28 +572,49 @@ export const HospitalPayoutsManagement: React.FC = () => {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs font-bold text-slate-300 block mb-1">Payment Method *</label>
                     <select
                       value={paymentMethod}
-                      onChange={e => setPaymentMethod(e.target.value as any)}
-                      className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-blue-500"
+                      onChange={e => setPaymentMethod(e.target.value)}
+                      className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-blue-500 font-medium"
                     >
-                      <option value="NEFT">NEFT</option>
-                      <option value="IMPS">IMPS</option>
-                      <option value="RTGS">RTGS</option>
-                      <option value="UPI">UPI Transfer</option>
+                      <option value="UPI">UPI (Google Pay, PhonePe, Paytm, BHIM)</option>
+                      <option value="Bank Transfer">Bank Transfer (Direct Bank / Net Banking)</option>
+                      <option value="Cheque / DD">Cheque / Demand Draft (DD)</option>
+                      <option value="Cash">Cash / Counter Settlement</option>
+                      <option value="Other">Other Payment Method</option>
                     </select>
                   </div>
 
                   <div>
-                    <label className="text-xs font-bold text-slate-300 block mb-1">Bank UTR / Txn Ref # *</label>
+                    <label className="text-xs font-bold text-slate-300 block mb-1">
+                      {paymentMethod === 'UPI'
+                        ? 'UPI Transaction ID / Ref # *'
+                        : paymentMethod === 'Cheque / DD'
+                        ? 'Cheque / DD Number *'
+                        : paymentMethod === 'Cash'
+                        ? 'Receipt / Voucher Number *'
+                        : paymentMethod === 'Other'
+                        ? 'Transaction Reference # *'
+                        : 'Bank UTR / Transaction Ref # *'}
+                    </label>
                     <input
                       type="text"
                       value={utrReference}
                       onChange={e => setUtrReference(e.target.value)}
-                      placeholder="e.g. 412390128912"
+                      placeholder={
+                        paymentMethod === 'UPI'
+                          ? 'e.g. 12-digit UPI Reference ID'
+                          : paymentMethod === 'Cheque / DD'
+                          ? 'e.g. 6-digit Cheque Number'
+                          : paymentMethod === 'Cash'
+                          ? 'e.g. Cash Voucher / Receipt #'
+                          : paymentMethod === 'Other'
+                          ? 'e.g. Transaction Ref #'
+                          : 'e.g. 12 or 16-digit Bank UTR #'
+                      }
                       required
                       className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-xs font-bold font-mono text-white focus:outline-none focus:border-blue-500"
                     />
