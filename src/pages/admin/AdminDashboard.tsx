@@ -2370,6 +2370,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                             <td className="py-3 px-3">
                               <p className="font-bold text-slate-900">{appt.patientName}</p>
                               <p className="text-[10px] text-slate-500 font-semibold">{appt.phone}</p>
+                              {(appt.address || appt.place) && (
+                                <p className="text-[9.5px] text-slate-500 font-medium truncate max-w-[150px] flex items-center gap-1 mt-0.5" title={appt.address || appt.place}>
+                                  <MapPin size={9} className="text-blue-600 shrink-0" />
+                                  <span className="truncate">{appt.address || appt.place}</span>
+                                </p>
+                              )}
                             </td>
 
                             {/* Token Fee & Doctor Fee Breakdown */}

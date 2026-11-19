@@ -7,7 +7,7 @@ import {
   XCircle, Calendar, Search,
   Printer, Eye, Phone, Wifi, WifiOff,
   Volume2, Stethoscope, Sparkles, UserX, Trash2,
-  Wallet
+  Wallet, MapPin
 } from 'lucide-react';
 import { TokenPaymentModal } from '../../components/hospital/TokenPaymentModal';
 
@@ -746,10 +746,18 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
                             </span>
                           )}
                         </div>
-                        <div className="text-[10px] text-slate-400 font-medium flex items-center gap-2 mt-0.5">
+                        <div className="text-[10px] text-slate-400 font-medium flex items-center gap-2 mt-0.5 flex-wrap">
                           <span>{tok.patientAgeDisplay || `${tok.patientAge}y`}, {tok.patientGender}</span>
                           <span>·</span>
                           <span className="flex items-center gap-1"><Phone size={10} /> {tok.patientPhone}</span>
+                          {(tok.patientAddress || (tok as any).address || (tok as any).place) && (
+                            <>
+                              <span>·</span>
+                              <span className="flex items-center gap-1 text-slate-500 font-semibold">
+                                <MapPin size={10} className="text-blue-500" /> {tok.patientAddress || (tok as any).address || (tok as any).place}
+                              </span>
+                            </>
+                          )}
                         </div>
                         {((tok.doctorReference && tok.doctorReference.name) || (tok.rmpReference && tok.rmpReference.name)) && (
                           <div className="text-[9.5px] font-bold text-indigo-700 mt-0.5">
@@ -968,6 +976,10 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
               <div className="p-3 bg-slate-50 rounded-2xl flex items-center justify-between">
                 <span className="text-slate-400 font-bold">Mobile Phone:</span>
                 <strong className="text-slate-800">{viewToken.patientPhone}</strong>
+              </div>
+              <div className="p-3 bg-slate-50 rounded-2xl flex items-center justify-between">
+                <span className="text-slate-400 font-bold">Place / Address:</span>
+                <strong className="text-slate-800">{viewToken.patientAddress || (viewToken as any).address || (viewToken as any).place || 'Not provided'}</strong>
               </div>
               <div className="p-3 bg-slate-50 rounded-2xl flex items-center justify-between">
                 <span className="text-slate-400 font-bold">Doctor:</span>

@@ -1777,6 +1777,12 @@ const TokenTable: React.FC<{
                         <p className="text-[10px] text-slate-400 font-medium mt-0.5">
                           {t.patientPhone} · {t.patientAgeDisplay || (t.patientAge ? `${t.patientAge}y` : '')}, {t.patientGender}
                         </p>
+                        {(t.patientAddress || t.address || t.place) && (
+                          <p className="text-[10px] text-slate-500 font-semibold mt-0.5 flex items-center gap-1">
+                            <MapPin size={10} className="text-blue-500 shrink-0" />
+                            <span className="truncate max-w-[200px]">{t.patientAddress || t.address || t.place}</span>
+                          </p>
+                        )}
                         {((t.doctorReference && t.doctorReference.name) || (t.rmpReference && t.rmpReference.name)) && (
                           <div className="mt-1">
                             <span className="text-[9.5px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200 inline-flex items-center gap-1">

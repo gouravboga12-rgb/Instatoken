@@ -3859,6 +3859,8 @@ app.post('/api/appointments', async (req, res) => {
     appt.doctorReference = ref;
     appt.rmpReference = ref;
   }
+  appt.address = appt.address || appt.place || '';
+  appt.place = appt.place || appt.address || '';
 
   store.appointments = [appt, ...store.appointments.filter(a => a.id !== appt.id)];
 
@@ -3875,6 +3877,9 @@ app.post('/api/appointments', async (req, res) => {
     patientPhone: appt.phone,
     patientAge: appt.age,
     patientGender: appt.gender,
+    patientAddress: appt.address || appt.place || '',
+    address: appt.address || appt.place || '',
+    place: appt.place || appt.address || '',
     doctorId: appt.doctorId,
     doctorName: appt.doctorName,
     departmentName: appt.departmentName,

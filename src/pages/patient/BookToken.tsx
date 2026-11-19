@@ -518,14 +518,15 @@ export const BookToken: React.FC = () => {
     } : null;
 
     const patientDetails = {
-      name,
+      name: name.trim(),
       age: ageVal,
       ageUnit,
       ageDisplay: computedAgeDisplay,
       gender,
-      phone,
+      phone: cleanPhone,
       email: user?.email || 'patient@example.com',
-      address: place,
+      address: place.trim(),
+      place: place.trim(),
       isExisting,
       doctorReference: ref,
       rmpReference: ref,
@@ -553,6 +554,8 @@ export const BookToken: React.FC = () => {
         platformFee: platformFee,
         gatewayFee: platformFee,
         gstFee: 0,
+        address: place.trim(),
+        place: place.trim(),
         totalBookingCharges: totalPayable,
         isFullOnline,
         collectionMode: isFullOnline ? 'full_online' : 'token_only',
@@ -861,26 +864,35 @@ export const BookToken: React.FC = () => {
                 </div>
               </div>
 
-              {/* Gender & Place in 2 columns */}
-              <div className="grid grid-cols-2 gap-2">
-                <div className="relative flex items-center bg-white border border-slate-200 rounded-xl overflow-hidden">
-                  <User size={14} className="absolute left-3 text-slate-400 pointer-events-none" />
-                  <select 
-                    value={gender}
-                    onChange={(e) => setGender(e.target.value)}
-                    className="w-full pl-8 pr-6 py-2 text-xs font-semibold text-slate-800 bg-transparent focus:outline-none appearance-none cursor-pointer"
-                  >
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
-                    <option value="Other">Other</option>
-                  </select>
-                  <ChevronDown size={12} className="absolute right-2 text-slate-400 pointer-events-none" />
+              {/* Gender */}
+              <div className="relative flex items-center bg-white border border-slate-200 rounded-xl overflow-hidden focus-within:border-blue-600 transition-all">
+                <User size={14} className="absolute left-3 text-slate-400 pointer-events-none" />
+                <select 
+                  value={gender}
+                  onChange={(e) => setGender(e.target.value)}
+                  className="w-full pl-8 pr-8 py-2.5 text-xs font-semibold text-slate-800 bg-transparent focus:outline-none appearance-none cursor-pointer"
+                >
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
+                <ChevronDown size={12} className="absolute right-3 text-slate-400 pointer-events-none" />
+              </div>
+
+              {/* Patient Place / Address (Full Width Dedicated Box - Clear & Editable) */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between px-0.5">
+                  <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1">
+                    <MapPin size={12} className="text-blue-600" />
+                    <span>Town / City / Patient Address *</span>
+                  </label>
+                  <span className="text-[10px] text-slate-400 font-medium">Clear & editable for prescription</span>
                 </div>
 
-                <div className={`relative flex items-center bg-white border rounded-xl overflow-hidden transition-all ${
+                <div className={`relative flex items-center bg-white border rounded-xl overflow-hidden transition-all shadow-2xs ${
                   fieldErrors.place ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20' : 'border-slate-200 focus-within:border-blue-600'
                 }`}>
-                  <MapPin size={14} className="absolute left-3 text-slate-400 pointer-events-none shrink-0" />
+                  <MapPin size={15} className="absolute left-3 text-blue-600 pointer-events-none shrink-0" />
                   <input 
                     type="text" 
                     value={place}
@@ -888,22 +900,22 @@ export const BookToken: React.FC = () => {
                       setPlace(e.target.value);
                       if (fieldErrors.place) setFieldErrors(prev => ({ ...prev, place: false }));
                     }}
-                    placeholder="Enter your place *"
-                    className="w-full pl-8 pr-18 py-2 text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-none"
+                    placeholder="Enter your town, village, or address *"
+                    className="w-full pl-9 pr-24 py-3 text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-none"
                   />
                   <button
                     type="button"
                     onClick={handleDetectLocation}
                     disabled={isDetectingLocation}
                     title="Auto-detect current location"
-                    className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1 bg-blue-50 hover:bg-blue-100 text-blue-600 px-2 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer disabled:opacity-60"
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200/80 px-2.5 py-1.5 rounded-lg text-[10.5px] font-bold transition-all cursor-pointer disabled:opacity-60 shadow-2xs"
                   >
                     {isDetectingLocation ? (
-                      <Loader2 size={11} className="animate-spin text-blue-600" />
+                      <Loader2 size={12} className="animate-spin text-blue-600" />
                     ) : (
-                      <Navigation size={11} className="text-blue-600" />
+                      <Navigation size={12} className="text-blue-600" />
                     )}
-                    <span>{isDetectingLocation ? 'Locating...' : 'Auto'}</span>
+                    <span>{isDetectingLocation ? 'Locating...' : 'Auto Detect'}</span>
                   </button>
                 </div>
               </div>

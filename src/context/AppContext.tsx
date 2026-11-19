@@ -45,6 +45,7 @@ export interface Appointment {
   phone: string;
   email: string;
   address: string;
+  place?: string;
   hospitalId: string;
   hospitalName: string;
   doctorId: string;
@@ -119,6 +120,7 @@ interface AppContextType {
       phone: string;
       email: string;
       address: string;
+  place?: string;
       isExisting?: boolean;
       rmpReference?: { name: string; phone: string; place?: string } | null;
       doctorReference?: { name: string; phone: string; place?: string } | null;
@@ -1410,6 +1412,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       phone: string;
       email: string;
       address: string;
+  place?: string;
       isExisting?: boolean;
       rmpReference?: { name: string; phone: string; place?: string } | null;
       doctorReference?: { name: string; phone: string; place?: string } | null;
@@ -1488,7 +1491,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       gender: patientDetails.gender,
       phone: patientDetails.phone,
       email: patientDetails.email,
-      address: patientDetails.address,
+      address: patientDetails.address || (patientDetails as any).place || '',
+      place: (patientDetails as any).place || patientDetails.address || '',
       hospitalId,
       hospitalName: targetHosp.name,
       doctorId,
@@ -1528,6 +1532,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       patientAgeDisplay: patientDetails.ageDisplay || (patientDetails.age ? `${patientDetails.age} Yrs` : '28 Yrs'),
       patientAgeUnit: patientDetails.ageUnit || 'Years',
       patientGender: newAppt.gender,
+      patientAddress: newAppt.address || (patientDetails as any).place || '',
+      address: newAppt.address || (patientDetails as any).place || '',
+      place: (patientDetails as any).place || newAppt.address || '',
       doctorId: newAppt.doctorId,
       doctorName: newAppt.doctorName,
       departmentId: targetDoc.departmentId || 'dept-general',

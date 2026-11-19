@@ -86,6 +86,9 @@ export interface TokenRecord {
   rmpReference?: { name: string; phone: string; place?: string } | null;
   patientAgeDisplay?: string;
   patientAgeUnit?: string;
+  patientAddress?: string;
+  address?: string;
+  place?: string;
   hospitalName?: string;
 }
 
