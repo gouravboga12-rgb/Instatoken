@@ -1052,52 +1052,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         reconnectionDelay: 2000
       });
 
-      const userPhoneClean = (user?.phone || '').replace(/\D/g, '').slice(-10);
-      socket.on('connect', () => {
-        if (userPhoneClean) {
-          socket.emit('join_patient', { phone: userPhoneClean });
-        }
-      });
-
-      socket.on('token_called', (callPayload: any) => {
-        if (!callPayload) return;
-        console.log('🔔 [Socket.io] AppContext received token_called:', callPayload);
-        const targetPhone = String(callPayload.patientPhone || '').replace(/\D/g, '').slice(-10);
-        
-        let savedApptPhones: string[] = [];
-        let hasMatchingAppt = false;
-        try {
-          const raw = localStorage.getItem('insta_appointments');
-          if (raw) {
-            const parsed = JSON.parse(raw);
-            if (Array.isArray(parsed)) {
-              savedApptPhones = parsed.map((a: any) => String(a.phone || a.patientPhone || '').replace(/\D/g, '').slice(-10)).filter(Boolean);
-              hasMatchingAppt = parsed.some((a: any) =>
-                a.id === callPayload.tokenId ||
-                (a.hospitalId === callPayload.hospitalId && Number(a.tokenNumber) === Number(callPayload.tokenNo))
-              );
-            }
-          }
-        } catch (e) {}
-
-        let storedUserPhone = '';
+      let myPhone = (user?.phone || '').replace(/\D/g, '').slice(-10);
+      if (!myPhone) {
         try {
           const rawU = localStorage.getItem('insta_user');
           if (rawU) {
             const u = JSON.parse(rawU);
-            storedUserPhone = String(u.phone || '').replace(/\D/g, '').slice(-10);
+            myPhone = String(u.phone || '').replace(/\D/g, '').slice(-10);
           }
         } catch (e) {}
+      }
 
-        let myPhones: string[] = [];
-        if (userPhoneClean) myPhones.push(userPhoneClean);
-        if (storedUserPhone && !myPhones.includes(storedUserPhone)) myPhones.push(storedUserPhone);
+      socket.on('connect', () => {
+        if (myPhone) {
+          socket.emit('join_patient', { phone: myPhone });
+        }
+      });
 
-        const matchesUser = targetPhone && myPhones.includes(targetPhone);
-        const matchesSavedAppt = targetPhone && savedApptPhones.includes(targetPhone);
+      socket.on('token_status_changed', (tok: any) => {
+        if (!tok) return;
+        setAppointments(prev =>
+          prev.map(a =>
+            (a.id === tok.id || (a.hospitalId === tok.hospitalId && Number(a.tokenNumber) === Number(tok.tokenNo || tok.tokenNumber)))
+              ? { ...a, status: tok.status }
+              : a
+          )
+        );
+      });
 
-        // Strict: ONLY alert if this token belongs strictly to this patient!
-        if (matchesUser || matchesSavedAppt || hasMatchingAppt) {
+      socket.on('token_called', (callPayload: any) => {
+        if (!callPayload) return;
+        const targetPhone = String(callPayload.patientPhone || '').replace(/\D/g, '').slice(-10);
+
+        // Strict 1-to-1: ONLY trigger notification if this patient matches targetPhone
+        if (myPhone && targetPhone === myPhone) {
           const rawDoc = callPayload.doctorName || 'Doctor';
           const cleanDoc = rawDoc.replace(/^Dr\.?\s*/i, '');
           const notifId = `notif-call-${callPayload.tokenId || Date.now()}`;

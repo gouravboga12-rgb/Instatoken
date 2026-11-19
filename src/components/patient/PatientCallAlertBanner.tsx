@@ -129,59 +129,40 @@ export const PatientCallAlertBanner: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    // Determine relevant phone numbers for current patient
-    const userPhoneClean = (user?.phone || '').replace(/\D/g, '').slice(-10);
-    
-    // Also read any saved appointment phone numbers
-    let savedApptPhones: string[] = [];
-    try {
-      const raw = localStorage.getItem('insta_appointments');
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          savedApptPhones = parsed.map((a: any) => String(a.phone || a.patientPhone || '').replace(/\D/g, '').slice(-10)).filter(Boolean);
+    // 1. Determine active logged-in patient's phone number
+    let myPhone = (user?.phone || '').replace(/\D/g, '').slice(-10);
+    if (!myPhone) {
+      try {
+        const rawU = localStorage.getItem('insta_user');
+        if (rawU) {
+          const u = JSON.parse(rawU);
+          myPhone = String(u.phone || '').replace(/\D/g, '').slice(-10);
         }
-      }
-    } catch (e) { }
+      } catch (e) {}
+    }
 
     const isTargetPatient = (payload: CallAlertPayload) => {
       if (!payload) return false;
       const targetPhone = String(payload.patientPhone || '').replace(/\D/g, '').slice(-10);
       if (!targetPhone) return false;
       
-      let myPhones: string[] = [];
-      if (userPhoneClean) myPhones.push(userPhoneClean);
+      // Strict 1-to-1 matching: If patient is logged in, alert ONLY if targetPhone === myPhone
+      if (myPhone) {
+        return targetPhone === myPhone;
+      }
+
+      // Guest fallback: only alert if the guest session holds this exact tokenId
       try {
-        const rawU = localStorage.getItem('insta_user');
-        if (rawU) {
-          const u = JSON.parse(rawU);
-          const p = String(u.phone || '').replace(/\D/g, '').slice(-10);
-          if (p && !myPhones.includes(p)) myPhones.push(p);
+        const activePass = sessionStorage.getItem('insta_guest_token_id') || localStorage.getItem('insta_guest_token_id');
+        if (activePass && activePass === payload.tokenId) {
+          return true;
         }
       } catch (e) {}
 
-      if (myPhones.includes(targetPhone)) return true;
-      if (savedApptPhones.includes(targetPhone)) return true;
-      
-      // Also check if any stored appointment matches the tokenId or patient phone
-      try {
-        const raw = localStorage.getItem('insta_appointments');
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed) && parsed.some((a: any) => 
-            a.id === payload.tokenId || 
-            (String(a.phone || a.patientPhone || '').replace(/\D/g, '').slice(-10) === targetPhone && Number(a.tokenNumber) === Number(payload.tokenNo))
-          )) {
-            return true;
-          }
-        }
-      } catch (e) { }
-
-      // Strict: Only alert if this token belongs strictly to this patient!
       return false;
     };
 
-    // 1. Cross-tab & local sync listener
+    // 1. Cross-tab & local sync listener (strictly filtered by isTargetPatient)
     const unsubscribeSync = subscribeGlobalSync((event) => {
       if (event.type === 'TOKEN_CALLED' && event.data) {
         const payload = event.data as CallAlertPayload;
@@ -191,7 +172,7 @@ export const PatientCallAlertBanner: React.FC = () => {
       }
     });
 
-    // 2. Real-time Socket.io listener
+    // 2. Real-time Socket.io listener (joins ONLY this patient's personal room)
     let socket: Socket | null = null;
     try {
       const socketBackendUrl =
@@ -206,14 +187,9 @@ export const PatientCallAlertBanner: React.FC = () => {
       });
 
       socket.on('connect', () => {
-        if (userPhoneClean) {
-          socket?.emit('join_patient', { phone: userPhoneClean });
+        if (myPhone) {
+          socket?.emit('join_patient', { phone: myPhone });
         }
-        savedApptPhones.forEach(phone => {
-          if (phone && phone !== userPhoneClean) {
-            socket?.emit('join_patient', { phone });
-          }
-        });
       });
 
       socket.on('token_called', (payload: CallAlertPayload) => {

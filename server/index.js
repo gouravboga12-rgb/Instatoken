@@ -3465,6 +3465,40 @@ app.post('/api/hospitals/:hospitalId/tokens/:tokenId/call', requireHospitalAuth,
     return a;
   });
 
+  // ─── SINGLE-CALLER INVARIANCE ───────────────────────────────────────
+  // A doctor has only one cabin door. When this token is called, any other
+  // token for the same doctor that was currently 'calling' MUST be automatically
+  // demoted to 'late-coming' (On-Hold) so only ONE token is actively calling.
+  const targetDoctorId = targetToken.doctorId;
+  const nowIso = new Date().toISOString();
+  const demotedTokens = [];
+
+  if (targetDoctorId) {
+    store.tokens = (store.tokens || []).map(t => {
+      if (t.doctorId === targetDoctorId && t.id !== targetToken.id && t.status === 'calling') {
+        const demoted = {
+          ...t,
+          status: 'late-coming',
+          autoHeldAt: nowIso
+        };
+        demotedTokens.push(demoted);
+        return demoted;
+      }
+      return t;
+    });
+
+    store.appointments = (store.appointments || []).map(a => {
+      if ((a.doctorId === targetDoctorId || a.doctor_id === targetDoctorId) && a.id !== targetToken.id && a.status === 'calling') {
+        return {
+          ...a,
+          status: 'late-coming',
+          autoHeldAt: nowIso
+        };
+      }
+      return a;
+    });
+  }
+
   if (isDbConnected) {
     try {
       await query(
@@ -3479,6 +3513,22 @@ app.post('/api/hospitals/:hospitalId/tokens/:tokenId/call', requireHospitalAuth,
          WHERE id = $1`,
         [targetToken.id]
       );
+
+      // In RDS: Demote all other calling tokens for this doctor to 'late-coming'
+      if (targetDoctorId) {
+        await query(
+          `UPDATE tokens SET status = 'late-coming', updated_at = NOW(),
+           data = (COALESCE(data, '{}'::jsonb) || jsonb_build_object('status', 'late-coming', 'autoHeldAt', NOW()))
+           WHERE doctor_id = $1 AND status = 'calling' AND id != $2`,
+          [targetDoctorId, targetToken.id]
+        );
+        await query(
+          `UPDATE appointments SET status = 'late-coming', updated_at = NOW(),
+           data = (COALESCE(data, '{}'::jsonb) || jsonb_build_object('status', 'late-coming', 'autoHeldAt', NOW()))
+           WHERE (doctor_id = $1 OR data->>'doctorId' = $1) AND status = 'calling' AND id != $2`,
+          [targetDoctorId, targetToken.id]
+        );
+      }
     } catch (e) {
       console.warn('RDS calling update error:', e.message);
     }
@@ -3509,16 +3559,25 @@ app.post('/api/hospitals/:hospitalId/tokens/:tokenId/call', requireHospitalAuth,
   store.broadcastNotifications = (store.broadcastNotifications || []).filter(b => b.type !== 'call');
   await saveUnifiedStore(store);
 
-  // 1. Emit strictly to the specific patient's private room
+  // 1. Notify hospital room and demoted patients of demotion
+  demotedTokens.forEach(dt => {
+    io.to(`hospital_${hospitalId}`).emit('token_status_changed', dt);
+    const dPhone = String(dt.patientPhone || '').replace(/\D/g, '').slice(-10);
+    if (dPhone) {
+      io.to(`patient_${dPhone}`).emit('token_status_changed', dt);
+    }
+  });
+
+  // 2. Emit strictly to the specific called patient's private room
   if (cleanPhone) {
     io.to(`patient_${cleanPhone}`).emit('token_called', callPayload);
   }
-  // 2. Notify hospital room of token status change
+  // 3. Notify hospital room of target token status change to 'calling'
   io.to(`hospital_${hospitalId}`).emit('token_status_changed', targetToken);
 
-  console.log(`📡 [Socket.io] Emitted private token_called for Token #${callPayload.tokenNo} strictly to patient room patient_${cleanPhone} (${targetToken.patientName})`);
+  console.log(`📡 [Socket.io] Emitted private token_called for Token #${callPayload.tokenNo} strictly to patient room patient_${cleanPhone} (${targetToken.patientName}). Demoted ${demotedTokens.length} other calling token(s) to late-coming.`);
 
-  res.json({ success: true, callPayload, token: targetToken });
+  res.json({ success: true, callPayload, token: targetToken, demotedCount: demotedTokens.length });
 });
 
 // ─── Out-of-Order Cabin Admission & Auto-Hold ───────────────────────

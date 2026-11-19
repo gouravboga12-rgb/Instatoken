@@ -2241,9 +2241,19 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const targetToken = tokens.find(t => t.id === id);
     if (!targetToken) return;
 
-    // 1. Immediately update local token status to 'calling'
+    // 1. Immediately update local token status: target becomes 'calling',
+    // and any other token for this doctor that was 'calling' is demoted to 'late-coming' (On-Hold)
+    const nowIso = new Date().toISOString();
     setTokens(prev => {
-      const updated = prev.map(t => t.id === id ? { ...t, status: 'calling' as const } : t);
+      const updated = prev.map(t => {
+        if (t.id === id) {
+          return { ...t, status: 'calling' as const, lastCalledAt: nowIso };
+        }
+        if (t.doctorId === targetToken.doctorId && t.status === 'calling') {
+          return { ...t, status: 'late-coming' as const, autoHeldAt: nowIso };
+        }
+        return t;
+      });
       localStorage.setItem('insta_hospital_tokens', JSON.stringify(updated));
       if (targetHospId) {
         localStorage.setItem(`insta_hospital_tokens_${targetHospId}`, JSON.stringify(updated));
@@ -2251,26 +2261,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       return updated;
     });
 
-    const cleanPhone = String(targetToken.patientPhone || '').replace(/\D/g, '').slice(-10);
-    const callPayload = {
-      tokenId: targetToken.id,
-      tokenNo: targetToken.tokenNo || (targetToken as any).tokenNumber,
-      patientName: targetToken.patientName,
-      patientPhone: cleanPhone,
-      doctorId: targetToken.doctorId,
-      doctorName: targetToken.doctorName,
-      hospitalId: targetToken.hospitalId || targetHospId,
-      hospitalName: hospitalProfile?.name || targetToken.hospitalName || "Hospital OPD",
-      departmentName: targetToken.departmentName || "General OPD",
-      session: targetToken.session || "Morning",
-      calledAt: new Date().toISOString(),
-      message: `Token #${targetToken.tokenNo || (targetToken as any).tokenNumber} Called! Dr. ${targetToken.doctorName} is ready for you in the cabin.`
-    };
-
-    // 2. Broadcast via global cross-tab sync so patient window in any browser/tab gets the alert instantly
-    broadcastGlobalSync('TOKEN_CALLED', callPayload);
-
-    // 3. Post to backend which broadcasts via Socket.io to patient room and all connected apps
+    // 2. Post to backend which enforces single-caller invariance in DB and emits strictly to patient's private socket room
     try {
       const res = await fetch(`/api/hospitals/${targetHospId}/tokens/${id}/call`, {
         method: 'POST',
