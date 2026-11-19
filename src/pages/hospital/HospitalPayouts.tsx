@@ -136,6 +136,7 @@ export const HospitalPayouts: React.FC = () => {
 
   const bd = summary?.bankDetails || {};
   const isFullOnline = summary?.paymentMode === 'full_online';
+  const hasDuesOrHistory = (summary?.totalCollectedOnline || 0) > 0 || (summary?.totalSettled || 0) > 0 || (summary?.pendingDue || 0) > 0;
   const pendingRequest = requests.find(r => r.status === 'pending');
   const hasPendingRequest = Boolean(pendingRequest);
 
@@ -165,21 +166,23 @@ export const HospitalPayouts: React.FC = () => {
         </button>
       </div>
 
-      {/* Not Full-Online Banner */}
+      {/* Mode Banner */}
       {!isFullOnline && (
         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 sm:p-5 flex items-start gap-3 sm:gap-4">
           <AlertCircle size={20} className="text-amber-600 shrink-0 mt-0.5" />
           <div>
-            <h3 className="text-sm font-black text-amber-900">Full Online Payment Not Enabled</h3>
+            <h3 className="text-sm font-black text-amber-900">Hospital is Operating in "Pay at Hospital" Mode</h3>
             <p className="text-xs text-amber-700 font-medium mt-1">
-              Your hospital is currently on <strong>Pay at Hospital</strong> mode. Patients pay the doctor consultation fee directly at your cabin.
-              To collect consultation fees online via InstaToken, enable <strong>Full Online Payment</strong> in <strong>Settings → Payout & Online Payments</strong>.
+              New bookings collect doctor consultation fees directly at your hospital counter.
+              {hasDuesOrHistory
+                ? " Any historical dues from past Full-Online consultations remain fully active and will be settled by InstaToken to your bank account."
+                : " To collect doctor consultation fees online through InstaToken, enable Full Online Payment in Settings → Payout & Online Payments."}
             </p>
           </div>
         </div>
       )}
 
-      {isFullOnline && (
+      {(isFullOnline || hasDuesOrHistory) && (
         <>
           {/* KPI Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-4">

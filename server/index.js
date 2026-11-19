@@ -5196,17 +5196,27 @@ app.get('/api/hospitals/:hospitalId/payout-summary', requireHospitalAuth, async 
 app.get('/api/admin/hospital-settlements', async (req, res) => {
   const store = await getUnifiedStore();
 
+  // Fetch all hospitals that are either full_online OR have historical online tokens/settlements
   let hospitals = [];
   if (isDbConnected) {
     try {
-      const r = await query(`SELECT id, name, city, payment_mode, bank_account_holder, bank_account_number, bank_name, bank_ifsc, upi_id, upi_phone FROM hospitals WHERE payment_mode='full_online' AND id != 'hosp-gandhi'`);
+      const r = await query(`
+        SELECT id, name, city, payment_mode, bank_account_holder, bank_account_number, bank_name, bank_ifsc, upi_id, upi_phone
+        FROM hospitals
+        WHERE id != 'hosp-gandhi'
+          AND (
+            payment_mode = 'full_online'
+            OR id IN (SELECT DISTINCT hospital_id FROM tokens WHERE (data->'paymentCollection'->>'mode' = 'full_online' OR data->>'paymentMethod' ILIKE '%full online%'))
+            OR id IN (SELECT DISTINCT hospital_id FROM hospital_payout_settlements)
+          )
+      `);
       hospitals = r.rows;
     } catch (e) {
       console.warn('Error fetching full-online hospitals:', e.message);
     }
   }
   if (hospitals.length === 0) {
-    hospitals = (store.hospitals || []).filter(h => h.payment_mode === 'full_online' && h.id !== 'hosp-gandhi');
+    hospitals = (store.hospitals || []).filter(h => h.id !== 'hosp-gandhi');
   } else {
     hospitals = hospitals.filter(h => h.id !== 'hosp-gandhi');
   }
