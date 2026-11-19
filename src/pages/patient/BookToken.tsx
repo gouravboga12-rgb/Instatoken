@@ -1,13 +1,14 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { calculateDistanceKm } from '../../utils/googleMaps';
+import { calculateDistanceKm, reverseGeocode } from '../../utils/googleMaps';
 import { subscribeGlobalSync } from '../../utils/syncBus';
 import { Button } from '../../components/ui/Button';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
   ArrowLeft, Calendar as CalendarIcon, Clock, User, Phone, 
   MapPin, ShieldCheck, Sun, Moon, Zap, Users,
-  ChevronDown, Heart, Stethoscope, UserX, Receipt, Info, Lock, Building2
+  ChevronDown, Heart, Stethoscope, UserX, Receipt, Info, Lock, Building2,
+  Navigation, Loader2
 } from 'lucide-react';
 
 const monthsList = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -47,7 +48,7 @@ const formatDateOption = (dateStr: string) => {
 
 export const BookToken: React.FC = () => {
   const { hospitalId, doctorId } = useParams<{ hospitalId: string; doctorId: string }>();
-  const { hospitals, user, toggleSaveDoctor, platformFeePercent, userCoords } = useApp();
+  const { hospitals, user, toggleSaveDoctor, platformFeePercent, userCoords, currentLocation } = useApp();
   const navigate = useNavigate();
 
   const hospital = hospitals.find(h => h.id === hospitalId) || hospitals[0];
@@ -239,8 +240,8 @@ export const BookToken: React.FC = () => {
   const [age, setAge] = useState<string>('');
   const [ageUnit, setAgeUnit] = useState<'Years' | 'Months' | 'Days'>('Years');
   const [gender, setGender] = useState<string>('Male');
-  const [phone, setPhone] = useState(user?.phone || '');
-  const [place, setPlace] = useState('');
+  const [phone, setPhone] = useState(() => (user?.phone || '').replace(/\D/g, '').slice(-10));
+  const [place, setPlace] = useState(user?.address || user?.location || currentLocation || '');
   const [isExisting, setIsExisting] = useState(false);
   const [showRmpFields, setShowRmpFields] = useState(false);
   const [rmpName, setRmpName] = useState('');
@@ -248,6 +249,68 @@ export const BookToken: React.FC = () => {
   const [rmpPlace, setRmpPlace] = useState('');
   
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<{ name?: boolean; phone?: boolean; age?: boolean; place?: boolean }>({});
+  const [isDetectingLocation, setIsDetectingLocation] = useState(false);
+
+  // Auto-detect current place using Reverse Geocoding
+  const handleDetectLocation = () => {
+    if (!navigator.geolocation) {
+      setError('Geolocation is not supported by your browser.');
+      return;
+    }
+    setIsDetectingLocation(true);
+    setError('');
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+          const placeName = await reverseGeocode(latitude, longitude);
+          if (placeName && placeName !== 'Current Location') {
+            setPlace(placeName);
+            setFieldErrors(prev => ({ ...prev, place: false }));
+          } else if (currentLocation) {
+            setPlace(currentLocation);
+            setFieldErrors(prev => ({ ...prev, place: false }));
+          } else {
+            setPlace('Current Location');
+          }
+        } catch (err) {
+          console.warn('Reverse geocode error:', err);
+          if (currentLocation) {
+            setPlace(currentLocation);
+            setFieldErrors(prev => ({ ...prev, place: false }));
+          }
+        } finally {
+          setIsDetectingLocation(false);
+        }
+      },
+      (geoErr) => {
+        console.warn('Geolocation error:', geoErr);
+        setIsDetectingLocation(false);
+        if (currentLocation) {
+          setPlace(currentLocation);
+          setFieldErrors(prev => ({ ...prev, place: false }));
+        } else {
+          setError('Location access denied or unavailable. Please enter your place manually.');
+        }
+      },
+      { timeout: 10000, enableHighAccuracy: true }
+    );
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Only accept numeric digits, up to 10 characters
+    const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 10);
+    setPhone(digitsOnly);
+    if (fieldErrors.phone) setFieldErrors(prev => ({ ...prev, phone: false }));
+  };
+
+  const handleAgeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Only accept numeric digits, up to 3 characters
+    const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 3);
+    setAge(digitsOnly);
+    if (fieldErrors.age) setFieldErrors(prev => ({ ...prev, age: false }));
+  };
 
   const dateInputRef = useRef<HTMLInputElement>(null);
   const patientDetailsRef = useRef<HTMLDivElement>(null);
@@ -373,20 +436,59 @@ export const BookToken: React.FC = () => {
   const handleProceedToBooking = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setFieldErrors({});
 
     if (!isDoctorOnlineAvailable) {
       setError(`Dr. ${doctor?.name || 'Doctor'} is currently unavailable for online token booking at this hospital.`);
       return;
     }
 
-    if (!name.trim()) {
-      setError('Please enter patient name');
+    // 1. Patient Name Validation
+    if (!name.trim() || name.trim().length < 2) {
+      setError('Please enter patient full name (at least 2 letters)');
+      setFieldErrors({ name: true });
+      patientDetailsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
-    if (!phone.trim()) {
-      setError('Please enter mobile number');
+
+    // 2. Mobile Number Validation (Strictly 10 digits)
+    const cleanPhone = phone.replace(/\D/g, '');
+    if (!cleanPhone || cleanPhone.length !== 10) {
+      setError('Please enter a valid 10-digit mobile number');
+      setFieldErrors({ phone: true });
+      patientDetailsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
+    if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
+      setError('Mobile number must start with 6, 7, 8, or 9');
+      setFieldErrors({ phone: true });
+      patientDetailsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+
+    // 3. Age Validation (Strictly required, > 0)
+    const ageVal = parseInt(age, 10);
+    if (!age.trim() || isNaN(ageVal) || ageVal <= 0) {
+      setError('Please enter patient age');
+      setFieldErrors({ age: true });
+      patientDetailsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    if (ageUnit === 'Years' && ageVal > 120) {
+      setError('Please enter a valid age (1 - 120 Years)');
+      setFieldErrors({ age: true });
+      patientDetailsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+
+    // 4. Place Validation (Strictly required)
+    if (!place.trim()) {
+      setError('Please enter your place or tap Auto to detect');
+      setFieldErrors({ place: true });
+      patientDetailsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+
     if (!isDoctorAvailableOnDate(selectedDate)) {
       const parts = selectedDate.split('-');
       const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
@@ -398,8 +500,7 @@ export const BookToken: React.FC = () => {
       return;
     }
 
-    const ageVal = parseInt(age) || 0;
-    const computedAgeDisplay = age ? `${age} ${ageUnit}` : '28 Years';
+    const computedAgeDisplay = `${ageVal} ${ageUnit}`;
 
     const isFullOnline = hospital?.payment_mode === 'full_online' || (hospital as any)?.paymentMode === 'full_online';
     const docFee = doctor.consultationFee || 500;
@@ -699,37 +800,51 @@ export const BookToken: React.FC = () => {
                 <input 
                   type="text" 
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Full Name"
-                  className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:border-blue-600 focus:outline-none transition-all placeholder:text-slate-400"
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    if (fieldErrors.name) setFieldErrors(prev => ({ ...prev, name: false }));
+                  }}
+                  placeholder="Full Name *"
+                  className={`w-full pl-9 pr-3 py-2 bg-white border rounded-xl text-xs font-semibold focus:outline-none transition-all placeholder:text-slate-400 ${
+                    fieldErrors.name ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
+                  }`}
                 />
               </div>
 
               {/* Mobile Number & Age in 2 columns */}
               <div className="grid grid-cols-2 gap-2">
-                <div className="relative">
-                  <Phone size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                <div className={`relative flex items-center bg-white border rounded-xl overflow-hidden transition-all ${
+                  fieldErrors.phone ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20' : 'border-slate-200 focus-within:border-blue-600'
+                }`}>
+                  <div className="flex items-center pl-2.5 pr-1.5 text-slate-500 font-bold text-xs select-none shrink-0 border-r border-slate-100">
+                    <Phone size={13} className="mr-1 text-slate-400" />
+                    <span>+91</span>
+                  </div>
                   <input 
                     type="tel" 
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={10}
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="Mobile Number *"
-                    className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:border-blue-600 focus:outline-none transition-all placeholder:text-slate-400"
+                    onChange={handlePhoneChange}
+                    placeholder="10-digit Mobile *"
+                    className="w-full pl-2.5 pr-3 py-2 text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-none"
                   />
                 </div>
 
                 {/* Age with Years dropdown */}
-                <div className="relative flex items-center bg-white border border-slate-200 rounded-xl overflow-hidden focus-within:border-blue-600 transition-all">
+                <div className={`relative flex items-center bg-white border rounded-xl overflow-hidden transition-all ${
+                  fieldErrors.age ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20' : 'border-slate-200 focus-within:border-blue-600'
+                }`}>
                   <CalendarIcon size={14} className="absolute left-3 text-slate-400 pointer-events-none" />
                   <input 
-                    type="number" 
+                    type="text" 
                     inputMode="numeric"
-                    min="1"
-                    max={ageUnit === 'Days' ? 365 : 120}
+                    maxLength={3}
                     value={age}
-                    onChange={(e) => setAge(e.target.value)}
-                    placeholder="Age"
-                    className="w-full min-w-0 pl-8 pr-1 py-2 text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    onChange={handleAgeChange}
+                    placeholder="Age *"
+                    className="w-full min-w-0 pl-8 pr-1 py-2 text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-none"
                   />
                   <div className="relative shrink-0 flex items-center pr-1.5">
                     <select
@@ -762,15 +877,34 @@ export const BookToken: React.FC = () => {
                   <ChevronDown size={12} className="absolute right-2 text-slate-400 pointer-events-none" />
                 </div>
 
-                <div className="relative">
-                  <MapPin size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                <div className={`relative flex items-center bg-white border rounded-xl overflow-hidden transition-all ${
+                  fieldErrors.place ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20' : 'border-slate-200 focus-within:border-blue-600'
+                }`}>
+                  <MapPin size={14} className="absolute left-3 text-slate-400 pointer-events-none shrink-0" />
                   <input 
                     type="text" 
                     value={place}
-                    onChange={(e) => setPlace(e.target.value)}
-                    placeholder="Enter your place"
-                    className="w-full pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:border-blue-600 focus:outline-none transition-all placeholder:text-slate-400"
+                    onChange={(e) => {
+                      setPlace(e.target.value);
+                      if (fieldErrors.place) setFieldErrors(prev => ({ ...prev, place: false }));
+                    }}
+                    placeholder="Enter your place *"
+                    className="w-full pl-8 pr-18 py-2 text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-none"
                   />
+                  <button
+                    type="button"
+                    onClick={handleDetectLocation}
+                    disabled={isDetectingLocation}
+                    title="Auto-detect current location"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1 bg-blue-50 hover:bg-blue-100 text-blue-600 px-2 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer disabled:opacity-60"
+                  >
+                    {isDetectingLocation ? (
+                      <Loader2 size={11} className="animate-spin text-blue-600" />
+                    ) : (
+                      <Navigation size={11} className="text-blue-600" />
+                    )}
+                    <span>{isDetectingLocation ? 'Locating...' : 'Auto'}</span>
+                  </button>
                 </div>
               </div>
 
