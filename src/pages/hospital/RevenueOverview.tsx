@@ -9,7 +9,7 @@ import {
 import { TokenPaymentModal } from '../../components/hospital/TokenPaymentModal';
 
 export const RevenueOverview: React.FC = () => {
-  const { doctors, tokens, updateTokenStatus, deleteToken, fetchHospitalRevenue } = useHospital();
+  const { doctors, tokens, updateTokenStatus, fetchHospitalRevenue } = useHospital();
 
   // Filters State
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month' | 'custom'>('all');
@@ -159,8 +159,8 @@ export const RevenueOverview: React.FC = () => {
   };
 
   const handleReleaseSlotFromModal = (tokenId: string) => {
-    if (window.confirm('Are you sure you want to release this token slot?')) {
-      deleteToken(tokenId);
+    if (window.confirm('Are you sure you want to cancel and release this token slot? Patient record will be preserved.')) {
+      updateTokenStatus(tokenId, 'cancelled');
     }
   };
 
