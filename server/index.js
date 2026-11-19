@@ -3424,36 +3424,82 @@ app.delete('/api/hospitals/:hospitalId/tokens/:tokenId', requireHospitalAuth, as
   const { hospitalId, tokenId } = req.params;
   const store = await getUnifiedStore();
 
-  const targetToken = (store.tokens || []).find(t => t.id === tokenId);
-  store.tokens = (store.tokens || []).filter(t => t.id !== tokenId);
-  store.appointments = (store.appointments || []).filter(a => a.id !== tokenId && !(targetToken && a.hospitalId === targetToken.hospitalId && a.doctorId === targetToken.doctorId && (a.tokenNumber === targetToken.tokenNo || a.tokenNumber === targetToken.tokenNumber)));
+  const targetToken = (store.tokens || []).find(t =>
+    t.id === tokenId ||
+    (t.appointmentId && t.appointmentId === tokenId) ||
+    (t.tokenId && t.tokenId === tokenId)
+  );
+
+  const targetAppt = (store.appointments || []).find(a =>
+    a.id === tokenId ||
+    (targetToken && (a.id === targetToken.id || a.id === targetToken.appointmentId)) ||
+    (targetToken && a.hospitalId === hospitalId && a.doctorId === targetToken.doctorId &&
+      (String(a.tokenNumber) === String(targetToken.tokenNo) || String(a.tokenNumber) === String(targetToken.tokenNumber)))
+  );
+
+  const matchedApptId = targetToken?.appointmentId || targetAppt?.id || null;
+  const tokNum = targetToken ? String(targetToken.tokenNo || targetToken.tokenNumber || '') : (targetAppt ? String(targetAppt.tokenNumber || '') : '');
+  const docId = targetToken?.doctorId || targetAppt?.doctorId || null;
+
+  // Filter in memory store
+  store.tokens = (store.tokens || []).filter(t =>
+    t.id !== tokenId &&
+    t.appointmentId !== tokenId &&
+    t.tokenId !== tokenId &&
+    !(matchedApptId && (t.id === matchedApptId || t.appointmentId === matchedApptId)) &&
+    !(tokNum && docId && t.hospitalId === hospitalId && t.doctorId === docId && (String(t.tokenNo) === tokNum || String(t.tokenNumber) === tokNum))
+  );
+
+  store.appointments = (store.appointments || []).filter(a =>
+    a.id !== tokenId &&
+    !(matchedApptId && a.id === matchedApptId) &&
+    !(tokNum && docId && a.hospitalId === hospitalId && a.doctorId === docId && String(a.tokenNumber) === tokNum)
+  );
 
   if (isDbConnected) {
     try {
-      await query(`DELETE FROM tokens WHERE id = $1`, [tokenId]);
-      await query(`DELETE FROM appointments WHERE id = $1`, [tokenId]);
-      if (targetToken && (targetToken.tokenNo || targetToken.tokenNumber)) {
-        const tokNum = String(targetToken.tokenNo || targetToken.tokenNumber);
-        await query(
-          `DELETE FROM tokens WHERE hospital_id = $1 AND doctor_id = $2 AND (token_number = $3 OR data->>'tokenNumber' = $3 OR data->>'tokenNo' = $3)`,
-          [hospitalId, targetToken.doctorId, tokNum]
-        );
-        await query(
-          `DELETE FROM appointments WHERE hospital_id = $1 AND doctor_id = $2 AND (data->>'tokenNumber' = $3 OR data->>'tokenNo' = $3)`,
-          [hospitalId, targetToken.doctorId, tokNum]
-        );
-      }
+      // 1. Delete from tokens table
+      await query(
+        `DELETE FROM tokens 
+         WHERE (hospital_id = $1 OR hospital_id IS NULL) AND (
+           id = $2 OR 
+           data->>'id' = $2 OR 
+           data->>'tokenId' = $2 OR 
+           data->>'appointmentId' = $2
+           ${matchedApptId ? `OR id = '${matchedApptId}' OR data->>'id' = '${matchedApptId}' OR data->>'appointmentId' = '${matchedApptId}'` : ''}
+           ${tokNum && docId ? `OR (doctor_id = '${docId}' AND (token_number = '${tokNum}' OR data->>'tokenNumber' = '${tokNum}' OR data->>'tokenNo' = '${tokNum}'))` : ''}
+         )`,
+        [hospitalId, tokenId]
+      );
+
+      // 2. Delete from appointments table
+      await query(
+        `DELETE FROM appointments 
+         WHERE (hospital_id = $1 OR hospital_id IS NULL) AND (
+           id = $2 OR 
+           data->>'id' = $2 OR 
+           data->>'tokenId' = $2 OR 
+           data->>'appointmentId' = $2
+           ${matchedApptId ? `OR id = '${matchedApptId}' OR data->>'id' = '${matchedApptId}' OR data->>'appointmentId' = '${matchedApptId}'` : ''}
+           ${tokNum && docId ? `OR (doctor_id = '${docId}' AND (data->>'tokenNumber' = '${tokNum}' OR data->>'tokenNo' = '${tokNum}'))` : ''}
+         )`,
+        [hospitalId, tokenId]
+      );
     } catch (e) {
       console.warn('Error deleting token from RDS:', e.message);
     }
   }
 
   await saveUnifiedStore(store);
+
+  // Broadcast deletion to hospital room and globally
   if (hospitalId) {
-    io.to(`hospital_${hospitalId}`).emit('token_deleted', { tokenId });
+    io.to(`hospital_${hospitalId}`).emit('token_deleted', { tokenId, appointmentId: matchedApptId });
     console.log(`📡 [Socket.io] Emitted token_deleted to hospital_${hospitalId} for token ${tokenId}`);
   }
-  res.json({ success: true, message: 'Token deleted successfully', id: tokenId });
+  io.emit('token_deleted', { hospitalId, tokenId, appointmentId: matchedApptId });
+
+  res.json({ success: true, message: 'Token deleted successfully', id: tokenId, appointmentId: matchedApptId });
 });
 
 // ─── Bulk Delete Hospital Tokens (e.g. End of Day Unvisited Clearance) ────────
@@ -3471,25 +3517,58 @@ app.delete('/api/hospitals/:hospitalId/tokens', requireHospitalAuth, async (req,
 
   if (targetIds.length > 0) {
     const idSet = new Set(targetIds);
-    store.tokens = (store.tokens || []).filter(t => !idSet.has(t.id));
+
+    // Also collect any associated appointment IDs
+    (store.tokens || []).forEach(t => {
+      if (idSet.has(t.id) && t.appointmentId) {
+        idSet.add(t.appointmentId);
+      }
+    });
+
+    const fullIdsArray = Array.from(idSet);
+
+    store.tokens = (store.tokens || []).filter(t => !idSet.has(t.id) && !idSet.has(t.appointmentId) && !idSet.has(t.tokenId));
     store.appointments = (store.appointments || []).filter(a => !idSet.has(a.id));
 
     if (isDbConnected) {
       try {
-        await query(`DELETE FROM tokens WHERE id = ANY($1::varchar[])`, [targetIds]);
-        await query(`DELETE FROM appointments WHERE id = ANY($1::varchar[])`, [targetIds]);
+        await query(
+          `DELETE FROM tokens 
+           WHERE (hospital_id = $1 OR hospital_id IS NULL) AND (
+             id = ANY($2::varchar[]) OR 
+             data->>'id' = ANY($2::varchar[]) OR 
+             data->>'tokenId' = ANY($2::varchar[]) OR 
+             data->>'appointmentId' = ANY($2::varchar[])
+           )`,
+          [hospitalId, fullIdsArray]
+        );
+        await query(
+          `DELETE FROM appointments 
+           WHERE (hospital_id = $1 OR hospital_id IS NULL) AND (
+             id = ANY($2::varchar[]) OR 
+             data->>'id' = ANY($2::varchar[]) OR 
+             data->>'tokenId' = ANY($2::varchar[]) OR 
+             data->>'appointmentId' = ANY($2::varchar[])
+           )`,
+          [hospitalId, fullIdsArray]
+        );
       } catch (e) {
         console.warn('Error bulk deleting tokens from RDS:', e.message);
       }
     }
+
+    await saveUnifiedStore(store);
+
+    if (hospitalId) {
+      io.to(`hospital_${hospitalId}`).emit('tokens_bulk_deleted', { ids: fullIdsArray });
+      console.log(`📡 [Socket.io] Emitted tokens_bulk_deleted to hospital_${hospitalId} (${fullIdsArray.length} tokens)`);
+    }
+    io.emit('tokens_bulk_deleted', { hospitalId, ids: fullIdsArray });
+
+    return res.json({ success: true, count: fullIdsArray.length, clearedIds: fullIdsArray });
   }
 
-  await saveUnifiedStore(store);
-  if (hospitalId && targetIds.length > 0) {
-    io.to(`hospital_${hospitalId}`).emit('tokens_bulk_deleted', { ids: targetIds });
-    console.log(`📡 [Socket.io] Emitted tokens_bulk_deleted to hospital_${hospitalId} (${targetIds.length} tokens)`);
-  }
-  res.json({ success: true, count: targetIds.length, clearedIds: targetIds });
+  res.json({ success: true, count: 0, clearedIds: [] });
 });
 
 // ─── Update Appointment Status Directly ──────────────────────────────────────

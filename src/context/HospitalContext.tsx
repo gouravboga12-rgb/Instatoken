@@ -1029,18 +1029,44 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       });
 
       // 4. Live Token Deleted
-      socket.on('token_deleted', ({ tokenId }: { tokenId: string }) => {
-        if (!tokenId) return;
-        console.log('🔔 [Socket.io] Live token_deleted received:', tokenId);
-        setTokens(prev => prev.filter(t => t.id !== tokenId));
+      socket.on('token_deleted', ({ tokenId, appointmentId }: { tokenId: string; appointmentId?: string }) => {
+        if (!tokenId && !appointmentId) return;
+        console.log('🔔 [Socket.io] Live token_deleted received:', tokenId, appointmentId);
+        setTokens(prev => {
+          const updated = prev.filter(t =>
+            t.id !== tokenId &&
+            (!appointmentId || t.id !== appointmentId) &&
+            ((t as any).appointmentId !== tokenId) &&
+            (!appointmentId || (t as any).appointmentId !== appointmentId) &&
+            ((t as any).tokenId !== tokenId)
+          );
+          localStorage.setItem('insta_hospital_tokens', JSON.stringify(updated));
+          if (targetHospId) {
+            localStorage.setItem(`insta_hospital_tokens_${targetHospId}`, JSON.stringify(updated));
+          }
+          broadcastGlobalSync('HOSPITAL_TOKENS_UPDATED', updated);
+          return updated;
+        });
       });
 
       // 5. Live Tokens Bulk Deleted (Clear unvisited)
       socket.on('tokens_bulk_deleted', ({ ids }: { ids: string[] }) => {
-        if (!Array.isArray(ids)) return;
+        if (!Array.isArray(ids) || ids.length === 0) return;
         console.log('🔔 [Socket.io] Live tokens_bulk_deleted received:', ids.length);
         const idSet = new Set(ids);
-        setTokens(prev => prev.filter(t => !idSet.has(t.id)));
+        setTokens(prev => {
+          const updated = prev.filter(t =>
+            !idSet.has(t.id) &&
+            !idSet.has((t as any).appointmentId) &&
+            !idSet.has((t as any).tokenId)
+          );
+          localStorage.setItem('insta_hospital_tokens', JSON.stringify(updated));
+          if (targetHospId) {
+            localStorage.setItem(`insta_hospital_tokens_${targetHospId}`, JSON.stringify(updated));
+          }
+          broadcastGlobalSync('HOSPITAL_TOKENS_UPDATED', updated);
+          return updated;
+        });
       });
     } catch (err) {
       console.warn('Socket.io connection initialization error:', err);
@@ -1347,6 +1373,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   useEffect(() => {
     if (!targetHospId || !hospitalUser) return;
     localStorage.setItem('insta_hospital_tokens', JSON.stringify(tokens));
+    localStorage.setItem(`insta_hospital_tokens_${targetHospId}`, JSON.stringify(tokens));
   }, [tokens, targetHospId, hospitalUser]);
 
   useEffect(() => {
@@ -2232,43 +2259,73 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const deleteToken = (id: string) => {
+    let matchedToken: TokenRecord | undefined;
     setTokens(prev => {
-      const updated = prev.filter(t => t.id !== id);
+      matchedToken = prev.find(t => t.id === id || (t as any).appointmentId === id || (t as any).tokenId === id);
+      const apptId = (matchedToken as any)?.appointmentId;
+      const updated = prev.filter(t =>
+        t.id !== id &&
+        (t as any).appointmentId !== id &&
+        (t as any).tokenId !== id &&
+        (!apptId || (t.id !== apptId && (t as any).appointmentId !== apptId))
+      );
       localStorage.setItem('insta_hospital_tokens', JSON.stringify(updated));
-      localStorage.setItem(`insta_hospital_tokens_${targetHospId}`, JSON.stringify(updated));
+      if (targetHospId) {
+        localStorage.setItem(`insta_hospital_tokens_${targetHospId}`, JSON.stringify(updated));
+      }
       broadcastGlobalSync('HOSPITAL_TOKENS_UPDATED', updated);
       return updated;
     });
+
+    const counterpartApptId = (matchedToken as any)?.appointmentId;
 
     // Delete persistently on server & RDS
     fetch(`/api/hospitals/${targetHospId}/tokens/${id}`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` }
     }).catch(() => { });
+
     fetch(`/api/appointments/${id}`, { method: 'DELETE' }).catch(() => { });
+    if (counterpartApptId && counterpartApptId !== id) {
+      fetch(`/api/appointments/${counterpartApptId}`, { method: 'DELETE' }).catch(() => { });
+    }
   };
 
   const deleteTokens = (ids: string[]) => {
     if (!ids || ids.length === 0) return;
     const idSet = new Set(ids);
     setTokens(prev => {
-      const updated = prev.filter(t => !idSet.has(t.id));
+      // Add any associated appointment IDs to the set
+      prev.forEach(t => {
+        if (idSet.has(t.id) && (t as any).appointmentId) {
+          idSet.add((t as any).appointmentId);
+        }
+      });
+      const updated = prev.filter(t =>
+        !idSet.has(t.id) &&
+        !idSet.has((t as any).appointmentId) &&
+        !idSet.has((t as any).tokenId)
+      );
       localStorage.setItem('insta_hospital_tokens', JSON.stringify(updated));
-      localStorage.setItem(`insta_hospital_tokens_${targetHospId}`, JSON.stringify(updated));
+      if (targetHospId) {
+        localStorage.setItem(`insta_hospital_tokens_${targetHospId}`, JSON.stringify(updated));
+      }
       broadcastGlobalSync('HOSPITAL_TOKENS_UPDATED', updated);
       return updated;
     });
+
+    const fullIds = Array.from(idSet);
 
     // Bulk delete on server & RDS
     fetch(`/api/hospitals/${targetHospId}/tokens`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
-      body: JSON.stringify({ ids })
+      body: JSON.stringify({ ids: fullIds })
     }).catch(() => { });
     fetch('/api/appointments', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids })
+      body: JSON.stringify({ ids: fullIds })
     }).catch(() => { });
   };
 

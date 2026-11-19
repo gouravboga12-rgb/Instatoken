@@ -8,7 +8,7 @@ import {
   Printer, X, Calendar, AlertCircle, UserPlus, User, Phone, Mail,
   MapPin, Droplets, FileText, Check, ArrowRight, Volume2, Eye, Clock,
   RotateCcw, CheckCircle2, Stethoscope, MessageSquare,
-  Wallet, CreditCard, Banknote
+  Wallet, CreditCard, Banknote, Trash2
 } from 'lucide-react';
 import { TokenPaymentModal } from '../../components/hospital/TokenPaymentModal';
 import { broadcastGlobalSync } from '../../utils/syncBus';
@@ -1483,7 +1483,7 @@ const TokenTable: React.FC<{
   isRevisitView,
   onIssueFollowUp
 }) => {
-  const { updateTokenStatus, updateTokenPayment, cancelToken, departments, doctors, hospitalProfile, patients } = useHospital();
+  const { updateTokenStatus, updateTokenPayment, cancelToken, deleteToken, deleteTokens, departments, doctors, hospitalProfile, patients } = useHospital();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [deptFilter, setDeptFilter] = useState('all');
@@ -1521,6 +1521,24 @@ const TokenTable: React.FC<{
   const inCabinCount = filtered.filter(t => ['checked-in', 'arrived', 'in-consultation'].includes(t.status)).length;
   const lateComingCount = filtered.filter(t => t.status === 'late-coming').length;
 
+  const handleDeleteToken = (tok: TokenRecord) => {
+    const patientLabel = tok.patientName ? `${tok.patientName} (Token #${tok.tokenNo})` : `Token #${tok.tokenNo}`;
+    if (window.confirm(`Are you sure you want to delete ${patientLabel}? This will remove the unvisited record permanently.`)) {
+      deleteToken(tok.id);
+    }
+  };
+
+  const unvisitedTokensInView = filtered.filter(t => t.status !== 'completed');
+  const handleClearUnvisited = () => {
+    if (unvisitedTokensInView.length === 0) {
+      alert('No unvisited or pending tokens found to clear in this view.');
+      return;
+    }
+    if (window.confirm(`Delete all ${unvisitedTokensInView.length} unvisited / absent / pending tokens from this view? This will permanently clear them.`)) {
+      deleteTokens(unvisitedTokensInView.map(t => t.id));
+    }
+  };
+
   // STRICT REVENUE INTEGRITY: Revenue is strictly earned ONLY upon completion!
   const totalEarnedRevenue = filtered
     .filter(t => t.status === 'completed')
@@ -1541,7 +1559,17 @@ const TokenTable: React.FC<{
             <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {unvisitedTokensInView.length > 0 && (
+              <button
+                type="button"
+                onClick={handleClearUnvisited}
+                className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 font-bold text-xs rounded-xl cursor-pointer border border-red-200 inline-flex items-center gap-1.5 transition-colors"
+                title="Bulk delete unvisited/pending tokens at end of day"
+              >
+                <Trash2 size={13} /> Clear Unvisited ({unvisitedTokensInView.length})
+              </button>
+            )}
             <button
               onClick={onAddClick}
               className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl cursor-pointer border-none inline-flex items-center gap-1.5 shadow-sm shadow-blue-500/20"
@@ -1965,6 +1993,18 @@ const TokenTable: React.FC<{
                           title="Cancel token"
                         >
                           <XCircle size={13} />
+                        </button>
+                      )}
+
+                      {/* Delete unvisited / absent / cancelled token permanently */}
+                      {t.status !== 'completed' && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteToken(t)}
+                          className="p-1 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-lg cursor-pointer transition-colors"
+                          title="Delete unvisited token permanently"
+                        >
+                          <Trash2 size={13} />
                         </button>
                       )}
                     </div>
