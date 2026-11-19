@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Routes, Route, useNavigate, Navigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { useHospital } from '../../context/HospitalContext';
 import type { HospitalDoctor, TokenRecord } from '../../context/HospitalContext';
 import { triggerManualSync } from '../../utils/syncBus';
@@ -31,11 +31,11 @@ import {
 
 // ─── RBAC permission map ──────────────────────────────────────────────────────
 const ROLE_SECTIONS: Record<string, string[]> = {
-  owner:        ['dashboard','doctor-screens','token-manage','tokens','add-token','all-tokens','online-tokens','offline-tokens','today-tokens','upcoming-tokens','completed-tokens','cancelled-tokens','revisit-tokens','unvisited-tokens','revenue','doctors','departments','doctor-references','sessions','staff','patients','communication','ads-promotion','billing','reports','settings','payouts'],
-  admin:        ['dashboard','doctor-screens','token-manage','tokens','add-token','all-tokens','online-tokens','offline-tokens','today-tokens','upcoming-tokens','completed-tokens','cancelled-tokens','revisit-tokens','unvisited-tokens','revenue','doctors','departments','doctor-references','sessions','staff','patients','communication','ads-promotion','reports','payouts'],
+  owner:        ['dashboard','doctor-screens','token-manage','tokens','add-token','all-tokens','online-tokens','offline-tokens','today-tokens','upcoming-tokens','completed-tokens','cancelled-tokens','revisit-tokens','unvisited-tokens','revenue','doctors','departments','doctor-references','sessions','staff','patients','communication','ads-promotion','billing','reports','download','settings','payouts'],
+  admin:        ['dashboard','doctor-screens','token-manage','tokens','add-token','all-tokens','online-tokens','offline-tokens','today-tokens','upcoming-tokens','completed-tokens','cancelled-tokens','revisit-tokens','unvisited-tokens','revenue','doctors','departments','doctor-references','sessions','staff','patients','communication','ads-promotion','reports','download','payouts'],
   receptionist: ['dashboard','doctor-screens','token-manage','add-token','all-tokens','today-tokens','unvisited-tokens','doctor-references','staff','patients'],
   doctor:       ['dashboard','doctor-screens','today-tokens','doctor-references','patients'],
-  accountant:   ['dashboard','revenue','billing','doctor-references','reports','payouts'],
+  accountant:   ['dashboard','revenue','billing','doctor-references','reports','download','payouts'],
   nurse:        ['dashboard','doctor-screens','today-tokens','staff'],
 };
 
@@ -43,6 +43,59 @@ interface NavItem {
   id: string; label: string; icon: React.ReactNode; path: string;
   badge?: string; isDoctorScreen?: boolean;
 }
+
+const isItemActive = (item: NavItem, pathname: string, search: string): boolean => {
+  const normPath = pathname.replace(/\/+$/, '') || '/';
+  const [itemBase, itemQuery] = item.path.split('?');
+  const normItemPath = itemBase.replace(/\/+$/, '') || '/';
+
+  // If item expects query params (e.g. /hospital/reports?tab=download)
+  if (itemQuery) {
+    return normPath === normItemPath && search.includes(itemQuery);
+  }
+
+  // If viewing /hospital/reports with tab=download, regular reports tab should not be active
+  if (item.id === 'reports' && search.includes('tab=download')) {
+    return false;
+  }
+
+  // Exact path match
+  if (normPath === normItemPath) {
+    return true;
+  }
+
+  // Dashboard root aliases
+  if (item.id === 'dashboard' && (normPath === '/hospital' || normPath === '/hospital/dashboard')) {
+    return true;
+  }
+
+  // Doctor Token Screens
+  if (item.isDoctorScreen && normPath === normItemPath) {
+    return true;
+  }
+
+  // Sessions / Schedule aliases
+  if (item.id === 'sessions' && normPath === '/hospital/schedule') {
+    return true;
+  }
+
+  // Doctor references / RMP referrals aliases
+  if (item.id === 'doctor-references' && normPath === '/hospital/rmp-referrals') {
+    return true;
+  }
+
+  // Departments subpaths (e.g. /hospital/departments/:deptId)
+  if (item.id === 'departments' && normPath.startsWith('/hospital/departments')) {
+    return true;
+  }
+
+  // Add token path with query parameters (e.g. /hospital/tokens/add?doctorId=...)
+  if (item.id === 'add-token' && normPath === '/hospital/tokens/add') {
+    return true;
+  }
+
+  return false;
+};
 
 const buildNav = (doctors: HospitalDoctor[], tokens: TokenRecord[]): { section: string; items: NavItem[] }[] => {
   const activeDoctors = doctors.filter(d => d.active);
@@ -112,15 +165,34 @@ const buildNav = (doctors: HospitalDoctor[], tokens: TokenRecord[]): { section: 
 };
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
-const Sidebar: React.FC<{ collapsed: boolean; onToggle: () => void }> = ({ collapsed, onToggle }) => {
+interface SidebarProps {
+  collapsed: boolean;
+  onToggle: () => void;
+  onItemClick?: () => void;
+}
+
+const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle, onItemClick }) => {
   const { hospitalUser, activeSection, setActiveSection, hospitalProfile, doctors, tokens } = useHospital();
   const navigate = useNavigate();
+  const location = useLocation();
   const nav = buildNav(doctors, tokens);
   const allowed = ROLE_SECTIONS[hospitalUser?.role || 'receptionist'] || [];
+
+  // Keep activeSection synchronized with URL route
+  useEffect(() => {
+    const allItems = nav.flatMap(g => g.items);
+    const matched = allItems.find(item => isItemActive(item, location.pathname, location.search));
+    if (matched && matched.id !== activeSection) {
+      setActiveSection(matched.id);
+    }
+  }, [location.pathname, location.search, nav, activeSection, setActiveSection]);
 
   const handleNav = (item: NavItem) => {
     setActiveSection(item.id);
     navigate(item.path);
+    if (onItemClick) {
+      onItemClick();
+    }
   };
 
   return (
@@ -154,30 +226,33 @@ const Sidebar: React.FC<{ collapsed: boolean; onToggle: () => void }> = ({ colla
               {group.section && !collapsed && (
                 <p className="text-[9px] font-extrabold text-slate-600 uppercase tracking-widest px-3 py-2">{group.section}</p>
               )}
-              {visibleItems.map(item => (
-                <button
-                  key={item.id}
-                  onClick={() => handleNav(item)}
-                  title={collapsed ? item.label : undefined}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer border-none group ${
-                    activeSection === item.id
-                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
-                      : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                  }`}
-                >
-                  <span className="shrink-0">{item.icon}</span>
-                  {!collapsed && (
-                    <>
-                      <span className="flex-1 text-left truncate">{item.label}</span>
-                      {item.badge && (
-                        <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full ${item.badge === 'Live' ? 'bg-red-500 text-white animate-pulse' : 'bg-blue-500/30 text-blue-300'}`}>
-                          {item.badge}
-                        </span>
-                      )}
-                    </>
-                  )}
-                </button>
-              ))}
+              {visibleItems.map(item => {
+                const isActive = isItemActive(item, location.pathname, location.search);
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => handleNav(item)}
+                    title={collapsed ? item.label : undefined}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer border-none group ${
+                      isActive
+                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
+                        : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                    }`}
+                  >
+                    <span className="shrink-0">{item.icon}</span>
+                    {!collapsed && (
+                      <>
+                        <span className="flex-1 text-left truncate">{item.label}</span>
+                        {item.badge && (
+                          <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full ${item.badge === 'Live' ? 'bg-red-500 text-white animate-pulse' : 'bg-blue-500/30 text-blue-300'}`}>
+                            {item.badge}
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           );
         })}
@@ -415,7 +490,11 @@ export const HospitalLayout: React.FC = () => {
               >
                 <X size={16} />
               </button>
-              <Sidebar collapsed={false} onToggle={() => setMobileSidebarOpen(false)} />
+              <Sidebar 
+                collapsed={false} 
+                onToggle={() => setMobileSidebarOpen(false)} 
+                onItemClick={() => setMobileSidebarOpen(false)}
+              />
             </div>
           </div>
         </>
