@@ -2329,10 +2329,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       return updated;
     });
 
-    // 3. Ring patient chime and push calling notification
-    await callPatientToken(tokenId);
-
-    // 4. Update backend via batch status update
+    // 3. Update backend via batch status update (admit to cabin & auto-hold skipped earlier tokens)
     try {
       await fetch(`/api/hospitals/${targetHospId}/tokens/admit-cabin`, {
         method: 'POST',

@@ -217,8 +217,9 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
     });
   }, [doctorTokens, dateFilter, customDate, selectedSessionFilter, todayStr, tomorrowStr, yesterdayStr]);
 
+  const activelyCalling = activeQueue.find(t => t.status === 'calling');
   const inConsultation = activeQueue.find(t => t.status === 'checked-in' || t.status === 'in-consultation');
-  const nextInLine = activeQueue.filter(t => t.id !== inConsultation?.id);
+  const nextInLine = activeQueue.filter(t => t.id !== inConsultation?.id && t.id !== activelyCalling?.id);
   const completedToday = doctorTokens.filter(t => {
     if (!isDateMatching(t) || t.status !== 'completed') return false;
     if (selectedSessionFilter !== 'all') {
@@ -271,16 +272,20 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
     );
   }
 
-  const handleAdmitCabin = async (tokenId: string) => {
+  const handleCallPatient = async (tokenId: string) => {
     playCallChime();
-    await admitPatientToCabin(tokenId);
+    await callPatientToken(tokenId);
   };
 
   const handleCallNext = (tokenId?: string) => {
     const targetId = tokenId || (nextInLine.length > 0 ? nextInLine[0].id : activeQueue.length > 0 ? activeQueue[0].id : undefined);
     if (targetId) {
-      handleAdmitCabin(targetId);
+      handleCallPatient(targetId);
     }
+  };
+
+  const handleAdmitCabin = async (tokenId: string) => {
+    await admitPatientToCabin(tokenId);
   };
 
   const handleCompleteToken = (id: string) => {
@@ -296,10 +301,9 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
     updateTokenStatus(id, 'not-visited');
   };
 
-  const handleRecallToken = (id: string) => {
+  const handleRecallToken = async (id: string) => {
     playCallChime();
-    callPatientToken(id);
-    updateTokenStatus(id, 'in-consultation');
+    await callPatientToken(id);
   };
 
   // Tokens for this doctor that are NOT visited (can be cleared at the end of the day)
@@ -558,6 +562,57 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
           </div>
         </div>
       </div>
+
+      {/* ── Active Calling Quick Bar (Visible when patient is being called from waiting area) ── */}
+      {activelyCalling && (
+        <div className="bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white rounded-2xl p-3.5 sm:p-4 shadow-lg shadow-amber-500/20 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 animate-in fade-in duration-150 border border-amber-400">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-white text-amber-700 font-black text-base flex items-center justify-center shrink-0 shadow-sm ring-2 ring-white/50">
+              #{activelyCalling.tokenNo}
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[11px] font-black uppercase tracking-wider bg-white/20 text-white px-2 py-0.5 rounded-full flex items-center gap-1 border border-white/30">
+                  <span className="w-2 h-2 rounded-full bg-white animate-ping" />
+                  <Volume2 size={12} /> Calling Patient
+                </span>
+                <span className="text-amber-200">·</span>
+                <h3 className="text-sm font-black text-white">{activelyCalling.patientName}</h3>
+                <span className="text-[10px] text-amber-100 font-semibold">
+                  ({activelyCalling.patientAgeDisplay || `${activelyCalling.patientAge}y`} · {activelyCalling.patientGender} · {activelyCalling.patientPhone})
+                </span>
+              </div>
+              <p className="text-[10.5px] text-amber-100 mt-0.5 font-medium">
+                Ringing patient chime on mobile. When patient arrives at the door, click <strong className="text-white underline">In Cabin</strong> to admit into doctor room.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-end md:self-auto shrink-0">
+            <button
+              onClick={() => handleAdmitCabin(activelyCalling.id)}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs cursor-pointer border-none shadow-sm flex items-center gap-1.5 transition-transform active:scale-95"
+              title="Patient is at the door - admit into doctor cabin"
+            >
+              <Play size={13} /> In Cabin
+            </button>
+            <button
+              onClick={() => handleRecallToken(activelyCalling.id)}
+              className="px-3 py-2 bg-amber-700/60 hover:bg-amber-700 text-white rounded-xl font-bold text-xs cursor-pointer border border-white/20 shadow-xs flex items-center gap-1 transition-colors"
+              title="Ring patient mobile chime again"
+            >
+              <Volume2 size={13} /> Re-Call
+            </button>
+            <button
+              onClick={() => handleMarkNotVisited(activelyCalling.id)}
+              className="px-3 py-2 bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-xl font-bold text-xs cursor-pointer flex items-center gap-1 transition-colors"
+              title="Patient absent or skipped"
+            >
+              <UserX size={13} /> Absent / Hold
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Active Consultation Quick Bar (Only visible when patient is in cabin) ── */}
       {inConsultation && (
@@ -934,22 +989,31 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
                         <div className="flex items-center justify-end gap-1.5 flex-wrap">
                           {['booked', 'waiting', 'arrived'].includes(tok.status) && (
                             <button
-                              onClick={() => handleAdmitCabin(tok.id)}
+                              onClick={() => handleCallPatient(tok.id)}
                               className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold cursor-pointer border-none shadow-xs flex items-center gap-1 transition-transform active:scale-95"
-                              title="Call and admit patient into cabin (auto-holds any skipped earlier tokens)"
+                              title="Ring chime and send live calling alert to patient mobile"
                             >
-                              <Play size={11} /> Call & Admit
+                              <Volume2 size={11} /> Call Patient
                             </button>
                           )}
 
                           {tok.status === 'calling' && (
-                            <button
-                              onClick={() => handleAdmitCabin(tok.id)}
-                              className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold cursor-pointer border-none shadow-xs flex items-center gap-1 transition-transform active:scale-95"
-                              title="Patient arrived - admit into cabin"
-                            >
-                              <Play size={11} /> In Cabin
-                            </button>
+                            <>
+                              <button
+                                onClick={() => handleAdmitCabin(tok.id)}
+                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold cursor-pointer border-none shadow-xs flex items-center gap-1 transition-transform active:scale-95 animate-pulse"
+                                title="Patient arrived at door - admit into cabin"
+                              >
+                                <Play size={11} /> In Cabin
+                              </button>
+                              <button
+                                onClick={() => handleRecallToken(tok.id)}
+                                className="px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold cursor-pointer border-none shadow-xs flex items-center gap-1 transition-colors"
+                                title="Ring patient alert chime again"
+                              >
+                                <Volume2 size={11} /> Re-Call
+                              </button>
+                            </>
                           )}
 
                           {(tok.status === 'checked-in' || tok.status === 'in-consultation') && (

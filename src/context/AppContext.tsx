@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import io from 'socket.io-client';
 import { HOSPITALS, DEPARTMENTS, HEALTH_ARTICLES, MOCK_CUSTOMERS, DEFAULT_MEDICAL_RECORDS } from '../utils/mockData';
 import type { Hospital, Doctor, HealthArticle, CustomerAccount, MedicalRecord } from '../utils/mockData';
 import { broadcastGlobalSync, subscribeGlobalSync, formatTimeSlot, fetchCloudSync } from '../utils/syncBus';
@@ -989,7 +990,95 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }).catch(() => {});
 
-    return unsubscribe;
+    // Real-time Socket.io listener for patient call alerts and notifications
+    let socket: any = null;
+    try {
+      const socketBackendUrl =
+        window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+          ? 'http://localhost:5000'
+          : 'https://16.113.86.236.nip.io';
+
+      socket = io(socketBackendUrl, {
+        transports: ['websocket', 'polling'],
+        reconnection: true,
+        reconnectionAttempts: 25,
+        reconnectionDelay: 2000
+      });
+
+      const userPhoneClean = (user?.phone || '').replace(/\D/g, '').slice(-10);
+      socket.on('connect', () => {
+        if (userPhoneClean) {
+          socket.emit('join_patient', { phone: userPhoneClean });
+        }
+      });
+
+      socket.on('token_called', (callPayload: any) => {
+        if (!callPayload) return;
+        console.log('🔔 [Socket.io] AppContext received token_called:', callPayload);
+        const targetPhone = String(callPayload.patientPhone || '').replace(/\D/g, '').slice(-10);
+        
+        let savedApptPhones: string[] = [];
+        let hasMatchingAppt = false;
+        try {
+          const raw = localStorage.getItem('insta_appointments');
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+              savedApptPhones = parsed.map((a: any) => String(a.phone || a.patientPhone || '').replace(/\D/g, '').slice(-10)).filter(Boolean);
+              hasMatchingAppt = parsed.some((a: any) =>
+                a.id === callPayload.tokenId ||
+                (a.hospitalId === callPayload.hospitalId && Number(a.tokenNumber) === Number(callPayload.tokenNo))
+              );
+            }
+          }
+        } catch (e) {}
+
+        const matchesUser = userPhoneClean && targetPhone && userPhoneClean === targetPhone;
+        const matchesSavedAppt = savedApptPhones.includes(targetPhone);
+
+        if (matchesUser || matchesSavedAppt || hasMatchingAppt || !targetPhone) {
+          const rawDoc = callPayload.doctorName || 'Doctor';
+          const cleanDoc = rawDoc.replace(/^Dr\.?\s*/i, '');
+          const notifId = `notif-call-${callPayload.tokenId || Date.now()}`;
+          const newNotif: AppNotification = {
+            id: notifId,
+            title: `🔔 Token #${callPayload.tokenNo} Called!`,
+            message: `Dr. ${cleanDoc} at ${callPayload.hospitalName || 'Hospital'} is calling Token #${callPayload.tokenNo}. Please proceed into the cabin immediately!`,
+            type: 'warning',
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            read: false
+          };
+
+          setNotifications(prev => {
+            const filtered = prev.filter(n => n.id !== notifId);
+            const updated = [newNotif, ...filtered];
+            try {
+              localStorage.setItem('insta_notifications', JSON.stringify(updated));
+            } catch (e) {}
+            return updated;
+          });
+
+          // Update appointment status to 'calling'
+          setAppointments(prev =>
+            prev.map(a =>
+              (a.id === callPayload.tokenId || (a.hospitalId === callPayload.hospitalId && Number(a.tokenNumber) === Number(callPayload.tokenNo)))
+                ? { ...a, status: 'calling' as any }
+                : a
+            )
+          );
+
+          // Broadcast to global bus for banner trigger
+          broadcastGlobalSync('TOKEN_CALLED', callPayload);
+        }
+      });
+    } catch (e) {
+      console.warn('AppContext socket initialization error:', e);
+    }
+
+    return () => {
+      unsubscribe();
+      if (socket) socket.disconnect();
+    };
   }, []);
 
   // --- Persistence Effects ---
@@ -1752,9 +1841,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     });
 
+    const cleanDoc = (targetDoc.name || 'Doctor').replace(/^Dr\.?\s*/i, '');
     addNotification(
       "OPD Token Booked!",
-      `Your token #${tokenAssigned} for Dr. ${targetDoc.name} is confirmed. Est. wait: ${computedWaitTime} mins.`,
+      `Your token #${tokenAssigned} for Dr. ${cleanDoc} is confirmed. Est. wait: ${computedWaitTime} mins.`,
       "success"
     );
 

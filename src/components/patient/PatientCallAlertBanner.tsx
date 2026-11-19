@@ -144,9 +144,10 @@ export const PatientCallAlertBanner: React.FC = () => {
     // 2. Real-time Socket.io listener
     let socket: Socket | null = null;
     try {
-      const socketBackendUrl = window.location.hostname === 'localhost'
-        ? 'http://localhost:5000'
-        : 'https://instatoken.in';
+      const socketBackendUrl =
+        window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+          ? 'http://localhost:5000'
+          : 'https://16.113.86.236.nip.io';
 
       socket = io(socketBackendUrl, {
         transports: ['websocket', 'polling'],
@@ -211,7 +212,7 @@ export const PatientCallAlertBanner: React.FC = () => {
                 </span>
               </div>
               <h4 className="text-base sm:text-lg font-black text-white mt-0.5 leading-snug">
-                Dr. {activeCall.doctorName}
+                Dr. {(activeCall.doctorName || 'Doctor').replace(/^Dr\.?\s*/i, '')}
               </h4>
               <p className="text-xs text-blue-100 font-medium line-clamp-1">
                 {activeCall.hospitalName} {activeCall.departmentName ? `• ${activeCall.departmentName}` : ''}
