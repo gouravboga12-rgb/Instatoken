@@ -10,6 +10,23 @@ import {
   ChevronDown, Heart, Stethoscope, UserX, Receipt, Info, Lock, Building2,
   Navigation, Loader2
 } from 'lucide-react';
+import confetti from 'canvas-confetti';
+
+// Helper to ensure Razorpay checkout script is loaded
+const loadRazorpayScript = (): Promise<boolean> => {
+  return new Promise((resolve) => {
+    if (typeof window !== 'undefined' && (window as any).Razorpay) {
+      resolve(true);
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+};
 
 const monthsList = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const weekdaysList = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -48,7 +65,7 @@ const formatDateOption = (dateStr: string) => {
 
 export const BookToken: React.FC = () => {
   const { hospitalId, doctorId } = useParams<{ hospitalId: string; doctorId: string }>();
-  const { hospitals, user, toggleSaveDoctor, platformFeePercent, userCoords, currentLocation } = useApp();
+  const { hospitals, user, toggleSaveDoctor, platformFeePercent, userCoords, currentLocation, bookToken, purchaseSubscription } = useApp();
   const navigate = useNavigate();
 
   const hospital = hospitals.find(h => h.id === hospitalId) || hospitals[0];
@@ -251,6 +268,11 @@ export const BookToken: React.FC = () => {
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<{ name?: boolean; phone?: boolean; age?: boolean; place?: boolean }>({});
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
+  const [isPaymentProcessing, setIsPaymentProcessing] = useState(false);
+
+  useEffect(() => {
+    loadRazorpayScript();
+  }, []);
 
   // Auto-detect current place using Reverse Geocoding
   const handleDetectLocation = () => {
@@ -433,8 +455,9 @@ export const BookToken: React.FC = () => {
     }
   };
 
-  const handleProceedToBooking = (e: React.FormEvent) => {
+  const handleProceedToBooking = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isPaymentProcessing) return;
     setError('');
     setFieldErrors({});
 
@@ -539,29 +562,137 @@ export const BookToken: React.FC = () => {
 
     const activeSessionObj = sessionOptions.find(s => s.id === selectedSession);
     const slotTime = activeSessionObj ? `${activeSessionObj.title} (${activeSessionObj.timing})` : '10:00 AM - 12:00 PM';
+    const planTitle = isFullOnline ? "Doctor Consultation + Booking Fee" : "InstaToken Booking Charges";
 
-    // Navigate to Razorpay/UPI Payment Gateway
-    navigate('/payment', {
-      state: {
-        patientDetails,
-        hospitalId: hospital.id,
-        doctorId: doctor.id,
-        date: selectedDate,
-        time: slotTime,
-        fee: docFee,
-        tokenBaseFee: tokenFee,
-        tokenFee: totalPayable,
-        platformFee: platformFee,
-        gatewayFee: platformFee,
-        gstFee: 0,
-        address: place.trim(),
-        place: place.trim(),
-        totalBookingCharges: totalPayable,
-        isFullOnline,
-        collectionMode: isFullOnline ? 'full_online' : 'token_only',
-        subscriptionPlan: { name: isFullOnline ? "Doctor Consultation + Booking Fee" : "InstaToken Booking Charges", price: totalPayable, days: 3 }
+    // Direct 1-Click Razorpay Payment Gateway Launch (No intermediate page)
+    setIsPaymentProcessing(true);
+
+    try {
+      const isLoaded = await loadRazorpayScript();
+      if (!isLoaded || !(window as any).Razorpay) {
+        throw new Error("Unable to load Razorpay payment gateway SDK. Please check your internet connection.");
       }
-    });
+
+      // 1. Create Order on Backend
+      const orderRes = await fetch('/api/razorpay/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: totalPayable,
+          receipt: `tok_${Date.now().toString().slice(-8)}`,
+          patientName: name.trim(),
+          patientPhone: cleanPhone,
+          notes: {
+            hospitalId: hospital.id,
+            doctorId: doctor.id,
+            slotDate: selectedDate,
+            slotTime: slotTime,
+            planName: planTitle
+          }
+        })
+      });
+
+      const orderData = await orderRes.json();
+      if (!orderRes.ok || !orderData.success || !orderData.order) {
+        throw new Error(orderData.message || 'Failed to create payment order.');
+      }
+
+      const { order, keyId } = orderData;
+
+      // 2. Open Razorpay Checkout Modal Directly on Current Screen
+      const options = {
+        key: keyId || 'rzp_test_ThOMWcFfdTPNme',
+        amount: order.amount,
+        currency: order.currency || 'INR',
+        name: 'InstaToken Healthcare',
+        description: `${isFullOnline ? 'Consultation + Token Fee' : 'OPD Token Fee'} - Dr. ${doctor.name}`,
+        image: 'https://cdn-icons-png.flaticon.com/512/2966/2966327.png',
+        order_id: order.id,
+        prefill: {
+          name: name.trim(),
+          contact: cleanPhone,
+          email: user?.email || 'patient@instatoken.in'
+        },
+        notes: {
+          hospitalId: hospital.id,
+          doctorId: doctor.id,
+          slotDate: selectedDate
+        },
+        theme: {
+          color: '#2563EB' // Brand blue
+        },
+        modal: {
+          confirm_close: true,
+          ondismiss: () => {
+            setIsPaymentProcessing(false);
+          }
+        },
+        handler: async (response: any) => {
+          try {
+            setIsPaymentProcessing(true);
+
+            // 3. Verify Payment Signature on Backend
+            const verifyRes = await fetch('/api/razorpay/verify-payment', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature
+              })
+            });
+
+            const verifyData = await verifyRes.json();
+            if (!verifyRes.ok || !verifyData.verified) {
+              throw new Error(verifyData.message || 'Payment signature verification failed.');
+            }
+
+            // 4. Confetti Celebration
+            try {
+              confetti({
+                particleCount: 160,
+                spread: 80,
+                origin: { y: 0.6 }
+              });
+            } catch (e) {}
+
+            // 5. Activate booking pass
+            purchaseSubscription(planTitle, totalPayable, 3);
+
+            // 6. Complete token booking directly
+            const appointmentCreated = await bookToken(
+              patientDetails,
+              hospital.id,
+              doctor.id,
+              selectedDate,
+              slotTime,
+              'RAZORPAY',
+              response.razorpay_payment_id
+            );
+
+            setIsPaymentProcessing(false);
+            navigate(`/confirmation/${appointmentCreated.id}`);
+          } catch (err: any) {
+            console.error('Payment confirmation error:', err);
+            setError(err.message || 'Payment verification failed. Please contact hospital support.');
+            setIsPaymentProcessing(false);
+          }
+        }
+      };
+
+      const rzpInstance = new (window as any).Razorpay(options);
+      rzpInstance.on('payment.failed', (failResponse: any) => {
+        console.error('Razorpay payment failed:', failResponse.error);
+        setError(`Payment Failed: ${failResponse.error?.description || failResponse.error?.reason || 'Transaction declined.'}`);
+        setIsPaymentProcessing(false);
+      });
+
+      rzpInstance.open();
+    } catch (err: any) {
+      console.error('Razorpay initiation error:', err);
+      setError(err.message || 'Failed to initialize payment gateway. Please try again.');
+      setIsPaymentProcessing(false);
+    }
   };
 
   return (
@@ -1091,15 +1222,24 @@ export const BookToken: React.FC = () => {
                 {/* 3. Big Action Button matching Image 78 */}
                 <button 
                   type="submit"
-                  disabled={!isDoctorOnlineAvailable}
+                  disabled={!isDoctorOnlineAvailable || isPaymentProcessing}
                   className={`w-full py-4 px-6 rounded-2xl flex items-center justify-center gap-2 font-black text-sm text-white shadow-lg transition-all cursor-pointer ${
-                    !isDoctorOnlineAvailable
-                      ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none'
+                    !isDoctorOnlineAvailable || isPaymentProcessing
+                      ? 'bg-blue-400 text-white/90 cursor-not-allowed shadow-none'
                       : 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/25 transform hover:scale-[1.01] active:scale-[0.99]'
                   }`}
                 >
-                  <Lock size={16} />
-                  <span>Pay ₹{totalPayable.toFixed(2)} and Confirm Booking →</span>
+                  {isPaymentProcessing ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin text-white" />
+                      <span>Connecting Payment Gateway...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Lock size={16} />
+                      <span>Pay ₹{totalPayable.toFixed(2)} and Confirm Booking →</span>
+                    </>
+                  )}
                 </button>
               </div>
             );
