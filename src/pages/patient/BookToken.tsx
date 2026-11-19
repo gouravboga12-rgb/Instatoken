@@ -864,29 +864,48 @@ export const BookToken: React.FC = () => {
                 </div>
               </div>
 
-              {/* Gender */}
-              <div className="relative flex items-center bg-white border border-slate-200 rounded-xl overflow-hidden focus-within:border-blue-600 transition-all">
-                <User size={14} className="absolute left-3 text-slate-400 pointer-events-none" />
-                <select 
-                  value={gender}
-                  onChange={(e) => setGender(e.target.value)}
-                  className="w-full pl-8 pr-8 py-2.5 text-xs font-semibold text-slate-800 bg-transparent focus:outline-none appearance-none cursor-pointer"
+              {/* Row 3: Gender (left) & Auto-Detect Location Button (right) */}
+              <div className="grid grid-cols-2 gap-2">
+                {/* Gender */}
+                <div className="relative flex items-center bg-white border border-slate-200 rounded-xl overflow-hidden focus-within:border-blue-600 transition-all">
+                  <User size={14} className="absolute left-3 text-slate-400 pointer-events-none" />
+                  <select 
+                    value={gender}
+                    onChange={(e) => setGender(e.target.value)}
+                    className="w-full pl-8 pr-7 py-2.5 text-xs font-semibold text-slate-800 bg-transparent focus:outline-none appearance-none cursor-pointer"
+                  >
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                  </select>
+                  <ChevronDown size={12} className="absolute right-2.5 text-slate-400 pointer-events-none" />
+                </div>
+
+                {/* Auto Detect Location Button (Outside Address Box) */}
+                <button
+                  type="button"
+                  onClick={handleDetectLocation}
+                  disabled={isDetectingLocation}
+                  title="Auto-detect current location"
+                  className="flex items-center justify-center gap-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200/90 px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer disabled:opacity-60 shadow-2xs active:scale-[0.98]"
                 >
-                  <option value="Male">Male</option>
-                  <option value="Female">Female</option>
-                  <option value="Other">Other</option>
-                </select>
-                <ChevronDown size={12} className="absolute right-3 text-slate-400 pointer-events-none" />
+                  {isDetectingLocation ? (
+                    <Loader2 size={13} className="animate-spin text-blue-600" />
+                  ) : (
+                    <Navigation size={13} className="text-blue-600" />
+                  )}
+                  <span className="truncate">{isDetectingLocation ? 'Locating...' : 'Auto Detect'}</span>
+                </button>
               </div>
 
-              {/* Patient Place / Address (Full Width Dedicated Box - Clear & Editable) */}
+              {/* Row 4: Patient Town / City / Address (100% Full Width - Completely Unobstructed) */}
               <div className="space-y-1">
                 <div className="flex items-center justify-between px-0.5">
                   <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1">
                     <MapPin size={12} className="text-blue-600" />
                     <span>Town / City / Patient Address *</span>
                   </label>
-                  <span className="text-[10px] text-slate-400 font-medium">Clear & editable for prescription</span>
+                  <span className="text-[10px] text-slate-400 font-medium">Editable for prescription</span>
                 </div>
 
                 <div className={`relative flex items-center bg-white border rounded-xl overflow-hidden transition-all shadow-2xs ${
@@ -901,22 +920,8 @@ export const BookToken: React.FC = () => {
                       if (fieldErrors.place) setFieldErrors(prev => ({ ...prev, place: false }));
                     }}
                     placeholder="Enter your town, village, or address *"
-                    className="w-full pl-9 pr-24 py-3 text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-none"
+                    className="w-full pl-9 pr-3 py-2.5 text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-none"
                   />
-                  <button
-                    type="button"
-                    onClick={handleDetectLocation}
-                    disabled={isDetectingLocation}
-                    title="Auto-detect current location"
-                    className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200/80 px-2.5 py-1.5 rounded-lg text-[10.5px] font-bold transition-all cursor-pointer disabled:opacity-60 shadow-2xs"
-                  >
-                    {isDetectingLocation ? (
-                      <Loader2 size={12} className="animate-spin text-blue-600" />
-                    ) : (
-                      <Navigation size={12} className="text-blue-600" />
-                    )}
-                    <span>{isDetectingLocation ? 'Locating...' : 'Auto Detect'}</span>
-                  </button>
                 </div>
               </div>
 
