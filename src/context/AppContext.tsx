@@ -1449,16 +1449,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Calculate dynamic booking charges breakdown matching unified 3% engine
     const baseConsultation = targetDoc.consultationFee || 500;
-    const tokenFee = (patientDetails as any).tokenBaseFee !== undefined
-      ? (patientDetails as any).tokenBaseFee
-      : Math.max(10, Math.round(baseConsultation * (platformFeePercent / 100)));
+    const tokenFee = (patientDetails as any).tokenFee !== undefined
+      ? (patientDetails as any).tokenFee
+      : ((patientDetails as any).tokenBaseFee !== undefined
+        ? (patientDetails as any).tokenBaseFee
+        : Math.max(10, Math.round(baseConsultation * (platformFeePercent / 100))));
     const onlineBase = isFullOnline ? (baseConsultation + tokenFee) : tokenFee;
-    const platformFee = patientDetails.gatewayFee !== undefined
+    const gatewayFee = patientDetails.gatewayFee !== undefined
       ? patientDetails.gatewayFee
       : parseFloat((onlineBase * 0.03).toFixed(2));
     const totalFee = patientDetails.totalBookingCharges !== undefined
       ? patientDetails.totalBookingCharges
-      : parseFloat((onlineBase + platformFee).toFixed(2));
+      : parseFloat((onlineBase + gatewayFee).toFixed(2));
 
     const ref = patientDetails.doctorReference || patientDetails.rmpReference || null;
 
@@ -1503,8 +1505,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       session: resolvedSession,
       fee: targetDoc.consultationFee,
       tokenFee,
-      platformFee,
-      gatewayFee: platformFee,
+      platformFee: tokenFee,
+      gatewayFee,
       gstFee: 0,
       totalFee,
       status: 'booked',
@@ -1551,7 +1553,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       paymentCollection: {
         mode: isFullOnline ? 'full_online' : 'token_only',
         consultationFee: newAppt.fee,
-        platformFee,
+        tokenFee: tokenFee,
+        platformFee: tokenFee,
+        gatewayFee: gatewayFee,
         totalAmountPaid: totalFee,
         settlementStatus: isFullOnline ? 'unsettled' : 'not_applicable',
         settlementId: null,

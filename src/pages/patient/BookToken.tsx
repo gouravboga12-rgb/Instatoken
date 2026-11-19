@@ -531,8 +531,8 @@ export const BookToken: React.FC = () => {
     
     // Unified 3% Payment Gateway Engine (Base Amount + 3% Gateway Fee)
     const onlineBase = isFullOnline ? (docFee + tokenFee) : tokenFee;
-    const platformFee = parseFloat((onlineBase * 0.03).toFixed(2));
-    const totalPayable = parseFloat((onlineBase + platformFee).toFixed(2));
+    const gatewayFee = parseFloat((onlineBase * 0.03).toFixed(2));
+    const totalPayable = parseFloat((onlineBase + gatewayFee).toFixed(2));
 
     const ref = showRmpFields && rmpName.trim() ? { 
       name: rmpName.trim(), 
@@ -554,8 +554,9 @@ export const BookToken: React.FC = () => {
       doctorReference: ref,
       rmpReference: ref,
       tokenBaseFee: tokenFee,
-      platformFee: platformFee,
-      gatewayFee: platformFee,
+      tokenFee: tokenFee,
+      platformFee: tokenFee, // InstaToken platform margin (5% token fee), strictly excluding 3% gateway charge
+      gatewayFee: gatewayFee,
       gstFee: 0,
       totalBookingCharges: totalPayable
     };

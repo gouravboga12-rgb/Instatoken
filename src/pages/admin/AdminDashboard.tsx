@@ -190,12 +190,34 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
     });
   };
 
+  // Dynamic Platform Fee & Full-Online Determination Helper
+  const getAppointmentPlatformFee = (a: any, feePercent: number = 5): number => {
+    const fee = Number(a?.fee) || 500;
+    const tokenVal = Number(a?.tokenFee || a?.tokenBaseFee);
+    if (tokenVal > 0) return tokenVal;
+    const platVal = Number(a?.platformFee);
+    const gwVal = Number(a?.gatewayFee);
+    if (platVal > 0 && platVal !== gwVal) return platVal;
+    return Math.max(10, Math.round(fee * (feePercent / 100)));
+  };
+
+  const isAppointmentFullOnline = (a: any): boolean => {
+    const pc = a?.paymentCollection || (a?.data && a?.data.paymentCollection);
+    if (pc && pc.mode === 'full_online') return true;
+    if (a?.collectionMode === 'full_online' || (a?.data && a?.data.collectionMode === 'full_online')) return true;
+    if (a?.paymentMethod && a?.paymentMethod.toLowerCase().includes('full online')) return true;
+    const totFee = Number(a?.totalFee || (a?.data && a?.data.totalFee) || 0);
+    const docFee = Number(a?.fee || (a?.data && a?.data.fee) || 0);
+    if (docFee > 0 && totFee >= docFee && totFee > 60) return true;
+    return false;
+  };
+
   // Filtered appointments for Financials tab
   const periodFilteredAppointments = filterByDateRange(safeAppointments, revenueDateFilter, customStartDate, customEndDate);
 
   // Token revenue: the actual platform booking fees collected online from tokens in selected period
   const periodTokenRevenue = periodFilteredAppointments.reduce((sum, a) => 
-    sum + (Number(a?.platformFee) || Math.max(10, Math.round((Number(a?.fee) || 500) * (platformFeePercent / 100)))), 0);
+    sum + getAppointmentPlatformFee(a, platformFeePercent), 0);
 
   // Doctor consultation fees (payable directly at the hospital) in selected period
   const periodDoctorConsultationVolume = periodFilteredAppointments.reduce((sum, a) => 
@@ -218,7 +240,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
   const todayOnlineCount = todayAppointments.filter(a => !a.isWalkin).length;
   const todayWalkinCount = todayAppointments.filter(a => a.isWalkin).length;
   const todayConsultationSum = todayAppointments.reduce((sum, a) => sum + (Number(a.fee) || 500), 0);
-  const todayCommissionSum = todayAppointments.reduce((sum, a) => sum + (Number(a.platformFee) || Math.max(10, Math.round((Number(a.fee) || 500) * (platformFeePercent / 100)))), 0);
+  const todayCommissionSum = todayAppointments.reduce((sum, a) => sum + getAppointmentPlatformFee(a, platformFeePercent), 0);
   const todayWaitingCount = todayAppointments.filter(a => ['waiting', 'booked', 'checked-in'].includes(a.status)).length;
   const todayInCabinCount = todayAppointments.filter(a => ['in-cabin', 'in_consultation', 'consulting'].includes(a.status)).length;
   const todayCompletedCount = todayAppointments.filter(a => a.status === 'completed').length;
@@ -322,12 +344,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
   // CSV Revenue Report Export Handler (Preserves existing feature with enhanced fields)
   const exportFinancialCSV = () => {
     const csvRows = [
-      ["Token #", "Payment ID", "Hospital", "Hospital Location", "Doctor", "Department", "Patient Name", "Phone", "Doctor Fee (INR - Payable at Desk)", `Platform Token Revenue (INR - ${platformFeePercent}% Paid Online)`, "Payment Method", "Status", "Date & Time (IST)"]
+      ["Token #", "Payment ID", "Hospital", "Hospital Location", "Doctor", "Department", "Patient Name", "Phone", "Doctor Fee (INR)", "Doctor Fee Mode", `Platform Token Revenue (INR - ${platformFeePercent}% Paid Online)`, "Payment Method", "Status", "Date & Time (IST)"]
     ];
 
     (periodFilteredAppointments || []).forEach(b => {
       const fee = Number(b.fee) || 500;
-      const platFee = Number(b.platformFee) || Math.max(10, Math.round(fee * (platformFeePercent / 100)));
+      const platFee = getAppointmentPlatformFee(b, platformFeePercent);
+      const isOnline = isAppointmentFullOnline(b);
       const istDate = new Intl.DateTimeFormat('en-IN', {
         timeZone: 'Asia/Kolkata',
         day: '2-digit',
@@ -348,6 +371,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
         `"${b.patientName || ''}"`,
         `"${b.phone || ''}"`,
         `"${fee}"`,
+        `"${isOnline ? 'Paid Online (Due to Hospital)' : 'Payable at Desk'}"`,
         `"${platFee}"`,
         `"${b.paymentMethod || 'Online'}"`,
         `"${b.status || 'Paid'}"`,
@@ -373,12 +397,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
       ["Hospital Ledger Report", `"${hosp.name}"`, `"${hosp.address || ''}"`],
       ["Generated At (IST)", `"${new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' }).format(new Date())}"`],
       [],
-      ["Token #", "Transaction ID", "Patient Name", "Phone", "Doctor", "Department", "Doctor Consultation Fee (Payable at Hospital)", `Platform Token Revenue (${platformFeePercent}% Paid Online)`, "Payment Method", "Status", "Date & Time (IST)"]
+      ["Token #", "Transaction ID", "Patient Name", "Phone", "Doctor", "Department", "Doctor Consultation Fee (INR)", "Collection Status", `Platform Token Revenue (${(hosp as any).platformFeePercent || platformFeePercent}% Paid Online)`, "Payment Method", "Status", "Date & Time (IST)"]
     ];
 
     hospBookings.forEach(b => {
       const fee = Number(b.fee) || 500;
-      const platFee = Number(b.platformFee) || Math.max(10, Math.round(fee * (platformFeePercent / 100)));
+      const platFee = getAppointmentPlatformFee(b, (hosp as any).platformFeePercent || platformFeePercent);
+      const isOnline = isAppointmentFullOnline(b);
       const istDate = new Intl.DateTimeFormat('en-IN', {
         timeZone: 'Asia/Kolkata',
         day: '2-digit',
@@ -397,6 +422,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
         `"${b.doctorName || ''}"`,
         `"${b.departmentName || ''}"`,
         `"${fee}"`,
+        `"${isOnline ? 'Paid Online (Due to Hosp)' : 'Pay at Desk'}"`,
         `"${platFee}"`,
         `"${b.paymentMethod || 'Online'}"`,
         `"${b.status || 'Paid'}"`,
@@ -788,7 +814,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                           const tokenNum = appt.tokenNumber || appt.token || `#${idx + 1}`;
                           const isWalkin = Boolean(appt.isWalkin);
                           const fee = Number(appt.fee) || 500;
-                          const platformFee = Number(appt.platformFee) || Math.max(10, Math.round(fee * (platformFeePercent / 100)));
+                          const platformFee = getAppointmentPlatformFee(appt, platformFeePercent);
                           const apptDate = appt.date || appt.bookingDate || (appt.createdAt ? appt.createdAt.split('T')[0] : 'Today');
                           const apptTime = appt.time || (appt.session ? `${appt.session.toUpperCase()} Session` : 'Scheduled');
                           const status = appt.status || 'booked';
@@ -2056,7 +2082,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                     const tokenCount = hospAppts.length;
                     const docConsultationTotal = hospAppts.reduce((sum, a) => sum + (Number(a.fee) || 500), 0);
                     const platRevenueTotal = hospAppts.reduce((sum, a) => 
-                      sum + (Number(a.platformFee) || Math.max(10, Math.round((Number(a.fee) || 500) * (platformFeePercent / 100)))), 0);
+                      sum + getAppointmentPlatformFee(a, (hosp as any).platformFeePercent || platformFeePercent), 0);
 
                     const isDisabled = hosp.status === 'disabled';
 
@@ -2143,10 +2169,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                           (a.hospitalName && hosp.name && a.hospitalName.toLowerCase() === hosp.name.toLowerCase())
                         );
 
+                        const isHospitalFullOnline = hosp.payment_mode === 'full_online' || 
+                          (hosp as any).paymentMode === 'full_online' || 
+                          hospAppts.some(isAppointmentFullOnline);
+
                         const tokenCount = hospAppts.length;
                         const docConsultationTotal = hospAppts.reduce((sum, a) => sum + (Number(a.fee) || 500), 0);
                         const platRevenueTotal = hospAppts.reduce((sum, a) => 
-                          sum + (Number(a.platformFee) || Math.max(10, Math.round((Number(a.fee) || 500) * (platformFeePercent / 100)))), 0);
+                          sum + getAppointmentPlatformFee(a, (hosp as any).platformFeePercent || platformFeePercent), 0);
 
                         const isDisabled = hosp.status === 'disabled';
 
@@ -2187,9 +2217,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                                 <p className="font-black text-slate-900 text-sm">
                                   ₹{docConsultationTotal.toLocaleString('en-IN')}
                                 </p>
-                                <span className="text-[10px] font-bold text-slate-400">
-                                  Payable at Hospital Counter
-                                </span>
+                                {isHospitalFullOnline && docConsultationTotal > 0 ? (
+                                  <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded inline-block mt-0.5">
+                                    Paid Online (Due to Hospital)
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] font-bold text-slate-400 inline-block mt-0.5">
+                                    Payable at Hospital Counter
+                                  </span>
+                                )}
                               </div>
                             </td>
 
@@ -2267,7 +2303,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                 ) : (
                   periodFilteredAppointments.map((appt) => {
                     const fee = Number(appt.fee) || 500;
-                    const platFee = Number(appt.platformFee) || Math.max(10, Math.round(fee * (platformFeePercent / 100)));
+                    const platFee = getAppointmentPlatformFee(appt, platformFeePercent);
+                    const isApptFullOnline = isAppointmentFullOnline(appt);
                     const istDate = new Intl.DateTimeFormat('en-IN', {
                       timeZone: 'Asia/Kolkata',
                       day: '2-digit',
@@ -2296,6 +2333,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                         <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 text-xs">
                           <div>
                             <span className="font-black text-slate-900">₹{fee}</span>
+                            {isApptFullOnline ? (
+                              <span className="text-[9.5px] text-blue-700 font-bold ml-1.5 bg-blue-50 px-1.5 py-0.5 rounded">
+                                Paid Online (Due)
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-slate-400 font-medium ml-1.5">(Desk)</span>
+                            )}
                             <span className="text-[10px] text-emerald-600 font-bold ml-1.5">(Fee: ₹{platFee})</span>
                           </div>
                           <span className="text-[10px] font-bold text-slate-500">{istDate}</span>
@@ -2330,7 +2374,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                     ) : (
                       periodFilteredAppointments.map((appt) => {
                         const fee = Number(appt.fee) || 500;
-                        const platFee = Number(appt.platformFee) || Math.max(10, Math.round(fee * (platformFeePercent / 100)));
+                        const platFee = getAppointmentPlatformFee(appt, platformFeePercent);
+                        const isApptFullOnline = isAppointmentFullOnline(appt);
 
                         const istDate = new Intl.DateTimeFormat('en-IN', {
                           timeZone: 'Asia/Kolkata',
@@ -2385,8 +2430,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                                   <span>Platform Fee:</span> ₹{platFee}
                                   <span className="text-[9px] font-bold bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">Paid Online ({platformFeePercent}%)</span>
                                 </p>
-                                <p className="text-[10px] text-slate-500 font-medium">
-                                  Doctor Fee: ₹{fee} <span className="text-slate-400">(Pay at Hospital)</span>
+                                <p className="text-[10px] font-medium">
+                                  <span className="text-slate-600">Doctor Fee: ₹{fee}</span>{' '}
+                                  {isApptFullOnline ? (
+                                    <span className="text-blue-700 font-bold bg-blue-50 px-1.5 py-0.5 rounded text-[9.5px]">
+                                      (Paid Online · Due to Hospital)
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-400 font-medium">
+                                      (Pay at Hospital)
+                                    </span>
+                                  )}
                                 </p>
                               </div>
                             </td>
@@ -2423,22 +2477,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
               // Filter ledger appointments by ledger date filter
               const ledgerAppts = filterByDateRange(allHospAppts, ledgerDateFilter, ledgerStartDate, ledgerEndDate);
 
-              const isFullOnlineBooking = (a: any) => {
-                const pc = a.paymentCollection || (a.data && a.data.paymentCollection);
-                if (pc && pc.mode === 'full_online') return true;
-                if (a.collectionMode === 'full_online' || (a.data && a.data.collectionMode === 'full_online')) return true;
-                if (a.paymentMethod && a.paymentMethod.toLowerCase().includes('full online')) return true;
-                const totFee = Number(a.totalFee || (a.data && a.data.totalFee) || 0);
-                const docFee = Number(a.fee || (a.data && a.data.fee) || 0);
-                if (docFee > 0 && totFee >= docFee && totFee > 60) return true;
-                return false;
-              };
-
               const ledgerDocTotal = ledgerAppts.reduce((sum, a) => sum + (Number(a.fee) || 500), 0);
-              const ledgerOnlineDocTotal = ledgerAppts.filter(isFullOnlineBooking).reduce((sum, a) => sum + (Number(a.fee) || 500), 0);
+              const ledgerOnlineDocTotal = ledgerAppts.filter(isAppointmentFullOnline).reduce((sum, a) => sum + (Number(a.fee) || 500), 0);
               const ledgerOfflineDocTotal = ledgerDocTotal - ledgerOnlineDocTotal;
               const ledgerPlatTotal = ledgerAppts.reduce((sum, a) => 
-                sum + (Number(a.platformFee) || Math.max(10, Math.round((Number(a.fee) || 500) * (platformFeePercent / 100)))), 0);
+                sum + getAppointmentPlatformFee(a, (hosp as any).platformFeePercent || platformFeePercent), 0);
 
               return (
                 <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
@@ -2573,8 +2616,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                           ) : (
                             ledgerAppts.map((appt) => {
                               const fee = Number(appt.fee) || 500;
-                              const platFee = Number(appt.platformFee) || Math.max(10, Math.round(fee * (platformFeePercent / 100)));
-                              const isFullOnline = isFullOnlineBooking(appt);
+                              const platFee = getAppointmentPlatformFee(appt, (hosp as any).platformFeePercent || platformFeePercent);
+                              const isFullOnline = isAppointmentFullOnline(appt);
                               const istDate = new Intl.DateTimeFormat('en-IN', {
                                 timeZone: 'Asia/Kolkata',
                                 day: '2-digit',

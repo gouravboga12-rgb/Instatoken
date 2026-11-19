@@ -3862,11 +3862,22 @@ app.post('/api/appointments', async (req, res) => {
   appt.address = appt.address || appt.place || '';
   appt.place = appt.place || appt.address || '';
 
-  store.appointments = [appt, ...store.appointments.filter(a => a.id !== appt.id)];
-
   const isFullOnlineBooking = appt.collectionMode === 'full_online' || 
     appt.paymentMethod?.toLowerCase().includes('full online') ||
     (Number(appt.totalFee || 0) > (Number(appt.fee || 0) + 5));
+
+  const docConsultationFee = Number(appt.fee || 500);
+  const baseTokenFee = Number(appt.tokenFee || appt.tokenBaseFee || Math.max(10, Math.round(docConsultationFee * 0.05)));
+  const onlineSubtotal = isFullOnlineBooking ? (docConsultationFee + baseTokenFee) : baseTokenFee;
+  const baseGatewayFee = Number(appt.gatewayFee || parseFloat((onlineSubtotal * 0.03).toFixed(2)));
+
+  appt.fee = docConsultationFee;
+  appt.tokenFee = baseTokenFee;
+  appt.platformFee = baseTokenFee; // Pure 5% platform cut (₹20), never gateway pass-through
+  appt.gatewayFee = baseGatewayFee;
+  appt.collectionMode = isFullOnlineBooking ? 'full_online' : 'token_only';
+
+  store.appointments = [appt, ...store.appointments.filter(a => a.id !== appt.id)];
 
   const tokenRecord = {
     id: appt.id,
@@ -3888,21 +3899,21 @@ app.post('/api/appointments', async (req, res) => {
     bookingDate: appt.date || new Date().toISOString().split('T')[0],
     status: appt.status || 'booked',
     estimatedWait: appt.estimatedWaitTime || 15,
-    consultationFee: Number(appt.fee || 500),
-    tokenFee: Number(appt.tokenBaseFee || appt.tokenFee || (isFullOnlineBooking ? 25 : 25)),
-    platformFee: Number(appt.platformFee || appt.gatewayFee || (isFullOnlineBooking ? 15.75 : 0.75)),
-    gatewayFee: Number(appt.platformFee || appt.gatewayFee || (isFullOnlineBooking ? 15.75 : 0.75)),
+    consultationFee: docConsultationFee,
+    tokenFee: baseTokenFee,
+    platformFee: baseTokenFee,
+    gatewayFee: baseGatewayFee,
     gstFee: 0,
-    totalFee: Number(appt.totalFee || appt.totalBookingCharges || (isFullOnlineBooking ? 540.75 : 25.75)),
+    totalFee: Number(appt.totalFee || appt.totalBookingCharges || (onlineSubtotal + baseGatewayFee)),
     paymentStatus: isFullOnlineBooking ? 'paid' : 'pending',
     paymentMethod: isFullOnlineBooking ? 'Razorpay (Full Online)' : (appt.paymentMethod || 'Pay at Hospital'),
     paymentCollection: {
       mode: isFullOnlineBooking ? 'full_online' : 'token_only',
-      consultationFee: Number(appt.fee || 500),
-      tokenFee: Number(appt.tokenBaseFee || appt.tokenFee || 25),
-      platformFee: Number(appt.platformFee || appt.gatewayFee || 0),
-      gatewayFee: Number(appt.platformFee || appt.gatewayFee || 0),
-      totalAmountPaid: Number(appt.totalFee || appt.totalBookingCharges || (isFullOnlineBooking ? 540.75 : 25.75)),
+      consultationFee: docConsultationFee,
+      tokenFee: baseTokenFee,
+      platformFee: baseTokenFee,
+      gatewayFee: baseGatewayFee,
+      totalAmountPaid: Number(appt.totalFee || appt.totalBookingCharges || (onlineSubtotal + baseGatewayFee)),
       settlementStatus: isFullOnlineBooking ? 'unsettled' : 'not_applicable'
     },
     paymentId: appt.paymentId,
