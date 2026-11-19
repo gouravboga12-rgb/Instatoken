@@ -34,8 +34,11 @@ export const PatientCallAlertBanner: React.FC = () => {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
       if (!AudioCtx) return;
       const ctx = new AudioCtx();
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
 
-      // Pleasant 3-tone chime: E5 (659Hz) -> G#5 (830Hz) -> B5 (987Hz)
+      // Pleasant 4-tone chime: E5 (659Hz) -> G#5 (830Hz) -> B5 (987Hz) -> E6 (1318Hz)
       const notes = [659.25, 830.61, 987.77, 1318.51];
       notes.forEach((freq, idx) => {
         const osc = ctx.createOscillator();
@@ -44,7 +47,7 @@ export const PatientCallAlertBanner: React.FC = () => {
 
         osc.type = 'sine';
         osc.frequency.setValueAtTime(freq, start);
-        gain.gain.setValueAtTime(0.2, start);
+        gain.gain.setValueAtTime(0.3, start);
         gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.5);
 
         osc.connect(gain);
@@ -55,6 +58,17 @@ export const PatientCallAlertBanner: React.FC = () => {
     } catch (e) {
       console.warn('Audio chime play error:', e);
     }
+
+    // Voice announcement for mobile accessibility
+    try {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const docClean = (activeCall?.doctorName || 'Doctor').replace(/^Dr\.?\s*/i, '');
+        const msg = new SpeechSynthesisUtterance(`Token ${activeCall?.tokenNo || ''}, Dr. ${docClean} is calling.`);
+        msg.rate = 1.0;
+        window.speechSynthesis.speak(msg);
+      }
+    } catch (e) {}
   };
 
   const triggerAlertSequence = (payload: CallAlertPayload) => {
@@ -95,6 +109,31 @@ export const PatientCallAlertBanner: React.FC = () => {
     navigate('/bookings');
   };
 
+  // Unlock mobile browser Web Audio on first user interaction
+  useEffect(() => {
+    const unlockAudio = () => {
+      try {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioCtx) {
+          const dummy = new AudioCtx();
+          if (dummy.state === 'suspended') {
+            dummy.resume().then(() => dummy.close()).catch(() => {});
+          }
+        }
+      } catch (e) {}
+      window.removeEventListener('click', unlockAudio);
+      window.removeEventListener('touchstart', unlockAudio);
+    };
+
+    window.addEventListener('click', unlockAudio, { passive: true });
+    window.addEventListener('touchstart', unlockAudio, { passive: true });
+
+    return () => {
+      window.removeEventListener('click', unlockAudio);
+      window.removeEventListener('touchstart', unlockAudio);
+    };
+  }, []);
+
   useEffect(() => {
     // Determine relevant phone numbers for current patient
     const userPhoneClean = (user?.phone || '').replace(/\D/g, '').slice(-10);
@@ -114,7 +153,17 @@ export const PatientCallAlertBanner: React.FC = () => {
     const isTargetPatient = (payload: CallAlertPayload) => {
       if (!payload) return false;
       const targetPhone = String(payload.patientPhone || '').replace(/\D/g, '').slice(-10);
-      if (userPhoneClean && targetPhone && userPhoneClean === targetPhone) return true;
+      
+      let storedUserPhone = userPhoneClean;
+      try {
+        const rawU = localStorage.getItem('insta_user');
+        if (rawU) {
+          const u = JSON.parse(rawU);
+          storedUserPhone = String(u.phone || '').replace(/\D/g, '').slice(-10);
+        }
+      } catch (e) {}
+
+      if (storedUserPhone && targetPhone && storedUserPhone === targetPhone) return true;
       if (savedApptPhones.includes(targetPhone)) return true;
       
       // Also check if any stored appointment matches the tokenId
@@ -127,6 +176,9 @@ export const PatientCallAlertBanner: React.FC = () => {
           }
         }
       } catch (e) { }
+
+      // If no specific user logged in, allow queue alert for guest / test sessions
+      if (!storedUserPhone) return true;
 
       return false;
     };

@@ -3487,6 +3487,9 @@ app.post('/api/hospitals/:hospitalId/tokens/:tokenId/call', requireHospitalAuth,
   await saveUnifiedStore(store);
 
   const cleanPhone = String(targetToken.patientPhone || '').replace(/\D/g, '').slice(-10);
+  const cleanDoc = (targetToken.doctorName || 'Doctor').replace(/^Dr\.?\s*/i, '');
+  const hospName = targetToken.hospitalName || store.hospitalProfiles?.[hospitalId]?.name || "Gandi Hospital";
+
   const callPayload = {
     tokenId: targetToken.id,
     tokenNo: targetToken.tokenNo || targetToken.tokenNumber,
@@ -3495,12 +3498,35 @@ app.post('/api/hospitals/:hospitalId/tokens/:tokenId/call', requireHospitalAuth,
     doctorId: targetToken.doctorId,
     doctorName: targetToken.doctorName,
     hospitalId: targetToken.hospitalId || hospitalId,
-    hospitalName: targetToken.hospitalName || "Hospital OPD",
+    hospitalName: hospName,
     departmentName: targetToken.departmentName || "General OPD",
     session: targetToken.session || "Morning",
     calledAt: new Date().toISOString(),
-    message: `Token #${targetToken.tokenNo || targetToken.tokenNumber} is called! Dr. ${targetToken.doctorName} is ready to see you in the cabin.`
+    message: `Token #${targetToken.tokenNo || targetToken.tokenNumber} is called! Dr. ${cleanDoc} is ready to see you in the cabin.`
   };
+
+  // Persistent calling notification for patient Notification Tray
+  const callNotification = {
+    id: `notif-call-${targetToken.id}-${Date.now()}`,
+    type: 'call',
+    tokenId: targetToken.id,
+    tokenNo: targetToken.tokenNo || targetToken.tokenNumber,
+    doctorName: cleanDoc,
+    patientName: targetToken.patientName,
+    patientPhone: cleanPhone,
+    hospitalId: targetToken.hospitalId || hospitalId,
+    hospitalName: hospName,
+    title: `🔔 Token #${targetToken.tokenNo || targetToken.tokenNumber} Called!`,
+    message: `Dr. ${cleanDoc} at ${hospName} is calling Token #${targetToken.tokenNo || targetToken.tokenNumber} (${targetToken.patientName}). Please proceed into the cabin immediately!`,
+    sentAt: new Date().toISOString()
+  };
+
+  store.broadcastNotifications = store.broadcastNotifications || [];
+  store.broadcastNotifications.unshift(callNotification);
+  if (store.broadcastNotifications.length > 50) {
+    store.broadcastNotifications = store.broadcastNotifications.slice(0, 50);
+  }
+  await saveUnifiedStore(store);
 
   // 1. Emit to patient room
   if (cleanPhone) {

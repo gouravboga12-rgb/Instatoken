@@ -674,6 +674,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (data.success && Array.isArray(data.appointments) && data.appointments.length > 0) {
           setAppointments(data.appointments);
           localStorage.setItem('insta_appointments', JSON.stringify(data.appointments));
+
+          // If an appointment is currently in 'calling' status, automatically surface alert & tray notification
+          const activeCalling = data.appointments.find((a: any) => a.status === 'calling');
+          if (activeCalling) {
+            const rawDoc = activeCalling.doctorName || 'Doctor';
+            const cleanDoc = rawDoc.replace(/^Dr\.?\s*/i, '');
+            const notifId = `notif-call-${activeCalling.id}`;
+            const newNotif: AppNotification = {
+              id: notifId,
+              title: `🔔 Token #${activeCalling.tokenNumber || activeCalling.tokenNo} Called!`,
+              message: `Dr. ${cleanDoc} at ${activeCalling.hospitalName || 'Hospital'} is calling Token #${activeCalling.tokenNumber || activeCalling.tokenNo} (${activeCalling.patientName}). Please proceed into the cabin immediately!`,
+              type: 'warning',
+              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              read: false
+            };
+            setNotifications(prev => {
+              const filtered = prev.filter(n => n.id !== notifId);
+              return [newNotif, ...filtered];
+            });
+
+            broadcastGlobalSync('TOKEN_CALLED', {
+              tokenId: activeCalling.id,
+              tokenNo: activeCalling.tokenNumber || activeCalling.tokenNo,
+              patientName: activeCalling.patientName,
+              patientPhone: activeCalling.phone,
+              doctorId: activeCalling.doctorId,
+              doctorName: cleanDoc,
+              hospitalId: activeCalling.hospitalId,
+              hospitalName: activeCalling.hospitalName || 'Hospital OPD',
+              calledAt: activeCalling.lastCalledAt || new Date().toISOString()
+            });
+          }
         }
       })
       .catch(err => console.warn('Failed to fetch appointments from server:', err));
@@ -974,9 +1006,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (filteredBroadcasts.length === 0) return prev;
           const mappedBroadcasts: AppNotification[] = filteredBroadcasts.map((b: any) => ({
             id: b.id,
-            title: b.type === 'push' ? `Push Alert • ${b.hospitalName || 'Hospital'}` : `Hospital Alert • ${b.hospitalName || 'Hospital'}`,
+            title: b.title || (b.type === 'push' ? `Push Alert • ${b.hospitalName || 'Hospital'}` : b.type === 'call' ? `🔔 Token #${b.tokenNo} Called!` : `Hospital Alert • ${b.hospitalName || 'Hospital'}`),
             message: b.message,
-            type: 'info' as const,
+            type: (b.type === 'call' || b.type === 'warning') ? ('warning' as const) : ('info' as const),
             timestamp: b.sentAt ? new Date(b.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             read: readIds.has(b.id)
           }));
@@ -1033,17 +1065,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }
         } catch (e) {}
 
-        const matchesUser = userPhoneClean && targetPhone && userPhoneClean === targetPhone;
-        const matchesSavedAppt = savedApptPhones.includes(targetPhone);
+        let storedUserPhone = '';
+        try {
+          const rawU = localStorage.getItem('insta_user');
+          if (rawU) {
+            const u = JSON.parse(rawU);
+            storedUserPhone = String(u.phone || '').replace(/\D/g, '').slice(-10);
+          }
+        } catch (e) {}
 
-        if (matchesUser || matchesSavedAppt || hasMatchingAppt || !targetPhone) {
+        const matchesUser = storedUserPhone && targetPhone && storedUserPhone === targetPhone;
+        const matchesSavedAppt = savedApptPhones.includes(targetPhone);
+        const isGuestOrTesting = !storedUserPhone;
+
+        if (matchesUser || matchesSavedAppt || hasMatchingAppt || isGuestOrTesting || !targetPhone) {
           const rawDoc = callPayload.doctorName || 'Doctor';
           const cleanDoc = rawDoc.replace(/^Dr\.?\s*/i, '');
           const notifId = `notif-call-${callPayload.tokenId || Date.now()}`;
           const newNotif: AppNotification = {
             id: notifId,
             title: `🔔 Token #${callPayload.tokenNo} Called!`,
-            message: `Dr. ${cleanDoc} at ${callPayload.hospitalName || 'Hospital'} is calling Token #${callPayload.tokenNo}. Please proceed into the cabin immediately!`,
+            message: `Dr. ${cleanDoc} at ${callPayload.hospitalName || 'Hospital'} is calling Token #${callPayload.tokenNo}${callPayload.patientName ? ` (${callPayload.patientName})` : ''}. Please proceed into the cabin immediately!`,
             type: 'warning',
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             read: false
