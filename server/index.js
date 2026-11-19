@@ -46,6 +46,18 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on('join_patient', (data) => {
+    const rawPhone = typeof data === 'string' ? data : data?.phone;
+    if (rawPhone) {
+      const cleanPhone = String(rawPhone).replace(/\D/g, '').slice(-10);
+      if (cleanPhone) {
+        socket.join(`patient_${cleanPhone}`);
+        console.log(`📡 Socket ${socket.id} joined room patient_${cleanPhone}`);
+        socket.emit('joined_patient', { phone: cleanPhone, status: 'connected' });
+      }
+    }
+  });
+
   socket.on('disconnect', () => {
     // client disconnected
   });
@@ -3417,6 +3429,91 @@ app.patch('/api/hospitals/:hospitalId/tokens/:tokenId/status', requireHospitalAu
     console.log(`📡 [Socket.io] Emitted token_status_changed to hospital_${hospitalId} for token ${targetToken.id}: ${targetToken.status}`);
   }
   res.json({ success: true, hospitalId, tokenId, status, token: targetToken });
+});
+
+// ─── Real-Time Patient OPD Calling Alert ─────────────────────────────
+app.post('/api/hospitals/:hospitalId/tokens/:tokenId/call', requireHospitalAuth, async (req, res) => {
+  const { hospitalId, tokenId } = req.params;
+  const store = await getUnifiedStore();
+
+  let targetToken = null;
+  store.tokens = (store.tokens || []).map(t => {
+    if (t.id === tokenId || (t.appointmentId && t.appointmentId === tokenId)) {
+      targetToken = {
+        ...t,
+        status: 'calling',
+        lastCalledAt: new Date().toISOString()
+      };
+      return targetToken;
+    }
+    return t;
+  });
+
+  if (!targetToken) {
+    return res.status(404).json({ success: false, message: 'Token not found' });
+  }
+
+  // Update appointment record
+  store.appointments = (store.appointments || []).map(a => {
+    if (a.id === tokenId || a.id === targetToken.id || (targetToken.appointmentId && a.id === targetToken.appointmentId)) {
+      return {
+        ...a,
+        status: 'calling',
+        lastCalledAt: new Date().toISOString()
+      };
+    }
+    return a;
+  });
+
+  if (isDbConnected) {
+    try {
+      await query(
+        `UPDATE tokens SET status = 'calling', updated_at = NOW(),
+         data = (COALESCE(data, '{}'::jsonb) || jsonb_build_object('status', 'calling', 'lastCalledAt', NOW()))
+         WHERE id = $1`,
+        [targetToken.id]
+      );
+      await query(
+        `UPDATE appointments SET status = 'calling', updated_at = NOW(),
+         data = (COALESCE(data, '{}'::jsonb) || jsonb_build_object('status', 'calling', 'lastCalledAt', NOW()))
+         WHERE id = $1`,
+        [targetToken.id]
+      );
+    } catch (e) {
+      console.warn('RDS calling update error:', e.message);
+    }
+  }
+
+  await saveUnifiedStore(store);
+
+  const cleanPhone = String(targetToken.patientPhone || '').replace(/\D/g, '').slice(-10);
+  const callPayload = {
+    tokenId: targetToken.id,
+    tokenNo: targetToken.tokenNo || targetToken.tokenNumber,
+    patientName: targetToken.patientName,
+    patientPhone: cleanPhone,
+    doctorId: targetToken.doctorId,
+    doctorName: targetToken.doctorName,
+    hospitalId: targetToken.hospitalId || hospitalId,
+    hospitalName: targetToken.hospitalName || "Hospital OPD",
+    departmentName: targetToken.departmentName || "General OPD",
+    session: targetToken.session || "Morning",
+    calledAt: new Date().toISOString(),
+    message: `Token #${targetToken.tokenNo || targetToken.tokenNumber} is called! Dr. ${targetToken.doctorName} is ready to see you in the cabin.`
+  };
+
+  // 1. Emit to patient room
+  if (cleanPhone) {
+    io.to(`patient_${cleanPhone}`).emit('token_called', callPayload);
+  }
+  // 2. Broadcast globally for active customer sessions
+  io.emit('token_called', callPayload);
+  // 3. Notify hospital room of token status change
+  io.to(`hospital_${hospitalId}`).emit('token_status_changed', targetToken);
+
+  console.log(`📡 [Socket.io] Emitted token_called for Token #${callPayload.tokenNo} to patient ${cleanPhone} (${targetToken.patientName})`);
+
+  res.json({ success: true, callPayload, token: targetToken });
 });
 
 // ─── Re-Admit Unvisited / Missed Token ─────────────────────────────────────────

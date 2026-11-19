@@ -325,6 +325,7 @@ interface HospitalContextType {
     session: 'morning' | 'afternoon' | 'evening', 
     deskDifference?: number
   ) => Promise<TokenRecord>;
+  callPatientToken: (id: string) => Promise<any>;
   updateTokenSession: (id: string, newSession: string) => void;
 
   // Patients
@@ -2219,6 +2220,54 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }).catch(() => { });
   };
 
+  const callPatientToken = async (id: string) => {
+    const targetToken = tokens.find(t => t.id === id);
+    if (!targetToken) return;
+
+    // 1. Immediately update local token status to 'calling'
+    setTokens(prev => {
+      const updated = prev.map(t => t.id === id ? { ...t, status: 'calling' as const } : t);
+      localStorage.setItem('insta_hospital_tokens', JSON.stringify(updated));
+      if (targetHospId) {
+        localStorage.setItem(`insta_hospital_tokens_${targetHospId}`, JSON.stringify(updated));
+      }
+      return updated;
+    });
+
+    const cleanPhone = String(targetToken.patientPhone || '').replace(/\D/g, '').slice(-10);
+    const callPayload = {
+      tokenId: targetToken.id,
+      tokenNo: targetToken.tokenNo || (targetToken as any).tokenNumber,
+      patientName: targetToken.patientName,
+      patientPhone: cleanPhone,
+      doctorId: targetToken.doctorId,
+      doctorName: targetToken.doctorName,
+      hospitalId: targetToken.hospitalId || targetHospId,
+      hospitalName: hospitalProfile?.name || targetToken.hospitalName || "Hospital OPD",
+      departmentName: targetToken.departmentName || "General OPD",
+      session: targetToken.session || "Morning",
+      calledAt: new Date().toISOString(),
+      message: `Token #${targetToken.tokenNo || (targetToken as any).tokenNumber} Called! Dr. ${targetToken.doctorName} is ready for you in the cabin.`
+    };
+
+    // 2. Broadcast via global cross-tab sync so patient window in any browser/tab gets the alert instantly
+    broadcastGlobalSync('TOKEN_CALLED', callPayload);
+
+    // 3. Post to backend which broadcasts via Socket.io to patient room and all connected apps
+    try {
+      const res = await fetch(`/api/hospitals/${targetHospId}/tokens/${id}/call`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        }
+      });
+      return await res.json();
+    } catch (e) {
+      console.warn('Call patient API error:', e);
+    }
+  };
+
   const updateTokenSession = (id: string, newSession: string) => {
     const normalizedSession = (newSession.toLowerCase()) as TokenRecord['session'];
     setTokens(prev => {
@@ -2942,7 +2991,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       addDoctor, updateDoctor, deleteDoctor, toggleDoctorActive,
       addDepartment, updateDepartment, deleteDepartment, toggleDepartmentActive,
       addStaffMember, updateStaffMember, deleteStaffMember, markStaffAttendance,
-      generateWalkInToken, updateTokenStatus, updateTokenPayment, cancelToken, deleteToken, deleteTokens, markTokensUnvisited, readmitToken, updateTokenSession,
+      generateWalkInToken, updateTokenStatus, updateTokenPayment, cancelToken, deleteToken, deleteTokens, markTokensUnvisited, readmitToken, callPatientToken, updateTokenSession,
       addPatient, updatePatient, searchPatients, validateToken,
       updateScheduleConfig, updateSession,
       sendNotification, clearHospitalNotifications,

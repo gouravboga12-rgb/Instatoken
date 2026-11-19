@@ -23,6 +23,7 @@ import { HospitalSignup } from './pages/hospital/HospitalSignup';
 import { HospitalLayout } from './pages/hospital/HospitalLayout';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { Footer } from './components/common/Footer';
+import { PatientCallAlertBanner } from './components/patient/PatientCallAlertBanner';
 import { 
   Home as HomeIcon, Search as SearchIcon, Award, User as UserIcon, 
   MapPin, Bell, ChevronDown, Loader2, RotateCw, Search, X
@@ -411,6 +412,9 @@ const AppContent: React.FC = () => {
   return (
     <div className={`min-h-screen bg-slate-50 flex flex-col justify-between relative ${isPanelRoute ? 'h-screen overflow-hidden' : ''}`} style={{ overflowX: 'clip' }}>
       <ScrollToTop />
+
+      {/* Real-Time Patient Calling Alert & Audio Chime Banner */}
+      {!isManagementRoute && <PatientCallAlertBanner />}
 
       {/* Desktop Navigation Header */}
       {!isManagementRoute && <TopNavbar />}

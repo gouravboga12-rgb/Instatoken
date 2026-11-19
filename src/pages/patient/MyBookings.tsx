@@ -122,8 +122,8 @@ export const MyBookings: React.FC = () => {
   };
 
   const renderCard = (appt: Appointment) => {
-    const currentStatus = appt.status || 'booked';
-    const isActive = currentStatus === 'booked' || currentStatus === 'checked-in' || currentStatus === 'in-cabin';
+    const currentStatus = (appt.status || 'booked') as string;
+    const isActive = currentStatus === 'booked' || currentStatus === 'checked-in' || currentStatus === 'in-cabin' || currentStatus === 'calling';
     const bookingIdDisplay = appt.id.startsWith('apt-') ? `ITK${appt.id.replace('apt-', '').slice(0, 6).toUpperCase()}` : appt.id.toUpperCase();
 
     const qrPayload = JSON.stringify({
@@ -147,10 +147,10 @@ export const MyBookings: React.FC = () => {
           {/* Card Top: Status & Booking ID */}
           <div className="flex justify-between items-center mb-2.5 pb-2 border-b border-slate-100">
             <Badge 
-              variant={currentStatus === 'completed' ? 'green' : currentStatus === 'cancelled' ? 'red' : currentStatus === 'in-cabin' || currentStatus === 'checked-in' ? 'orange' : 'green'} 
-              className="text-[9.5px] px-2.5 py-0.5 rounded-full uppercase font-black"
+              variant={currentStatus === 'completed' ? 'green' : currentStatus === 'cancelled' ? 'red' : currentStatus === 'calling' ? 'orange' : currentStatus === 'in-cabin' || currentStatus === 'checked-in' ? 'orange' : 'green'} 
+              className={`text-[9.5px] px-2.5 py-0.5 rounded-full uppercase font-black ${currentStatus === 'calling' ? 'animate-pulse bg-amber-500 text-white' : ''}`}
             >
-              {currentStatus === 'in-cabin' ? 'In Consultation' : currentStatus === 'checked-in' ? 'Checked In' : currentStatus === 'booked' ? 'Confirmed' : currentStatus.toUpperCase()}
+              {currentStatus === 'calling' ? '🔔 CALLED • PROCEED TO CABIN' : currentStatus === 'in-cabin' ? 'In Consultation' : currentStatus === 'checked-in' ? 'Checked In' : currentStatus === 'booked' ? 'Confirmed' : currentStatus.toUpperCase()}
             </Badge>
 
             <span className="text-[10px] font-bold text-slate-400 tracking-wide">

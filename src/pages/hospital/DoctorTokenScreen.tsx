@@ -14,7 +14,7 @@ import { TokenPaymentModal } from '../../components/hospital/TokenPaymentModal';
 export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorIdProp }) => {
   const params = useParams<{ doctorId: string }>();
   const doctorId = doctorIdProp || params.doctorId;
-  const { doctors, tokens, updateTokenStatus, updateTokenPayment, deleteToken, deleteTokens, updateTokenSession, hospitalProfile } = useHospital();
+  const { doctors, tokens, updateTokenStatus, callPatientToken, updateTokenPayment, deleteToken, deleteTokens, updateTokenSession, hospitalProfile } = useHospital();
   const navigate = useNavigate();
 
   const doctor = doctors.find(d => d.id === doctorId) || doctors[0];
@@ -233,12 +233,10 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
 
   const handleCallNext = (tokenId?: string) => {
     playCallChime();
-    if (tokenId) {
-      updateTokenStatus(tokenId, 'checked-in');
-    } else if (nextInLine.length > 0) {
-      updateTokenStatus(nextInLine[0].id, 'checked-in');
-    } else if (activeQueue.length > 0) {
-      updateTokenStatus(activeQueue[0].id, 'checked-in');
+    const targetId = tokenId || (nextInLine.length > 0 ? nextInLine[0].id : activeQueue.length > 0 ? activeQueue[0].id : undefined);
+    if (targetId) {
+      callPatientToken(targetId);
+      updateTokenStatus(targetId, 'checked-in');
     }
   };
 
@@ -256,8 +254,9 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
   };
 
   const handleRecallToken = (id: string) => {
-    updateTokenStatus(id, 'checked-in');
     playCallChime();
+    callPatientToken(id);
+    updateTokenStatus(id, 'checked-in');
   };
 
   // Tokens for this doctor that are NOT visited (can be cleared at the end of the day)
@@ -859,14 +858,23 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
                             </button>
                           )}
 
-                          {(tok.status === 'checked-in' || tok.status === 'in-consultation') && (
-                            <button
-                              onClick={() => handleCompleteToken(tok.id)}
-                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold cursor-pointer border-none shadow-xs flex items-center gap-1"
-                              title="Complete consultation (adds to revenue)"
-                            >
-                              <CheckCircle size={11} /> Visited
-                            </button>
+                          {(tok.status === 'checked-in' || tok.status === 'in-consultation' || tok.status === 'calling') && (
+                            <>
+                              <button
+                                onClick={() => handleRecallToken(tok.id)}
+                                className="px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold cursor-pointer border-none shadow-xs flex items-center gap-1"
+                                title="Ring patient alert chime again"
+                              >
+                                <Volume2 size={11} /> Re-Call
+                              </button>
+                              <button
+                                onClick={() => handleCompleteToken(tok.id)}
+                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold cursor-pointer border-none shadow-xs flex items-center gap-1"
+                                title="Complete consultation (adds to revenue)"
+                              >
+                                <CheckCircle size={11} /> Visited
+                              </button>
+                            </>
                           )}
 
                           {['booked', 'waiting', 'checked-in', 'calling', 'in-consultation', 'arrived'].includes(tok.status) && (
