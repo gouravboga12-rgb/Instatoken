@@ -46,8 +46,7 @@ async function renumber() {
     `);
     await c.query(`
       UPDATE appointments
-      SET token_number = 2,
-          data = jsonb_set(jsonb_set(COALESCE(data, '{}'::jsonb), '{tokenNo}', '2'::jsonb), '{tokenNumber}', '2'::jsonb)
+      SET data = jsonb_set(jsonb_set(COALESCE(data, '{}'::jsonb), '{tokenNo}', '2'::jsonb), '{tokenNumber}', '2'::jsonb)
       WHERE id = 'tok-8045'
     `);
     const check = await c.query(`SELECT id, token_number, data->>'tokenNo' as tok_no FROM tokens WHERE id = 'tok-8045'`);
