@@ -3505,39 +3505,18 @@ app.post('/api/hospitals/:hospitalId/tokens/:tokenId/call', requireHospitalAuth,
     message: `Token #${targetToken.tokenNo || targetToken.tokenNumber} is called! Dr. ${cleanDoc} is ready to see you in the cabin.`
   };
 
-  // Persistent calling notification for patient Notification Tray
-  const callNotification = {
-    id: `notif-call-${targetToken.id}-${Date.now()}`,
-    type: 'call',
-    tokenId: targetToken.id,
-    tokenNo: targetToken.tokenNo || targetToken.tokenNumber,
-    doctorName: cleanDoc,
-    patientName: targetToken.patientName,
-    patientPhone: cleanPhone,
-    hospitalId: targetToken.hospitalId || hospitalId,
-    hospitalName: hospName,
-    title: `🔔 Token #${targetToken.tokenNo || targetToken.tokenNumber} Called!`,
-    message: `Dr. ${cleanDoc} at ${hospName} is calling Token #${targetToken.tokenNo || targetToken.tokenNumber} (${targetToken.patientName}). Please proceed into the cabin immediately!`,
-    sentAt: new Date().toISOString()
-  };
-
-  store.broadcastNotifications = store.broadcastNotifications || [];
-  store.broadcastNotifications.unshift(callNotification);
-  if (store.broadcastNotifications.length > 50) {
-    store.broadcastNotifications = store.broadcastNotifications.slice(0, 50);
-  }
+  // Clean any old individual call notifications from global broadcasts
+  store.broadcastNotifications = (store.broadcastNotifications || []).filter(b => b.type !== 'call');
   await saveUnifiedStore(store);
 
-  // 1. Emit to patient room
+  // 1. Emit strictly to the specific patient's private room
   if (cleanPhone) {
     io.to(`patient_${cleanPhone}`).emit('token_called', callPayload);
   }
-  // 2. Broadcast globally for active customer sessions
-  io.emit('token_called', callPayload);
-  // 3. Notify hospital room of token status change
+  // 2. Notify hospital room of token status change
   io.to(`hospital_${hospitalId}`).emit('token_status_changed', targetToken);
 
-  console.log(`📡 [Socket.io] Emitted token_called for Token #${callPayload.tokenNo} to patient ${cleanPhone} (${targetToken.patientName})`);
+  console.log(`📡 [Socket.io] Emitted private token_called for Token #${callPayload.tokenNo} strictly to patient room patient_${cleanPhone} (${targetToken.patientName})`);
 
   res.json({ success: true, callPayload, token: targetToken });
 });

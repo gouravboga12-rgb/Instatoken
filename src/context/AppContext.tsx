@@ -675,8 +675,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           setAppointments(data.appointments);
           localStorage.setItem('insta_appointments', JSON.stringify(data.appointments));
 
-          // If an appointment is currently in 'calling' status, automatically surface alert & tray notification
-          const activeCalling = data.appointments.find((a: any) => a.status === 'calling');
+          // If an appointment that belongs strictly to this user is currently in 'calling' status, surface alert
+          let myPhones: string[] = [];
+          if (user?.phone) myPhones.push(String(user.phone).replace(/\D/g, '').slice(-10));
+          try {
+            const rawU = localStorage.getItem('insta_user');
+            if (rawU) {
+              const u = JSON.parse(rawU);
+              if (u.phone) myPhones.push(String(u.phone).replace(/\D/g, '').slice(-10));
+            }
+          } catch (e) {}
+
+          const activeCalling = data.appointments.find((a: any) => {
+            if (a.status !== 'calling') return false;
+            const aPhone = String(a.phone || '').replace(/\D/g, '').slice(-10);
+            return myPhones.length > 0 && myPhones.includes(aPhone);
+          });
+
           if (activeCalling) {
             const rawDoc = activeCalling.doctorName || 'Doctor';
             const cleanDoc = rawDoc.replace(/^Dr\.?\s*/i, '');
@@ -1074,11 +1089,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }
         } catch (e) {}
 
-        const matchesUser = storedUserPhone && targetPhone && storedUserPhone === targetPhone;
-        const matchesSavedAppt = savedApptPhones.includes(targetPhone);
-        const isGuestOrTesting = !storedUserPhone;
+        let myPhones: string[] = [];
+        if (userPhoneClean) myPhones.push(userPhoneClean);
+        if (storedUserPhone && !myPhones.includes(storedUserPhone)) myPhones.push(storedUserPhone);
 
-        if (matchesUser || matchesSavedAppt || hasMatchingAppt || isGuestOrTesting || !targetPhone) {
+        const matchesUser = targetPhone && myPhones.includes(targetPhone);
+        const matchesSavedAppt = targetPhone && savedApptPhones.includes(targetPhone);
+
+        // Strict: ONLY alert if this token belongs strictly to this patient!
+        if (matchesUser || matchesSavedAppt || hasMatchingAppt) {
           const rawDoc = callPayload.doctorName || 'Doctor';
           const cleanDoc = rawDoc.replace(/^Dr\.?\s*/i, '');
           const notifId = `notif-call-${callPayload.tokenId || Date.now()}`;

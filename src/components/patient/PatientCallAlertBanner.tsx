@@ -147,33 +147,37 @@ export const PatientCallAlertBanner: React.FC = () => {
     const isTargetPatient = (payload: CallAlertPayload) => {
       if (!payload) return false;
       const targetPhone = String(payload.patientPhone || '').replace(/\D/g, '').slice(-10);
+      if (!targetPhone) return false;
       
-      let storedUserPhone = userPhoneClean;
+      let myPhones: string[] = [];
+      if (userPhoneClean) myPhones.push(userPhoneClean);
       try {
         const rawU = localStorage.getItem('insta_user');
         if (rawU) {
           const u = JSON.parse(rawU);
-          storedUserPhone = String(u.phone || '').replace(/\D/g, '').slice(-10);
+          const p = String(u.phone || '').replace(/\D/g, '').slice(-10);
+          if (p && !myPhones.includes(p)) myPhones.push(p);
         }
       } catch (e) {}
 
-      if (storedUserPhone && targetPhone && storedUserPhone === targetPhone) return true;
+      if (myPhones.includes(targetPhone)) return true;
       if (savedApptPhones.includes(targetPhone)) return true;
       
-      // Also check if any stored appointment matches the tokenId
+      // Also check if any stored appointment matches the tokenId or patient phone
       try {
         const raw = localStorage.getItem('insta_appointments');
         if (raw) {
           const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed) && parsed.some((a: any) => a.id === payload.tokenId || (a.hospitalId === payload.hospitalId && Number(a.tokenNumber) === Number(payload.tokenNo)))) {
+          if (Array.isArray(parsed) && parsed.some((a: any) => 
+            a.id === payload.tokenId || 
+            (String(a.phone || a.patientPhone || '').replace(/\D/g, '').slice(-10) === targetPhone && Number(a.tokenNumber) === Number(payload.tokenNo))
+          )) {
             return true;
           }
         }
       } catch (e) { }
 
-      // If no specific user logged in, allow queue alert for guest / test sessions
-      if (!storedUserPhone) return true;
-
+      // Strict: Only alert if this token belongs strictly to this patient!
       return false;
     };
 
