@@ -11,7 +11,7 @@ const s3Client = new S3Client({
   },
 });
 
-const BUCKET_NAME = process.env.AWS_S3_BUCKET_NAME || 'instatoken-media-prod';
+const BUCKET_NAME = process.env.AWS_S3_BUCKET_NAME || 'instatoken-media-prod-2026';
 
 /**
  * Generate a pre-signed URL for direct client-side upload

@@ -209,7 +209,8 @@ export const HospitalSettings: React.FC = () => {
       if (res.ok) {
         const data = await res.json();
         if (data.success && data.url) {
-          setForm(prev => ({ ...prev, [field]: data.url }));
+          const sanitizedUrl = data.url.replace(/instatoken-media-prod\.(?!2026)/g, 'instatoken-media-prod-2026.');
+          setForm(prev => ({ ...prev, [field]: sanitizedUrl }));
           setUploadingPhoto(false);
           return;
         }
@@ -498,6 +499,28 @@ export const HospitalSettings: React.FC = () => {
         <div className="xl:col-span-3">
           <form onSubmit={activeTab === 'payouts' ? handlePayoutSave : handleSubmit} className="bg-white border border-slate-100 rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 shadow-xs space-y-5 sm:space-y-6">
 
+            {/* Quick Top Action Bar */}
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black uppercase tracking-wider text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full border border-blue-100">
+                  {activeTab === 'basic' ? 'Basic Identity & Photo' : activeTab === 'contact' ? 'Contacts & Digital' : activeTab === 'location' ? 'GPS & Maps' : activeTab === 'about' ? 'Amenities' : 'Payouts & Banking'}
+                </span>
+                {saveSuccess && activeTab !== 'payouts' && (
+                  <span className="text-xs font-bold text-emerald-600 flex items-center gap-1 bg-emerald-50 px-2.5 py-1 rounded-xl border border-emerald-200 animate-fadeIn">
+                    <Check size={14} /> Saved & Published!
+                  </span>
+                )}
+              </div>
+              <button
+                type="submit"
+                disabled={activeTab === 'payouts' ? payoutSaving : false}
+                className="bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-extrabold px-4 sm:px-5 py-2 rounded-xl cursor-pointer border-none flex items-center gap-1.5 text-xs shadow-sm shadow-blue-500/20 transition-all"
+              >
+                <Save size={13} />
+                <span>{activeTab === 'payouts' ? (payoutSaving ? 'Saving...' : 'Save Settings') : 'Save Changes'}</span>
+              </button>
+            </div>
+
             {/* ─── BASIC PROFILE & PHOTO ─── */}
             {activeTab === 'basic' && (
               <div className="space-y-6">
@@ -510,7 +533,19 @@ export const HospitalSettings: React.FC = () => {
                     {/* Preview */}
                     <div className="w-full sm:w-32 h-28 sm:h-24 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center shrink-0 relative">
                       {form.coverImage ? (
-                        <img src={form.coverImage} alt="Hospital" className="w-full h-full object-cover" />
+                        <img
+                          src={form.coverImage}
+                          alt="Hospital"
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const img = e.target as HTMLImageElement;
+                            if (img.src.includes('instatoken-media-prod.') && !img.src.includes('instatoken-media-prod-2026.')) {
+                              img.src = img.src.replace('instatoken-media-prod.', 'instatoken-media-prod-2026.');
+                            } else {
+                              img.src = 'https://images.unsplash.com/photo-1586773860418-d37222d8fce3?w=800';
+                            }
+                          }}
+                        />
                       ) : (
                         <div className="flex flex-col items-center gap-1 text-slate-400">
                           <ImageIcon size={24} />
@@ -722,7 +757,19 @@ export const HospitalSettings: React.FC = () => {
                   <div className="flex gap-4 items-start">
                     <div className="w-16 h-16 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center shrink-0">
                       {form.logo ? (
-                        <img src={form.logo} alt="Logo" className="w-full h-full object-cover" />
+                        <img
+                          src={form.logo}
+                          alt="Logo"
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const img = e.target as HTMLImageElement;
+                            if (img.src.includes('instatoken-media-prod.') && !img.src.includes('instatoken-media-prod-2026.')) {
+                              img.src = img.src.replace('instatoken-media-prod.', 'instatoken-media-prod-2026.');
+                            } else {
+                              img.src = 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=400';
+                            }
+                          }}
+                        />
                       ) : (
                         <Building2 size={20} className="text-slate-300" />
                       )}
