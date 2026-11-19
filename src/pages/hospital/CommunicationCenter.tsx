@@ -4,9 +4,9 @@ import { Send, Bell, Smartphone, CheckCircle, RefreshCw, Trash2, Zap, ShieldChec
 
 export const CommunicationCenter: React.FC = () => {
   const { sendNotification, notifications, tokens, clearHospitalNotifications } = useHospital();
-  
+
   const [activeTab, setActiveTab] = useState<'inapp' | 'push'>('inapp');
-  
+
   const [form, setForm] = useState({
     recipientGroup: 'all',
     customNumbers: '',
@@ -53,7 +53,7 @@ export const CommunicationCenter: React.FC = () => {
   };
 
   // Group counts based on live data
-  const waitingCount = tokens.filter(t => ['booked','waiting','checked-in'].includes(t.status)).length;
+  const waitingCount = tokens.filter(t => ['booked', 'waiting', 'checked-in'].includes(t.status)).length;
   const todayCount = tokens.length;
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -142,9 +142,8 @@ export const CommunicationCenter: React.FC = () => {
             key={t.id}
             type="button"
             onClick={() => { setActiveTab(t.id as any); setSuccess(false); }}
-            className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 text-xs font-bold rounded-lg sm:rounded-xl cursor-pointer border-none whitespace-nowrap transition-all ${
-              activeTab === t.id ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'
-            }`}
+            className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 text-xs font-bold rounded-lg sm:rounded-xl cursor-pointer border-none whitespace-nowrap transition-all ${activeTab === t.id ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+              }`}
           >
             {t.icon}
             {t.label}
@@ -186,11 +185,10 @@ export const CommunicationCenter: React.FC = () => {
                     type="button"
                     key={r.id}
                     onClick={() => setForm(f => ({ ...f, recipientGroup: r.id }))}
-                    className={`py-2 px-2.5 sm:px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer truncate ${
-                      form.recipientGroup === r.id
+                    className={`py-2 px-2.5 sm:px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer truncate ${form.recipientGroup === r.id
                         ? 'border-blue-600 bg-blue-50 text-blue-700'
                         : 'border-slate-200 text-slate-600 bg-white hover:border-slate-300'
-                    }`}
+                      }`}
                   >
                     {r.label}
                   </button>
@@ -215,9 +213,8 @@ export const CommunicationCenter: React.FC = () => {
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="text-xs font-bold text-slate-700">Notification Message</label>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
-                  activeTab === 'inapp' ? 'text-blue-600 bg-blue-50' : 'text-purple-600 bg-purple-50'
-                }`}>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${activeTab === 'inapp' ? 'text-blue-600 bg-blue-50' : 'text-purple-600 bg-purple-50'
+                  }`}>
                   {activeTab === 'inapp' ? 'In-App Web & App Notice' : 'External Device Push Notification'}
                 </span>
               </div>
@@ -226,8 +223,8 @@ export const CommunicationCenter: React.FC = () => {
                 value={form.message}
                 onChange={e => setForm(f => ({ ...f, message: e.target.value }))}
                 rows={5}
-                placeholder={activeTab === 'inapp' 
-                  ? 'Type your in-app notification message here (displays in patient notification bell & top alert bar)...' 
+                placeholder={activeTab === 'inapp'
+                  ? 'Type your in-app notification message here (displays in patient notification bell & top alert bar)...'
                   : 'Type your external push notification broadcast (delivers as device OS / mobile push notice)...'
                 }
                 className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 resize-none font-medium text-slate-800"
@@ -292,9 +289,8 @@ export const CommunicationCenter: React.FC = () => {
                     key={tab}
                     type="button"
                     onClick={() => setFilterType(tab)}
-                    className={`px-2 py-0.5 rounded-lg text-[10px] font-bold cursor-pointer transition-all ${
-                      filterType === tab ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
+                    className={`px-2 py-0.5 rounded-lg text-[10px] font-bold cursor-pointer transition-all ${filterType === tab ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
                   >
                     {tab === 'all' ? 'All' : tab === 'inapp' ? 'In-App' : 'Push'}
                   </button>
@@ -306,9 +302,8 @@ export const CommunicationCenter: React.FC = () => {
               {filteredTransmissions.map(n => (
                 <div key={n.id} className="bg-slate-50 border border-slate-100 rounded-2xl p-3 text-xs space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <span className={`font-extrabold capitalize text-[11px] flex items-center gap-1 ${
-                      n.type === 'push' ? 'text-purple-600' : 'text-blue-600'
-                    }`}>
+                    <span className={`font-extrabold capitalize text-[11px] flex items-center gap-1 ${n.type === 'push' ? 'text-purple-600' : 'text-blue-600'
+                      }`}>
                       {n.type === 'push' ? <Smartphone size={11} /> : <Bell size={11} />}
                       {n.type === 'inapp' ? 'In-App Alert' : n.type === 'push' ? 'Device Push' : n.type}
                     </span>

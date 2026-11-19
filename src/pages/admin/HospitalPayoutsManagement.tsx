@@ -205,8 +205,11 @@ export const HospitalPayoutsManagement: React.FC = () => {
           <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Enrolled Full-Online Hospitals</span>
           <div className="text-2xl font-black text-blue-400 mt-1">{hospitals.length}</div>
           <p className="text-[11px] text-slate-400 font-medium mt-0.5">
-            {totalPendingRequests > 0 ? (
-              <span className="text-amber-400 font-bold">{totalPendingRequests} payout request(s) pending</span>
+            {hospitals.filter(h => h.pendingRequests && h.pendingRequests.length > 0).length > 0 ? (
+              <span className="text-amber-400 font-bold">
+                {hospitals.filter(h => h.pendingRequests && h.pendingRequests.length > 0).length} hospital(s) requesting payout
+                {totalPendingRequests > hospitals.filter(h => h.pendingRequests && h.pendingRequests.length > 0).length ? ` (${totalPendingRequests} submissions)` : ''}
+              </span>
             ) : (
               'All payout requests processed'
             )}
@@ -235,9 +238,9 @@ export const HospitalPayoutsManagement: React.FC = () => {
           }`}
         >
           <span>Hospital Payout Requests</span>
-          {totalPendingRequests > 0 && (
+          {hospitals.filter(h => h.pendingRequests && h.pendingRequests.length > 0).length > 0 && (
             <span className="bg-amber-500 text-black text-[10px] font-black px-1.5 py-0.2 rounded-full">
-              {totalPendingRequests}
+              {hospitals.filter(h => h.pendingRequests && h.pendingRequests.length > 0).length}
             </span>
           )}
         </button>
@@ -401,8 +404,12 @@ export const HospitalPayoutsManagement: React.FC = () => {
       {/* Hospital Payout Requests View */}
       {activeSubTab === 'requests' && (
         <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-sm space-y-4">
-          <h3 className="text-sm font-black text-white uppercase tracking-wider">On-Demand Payout Requests from Hospitals</h3>
-          <p className="text-xs text-slate-400">Hospitals submit these requests when they need funds cleared.</p>
+          <div>
+            <h3 className="text-sm font-black text-white uppercase tracking-wider">On-Demand Payout Requests from Hospitals</h3>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Hospitals submit these requests when they need funds cleared. Each hospital is consolidated into a single card to prevent duplicate payouts.
+            </p>
+          </div>
 
           <div className="space-y-3">
             {hospitals.filter(h => h.pendingRequests && h.pendingRequests.length > 0).length === 0 ? (
@@ -410,35 +417,65 @@ export const HospitalPayoutsManagement: React.FC = () => {
                 No active payout requests from hospitals.
               </div>
             ) : (
-              hospitals.map(h =>
-                (h.pendingRequests || []).map((req: any) => (
-                  <div key={req.id} className="p-4 bg-slate-800/60 border border-amber-500/30 rounded-2xl flex items-center justify-between gap-4">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-black text-white text-sm">{h.name}</span>
-                        <span className="bg-amber-500/20 text-amber-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-500/30">
-                          Pending
-                        </span>
-                      </div>
-                      <div className="text-xs text-slate-400 mt-1">
-                        Requested: <strong className="text-amber-300 text-sm font-mono">₹{Number(req.requested_amount).toLocaleString('en-IN')}</strong>
-                        {req.notes && <span className="ml-2 text-slate-300">· "{req.notes}"</span>}
-                      </div>
-                      <div className="text-[11px] text-slate-500 mt-0.5">
-                        Submitted: {req.created_at_ist || new Date(req.created_at).toLocaleString('en-IN')}
-                      </div>
-                    </div>
+              hospitals
+                .filter(h => h.pendingRequests && h.pendingRequests.length > 0)
+                .map(h => {
+                  const reqList = h.pendingRequests || [];
+                  const repeatCount = reqList.length;
+                  const isRepeated = repeatCount > 1;
+                  const latestReq = reqList[0] || {};
+                  const requestedAmt = Number(latestReq.requested_amount || h.pendingDue);
+                  const submittedTime = latestReq.created_at_ist || (latestReq.created_at ? new Date(latestReq.created_at).toLocaleString('en-IN') : 'Recently');
 
-                    <button
-                      onClick={() => openSettleModal(h, Number(req.requested_amount))}
-                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-md cursor-pointer border-none transition-all flex items-center gap-1.5 shrink-0"
+                  return (
+                    <div
+                      key={h.id}
+                      className={`p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all ${
+                        isRepeated
+                          ? 'bg-amber-950/20 border-2 border-amber-500/50 shadow-md shadow-amber-500/5'
+                          : 'bg-slate-800/60 border border-amber-500/30'
+                      }`}
                     >
-                      <Send size={12} />
-                      <span>Settle Now</span>
-                    </button>
-                  </div>
-                ))
-              )
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-black text-white text-sm sm:text-base">{h.name}</span>
+                          <span className="bg-amber-500/20 text-amber-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-500/30">
+                            Pending Settlement
+                          </span>
+
+                          {isRepeated && (
+                            <span className="inline-flex items-center gap-1.5 bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[10px] font-black px-2.5 py-0.5 rounded-full animate-pulse">
+                              <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+                              <span>Requested {repeatCount} Times</span>
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="text-xs text-slate-300">
+                          Requested Amount: <strong className="text-amber-300 text-sm sm:text-base font-mono font-black">₹{requestedAmt.toLocaleString('en-IN')}</strong>
+                          {latestReq.notes && <span className="ml-2 text-slate-400">· "{latestReq.notes}"</span>}
+                        </div>
+
+                        <div className="text-[11px] text-slate-500 flex flex-wrap items-center gap-1">
+                          <span>Latest Request: <strong className="text-slate-400">{submittedTime}</strong></span>
+                          {isRepeated && (
+                            <span className="text-rose-400 font-bold ml-1">
+                              · (Hospital submitted {repeatCount} requests for this same pending balance. Single payout covers all.)
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => openSettleModal(h, requestedAmt)}
+                        className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-black text-xs rounded-xl shadow-md cursor-pointer border-none transition-all flex items-center justify-center gap-1.5 shrink-0 self-start sm:self-auto"
+                      >
+                        <Send size={13} />
+                        <span>Settle Now</span>
+                      </button>
+                    </div>
+                  );
+                })
             )}
           </div>
         </div>

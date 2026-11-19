@@ -103,6 +103,10 @@ export const HospitalPayouts: React.FC = () => {
     e.preventDefault();
     setRequestError('');
     setRequestSuccess('');
+    if (hasPendingRequest) {
+      setRequestError('A payout request is already pending review with Admin. Please allow 24 to 48 working hours.');
+      return;
+    }
     const amt = parseFloat(requestAmount);
     if (!amt || amt <= 0) { setRequestError('Enter a valid amount.'); return; }
     if (summary && amt > summary.pendingDue) { setRequestError(`Amount cannot exceed pending due ₹${summary.pendingDue.toFixed(2)}.`); return; }
@@ -132,6 +136,8 @@ export const HospitalPayouts: React.FC = () => {
 
   const bd = summary?.bankDetails || {};
   const isFullOnline = summary?.paymentMode === 'full_online';
+  const pendingRequest = requests.find(r => r.status === 'pending');
+  const hasPendingRequest = Boolean(pendingRequest);
 
   if (loading) return (
     <div className="p-8 flex items-center justify-center min-h-[400px]">
@@ -261,15 +267,32 @@ export const HospitalPayouts: React.FC = () => {
                 )}
               </div>
 
-              {/* Request Payout Button */}
-              {(summary?.pendingDue || 0) > 0 && (
-                <button
-                  onClick={() => { setShowRequestModal(true); setRequestAmount(String(summary?.pendingDue || '')); }}
-                  className="flex items-center gap-2 px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs rounded-xl shadow-md shadow-blue-500/20 cursor-pointer border-none transition-colors shrink-0"
-                >
-                  <Send size={14} />
-                  Request Payout (₹{(summary?.pendingDue || 0).toLocaleString('en-IN')})
-                </button>
+              {/* Request Payout Button or Pending Status Notice */}
+              {hasPendingRequest ? (
+                <div className="flex items-center gap-2.5 bg-amber-50 border border-amber-200/80 px-4 py-3 rounded-xl text-xs font-bold text-amber-900 shrink-0">
+                  <Clock size={16} className="text-amber-600 shrink-0 animate-pulse" />
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-black text-amber-950">Payout Request Under Review</span>
+                      <span className="bg-amber-500/20 text-amber-800 text-[9px] font-black px-1.5 py-0.5 rounded-full">
+                        Pending
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-amber-700 font-medium mt-0.5">
+                      ₹{Number(pendingRequest?.requested_amount || summary?.pendingDue).toLocaleString('en-IN')} requested · Processing within 24–48 working hours
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                (summary?.pendingDue || 0) > 0 && (
+                  <button
+                    onClick={() => { setShowRequestModal(true); setRequestAmount(String(summary?.pendingDue || '')); }}
+                    className="flex items-center gap-2 px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs rounded-xl shadow-md shadow-blue-500/20 cursor-pointer border-none transition-colors shrink-0"
+                  >
+                    <Send size={14} />
+                    Request Payout (₹{(summary?.pendingDue || 0).toLocaleString('en-IN')})
+                  </button>
+                )
               )}
             </div>
           </div>

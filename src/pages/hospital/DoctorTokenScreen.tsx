@@ -54,7 +54,7 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
       gain.connect(ctx.destination);
       osc.start();
       osc.stop(ctx.currentTime + 0.6);
-    } catch (e) {}
+    } catch (e) { }
   };
 
   // Filter Tokens strictly for this Doctor (matching both ID and normalized Doctor Name)
@@ -333,11 +333,10 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
                 key={doc.id}
                 type="button"
                 onClick={() => navigate(`/hospital/tokens/doctor/${doc.id}`)}
-                className={`px-3.5 py-2 rounded-2xl text-xs font-black flex items-center gap-2.5 shrink-0 cursor-pointer border transition-all ${
-                  isSelected
+                className={`px-3.5 py-2 rounded-2xl text-xs font-black flex items-center gap-2.5 shrink-0 cursor-pointer border transition-all ${isSelected
                     ? 'bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-500/20'
                     : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                }`}
+                  }`}
               >
                 <img
                   src={doc.photo || 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&auto=format&fit=crop&q=80'}
@@ -346,9 +345,8 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
                 />
                 <span>{doc.name}</span>
                 {docWaiting > 0 && (
-                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
-                    isSelected ? 'bg-red-500 text-white' : 'bg-red-100 text-red-600'
-                  }`}>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${isSelected ? 'bg-red-500 text-white' : 'bg-red-100 text-red-600'
+                    }`}>
                     {docWaiting}
                   </span>
                 )}
@@ -422,17 +420,15 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
           <button
             type="button"
             onClick={() => setSelectedSessionFilter('all')}
-            className={`p-3 rounded-2xl border text-left cursor-pointer transition-all flex flex-col justify-between ${
-              selectedSessionFilter === 'all'
+            className={`p-3 rounded-2xl border text-left cursor-pointer transition-all flex flex-col justify-between ${selectedSessionFilter === 'all'
                 ? 'bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-500/20'
                 : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-            }`}
+              }`}
           >
             <div className="flex items-center justify-between">
               <span className="text-xs font-black">All Shifts</span>
-              <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
-                selectedSessionFilter === 'all' ? 'bg-white/20 text-white' : 'bg-blue-50 text-blue-700'
-              }`}>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${selectedSessionFilter === 'all' ? 'bg-white/20 text-white' : 'bg-blue-50 text-blue-700'
+                }`}>
                 {sessionStats.all.total} Tokens
               </span>
             </div>
@@ -453,13 +449,12 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
                 key={sess.id}
                 type="button"
                 onClick={() => setSelectedSessionFilter(sKey)}
-                className={`p-3 rounded-2xl border text-left cursor-pointer transition-all flex flex-col justify-between relative overflow-hidden ${
-                  isSelected
+                className={`p-3 rounded-2xl border text-left cursor-pointer transition-all flex flex-col justify-between relative overflow-hidden ${isSelected
                     ? 'bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-500/20'
                     : isCurrentNow
-                    ? 'bg-emerald-50/70 text-slate-800 border-emerald-300 hover:bg-emerald-50'
-                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                }`}
+                      ? 'bg-emerald-50/70 text-slate-800 border-emerald-300 hover:bg-emerald-50'
+                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                  }`}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
@@ -469,9 +464,8 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
                     )}
                   </div>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
-                    isSelected ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-700'
-                  }`}>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${isSelected ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-700'
+                    }`}>
                     {sStat.waiting} Waiting
                   </span>
                 </div>
@@ -602,11 +596,10 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
               <button
                 key={tab.key}
                 onClick={() => setStatusTab(tab.key as any)}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-black cursor-pointer border transition-all shrink-0 ${
-                  statusTab === tab.key
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-black cursor-pointer border transition-all shrink-0 ${statusTab === tab.key
                     ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
                     : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                }`}
+                  }`}
               >
                 {tab.label}
               </button>
@@ -728,20 +721,18 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
                   return (
                     <tr
                       key={tok.id}
-                      className={`hover:bg-slate-50/80 transition-colors ${
-                        isCurrent ? 'bg-blue-50/50' : isNotVisited ? 'bg-amber-50/20' : ''
-                      }`}
+                      className={`hover:bg-slate-50/80 transition-colors ${isCurrent ? 'bg-blue-50/50' : isNotVisited ? 'bg-amber-50/20' : ''
+                        }`}
                     >
                       <td className="py-3.5 px-4">
-                        <span className={`inline-flex items-center justify-center w-8 h-8 rounded-xl font-black text-sm ${
-                          isCurrent
+                        <span className={`inline-flex items-center justify-center w-8 h-8 rounded-xl font-black text-sm ${isCurrent
                             ? 'bg-blue-600 text-white shadow-xs'
                             : isCompleted
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : isNotVisited
-                            ? 'bg-amber-100 text-amber-800'
-                            : 'bg-slate-100 text-slate-800'
-                        }`}>
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : isNotVisited
+                                ? 'bg-amber-100 text-amber-800'
+                                : 'bg-slate-100 text-slate-800'
+                          }`}>
                           #{tok.tokenNo}
                         </span>
                       </td>
@@ -769,13 +760,12 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
 
                       <td className="py-3.5 px-4">
                         <div className="flex items-center gap-1.5">
-                          <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
-                            (tok.session || '').toLowerCase().includes('morn')
+                          <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${(tok.session || '').toLowerCase().includes('morn')
                               ? 'bg-amber-50 text-amber-800 border-amber-200'
                               : (tok.session || '').toLowerCase().includes('even')
-                              ? 'bg-indigo-50 text-indigo-800 border-indigo-200'
-                              : 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                          }`}>
+                                ? 'bg-indigo-50 text-indigo-800 border-indigo-200'
+                                : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                            }`}>
                             {(tok.session || '').toLowerCase().includes('morn') ? '🌅 ' : (tok.session || '').toLowerCase().includes('even') ? '🌙 ' : '☀️ '}
                             {tok.session ? tok.session.toUpperCase() : 'MORNING'}
                           </span>
@@ -803,13 +793,12 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
                           className="mt-0.5 inline-flex items-center gap-1 cursor-pointer border-none bg-transparent p-0 text-left group"
                           title="Click to record or update payment status / method"
                         >
-                          <span className={`text-[9.5px] font-black px-1.5 py-0.5 rounded flex items-center gap-1 transition-all group-hover:scale-102 ${
-                            tok.paymentStatus === 'paid'
+                          <span className={`text-[9.5px] font-black px-1.5 py-0.5 rounded flex items-center gap-1 transition-all group-hover:scale-102 ${tok.paymentStatus === 'paid'
                               ? 'text-emerald-700 bg-emerald-50 border border-emerald-200'
                               : isNotVisited
-                              ? 'text-amber-700 bg-amber-50 border border-amber-200'
-                              : 'text-amber-700 bg-amber-50 border border-amber-300 font-extrabold shadow-2xs'
-                          }`}>
+                                ? 'text-amber-700 bg-amber-50 border border-amber-200'
+                                : 'text-amber-700 bg-amber-50 border border-amber-300 font-extrabold shadow-2xs'
+                            }`}>
                             {tok.paymentStatus === 'paid' ? (
                               <>
                                 <CheckCircle size={9} />
@@ -826,17 +815,16 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
                       </td>
 
                       <td className="py-3.5 px-4">
-                        <span className={`inline-flex items-center gap-1 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider ${
-                          tok.status === 'completed'
+                        <span className={`inline-flex items-center gap-1 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider ${tok.status === 'completed'
                             ? 'bg-emerald-100 text-emerald-700'
                             : (tok.status === 'checked-in' || tok.status === 'in-consultation')
-                            ? 'bg-blue-600 text-white'
-                            : isNotVisited
-                            ? 'bg-amber-100 text-amber-700'
-                            : tok.status === 'cancelled'
-                            ? 'bg-red-100 text-red-700'
-                            : 'bg-blue-50 text-blue-700'
-                        }`}>
+                              ? 'bg-blue-600 text-white'
+                              : isNotVisited
+                                ? 'bg-amber-100 text-amber-700'
+                                : tok.status === 'cancelled'
+                                  ? 'bg-red-100 text-red-700'
+                                  : 'bg-blue-50 text-blue-700'
+                          }`}>
                           {tok.status === 'checked-in' || tok.status === 'in-consultation' ? 'In Cabin' : tok.status === 'completed' ? 'Visited' : isNotVisited ? 'Not Visited' : tok.status}
                         </span>
                       </td>

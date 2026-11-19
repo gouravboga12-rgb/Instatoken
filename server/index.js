@@ -4442,6 +4442,20 @@ app.post('/api/hospitals/:hospitalId/payout-requests', requireHospitalAuth, asyn
 
   if (isDbConnected) {
     try {
+      // Check if hospital already has a pending payout request to prevent duplication
+      const existing = await query(
+        `SELECT id FROM hospital_payout_requests WHERE hospital_id=$1 AND status='pending' ORDER BY created_at DESC LIMIT 1`,
+        [hospitalId]
+      );
+      if (existing.rows.length > 0) {
+        // Update existing pending request instead of inserting duplicate
+        await query(
+          `UPDATE hospital_payout_requests SET requested_amount=$1, notes=$2, updated_at=NOW(), created_at_ist=$3 WHERE id=$4`,
+          [Number(requested_amount), notes || '', nowIST, existing.rows[0].id]
+        );
+        return res.json({ success: true, message: 'Existing payout request updated successfully.', requestId: existing.rows[0].id, updated: true });
+      }
+
       await query(
         `INSERT INTO hospital_payout_requests (id, hospital_id, hospital_name, requested_amount, status, notes, created_at_ist) VALUES ($1,$2,$3,$4,'pending',$5,$6)`,
         [reqId, hospitalId, hospitalName, Number(requested_amount), notes || '', nowIST]
@@ -4452,6 +4466,16 @@ app.post('/api/hospitals/:hospitalId/payout-requests', requireHospitalAuth, asyn
   }
   // Also store in memory as fallback
   store.payoutRequests = store.payoutRequests || [];
+  const existingMemIdx = store.payoutRequests.findIndex(r => r.hospitalId === hospitalId && r.status === 'pending');
+  if (existingMemIdx !== -1) {
+    store.payoutRequests[existingMemIdx].requested_amount = Number(requested_amount);
+    store.payoutRequests[existingMemIdx].notes = notes || '';
+    store.payoutRequests[existingMemIdx].updated_at = new Date().toISOString();
+    store.payoutRequests[existingMemIdx].created_at_ist = nowIST;
+    await saveUnifiedStore(store);
+    return res.json({ success: true, message: 'Existing payout request updated successfully.', requestId: store.payoutRequests[existingMemIdx].id, updated: true });
+  }
+
   store.payoutRequests.push({ id: reqId, hospitalId, hospital_name: hospitalName, requested_amount: Number(requested_amount), status: 'pending', notes: notes || '', created_at: new Date().toISOString(), created_at_ist: nowIST });
   await saveUnifiedStore(store);
 
