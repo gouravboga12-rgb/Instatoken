@@ -175,68 +175,68 @@ export const PatientManagement: React.FC = () => {
   const activeTodayCount = tokens.filter(t => ['booked', 'waiting', 'checked-in', 'in-cabin'].includes(t.status) && t.bookingDate === todayStr).length;
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3.5 sm:p-6 space-y-4 sm:space-y-6 max-w-[1600px] mx-auto">
       {/* ─── Top Stats Bar ────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 font-bold">
-            <Users size={20} />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+        <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3">
+          <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 font-bold shrink-0">
+            <Users size={18} />
           </div>
-          <div>
-            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Hospital Patients</p>
-            <h3 className="text-xl font-black text-slate-800">{totalHospitalPatients}</h3>
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 font-bold">
-            <CheckCircle2 size={20} />
-          </div>
-          <div>
-            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Completed Consultations</p>
-            <h3 className="text-xl font-black text-slate-800">{completedVisitsCount}</h3>
+          <div className="min-w-0">
+            <p className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider truncate">Hospital Patients</p>
+            <h3 className="text-lg sm:text-xl font-black text-slate-800">{totalHospitalPatients}</h3>
           </div>
         </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600 font-bold">
-            <Clock size={20} />
+        <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3">
+          <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 font-bold shrink-0">
+            <CheckCircle2 size={18} />
           </div>
-          <div>
-            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Active Visits Today</p>
-            <h3 className="text-xl font-black text-slate-800">{activeTodayCount}</h3>
+          <div className="min-w-0">
+            <p className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider truncate">Completed Consults</p>
+            <h3 className="text-lg sm:text-xl font-black text-slate-800">{completedVisitsCount}</h3>
           </div>
         </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold">
-            <Stethoscope size={20} />
+        <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3">
+          <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600 font-bold shrink-0">
+            <Clock size={18} />
           </div>
-          <div>
-            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Active Doctors</p>
-            <h3 className="text-xl font-black text-slate-800">{doctors.filter(d => d.active).length}</h3>
+          <div className="min-w-0">
+            <p className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider truncate">Active Today</p>
+            <h3 className="text-lg sm:text-xl font-black text-slate-800">{activeTodayCount}</h3>
+          </div>
+        </div>
+
+        <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3">
+          <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold shrink-0">
+            <Stethoscope size={18} />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider truncate">Active Doctors</p>
+            <h3 className="text-lg sm:text-xl font-black text-slate-800">{doctors.filter(d => d.active).length}</h3>
           </div>
         </div>
       </div>
 
       {/* Header & Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-xl font-black text-slate-800">Hospital Patient Records</h2>
-            <span className="text-[10px] font-extrabold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full border border-blue-100">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="text-lg sm:text-xl font-black text-slate-800">Hospital Patient Records</h2>
+            <span className="text-[10px] font-extrabold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full border border-blue-100 truncate max-w-[200px]">
               {hospitalProfile?.name || 'Partner Hospital'}
             </span>
           </div>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-slate-400 mt-0.5 sm:mt-1">
             Connected to Doctor Consultations, OPD Tokens, and Customer Accounts · Isolated by Hospital
           </p>
         </div>
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={handleRefresh}
             disabled={isRefreshing}
-            className="p-2.5 bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 rounded-xl cursor-pointer text-xs font-bold flex items-center gap-1 shadow-sm transition-all"
+            className="p-2 sm:p-2.5 bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 rounded-xl cursor-pointer text-xs font-bold flex items-center gap-1 shadow-sm transition-all"
             title="Refresh from backend"
           >
             <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
@@ -244,15 +244,15 @@ export const PatientManagement: React.FC = () => {
           </button>
           <button
             onClick={() => setShowAddModal(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2.5 rounded-xl cursor-pointer border-none flex items-center gap-1.5 text-xs shadow-md shadow-blue-500/10 transition-all"
+            className="flex-1 sm:flex-initial bg-blue-600 hover:bg-blue-700 text-white font-bold px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl cursor-pointer border-none flex items-center justify-center gap-1.5 text-xs shadow-md shadow-blue-500/10 transition-all"
           >
-            <Plus size={14} /> Register New Patient
+            <Plus size={14} /> Register Patient
           </button>
         </div>
       </div>
 
       {/* ─── Filters & Search Bar ────────────────────────────────────────── */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col md:flex-row items-center gap-3">
+      <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col md:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3">
         <div className="relative flex-1 w-full">
           <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
@@ -260,7 +260,7 @@ export const PatientManagement: React.FC = () => {
             placeholder="Search by UHID, Patient Name, Phone, Token #, Doctor..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-blue-500 bg-slate-50 font-medium"
+            className="w-full pl-10 pr-4 py-2 sm:py-2.5 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-blue-500 bg-slate-50 font-medium"
           />
         </div>
 
@@ -268,12 +268,12 @@ export const PatientManagement: React.FC = () => {
         <div className="flex items-center gap-2 w-full md:w-auto">
           <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500 shrink-0">
             <Stethoscope size={14} className="text-blue-500" />
-            <span className="hidden lg:inline">Doctor:</span>
+            <span className="hidden sm:inline">Doctor:</span>
           </div>
           <select
             value={selectedDoctorFilter}
             onChange={e => setSelectedDoctorFilter(e.target.value)}
-            className="px-3 py-2.5 border border-slate-200 rounded-xl text-xs font-bold bg-white text-slate-700 outline-none focus:border-blue-500 cursor-pointer min-w-[160px]"
+            className="flex-1 sm:flex-initial px-3 py-2 sm:py-2.5 border border-slate-200 rounded-xl text-xs font-bold bg-white text-slate-700 outline-none focus:border-blue-500 cursor-pointer min-w-0 sm:min-w-[160px]"
           >
             <option value="all">All Doctors ({doctors.length})</option>
             {doctors.map(d => (
@@ -288,12 +288,12 @@ export const PatientManagement: React.FC = () => {
         <div className="flex items-center gap-2 w-full md:w-auto">
           <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500 shrink-0">
             <Filter size={14} className="text-blue-500" />
-            <span className="hidden lg:inline">Status:</span>
+            <span className="hidden sm:inline">Status:</span>
           </div>
           <select
             value={selectedStatusFilter}
             onChange={e => setSelectedStatusFilter(e.target.value)}
-            className="px-3 py-2.5 border border-slate-200 rounded-xl text-xs font-bold bg-white text-slate-700 outline-none focus:border-blue-500 cursor-pointer min-w-[140px]"
+            className="flex-1 sm:flex-initial px-3 py-2 sm:py-2.5 border border-slate-200 rounded-xl text-xs font-bold bg-white text-slate-700 outline-none focus:border-blue-500 cursor-pointer min-w-0 sm:min-w-[140px]"
           >
             <option value="all">All Status</option>
             <option value="today">Visited / Booked Today</option>
@@ -303,11 +303,11 @@ export const PatientManagement: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6">
         {/* ─── Left: Patient List (2 cols on xl) ─────────────────────────── */}
         <div className="xl:col-span-2 space-y-4">
-          <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto -mx-3.5 px-3.5 sm:mx-0 sm:px-0">
               <table className="w-full min-w-[650px]">
                 <thead className="bg-slate-50/80 border-b border-slate-100">
                   <tr>
@@ -411,19 +411,19 @@ export const PatientManagement: React.FC = () => {
         {/* ─── Right: Selected Patient Details Card (Phase 20) ───────────── */}
         <div>
           {selectedPatient ? (
-            <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 space-y-5 sticky top-6">
+            <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm p-4 sm:p-6 space-y-4 sm:space-y-5 sticky top-6">
               {/* Card Header */}
-              <div className="flex items-start justify-between">
-                <div>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
                   <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md uppercase tracking-wider border border-blue-100">
                     {selectedPatient.uhid}
                   </span>
-                  <h3 className="text-lg font-black text-slate-800 mt-2">{selectedPatient.name}</h3>
+                  <h3 className="text-base sm:text-lg font-black text-slate-800 mt-2 truncate">{selectedPatient.name}</h3>
                   <p className="text-xs text-slate-400 mt-0.5 font-medium">
                     {selectedPatient.gender} · {selectedPatient.age} Years · Blood Group <strong className="text-red-600">{selectedPatient.bloodGroup}</strong>
                   </p>
                 </div>
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center font-black text-base shrink-0 shadow-md shadow-blue-500/20">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center font-black text-sm sm:text-base shrink-0 shadow-md shadow-blue-500/20">
                   {selectedPatient.name.charAt(0)}
                 </div>
               </div>
@@ -577,7 +577,7 @@ export const PatientManagement: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 text-center text-slate-400 py-24 text-xs">
+            <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm p-4 sm:p-6 text-center text-slate-400 py-16 sm:py-24 text-xs">
               <User size={36} className="mx-auto mb-2 text-slate-300 opacity-60" />
               <p className="font-bold text-slate-600">No Patient Selected</p>
               <p className="text-[11px] text-slate-400 mt-1">Select a patient from the list to view their complete history and doctor appointments.</p>
@@ -588,22 +588,22 @@ export const PatientManagement: React.FC = () => {
 
       {/* ─── QUICK ISSUE TOKEN MODAL FOR SELECTED PATIENT ───────────────── */}
       {showQuickTokenModal && selectedPatient && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl shadow-xl w-full max-w-md overflow-hidden">
-            <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3 sm:p-4">
+          <div className="bg-white rounded-2xl sm:rounded-3xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-black text-slate-800">Issue Walk-in Token</h3>
                 <p className="text-xs text-slate-400 mt-0.5">For {selectedPatient.name} ({selectedPatient.uhid})</p>
               </div>
               <button onClick={() => setShowQuickTokenModal(false)} className="p-1 rounded-lg hover:bg-slate-100 cursor-pointer border-none text-slate-400">✕</button>
             </div>
-            <form onSubmit={handleQuickIssueToken} className="p-5 space-y-4">
+            <form onSubmit={handleQuickIssueToken} className="p-4 sm:p-5 space-y-4">
               <div>
                 <label className="text-xs font-bold text-slate-700 block mb-1.5">Select Attending Doctor *</label>
                 <select
                   value={quickTokenDoctorId}
                   onChange={e => setQuickTokenDoctorId(e.target.value)}
-                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-xs font-bold bg-white text-slate-700 outline-none focus:border-blue-500 cursor-pointer"
+                  className="w-full px-3 py-2 sm:py-2.5 border border-slate-200 rounded-xl text-xs font-bold bg-white text-slate-700 outline-none focus:border-blue-500 cursor-pointer"
                 >
                   {doctors.map(d => (
                     <option key={d.id} value={d.id}>
@@ -617,7 +617,7 @@ export const PatientManagement: React.FC = () => {
                 <select
                   value={quickTokenSession}
                   onChange={e => setQuickTokenSession(e.target.value as any)}
-                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-xs font-bold bg-white text-slate-700 outline-none focus:border-blue-500 cursor-pointer"
+                  className="w-full px-3 py-2 sm:py-2.5 border border-slate-200 rounded-xl text-xs font-bold bg-white text-slate-700 outline-none focus:border-blue-500 cursor-pointer"
                 >
                   <option value="morning">Morning Session (09:00 AM - 01:00 PM)</option>
                   <option value="afternoon">Afternoon Session (01:00 PM - 05:00 PM)</option>
@@ -635,18 +635,18 @@ export const PatientManagement: React.FC = () => {
 
       {/* ─── REGISTER PATIENT MODAL ─────────────────────────────────────── */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3 sm:p-4">
+          <div className="bg-white rounded-2xl sm:rounded-3xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-black text-slate-800">Register New Patient</h3>
                 <p className="text-xs text-slate-400 mt-0.5">Hospital: {hospitalProfile?.name || 'Partner Hospital'}</p>
               </div>
               <button onClick={() => setShowAddModal(false)} className="p-1 rounded-lg hover:bg-slate-100 cursor-pointer border-none text-slate-400">✕</button>
             </div>
-            <form onSubmit={handleRegister} className="p-5 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
+            <form onSubmit={handleRegister} className="p-4 sm:p-5 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                <div className="col-span-1 sm:col-span-2">
                   <label className="text-xs font-bold text-slate-700 block mb-1.5">Full Name *</label>
                   <input type="text" value={newPatient.name} onChange={e => setNewPatient({...newPatient, name: e.target.value})} placeholder="e.g. Anand Kumar" required className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500" />
                 </div>
@@ -668,21 +668,21 @@ export const PatientManagement: React.FC = () => {
                     {['A+','A-','B+','B-','AB+','AB-','O+','O-'].map(b => <option key={b}>{b}</option>)}
                   </select>
                 </div>
-                <div className="col-span-2">
+                <div className="col-span-1 sm:col-span-2">
                   <label className="text-xs font-bold text-slate-700 block mb-1.5">Complete Address</label>
                   <input type="text" value={newPatient.address} onChange={e => setNewPatient({...newPatient, address: e.target.value})} placeholder="Area, Building name..." className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500" />
                 </div>
-                <div className="col-span-2">
+                <div className="col-span-1 sm:col-span-2">
                   <label className="text-xs font-bold text-slate-700 block mb-1.5">Medical History (comma separated)</label>
                   <input type="text" value={newPatient.medicalHistory} onChange={e => setNewPatient({...newPatient, medicalHistory: e.target.value})} placeholder="e.g. Asthma, Hypertension" className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500" />
                 </div>
-                <div className="col-span-2">
+                <div className="col-span-1 sm:col-span-2">
                   <label className="text-xs font-bold text-slate-700 block mb-1.5">Allergies (comma separated)</label>
                   <input type="text" value={newPatient.allergies} onChange={e => setNewPatient({...newPatient, allergies: e.target.value})} placeholder="e.g. Penicillin, Peanuts" className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500" />
                 </div>
 
                 {/* Immediate Token Issuance Option */}
-                <div className="col-span-2 bg-blue-50/60 border border-blue-100 rounded-2xl p-4 space-y-3">
+                <div className="col-span-1 sm:col-span-2 bg-blue-50/60 border border-blue-100 rounded-2xl p-3.5 sm:p-4 space-y-3">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
@@ -694,7 +694,7 @@ export const PatientManagement: React.FC = () => {
                   </label>
 
                   {newPatient.issueTokenNow && (
-                    <div className="grid grid-cols-2 gap-3 pt-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                       <div>
                         <label className="text-[11px] font-bold text-slate-600 block mb-1">Doctor</label>
                         <select

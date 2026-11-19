@@ -45,23 +45,23 @@ export const LiveQueue: React.FC = () => {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3.5 sm:p-6 space-y-4 sm:space-y-6 max-w-[1600px] mx-auto">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <h2 className="text-xl font-black text-slate-800">Live OPD Queue Board</h2>
+            <h2 className="text-lg sm:text-xl font-black text-slate-800">Live OPD Queue Board</h2>
             <span className="flex h-2.5 w-2.5 relative">
               <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${pulse ? 'bg-red-500' : 'bg-red-450'}`} />
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-650" />
             </span>
           </div>
-          <p className="text-xs text-slate-400 mt-1">Real-time cabin monitors and active patient queues</p>
+          <p className="text-xs text-slate-400 mt-0.5 sm:mt-1">Real-time cabin monitors and active patient queues</p>
         </div>
         <button 
           onClick={handleRefresh}
           disabled={isRefreshing}
-          className="bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 px-3.5 py-1.5 rounded-xl text-xs font-bold text-slate-700 flex items-center gap-2 shadow-2xs transition-all cursor-pointer"
+          className="self-start sm:self-auto bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold text-slate-700 flex items-center gap-2 shadow-2xs transition-all cursor-pointer"
         >
           <RefreshCw size={13} className={isRefreshing ? 'animate-spin text-blue-600' : 'text-slate-500'} />
           <span>{isRefreshing ? 'Updating Queue...' : 'Refresh Queue'}</span>
@@ -69,12 +69,12 @@ export const LiveQueue: React.FC = () => {
       </div>
 
       {/* Stats Board */}
-      <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
-        <div className="bg-blue-600 text-white rounded-2xl p-4 shadow-sm relative overflow-hidden col-span-2 sm:col-span-1 lg:col-span-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 sm:gap-4">
+        <div className="bg-blue-600 text-white rounded-2xl p-3.5 sm:p-4 shadow-sm relative overflow-hidden col-span-2 sm:col-span-1 lg:col-span-2">
           <Radio size={30} className="absolute right-3 top-3 opacity-15" />
           <span className="text-[9px] font-bold uppercase tracking-wider opacity-75">Avg Waiting Time</span>
-          <h3 className="text-3xl font-black mt-1">~{activeWait} mins</h3>
-          <p className="text-[10px] opacity-90 mt-1">Across all active doctor cabins</p>
+          <h3 className="text-2xl sm:text-3xl font-black mt-1">~{activeWait} mins</h3>
+          <p className="text-[10px] opacity-90 mt-0.5 sm:mt-1 truncate">Across all active cabins</p>
         </div>
 
         {[
@@ -83,24 +83,24 @@ export const LiveQueue: React.FC = () => {
           { label: 'Skipped', val: skipped, sub: 'Called but absent', color: 'text-slate-600', bg: 'bg-slate-500/10' },
           { label: 'Cancelled', val: cancelled, sub: 'Patient cancelled', color: 'text-red-600', bg: 'bg-red-500/10' },
         ].map(s => (
-          <div key={s.label} className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm">
-            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">{s.label}</span>
-            <h3 className="text-2xl font-black text-slate-800 mt-1">{s.val}</h3>
-            <span className={`text-[9px] font-semibold mt-1 block ${s.color}`}>{s.sub}</span>
+          <div key={s.label} className="bg-white border border-slate-100 rounded-2xl p-3 sm:p-4 shadow-sm">
+            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block truncate">{s.label}</span>
+            <h3 className="text-xl sm:text-2xl font-black text-slate-800 mt-1">{s.val}</h3>
+            <span className={`text-[9px] font-semibold mt-0.5 sm:mt-1 block truncate ${s.color}`}>{s.sub}</span>
           </div>
         ))}
       </div>
 
       {/* Doctor-wise Cabin Queue Monitors */}
       <div>
-        <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-4">Doctor Cabin Live View</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-3 sm:mb-4">Doctor Cabin Live View</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
           {doctors.filter(d => d.active).map(doc => {
             const activeToken = getDoctorActiveToken(doc.id);
             const docQueue = todayTokens.filter(t => t.doctorId === doc.id && ['booked','waiting','checked-in'].includes(t.status));
             
             return (
-              <div key={doc.id} className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5 space-y-4">
+              <div key={doc.id} className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm p-4 sm:p-5 space-y-3.5 sm:space-y-4">
                 <div className="flex items-start justify-between">
                   <div>
                     <h4 className="font-extrabold text-slate-800 text-sm">{doc.name}</h4>

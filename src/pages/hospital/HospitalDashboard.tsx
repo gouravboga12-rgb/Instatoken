@@ -132,33 +132,33 @@ export const HospitalDashboard: React.FC = () => {
   };
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 max-w-[1600px] mx-auto bg-slate-50 min-h-screen">
+    <div className="p-3 sm:p-5 md:p-6 space-y-4 sm:space-y-6 max-w-[1600px] mx-auto bg-slate-50 min-h-screen">
 
       {/* ─── 1. TOP HEADER & OPERATIONAL ACTIONS ─────────────────────────────── */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-3xl border border-slate-100 shadow-2xs">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 bg-white p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-100 shadow-2xs">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-[11px] font-black uppercase tracking-wider text-emerald-600">Hospital Live OPD</span>
+            <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-emerald-600">Hospital Live OPD</span>
             <span className="text-slate-300">·</span>
-            <span className="text-xs font-bold text-slate-500">{dateFormatted}</span>
+            <span className="text-[11px] sm:text-xs font-bold text-slate-500">{dateFormatted}</span>
           </div>
-          <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight font-heading mt-1">
+          <h2 className="text-lg sm:text-2xl font-black text-slate-900 tracking-tight font-heading mt-1">
             Welcome, {firstName} 👋
           </h2>
-          <p className="text-xs text-slate-400 font-semibold mt-0.5">
+          <p className="text-[11px] sm:text-xs text-slate-400 font-semibold mt-0.5 truncate">
             {hospitalProfile?.name || 'Hospital Panel'} · Live queue and OPD doctor operations
           </p>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-2.5 flex-wrap">
+        <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap w-full md:w-auto">
           <button
             onClick={() => {
               setGeneratedSlip(null);
               setShowWalkInModal(true);
             }}
-            className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-sm shadow-blue-500/20 cursor-pointer border-none transition-all active:scale-95"
+            className="flex-1 sm:flex-initial justify-center px-3 sm:px-4 py-2 sm:py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-sm shadow-blue-500/20 cursor-pointer border-none transition-all active:scale-95"
           >
             <UserPlus size={15} />
             <span>+ Walk-in Token</span>
@@ -166,7 +166,7 @@ export const HospitalDashboard: React.FC = () => {
 
           <button
             onClick={() => navigate('/hospital/doctors')}
-            className="px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-extrabold flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-2xs"
+            className="flex-1 sm:flex-initial justify-center px-3 sm:px-4 py-2 sm:py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-extrabold flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-2xs"
           >
             <Stethoscope size={15} className="text-emerald-600" />
             <span>+ Add Doctor</span>
@@ -174,7 +174,7 @@ export const HospitalDashboard: React.FC = () => {
 
           <button
             onClick={() => navigate('/hospital/tokens/all')}
-            className="px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-extrabold flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-2xs"
+            className="w-full sm:w-auto justify-center px-3 sm:px-4 py-2 sm:py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-extrabold flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-2xs"
           >
             <Ticket size={15} className="text-purple-600" />
             <span>All Tokens Directory</span>
@@ -183,87 +183,87 @@ export const HospitalDashboard: React.FC = () => {
       </div>
 
       {/* ─── 2. OPERATIONAL KPI METRICS (100% Dynamic) ───────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
         
         {/* KPI 1: Today's Tokens */}
-        <div className="bg-white rounded-3xl border border-slate-100 p-5 shadow-2xs hover:shadow-xs transition-shadow">
+        <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 p-3 sm:p-5 shadow-2xs hover:shadow-xs transition-shadow flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-black">
-              <Ticket size={20} />
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-black">
+              <Ticket size={18} />
             </div>
-            <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full uppercase tracking-wider">
+            <span className="text-[8.5px] sm:text-[10px] font-black text-blue-600 bg-blue-50 px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full uppercase tracking-wider">
               Today's OPD
             </span>
           </div>
-          <div className="mt-4">
-            <span className="text-3xl font-black text-slate-900 leading-none block font-heading">
+          <div className="mt-2.5 sm:mt-4">
+            <span className="text-2xl sm:text-3xl font-black text-slate-900 leading-tight block font-heading">
               {totalTokensCount}
             </span>
-            <span className="text-xs font-bold text-slate-700 mt-1.5 block">Today's Tokens</span>
-            <span className="text-[11px] text-slate-400 font-semibold block mt-0.5">
+            <span className="text-[11px] sm:text-xs font-bold text-slate-700 mt-1 block leading-tight">Today's Tokens</span>
+            <span className="text-[10px] sm:text-[11px] text-slate-400 font-semibold block mt-0.5 truncate">
               {onlineTokensCount} Online · {offlineTokensCount} Walk-in
             </span>
           </div>
         </div>
 
         {/* KPI 2: Waiting Queue */}
-        <div className="bg-white rounded-3xl border border-slate-100 p-5 shadow-2xs hover:shadow-xs transition-shadow">
+        <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 p-3 sm:p-5 shadow-2xs hover:shadow-xs transition-shadow flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <div className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center font-black">
-              <Users size={20} />
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center font-black">
+              <Users size={18} />
             </div>
-            <span className="text-[10px] font-black text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full uppercase tracking-wider">
+            <span className="text-[8.5px] sm:text-[10px] font-black text-amber-700 bg-amber-50 px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full uppercase tracking-wider">
               In Clinic
             </span>
           </div>
-          <div className="mt-4">
-            <span className="text-3xl font-black text-slate-900 leading-none block font-heading">
+          <div className="mt-2.5 sm:mt-4">
+            <span className="text-2xl sm:text-3xl font-black text-slate-900 leading-tight block font-heading">
               {waitingTokens.length}
             </span>
-            <span className="text-xs font-bold text-slate-700 mt-1.5 block">Waiting in Queue</span>
-            <span className="text-[11px] text-amber-600 font-bold block mt-0.5">
+            <span className="text-[11px] sm:text-xs font-bold text-slate-700 mt-1 block leading-tight">Waiting in Queue</span>
+            <span className="text-[10px] sm:text-[11px] text-amber-600 font-bold block mt-0.5 truncate">
               {inCabinTokens.length} currently in cabin
             </span>
           </div>
         </div>
 
         {/* KPI 3: Visited / Completed */}
-        <div className="bg-white rounded-3xl border border-slate-100 p-5 shadow-2xs hover:shadow-xs transition-shadow">
+        <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 p-3 sm:p-5 shadow-2xs hover:shadow-xs transition-shadow flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-black">
-              <CheckCircle2 size={20} />
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-black">
+              <CheckCircle2 size={18} />
             </div>
-            <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full uppercase tracking-wider">
+            <span className="text-[8.5px] sm:text-[10px] font-black text-emerald-700 bg-emerald-50 px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full uppercase tracking-wider">
               Completed
             </span>
           </div>
-          <div className="mt-4">
-            <span className="text-3xl font-black text-slate-900 leading-none block font-heading">
+          <div className="mt-2.5 sm:mt-4">
+            <span className="text-2xl sm:text-3xl font-black text-slate-900 leading-tight block font-heading">
               {completedTokens.length}
             </span>
-            <span className="text-xs font-bold text-slate-700 mt-1.5 block">Visited Today</span>
-            <span className="text-[11px] text-emerald-600 font-bold block mt-0.5">
+            <span className="text-[11px] sm:text-xs font-bold text-slate-700 mt-1 block leading-tight">Visited Today</span>
+            <span className="text-[10px] sm:text-[11px] text-emerald-600 font-bold block mt-0.5 truncate">
               Consultations completed
             </span>
           </div>
         </div>
 
         {/* KPI 4: Active Doctors */}
-        <div className="bg-white rounded-3xl border border-slate-100 p-5 shadow-2xs hover:shadow-xs transition-shadow">
+        <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 p-3 sm:p-5 shadow-2xs hover:shadow-xs transition-shadow flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black">
-              <Stethoscope size={20} />
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black">
+              <Stethoscope size={18} />
             </div>
-            <span className="text-[10px] font-black text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-full uppercase tracking-wider">
+            <span className="text-[8.5px] sm:text-[10px] font-black text-indigo-700 bg-indigo-50 px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full uppercase tracking-wider">
               On Duty
             </span>
           </div>
-          <div className="mt-4">
-            <span className="text-3xl font-black text-slate-900 leading-none block font-heading">
+          <div className="mt-2.5 sm:mt-4">
+            <span className="text-2xl sm:text-3xl font-black text-slate-900 leading-tight block font-heading">
               {activeDoctors.length}
             </span>
-            <span className="text-xs font-bold text-slate-700 mt-1.5 block">Active Doctors</span>
-            <span className="text-[11px] text-indigo-600 font-bold block mt-0.5">
+            <span className="text-[11px] sm:text-xs font-bold text-slate-700 mt-1 block leading-tight">Active Doctors</span>
+            <span className="text-[10px] sm:text-[11px] text-indigo-600 font-bold block mt-0.5 truncate">
               {doctors.length} enrolled total
             </span>
           </div>
@@ -272,20 +272,20 @@ export const HospitalDashboard: React.FC = () => {
       </div>
 
       {/* ─── 3. DOCTOR OPD CABIN STATUS (Live Roster across all Doctors) ──────── */}
-      <div className="bg-white rounded-3xl border border-slate-100 p-5 shadow-2xs space-y-4">
+      <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 p-3.5 sm:p-5 shadow-2xs space-y-3 sm:space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-black text-slate-800 uppercase tracking-wide flex items-center gap-2">
+            <h3 className="text-xs sm:text-sm font-black text-slate-800 uppercase tracking-wide flex items-center gap-1.5 sm:gap-2">
               <Stethoscope size={16} className="text-blue-600" />
               <span>Doctor OPD Cabin Status</span>
             </h3>
-            <p className="text-[11px] text-slate-400 font-semibold mt-0.5">
+            <p className="text-[10px] sm:text-[11px] text-slate-400 font-semibold mt-0.5">
               Live consultation status & token queues across all {doctors.length} doctors
             </p>
           </div>
           <button
             onClick={() => navigate('/hospital/doctors')}
-            className="text-xs font-bold text-blue-600 hover:underline cursor-pointer border-none bg-transparent"
+            className="text-xs font-bold text-blue-600 hover:underline cursor-pointer border-none bg-transparent shrink-0"
           >
             Manage Doctors →
           </button>
@@ -371,22 +371,22 @@ export const HospitalDashboard: React.FC = () => {
       </div>
 
       {/* ─── 4. TODAY'S LIVE QUEUE TABLE (Comprehensive & Functional) ──────── */}
-      <div className="bg-white rounded-3xl border border-slate-100 shadow-2xs overflow-hidden p-5 space-y-4">
+      <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-2xs overflow-hidden p-3.5 sm:p-5 space-y-3 sm:space-y-4">
         
         {/* Table Header & Controls */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-2 border-b border-slate-100">
           <div>
-            <h3 className="text-sm font-black text-slate-800 uppercase tracking-wide flex items-center gap-2">
+            <h3 className="text-xs sm:text-sm font-black text-slate-800 uppercase tracking-wide flex items-center gap-1.5 sm:gap-2">
               <Ticket size={16} className="text-blue-600" />
               <span>Today's Live Queue ({filteredQueue.length} Tokens)</span>
             </h3>
-            <p className="text-[11px] text-slate-400 font-semibold mt-0.5">
+            <p className="text-[10px] sm:text-[11px] text-slate-400 font-semibold mt-0.5">
               Live patient registration and status across all consultations today
             </p>
           </div>
 
           {/* Search & Doctor Filter */}
-          <div className="flex items-center gap-2.5 flex-wrap">
+          <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap w-full md:w-auto">
             {/* Search Input */}
             <div className="relative w-full sm:w-64">
               <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -403,7 +403,7 @@ export const HospitalDashboard: React.FC = () => {
             <select
               value={selectedDoctorFilter}
               onChange={e => setSelectedDoctorFilter(e.target.value)}
-              className="px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold outline-none bg-white text-slate-700 cursor-pointer"
+              className="flex-1 sm:flex-none px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold outline-none bg-white text-slate-700 cursor-pointer"
             >
               <option value="all">All Doctors ({doctors.length})</option>
               {doctors.map(d => (
@@ -415,7 +415,7 @@ export const HospitalDashboard: React.FC = () => {
             <select
               value={statusFilter}
               onChange={e => setStatusFilter(e.target.value as any)}
-              className="px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold outline-none bg-white text-slate-700 cursor-pointer"
+              className="flex-1 sm:flex-none px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold outline-none bg-white text-slate-700 cursor-pointer"
             >
               <option value="all">All Statuses</option>
               <option value="waiting">Waiting ({waitingTokens.length})</option>
@@ -426,8 +426,8 @@ export const HospitalDashboard: React.FC = () => {
         </div>
 
         {/* Live Queue Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+        <div className="overflow-x-auto -mx-3.5 px-3.5 sm:mx-0 sm:px-0">
+          <table className="w-full text-left text-xs min-w-[700px]">
             <thead>
               <tr className="bg-slate-50/80 border-b border-slate-100 text-[10px] font-black text-slate-500 uppercase tracking-wider">
                 <th className="py-3 px-4">Token #</th>
@@ -549,14 +549,14 @@ export const HospitalDashboard: React.FC = () => {
 
       {/* ─── 5. WALK-IN TOKEN MODAL ────────────────────────────────────────── */}
       {showWalkInModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 w-full max-w-md p-6 space-y-4">
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-100 w-full max-w-md p-4 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 rounded-xl bg-blue-50 text-blue-600">
                   <UserPlus size={18} />
                 </div>
-                <h3 className="font-black text-slate-800 text-base">New Walk-in Patient</h3>
+                <h3 className="font-black text-slate-800 text-sm sm:text-base">New Walk-in Patient</h3>
               </div>
               <button
                 onClick={() => setShowWalkInModal(false)}
@@ -673,8 +673,8 @@ export const HospitalDashboard: React.FC = () => {
 
       {/* ─── 6. TOKEN DETAIL MODAL ─────────────────────────────────────────── */}
       {selectedTokenDetail && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 w-full max-w-sm p-6 space-y-4">
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-100 w-full max-w-sm p-4 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-xl bg-blue-600 text-white font-black text-sm flex items-center justify-center">

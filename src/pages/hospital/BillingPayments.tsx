@@ -57,16 +57,16 @@ export const BillingPayments: React.FC = () => {
   const dateLabel = dateFilter === 'today' ? "Today's" : dateFilter === 'week' ? "This Week's" : dateFilter === 'month' ? "This Month's" : "Total";
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3.5 sm:p-6 space-y-4 sm:space-y-6 max-w-[1600px] mx-auto">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <div>
-          <h2 className="text-xl font-black text-slate-800">Billing & Transactions</h2>
-          <p className="text-xs text-slate-400 mt-1">Manage consultation fee collections and patient refunds</p>
+          <h2 className="text-lg sm:text-xl font-black text-slate-800">Billing & Transactions</h2>
+          <p className="text-xs text-slate-400 mt-0.5 sm:mt-1">Manage consultation fee collections and patient refunds</p>
         </div>
 
         {/* Date Filter Buttons */}
-        <div className="flex bg-slate-100 rounded-xl p-1 shrink-0 self-start sm:self-auto">
+        <div className="flex bg-slate-100 rounded-xl p-1 shrink-0 self-start sm:self-auto overflow-x-auto max-w-full">
           {[
             { key: 'today', label: 'Today' },
             { key: 'week', label: 'This Week' },
@@ -77,7 +77,7 @@ export const BillingPayments: React.FC = () => {
               key={d.key}
               type="button"
               onClick={() => setDateFilter(d.key as any)}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg cursor-pointer transition-all border-none ${
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg cursor-pointer transition-all border-none shrink-0 ${
                 dateFilter === d.key ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'
               }`}
             >
@@ -88,28 +88,28 @@ export const BillingPayments: React.FC = () => {
       </div>
 
       {/* Finance Stats Row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 sm:gap-4">
         {[
           { label: `${dateLabel} Total Revenue`, val: `₹${totalRevenue.toLocaleString()}`, sub: 'Direct Settlement', icon: <DollarSign size={18} />, color: 'bg-emerald-500/10 text-emerald-600' },
           { label: 'Pending Collections', val: `₹${pendingRevenue.toLocaleString()}`, sub: 'Pay-at-Hospital Cabin', icon: <Clock size={18} />, color: 'bg-amber-500/10 text-amber-600' },
           { label: 'Refunded Tokens', val: `₹${refundedRevenue.toLocaleString()}`, sub: 'Cancelled Appointments', icon: <RefreshCw size={18} />, color: 'bg-red-500/10 text-red-600' }
         ].map(s => (
-          <div key={s.label} className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm flex items-center justify-between">
+          <div key={s.label} className="bg-white border border-slate-100 rounded-2xl p-3.5 sm:p-4 shadow-sm flex items-center justify-between">
             <div>
               <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">{s.label}</span>
-              <h3 className="text-2xl font-black text-slate-800 mt-1">{s.val}</h3>
+              <h3 className="text-xl sm:text-2xl font-black text-slate-800 mt-1">{s.val}</h3>
               <span className="text-[10px] text-slate-400 mt-1 block">{s.sub}</span>
             </div>
-            <div className={`p-3 rounded-xl ${s.color}`}>{s.icon}</div>
+            <div className={`p-2.5 sm:p-3 rounded-xl ${s.color} shrink-0`}>{s.icon}</div>
           </div>
         ))}
       </div>
 
       {/* Main Grid */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6">
         {/* Left Payments Table */}
-        <div className="xl:col-span-2 space-y-4">
-          <div className="flex flex-col sm:flex-row gap-3 justify-between items-stretch sm:items-center bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+        <div className="xl:col-span-2 space-y-3 sm:space-y-4">
+          <div className="flex flex-col sm:flex-row gap-3 justify-between items-stretch sm:items-center bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-100 shadow-sm">
             <div className="relative flex-1 max-w-md">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-450" />
               <input
@@ -120,12 +120,12 @@ export const BillingPayments: React.FC = () => {
                 className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-blue-500 bg-slate-50"
               />
             </div>
-            <div className="flex bg-slate-100 rounded-xl p-1 shrink-0">
+            <div className="flex bg-slate-100 rounded-xl p-1 shrink-0 overflow-x-auto">
               {['All', 'Paid', 'Pending', 'Refunded'].map(f => (
                 <button
                   key={f}
                   onClick={() => setStatusFilter(f)}
-                  className={`px-3 py-1.5 text-xs font-bold rounded-lg cursor-pointer transition-all border-none ${
+                  className={`px-3 py-1.5 text-xs font-bold rounded-lg cursor-pointer transition-all border-none shrink-0 ${
                     statusFilter === f ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'
                   }`}
                 >
@@ -135,9 +135,9 @@ export const BillingPayments: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[600px]">
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto -mx-3.5 px-3.5 sm:mx-0 sm:px-0">
+              <table className="w-full min-w-[650px]">
                 <thead className="bg-slate-50 border-b border-slate-100">
                   <tr>
                     {['Txn ID', 'Patient', 'Doc Consultation', 'Fee', 'Total Paid', 'Status', 'Invoice'].map(h => (

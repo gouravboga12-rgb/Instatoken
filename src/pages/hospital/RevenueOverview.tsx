@@ -165,16 +165,16 @@ export const RevenueOverview: React.FC = () => {
   };
 
   return (
-    <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
+    <div className="p-3.5 sm:p-6 space-y-4 sm:space-y-6 max-w-[1600px] mx-auto">
       {/* ── Top Header Banner ──────────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-xs">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-100 shadow-xs">
         <div>
           <div className="flex items-center gap-2.5">
-            <div className="p-2.5 bg-emerald-600 text-white rounded-2xl shadow-sm shadow-emerald-500/20">
+            <div className="p-2 sm:p-2.5 bg-emerald-600 text-white rounded-xl sm:rounded-2xl shadow-sm shadow-emerald-500/20 shrink-0">
               <DollarSign size={20} />
             </div>
             <div>
-              <h1 className="text-xl font-black text-slate-800 leading-tight">Revenue Overview & Doctor Financial Ledger</h1>
+              <h1 className="text-lg sm:text-xl font-black text-slate-800 leading-tight">Revenue Overview & Doctor Financial Ledger</h1>
               <p className="text-xs text-slate-400 font-semibold mt-0.5">
                 Calculated strictly on completed / visited consultations according to hospital business rules.
               </p>
@@ -183,12 +183,12 @@ export const RevenueOverview: React.FC = () => {
         </div>
 
         {/* Date Filter Pills */}
-        <div className="flex flex-wrap items-center gap-1.5 bg-slate-50 p-1.5 rounded-2xl border border-slate-100">
+        <div className="flex flex-wrap items-center gap-1.5 bg-slate-50 p-1.5 rounded-2xl border border-slate-100 overflow-x-auto max-w-full">
           {(['all', 'today', 'week', 'month', 'custom'] as const).map(df => (
             <button
               key={df}
               onClick={() => setDateFilter(df)}
-              className={`px-3 py-1.5 rounded-xl text-xs capitalize font-extrabold cursor-pointer transition-all border-none ${
+              className={`px-3 py-1.5 rounded-xl text-xs capitalize font-extrabold cursor-pointer transition-all border-none shrink-0 ${
                 dateFilter === df
                   ? 'bg-emerald-600 text-white shadow-xs'
                   : 'text-slate-500 hover:text-slate-800'
@@ -201,7 +201,7 @@ export const RevenueOverview: React.FC = () => {
       </div>
 
       {dateFilter === 'custom' && (
-        <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-xs flex flex-wrap items-center gap-4 text-xs font-bold text-slate-700 animate-fadeIn">
+        <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-100 shadow-xs flex flex-wrap items-center gap-3 sm:gap-4 text-xs font-bold text-slate-700 animate-fadeIn">
           <span>From:</span>
           <input
             type="date"
@@ -220,59 +220,59 @@ export const RevenueOverview: React.FC = () => {
       )}
 
       {/* ── KPI Cards ──────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-3xl border border-slate-100 p-5 shadow-xs flex items-center justify-between">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+        <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 p-3.5 sm:p-5 shadow-xs flex items-center justify-between">
           <div>
             <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Realized Earned Revenue</span>
-            <h3 className="text-3xl font-black text-emerald-600 mt-1">₹{totalEarnedRevenue.toLocaleString('en-IN')}</h3>
+            <h3 className="text-2xl sm:text-3xl font-black text-emerald-600 mt-1">₹{totalEarnedRevenue.toLocaleString('en-IN')}</h3>
             <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full mt-1 inline-block">
               {totalCompletedVisits} Visited Consultations
             </span>
           </div>
-          <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl">
-            <DollarSign size={24} />
+          <div className="p-2.5 sm:p-3 bg-emerald-50 text-emerald-600 rounded-xl sm:rounded-2xl shrink-0">
+            <DollarSign size={22} />
           </div>
         </div>
 
-        <div className="bg-white rounded-3xl border border-slate-100 p-5 shadow-xs flex items-center justify-between">
+        <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 p-3.5 sm:p-5 shadow-xs flex items-center justify-between">
           <div>
             <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Total Visited Patients</span>
-            <h3 className="text-3xl font-black text-slate-800 mt-1">{totalCompletedVisits}</h3>
+            <h3 className="text-2xl sm:text-3xl font-black text-slate-800 mt-1">{totalCompletedVisits}</h3>
             <span className="text-[10px] text-slate-400 font-semibold mt-1 block">Successfully consulted</span>
           </div>
-          <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl">
-            <CheckCircle2 size={24} />
+          <div className="p-2.5 sm:p-3 bg-blue-50 text-blue-600 rounded-xl sm:rounded-2xl shrink-0">
+            <CheckCircle2 size={22} />
           </div>
         </div>
 
-        <div className="bg-white rounded-3xl border border-slate-100 p-5 shadow-xs flex items-center justify-between">
+        <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 p-3.5 sm:p-5 shadow-xs flex items-center justify-between">
           <div>
             <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Not Visited / Absent</span>
-            <h3 className="text-3xl font-black text-amber-600 mt-1">{totalNotVisitedCount}</h3>
+            <h3 className="text-2xl sm:text-3xl font-black text-amber-600 mt-1">{totalNotVisitedCount}</h3>
             <span className="text-[10px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full font-bold mt-1 inline-block">
               ₹0 Revenue Counted
             </span>
           </div>
-          <div className="p-3 bg-amber-50 text-amber-600 rounded-2xl">
-            <UserX size={24} />
+          <div className="p-2.5 sm:p-3 bg-amber-50 text-amber-600 rounded-xl sm:rounded-2xl shrink-0">
+            <UserX size={22} />
           </div>
         </div>
 
-        <div className="bg-white rounded-3xl border border-slate-100 p-5 shadow-xs flex items-center justify-between">
+        <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 p-3.5 sm:p-5 shadow-xs flex items-center justify-between">
           <div>
             <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Avg Revenue Per Doctor</span>
-            <h3 className="text-3xl font-black text-purple-600 mt-1">₹{avgRevenuePerDoctor.toLocaleString('en-IN')}</h3>
+            <h3 className="text-2xl sm:text-3xl font-black text-purple-600 mt-1">₹{avgRevenuePerDoctor.toLocaleString('en-IN')}</h3>
             <span className="text-[10px] text-slate-400 font-semibold mt-1 block">{doctors.length} active doctors</span>
           </div>
-          <div className="p-3 bg-purple-50 text-purple-600 rounded-2xl">
-            <TrendingUp size={24} />
+          <div className="p-2.5 sm:p-3 bg-purple-50 text-purple-600 rounded-xl sm:rounded-2xl shrink-0">
+            <TrendingUp size={22} />
           </div>
         </div>
       </div>
 
       {/* ── Doctor-Wise Revenue Breakdown Table ───────────────────────────── */}
-      <div className="bg-white rounded-3xl border border-slate-100 shadow-xs overflow-hidden">
-        <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-xs overflow-hidden">
+        <div className="p-3.5 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
             <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
               <Stethoscope size={16} className="text-blue-600" />
@@ -395,10 +395,10 @@ export const RevenueOverview: React.FC = () => {
 
       {/* ── Doctor Revenue Detail Modal / Drawer (Phase 11) ─────────────────── */}
       {selectedDoctor && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-scaleUp">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white rounded-2xl sm:rounded-3xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-scaleUp">
             {/* Modal Header */}
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 shrink-0">
+            <div className="p-4 sm:p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 shrink-0">
               <div className="flex items-center gap-3">
                 <img
                   src={selectedDoctor.photo || 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&auto=format&fit=crop&q=80'}
@@ -472,7 +472,8 @@ export const RevenueOverview: React.FC = () => {
 
             {/* Modal Body: Transactions List */}
             <div className="flex-1 overflow-y-auto p-4">
-              <table className="w-full text-left border-collapse text-xs">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs min-w-[650px]">
                 <thead className="bg-slate-50 border-b border-slate-100 text-[10px] font-black text-slate-500 uppercase tracking-wider">
                   <tr>
                     <th className="px-3.5 py-3">Token No.</th>
@@ -567,6 +568,7 @@ export const RevenueOverview: React.FC = () => {
                   )}
                 </tbody>
               </table>
+              </div>
             </div>
 
             {/* Modal Footer */}

@@ -446,29 +446,29 @@ export const HospitalSettings: React.FC = () => {
   const labelCls = 'text-xs font-extrabold text-slate-700 block mb-1.5';
 
   return (
-    <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
+    <div className="p-3.5 sm:p-6 space-y-4 sm:space-y-6 max-w-[1600px] mx-auto">
       {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-xs">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 sm:gap-4 bg-white p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-100 shadow-xs">
         <div className="flex items-center gap-3">
-          <div className="p-3 bg-blue-600 text-white rounded-2xl shadow-sm shadow-blue-500/20">
-            <Building2 size={22} />
+          <div className="p-2.5 sm:p-3 bg-blue-600 text-white rounded-xl sm:rounded-2xl shadow-sm shadow-blue-500/20 shrink-0">
+            <Building2 size={20} />
           </div>
           <div>
-            <h2 className="text-xl font-black text-slate-800">Hospital Settings</h2>
+            <h2 className="text-lg sm:text-xl font-black text-slate-800">Hospital Settings</h2>
             <p className="text-xs text-slate-400 font-semibold mt-0.5">
               Update profile, contacts, GPS & amenities — changes reflect globally on patient side.
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2.5 bg-blue-50/80 border border-blue-100 px-4 py-2.5 rounded-2xl">
+        <div className="flex items-center gap-2 bg-blue-50/80 border border-blue-100 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl self-start lg:self-auto max-w-full">
           <span className="text-xs font-bold text-slate-500 whitespace-nowrap">Active Hospital:</span>
-          <span className="text-xs font-black text-blue-700">{hospitalProfile?.name || 'City Care Multi-Specialty Hospital'}</span>
+          <span className="text-xs font-black text-blue-700 truncate">{hospitalProfile?.name || 'City Care Multi-Specialty Hospital'}</span>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-4 gap-4 sm:gap-6">
         {/* Sidebar Tabs */}
-        <div className="space-y-2">
+        <div className="flex xl:flex-col overflow-x-auto max-w-full gap-2 pb-1 xl:pb-0">
           {[
             { id: 'basic', label: 'Basic Profile & Photo', desc: 'Name, photo, registration', icon: <Building2 size={16} /> },
             { id: 'contact', label: 'Contacts & Emergency', desc: 'Phone, WhatsApp, helpline', icon: <Phone size={16} /> },
@@ -479,7 +479,7 @@ export const HospitalSettings: React.FC = () => {
             <button
               key={t.id}
               onClick={() => { setActiveTab(t.id as any); setSaveSuccess(false); }}
-              className={`w-full flex items-center gap-3 p-4 rounded-2xl border text-left cursor-pointer transition-all ${
+              className={`flex items-center gap-2.5 sm:gap-3 p-3 xl:p-4 rounded-xl sm:rounded-2xl border text-left cursor-pointer transition-all shrink-0 xl:shrink whitespace-nowrap xl:whitespace-normal ${
                 activeTab === t.id
                   ? 'border-blue-600 bg-blue-50/60 shadow-xs text-blue-600'
                   : 'border-slate-100 bg-white text-slate-600 hover:border-slate-200'
@@ -488,7 +488,7 @@ export const HospitalSettings: React.FC = () => {
               <div className="shrink-0">{t.icon}</div>
               <div>
                 <span className="text-xs font-black block">{t.label}</span>
-                <span className="text-[10px] text-slate-400 font-semibold block mt-0.5">{t.desc}</span>
+                <span className="text-[10px] text-slate-400 font-semibold hidden sm:block xl:block mt-0.5">{t.desc}</span>
               </div>
             </button>
           ))}
@@ -496,7 +496,7 @@ export const HospitalSettings: React.FC = () => {
 
         {/* Main Content */}
         <div className="xl:col-span-3">
-          <form onSubmit={activeTab === 'payouts' ? handlePayoutSave : handleSubmit} className="bg-white border border-slate-100 rounded-3xl p-6 sm:p-8 shadow-xs space-y-6">
+          <form onSubmit={activeTab === 'payouts' ? handlePayoutSave : handleSubmit} className="bg-white border border-slate-100 rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 shadow-xs space-y-5 sm:space-y-6">
 
             {/* ─── BASIC PROFILE & PHOTO ─── */}
             {activeTab === 'basic' && (
@@ -506,9 +506,9 @@ export const HospitalSettings: React.FC = () => {
                 {/* Main Hospital Photo Upload */}
                 <div>
                   <label className={labelCls}>Hospital Main Photo <span className="text-blue-600">(shown on patient search & booking pages)</span></label>
-                  <div className="flex gap-4 items-start">
+                  <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-start">
                     {/* Preview */}
-                    <div className="w-32 h-24 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center shrink-0 relative">
+                    <div className="w-full sm:w-32 h-28 sm:h-24 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center shrink-0 relative">
                       {form.coverImage ? (
                         <img src={form.coverImage} alt="Hospital" className="w-full h-full object-cover" />
                       ) : (
@@ -524,7 +524,7 @@ export const HospitalSettings: React.FC = () => {
                       )}
                     </div>
 
-                    <div className="flex-1 space-y-2">
+                    <div className="w-full sm:flex-1 space-y-2">
                       <input
                         type="file"
                         ref={photoInputRef}

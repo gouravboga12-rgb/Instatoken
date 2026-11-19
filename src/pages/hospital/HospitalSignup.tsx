@@ -206,7 +206,7 @@ export const HospitalSignup: React.FC = () => {
       </div>
 
       {/* Right Panel – Sign Up Form */}
-      <div className="flex-1 flex items-center justify-center p-6 lg:p-12 bg-white">
+      <div className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-12 bg-white">
         <div className="w-full max-w-md">
           {/* Mobile logo */}
           <div className="flex items-center gap-2 mb-6 lg:hidden">
@@ -422,7 +422,7 @@ export const HospitalSignup: React.FC = () => {
                       <span>Settlement Bank Details (for receiving fees) *</span>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <input
                         type="text"
                         value={bankName}
@@ -441,7 +441,7 @@ export const HospitalSignup: React.FC = () => {
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <input
                         type="text"
                         value={bankAccountNumber}

@@ -314,10 +314,10 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
   };
 
   return (
-    <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
+    <div className="p-3.5 sm:p-6 space-y-4 sm:space-y-6 max-w-[1600px] mx-auto">
       {/* ── Doctor Cabin Switcher Tabs ────────────────────────────────────────── */}
-      <div className="bg-white rounded-3xl border border-slate-100 p-4 shadow-xs">
-        <div className="flex items-center justify-between mb-3 px-1">
+      <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 p-3 sm:p-4 shadow-xs">
+        <div className="flex items-center justify-between mb-2.5 sm:mb-3 px-1">
           <span className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
             <Stethoscope size={14} className="text-blue-600" />
             <span>Doctor Cabin Token Monitors ({doctors.length} Doctors Available)</span>
@@ -359,42 +359,42 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
       </div>
 
       {/* ── Top Doctor Banner Header ──────────────────────────────────────── */}
-      <div className="bg-white rounded-3xl border border-slate-100 shadow-xs p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <div className="relative">
+      <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-xs p-4 sm:p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5 sm:gap-4">
+          <div className="relative shrink-0">
             <img
               src={doctor.photo || 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&auto=format&fit=crop&q=80'}
               alt={doctor.name}
-              className="w-16 h-16 rounded-2xl object-cover border border-slate-200 shadow-xs"
+              className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl object-cover border border-slate-200 shadow-xs"
             />
-            <span className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${doctor.active ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+            <span className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full border-2 border-white ${doctor.active ? 'bg-emerald-500' : 'bg-slate-400'}`} />
           </div>
 
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-xl font-black text-slate-800 leading-none">{doctor.name}</h1>
-              <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100 uppercase tracking-wide">
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+              <h1 className="text-lg sm:text-xl font-black text-slate-800 leading-tight">{doctor.name}</h1>
+              <span className="text-[9.5px] sm:text-[10px] font-black px-2 sm:px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100 uppercase tracking-wide">
                 {doctor.specialization} · Cabin Active
               </span>
             </div>
-            <p className="text-xs text-slate-400 font-semibold mt-1">
+            <p className="text-[11px] sm:text-xs text-slate-400 font-semibold mt-1">
               Dept: <strong className="text-slate-600">{doctor.departmentName}</strong> · Fee: <strong className="text-emerald-600">₹{doctor.consultationFee}</strong> · Avg Consult: <strong className="text-slate-600">{doctor.consultationDuration} mins</strong>
             </p>
           </div>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-2.5 flex-wrap self-end md:self-auto">
+        <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap w-full md:w-auto">
           <button
             onClick={() => handleCallNext()}
             disabled={activeQueue.length === 0}
-            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-2xl font-black text-xs cursor-pointer border-none shadow-sm shadow-blue-500/20 flex items-center gap-2 transition-transform active:scale-95"
+            className="flex-1 sm:flex-initial justify-center px-4 sm:px-5 py-2 sm:py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl sm:rounded-2xl font-black text-xs cursor-pointer border-none shadow-sm shadow-blue-500/20 flex items-center gap-2 transition-transform active:scale-95"
           >
             <Volume2 size={15} /> Call Next Patient
           </button>
           <button
             onClick={() => navigate(`/hospital/tokens/add?doctorId=${doctor.id}&departmentId=${doctor.departmentId || ''}`)}
-            className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-extrabold text-xs cursor-pointer border-none shadow-xs flex items-center gap-1.5"
+            className="flex-1 sm:flex-initial justify-center px-3.5 sm:px-4 py-2 sm:py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl sm:rounded-2xl font-extrabold text-xs cursor-pointer border-none shadow-xs flex items-center gap-1.5"
           >
             Add Walk-in Token
           </button>
@@ -402,7 +402,7 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
       </div>
 
       {/* ── Doctor OPD Shift / Session Switcher ────────────────────────────── */}
-      <div className="bg-white rounded-3xl border border-slate-100 p-4 shadow-xs">
+      <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 p-3.5 sm:p-4 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
           <div className="flex items-center gap-2">
             <span className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
@@ -697,9 +697,9 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
       </div>
 
       {/* ── Token Queue Table ─────────────────────────────────────────────── */}
-      <div className="bg-white rounded-3xl border border-slate-100 shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+      <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-xs overflow-hidden">
+        <div className="overflow-x-auto -mx-3.5 px-3.5 sm:mx-0 sm:px-0">
+          <table className="w-full text-left border-collapse min-w-[750px]">
             <thead>
               <tr className="bg-slate-50/80 border-b border-slate-100 text-[10px] font-black text-slate-500 uppercase tracking-wider">
                 <th className="py-3.5 px-4">Token #</th>

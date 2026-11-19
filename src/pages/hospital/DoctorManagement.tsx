@@ -211,17 +211,17 @@ export const DoctorManagement: React.FC<DoctorManagementProps> = ({ tab: initial
   );
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3.5 sm:p-6 space-y-4 sm:space-y-6 max-w-[1600px] mx-auto">
       {/* Header & Tabs */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
-          <h2 className="text-xl font-black text-slate-800">Resource Management</h2>
-          <p className="text-xs text-slate-400 mt-1">Configure your clinical staff and active specialties</p>
+          <h2 className="text-lg sm:text-xl font-black text-slate-800">Resource Management</h2>
+          <p className="text-xs text-slate-400 mt-0.5 sm:mt-1">Configure your clinical staff and active specialties</p>
         </div>
-        <div className="flex bg-slate-100 rounded-xl p-1 self-start">
+        <div className="flex bg-slate-100 rounded-xl p-1 self-start overflow-x-auto max-w-full">
           <button
             onClick={() => setActiveTab('doctors')}
-            className={`px-4 py-2 text-xs font-bold rounded-lg cursor-pointer transition-all border-none ${
+            className={`px-3.5 sm:px-4 py-2 text-xs font-bold rounded-lg cursor-pointer transition-all border-none shrink-0 ${
               activeTab === 'doctors' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'
             }`}
           >
@@ -229,7 +229,7 @@ export const DoctorManagement: React.FC<DoctorManagementProps> = ({ tab: initial
           </button>
           <button
             onClick={() => navigate('/hospital/departments')}
-            className={`px-4 py-2 text-xs font-bold rounded-lg cursor-pointer transition-all border-none ${
+            className={`px-3.5 sm:px-4 py-2 text-xs font-bold rounded-lg cursor-pointer transition-all border-none shrink-0 ${
               activeTab === 'departments' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'
             }`}
           >
@@ -240,8 +240,8 @@ export const DoctorManagement: React.FC<DoctorManagementProps> = ({ tab: initial
 
       {/* ─── DOCTORS TAB ─────────────────────────────────────────────────── */}
       {activeTab === 'doctors' && (
-        <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row gap-3 justify-between items-stretch sm:items-center bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+        <div className="space-y-3 sm:space-y-4">
+          <div className="flex flex-col sm:flex-row gap-3 justify-between items-stretch sm:items-center bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-100 shadow-sm">
             <div className="relative flex-1 max-w-md">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-450" />
               <input
@@ -263,14 +263,14 @@ export const DoctorManagement: React.FC<DoctorManagementProps> = ({ tab: initial
                 });
                 setShowDocModal(true);
               }}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2.5 rounded-xl cursor-pointer border-none flex items-center gap-1.5 text-xs shadow-md shadow-blue-500/10"
+              className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2.5 rounded-xl cursor-pointer border-none flex items-center justify-center gap-1.5 text-xs shadow-md shadow-blue-500/10"
             >
               <Plus size={14} /> Add New Doctor
             </button>
           </div>
 
           {filteredDoctors.length === 0 ? (
-            <div className="bg-white rounded-3xl p-12 text-center border border-slate-100 shadow-sm max-w-lg mx-auto space-y-4 my-8">
+            <div className="bg-white rounded-2xl sm:rounded-3xl p-8 sm:p-12 text-center border border-slate-100 shadow-sm max-w-lg mx-auto space-y-4 my-8">
               <div className="w-14 h-14 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto text-2xl">
                 🩺
               </div>
@@ -297,7 +297,7 @@ export const DoctorManagement: React.FC<DoctorManagementProps> = ({ tab: initial
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-6">
               {filteredDoctors.map(doc => {
                 const photo = doc.photo || (doc as any).image;
                 const opdDaysText = Array.isArray(doc.opdDays) && doc.opdDays.length > 0
@@ -307,7 +307,7 @@ export const DoctorManagement: React.FC<DoctorManagementProps> = ({ tab: initial
                     : 'Mon, Tue, Wed, Thu, Fri';
 
                 return (
-                  <div key={doc.id} className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden p-5 flex flex-col justify-between hover:shadow-md transition-shadow">
+                  <div key={doc.id} className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm overflow-hidden p-3.5 sm:p-5 flex flex-col justify-between hover:shadow-md transition-shadow">
                     <div>
                       <div className="flex items-start gap-4">
                         <div className="w-16 h-16 rounded-2xl bg-blue-50 border border-slate-100 flex items-center justify-center text-blue-600 text-xl font-black shrink-0 overflow-hidden">
@@ -459,8 +459,8 @@ export const DoctorManagement: React.FC<DoctorManagementProps> = ({ tab: initial
 
           {/* Department Detail Modal */}
           {selectedDeptDetail && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-3xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 space-y-4 animate-scaleUp">
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3 sm:p-4">
+              <div className="bg-white rounded-2xl sm:rounded-3xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6 space-y-4 animate-scaleUp">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                   <div className="flex items-center gap-2.5">
                     <span className="text-2xl">{selectedDeptDetail.icon}</span>
@@ -526,13 +526,13 @@ export const DoctorManagement: React.FC<DoctorManagementProps> = ({ tab: initial
 
       {/* ─── DOCTOR MODAL ───────────────────────────────────────────────── */}
       {showDocModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3 sm:p-4">
+          <div className="bg-white rounded-2xl sm:rounded-3xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="p-4 sm:p-6 border-b border-slate-100 flex items-center justify-between">
               <h3 className="text-base font-black text-slate-800">{editingDoc ? 'Edit Doctor Profile' : 'Add New Doctor'}</h3>
               <button onClick={() => setShowDocModal(false)} className="p-1 rounded-lg hover:bg-slate-50 cursor-pointer border-none text-slate-400">✕</button>
             </div>
-            <form onSubmit={handleDocSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleDocSubmit} className="p-4 sm:p-6 space-y-4">
               {/* Doctor Photo Upload Section */}
               <div className="flex flex-col sm:flex-row items-center gap-4 p-4 bg-slate-50 border border-slate-100 rounded-2xl">
                 <div className="w-16 h-16 rounded-2xl bg-white border border-slate-200 shadow-xs overflow-hidden shrink-0 flex items-center justify-center text-slate-400 font-extrabold text-lg">

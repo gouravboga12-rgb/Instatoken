@@ -220,41 +220,41 @@ const TopHeader: React.FC<{ onMenuToggle: () => void }> = ({ onMenuToggle }) => 
   const roleColor = roleColors[hospitalUser?.role || 'receptionist'];
 
   return (
-    <header className="bg-white border-b border-slate-100 px-6 py-3 flex items-center gap-4 shrink-0">
+    <header className="bg-white border-b border-slate-100 px-3 sm:px-6 py-2 sm:py-3 flex items-center gap-2 sm:gap-4 shrink-0">
       {/* Mobile menu toggle */}
-      <button onClick={onMenuToggle} className="md:hidden p-2 rounded-xl hover:bg-slate-100 cursor-pointer">
-        <Menu size={18} className="text-slate-600" />
+      <button onClick={onMenuToggle} className="md:hidden p-1.5 sm:p-2 rounded-xl hover:bg-slate-100 cursor-pointer text-slate-600 shrink-0">
+        <Menu size={20} />
       </button>
 
       {/* Big Hospital Name & Welcome Header */}
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2.5 flex-wrap">
-          <h1 className="text-lg sm:text-xl md:text-2xl font-black text-slate-900 tracking-tight leading-none uppercase font-heading">
+        <div className="flex items-center gap-1.5 sm:gap-2.5">
+          <h1 className="text-sm sm:text-lg md:text-xl font-black text-slate-900 tracking-tight leading-tight uppercase font-heading truncate">
             {hospitalProfile?.name || hospitalUser?.hospitalName || 'Hospital Administration'}
           </h1>
-          <span className="hidden sm:inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-black px-2.5 py-0.5 rounded-full">
+          <span className="hidden sm:inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-black px-2.5 py-0.5 rounded-full shrink-0">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
             Hospital Online
           </span>
-          <span className={`text-[9.5px] font-black px-2.5 py-0.5 rounded-full capitalize ${roleColor}`}>
+          <span className={`text-[9px] sm:text-[9.5px] font-black px-2 py-0.5 rounded-full capitalize shrink-0 ${roleColor}`}>
             {hospitalUser?.role}
           </span>
         </div>
-        <p className="text-[11px] text-slate-400 font-semibold mt-1 flex items-center gap-1.5">
-          <span>Welcome, {hospitalUser?.name || 'Administrator'}</span>
-          <span className="text-slate-300">·</span>
-          <span>Hospital Administration Portal</span>
+        <p className="text-[10px] sm:text-[11px] text-slate-400 font-semibold mt-0.5 truncate flex items-center gap-1.5">
+          <span className="truncate">Welcome, {hospitalUser?.name || 'Administrator'}</span>
+          <span className="hidden sm:inline text-slate-300">·</span>
+          <span className="hidden sm:inline">Hospital Administration Portal</span>
         </p>
       </div>
 
       {/* Date */}
-      <div className="hidden lg:flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-xl px-3 py-1.5">
+      <div className="hidden lg:flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-xl px-3 py-1.5 shrink-0">
         <Calendar size={13} className="text-blue-600" />
         <span className="text-[11px] font-bold text-slate-700">{todayStr}</span>
       </div>
 
       {/* Search */}
-      <div className="hidden md:flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-xl px-3 py-1.5 w-52">
+      <div className="hidden md:flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-xl px-3 py-1.5 w-52 shrink-0">
         <Search size={13} className="text-slate-400 shrink-0" />
         <input
           type="text"
@@ -267,109 +267,112 @@ const TopHeader: React.FC<{ onMenuToggle: () => void }> = ({ onMenuToggle }) => 
       </div>
 
       {/* Active tokens badge */}
-      <div className="hidden lg:flex items-center gap-1.5 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-1.5">
+      <div className="hidden lg:flex items-center gap-1.5 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-1.5 shrink-0">
         <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
         <span className="text-[11px] font-extrabold text-emerald-700">{todayTokens} Active</span>
       </div>
 
-      {/* Manual Sync / Refresh Button (In-Place, Never Navigates Away) */}
-      <button 
-        type="button"
-        onClick={handleManualRefresh}
-        title="Refresh appointments and queues in-place (stays on current screen)"
-        className="flex items-center gap-1.5 text-xs font-bold text-slate-650 hover:text-blue-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl px-2.5 py-1.5 transition-all cursor-pointer shadow-2xs"
-      >
-        <RefreshCw size={13} className={isRefreshing || isRefreshingData ? 'animate-spin text-blue-600' : 'text-slate-500'} />
-        <span className="text-[11px] hidden sm:inline">{isRefreshing || isRefreshingData ? 'Syncing...' : 'Sync'}</span>
-      </button>
-
-      {/* Notification Bell & Dropdown */}
-      <div className="relative">
+      {/* Right Controls Container */}
+      <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+        {/* Manual Sync / Refresh Button (In-Place, Never Navigates Away) */}
         <button 
           type="button"
-          onClick={() => setShowNotificationsDropdown(prev => !prev)}
-          className="relative p-2 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer"
-          title="Hospital Broadcasts & Notifications"
+          onClick={handleManualRefresh}
+          title="Refresh appointments and queues in-place (stays on current screen)"
+          className="flex items-center gap-1.5 text-xs font-bold text-slate-650 hover:text-blue-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl p-1.5 sm:px-2.5 sm:py-1.5 transition-all cursor-pointer shadow-2xs"
         >
-          <Bell size={18} className="text-slate-500" />
-          {notifsCount > 0 && (
-            <span className="absolute top-1 right-1 w-4 h-4 bg-blue-600 rounded-full text-[9px] text-white font-bold flex items-center justify-center animate-pulse">
-              {notifsCount > 9 ? '9+' : notifsCount}
-            </span>
-          )}
+          <RefreshCw size={13} className={isRefreshing || isRefreshingData ? 'animate-spin text-blue-600' : 'text-slate-500'} />
+          <span className="text-[11px] hidden sm:inline">{isRefreshing || isRefreshingData ? 'Syncing...' : 'Sync'}</span>
         </button>
 
-        {showNotificationsDropdown && (
-          <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-slate-100 p-3 z-50 space-y-2">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100 px-1">
-              <span className="text-xs font-black text-slate-800">Hospital Broadcasts</span>
+        {/* Notification Bell & Dropdown */}
+        <div className="relative">
+          <button 
+            type="button"
+            onClick={() => setShowNotificationsDropdown(prev => !prev)}
+            className="relative p-1.5 sm:p-2 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer"
+            title="Hospital Broadcasts & Notifications"
+          >
+            <Bell size={17} className="text-slate-500" />
+            {notifsCount > 0 && (
+              <span className="absolute top-0.5 right-0.5 w-3.5 h-3.5 bg-blue-600 rounded-full text-[8.5px] text-white font-bold flex items-center justify-center animate-pulse">
+                {notifsCount > 9 ? '9+' : notifsCount}
+              </span>
+            )}
+          </button>
+
+          {showNotificationsDropdown && (
+            <div className="absolute right-0 mt-2 w-72 sm:w-80 bg-white rounded-2xl shadow-xl border border-slate-100 p-3 z-50 space-y-2">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100 px-1">
+                <span className="text-xs font-black text-slate-800">Hospital Broadcasts</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowNotificationsDropdown(false);
+                    navigate('/hospital/communication');
+                  }}
+                  className="text-[10px] font-bold text-blue-600 hover:underline cursor-pointer border-none bg-transparent"
+                >
+                  Open Push Center
+                </button>
+              </div>
+              
+              <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
+                {notifications.length > 0 ? (
+                  notifications.slice(0, 5).map(n => (
+                    <div key={n.id} className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className={`font-extrabold text-[10px] capitalize ${n.type === 'push' ? 'text-purple-600' : 'text-blue-600'}`}>
+                          {n.type === 'push' ? 'Device Push' : 'In-App Alert'}
+                        </span>
+                        <span className="text-[9px] text-slate-400">
+                          {new Date(n.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-600 mt-1 line-clamp-2">{n.message}</p>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-6 text-[11px] text-slate-400 font-bold">
+                    No broadcast messages yet.
+                  </div>
+                )}
+              </div>
+
               <button
                 type="button"
                 onClick={() => {
                   setShowNotificationsDropdown(false);
                   navigate('/hospital/communication');
                 }}
-                className="text-[10px] font-bold text-blue-600 hover:underline cursor-pointer border-none bg-transparent"
+                className="w-full py-2 bg-blue-50 hover:bg-blue-100 text-blue-600 font-bold text-xs rounded-xl cursor-pointer transition-colors text-center block border-none"
               >
-                Open Push Center
+                + Send New Notification
               </button>
             </div>
-            
-            <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
-              {notifications.length > 0 ? (
-                notifications.slice(0, 5).map(n => (
-                  <div key={n.id} className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-xs">
-                    <div className="flex items-center justify-between">
-                      <span className={`font-extrabold text-[10px] capitalize ${n.type === 'push' ? 'text-purple-600' : 'text-blue-600'}`}>
-                        {n.type === 'push' ? 'Device Push' : 'In-App Alert'}
-                      </span>
-                      <span className="text-[9px] text-slate-400">
-                        {new Date(n.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-slate-600 mt-1 line-clamp-2">{n.message}</p>
-                  </div>
-                ))
-              ) : (
-                <div className="text-center py-6 text-[11px] text-slate-400 font-bold">
-                  No broadcast messages yet.
-                </div>
-              )}
+          )}
+        </div>
+
+        {/* Profile */}
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xs font-black shrink-0">
+            {hospitalUser?.name?.charAt(0) || 'H'}
+          </div>
+          <div className="hidden lg:block">
+            <p className="text-xs font-bold text-slate-800 leading-none">{hospitalUser?.name?.split(' ').slice(-1)[0]}</p>
+            <div className="flex items-center gap-1 mt-0.5">
+              <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
+              <span className="text-[9px] font-semibold text-slate-400">Online</span>
             </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                setShowNotificationsDropdown(false);
-                navigate('/hospital/communication');
-              }}
-              className="w-full py-2 bg-blue-50 hover:bg-blue-100 text-blue-600 font-bold text-xs rounded-xl cursor-pointer transition-colors text-center block border-none"
-            >
-              + Send New Notification
-            </button>
           </div>
-        )}
-      </div>
-
-      {/* Profile */}
-      <div className="flex items-center gap-2">
-        <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xs font-black shrink-0">
-          {hospitalUser?.name?.charAt(0) || 'H'}
+          <button
+            onClick={handleLogout}
+            className="p-1.5 rounded-xl hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
+            title="Logout"
+          >
+            <LogOut size={15} />
+          </button>
         </div>
-        <div className="hidden lg:block">
-          <p className="text-xs font-bold text-slate-800 leading-none">{hospitalUser?.name?.split(' ').slice(-1)[0]}</p>
-          <div className="flex items-center gap-1 mt-0.5">
-            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
-            <span className="text-[9px] font-semibold text-slate-400">Online</span>
-          </div>
-        </div>
-        <button
-          onClick={handleLogout}
-          className="p-1.5 rounded-xl hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors cursor-pointer ml-1"
-          title="Logout"
-        >
-          <LogOut size={15} />
-        </button>
       </div>
     </header>
   );
@@ -395,12 +398,13 @@ export const HospitalLayout: React.FC = () => {
       {/* Mobile Sidebar Overlay */}
       {mobileSidebarOpen && (
         <>
-          <div className="md:hidden fixed inset-0 bg-black/50 z-50" onClick={() => setMobileSidebarOpen(false)} />
-          <div className="md:hidden fixed left-0 top-0 h-full z-50">
-            <div className="relative">
+          <div className="md:hidden fixed inset-0 bg-black/60 z-50 backdrop-blur-xs transition-opacity" onClick={() => setMobileSidebarOpen(false)} />
+          <div className="md:hidden fixed left-0 top-0 h-full z-50 flex max-w-[85vw] shadow-2xl">
+            <div className="relative h-full flex flex-col">
               <button
-                className="absolute top-4 right-[-40px] p-2 bg-white rounded-full shadow cursor-pointer"
+                className="absolute top-3.5 right-3.5 z-20 p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl shadow cursor-pointer border-none transition-colors"
                 onClick={() => setMobileSidebarOpen(false)}
+                aria-label="Close menu"
               >
                 <X size={16} />
               </button>

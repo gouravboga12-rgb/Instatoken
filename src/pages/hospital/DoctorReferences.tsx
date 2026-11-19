@@ -242,13 +242,13 @@ export const DoctorReferences: React.FC = () => {
   const paginatedPatients = selectedDoctorPatients.slice((patientPage - 1) * patientItemsPerPage, patientPage * patientItemsPerPage);
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1600px] mx-auto animate-in fade-in duration-200">
+    <div className="p-3.5 sm:p-6 lg:p-8 space-y-4 sm:space-y-6 max-w-[1600px] mx-auto animate-in fade-in duration-200">
       
       {/* ── TOP HEADER (Matching Image 79) ─────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 sm:p-6 rounded-3xl border border-slate-100 shadow-xs">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 bg-white p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-100 shadow-xs">
         <div>
           <div className="flex items-center gap-2.5">
-            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight font-heading">
+            <h1 className="text-lg sm:text-2xl font-black text-slate-900 tracking-tight font-heading">
               Doctor References
             </h1>
             <Badge variant="blue" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px] font-black uppercase">
@@ -262,7 +262,7 @@ export const DoctorReferences: React.FC = () => {
 
         <button
           onClick={() => setShowAddModal(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs px-5 py-3 rounded-2xl flex items-center gap-2 cursor-pointer shadow-md shadow-blue-500/20 transition-all border-none"
+          className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-blue-500/20 transition-all border-none"
         >
           <Plus size={16} />
           <span>+ Add Doctor Reference</span>
@@ -270,17 +270,17 @@ export const DoctorReferences: React.FC = () => {
       </div>
 
       {/* ── 2 TOP STAT CARDS (Matching Image 79) ───────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-4">
         {/* Card 1: Total Referring Doctors */}
-        <Card className="p-5 border-none shadow-xs bg-white rounded-3xl flex items-center gap-4 hover:shadow-md transition-shadow">
-          <div className="w-14 h-14 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 shadow-2xs">
-            <Users size={26} />
+        <Card className="p-4 sm:p-5 border-none shadow-xs bg-white rounded-2xl sm:rounded-3xl flex items-center gap-3.5 sm:gap-4 hover:shadow-md transition-shadow">
+          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 shadow-2xs">
+            <Users size={24} />
           </div>
           <div>
-            <span className="text-xs text-slate-400 font-extrabold uppercase tracking-wider block">
+            <span className="text-[11px] sm:text-xs text-slate-400 font-extrabold uppercase tracking-wider block">
               Total Referring Doctors / RMPs
             </span>
-            <span className="text-3xl font-black text-slate-900 font-heading block mt-0.5">
+            <span className="text-2xl sm:text-3xl font-black text-slate-900 font-heading block mt-0.5">
               {totalReferringDoctors}
             </span>
             <span className="text-[10px] text-emerald-600 font-bold block mt-0.5">
@@ -290,15 +290,15 @@ export const DoctorReferences: React.FC = () => {
         </Card>
 
         {/* Card 2: Total Patients Referred */}
-        <Card className="p-5 border-none shadow-xs bg-white rounded-3xl flex items-center gap-4 hover:shadow-md transition-shadow">
-          <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 shadow-2xs">
-            <UserCheck size={26} />
+        <Card className="p-4 sm:p-5 border-none shadow-xs bg-white rounded-2xl sm:rounded-3xl flex items-center gap-3.5 sm:gap-4 hover:shadow-md transition-shadow">
+          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 shadow-2xs">
+            <UserCheck size={24} />
           </div>
           <div>
-            <span className="text-xs text-slate-400 font-extrabold uppercase tracking-wider block">
+            <span className="text-[11px] sm:text-xs text-slate-400 font-extrabold uppercase tracking-wider block">
               Total Patients Referred
             </span>
-            <span className="text-3xl font-black text-slate-900 font-heading block mt-0.5">
+            <span className="text-2xl sm:text-3xl font-black text-slate-900 font-heading block mt-0.5">
               {totalPatientsReferred}
             </span>
             <span className="text-[10px] text-blue-600 font-bold block mt-0.5">
@@ -380,8 +380,8 @@ export const DoctorReferences: React.FC = () => {
               </span>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs">
+            <div className="overflow-x-auto -mx-3.5 px-3.5 sm:mx-0 sm:px-0">
+              <table className="w-full text-left border-collapse text-xs min-w-[650px]">
                 <thead className="bg-slate-50 border-b border-slate-100 text-[10px] font-black text-slate-500 uppercase tracking-wider">
                   <tr>
                     <th className="px-4 py-3.5 w-12 text-center">#</th>
@@ -707,8 +707,8 @@ export const DoctorReferences: React.FC = () => {
 
       {/* ── MODAL: ADD DOCTOR REFERENCE ───────────────────────────────────── */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-3 sm:p-4">
+          <div className="bg-white rounded-2xl sm:rounded-3xl max-w-md w-full p-4 sm:p-6 shadow-2xl border border-slate-100 space-y-4 max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-black">

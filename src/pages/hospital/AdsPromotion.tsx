@@ -256,15 +256,15 @@ export const AdsPromotion: React.FC = () => {
 
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="p-3.5 sm:p-6 space-y-4 sm:space-y-6 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 sm:gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <div className="p-2 bg-blue-500/10 text-blue-600 rounded-xl">
-              <Megaphone size={22} />
+            <div className="p-2 bg-blue-500/10 text-blue-600 rounded-xl shrink-0">
+              <Megaphone size={20} />
             </div>
-            <h2 className="text-xl font-black text-slate-800 tracking-tight">Ads & Promotion</h2>
+            <h2 className="text-lg sm:text-xl font-black text-slate-800 tracking-tight">Ads & Promotion</h2>
           </div>
           <p className="text-xs text-slate-400 mt-1">
             Request homepage & regional advertising placements from InstaToken Super Admin
@@ -272,16 +272,16 @@ export const AdsPromotion: React.FC = () => {
         </div>
 
         {/* SLA Pill */}
-        <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-full text-xs font-bold text-emerald-700">
+        <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-full text-xs font-bold text-emerald-700 shrink-0">
           <Sparkles size={14} className="text-emerald-600" />
-          <span>Super Admin Review: Within 24 Hours</span>
+          <span>Review: Within 24 Hours</span>
         </div>
       </div>
 
       {/* Admin Contact Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
         {/* Email Super Admin Card */}
-        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl p-5 flex flex-col justify-between shadow-xs">
+        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl p-4 sm:p-5 flex flex-col justify-between shadow-xs">
           <div className="flex items-start justify-between">
             <div className="space-y-1">
               <span className="text-[10px] font-black uppercase tracking-wider text-blue-600">Official Ad Desk</span>
@@ -290,24 +290,24 @@ export const AdsPromotion: React.FC = () => {
                 Prefer sending assets directly via email? Reach out with high-resolution creative designs or custom campaign contracts.
               </p>
             </div>
-            <div className="p-3 bg-white text-blue-600 rounded-xl shadow-xs">
-              <Mail size={20} />
+            <div className="p-2.5 sm:p-3 bg-white text-blue-600 rounded-xl shadow-xs shrink-0">
+              <Mail size={18} />
             </div>
           </div>
 
-          <div className="mt-4 pt-3 border-t border-blue-100/70 flex items-center justify-between">
-            <span className="text-xs font-mono font-bold text-blue-800">ads@instatoken.com</span>
+          <div className="mt-4 pt-3 border-t border-blue-100/70 flex items-center justify-between gap-2">
+            <span className="text-xs font-mono font-bold text-blue-800 truncate">ads@instatoken.com</span>
             <a
               href={`mailto:ads@instatoken.com?subject=Ad%20Banner%20Inquiry%20-%20${encodeURIComponent(hospitalProfile?.name || 'Hospital')}`}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-colors shadow-xs no-underline"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-colors shadow-xs no-underline shrink-0"
             >
-              <Mail size={13} /> Email Super Admin
+              <Mail size={13} /> Email Admin
             </a>
           </div>
         </div>
 
         {/* Helpline Card */}
-        <div className="bg-white border border-slate-100 rounded-2xl p-5 flex flex-col justify-between shadow-xs">
+        <div className="bg-white border border-slate-100 rounded-2xl p-4 sm:p-5 flex flex-col justify-between shadow-xs">
           <div className="flex items-start justify-between">
             <div className="space-y-1">
               <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Fast Track Support</span>
@@ -316,16 +316,16 @@ export const AdsPromotion: React.FC = () => {
                 Need urgent campaign placement for medical camps, seasonal OPD drives, or emergency wing launches?
               </p>
             </div>
-            <div className="p-3 bg-slate-100 text-slate-700 rounded-xl shadow-xs">
-              <Phone size={20} />
+            <div className="p-2.5 sm:p-3 bg-slate-100 text-slate-700 rounded-xl shadow-xs shrink-0">
+              <Phone size={18} />
             </div>
           </div>
 
-          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
-            <span className="text-xs font-mono font-bold text-slate-700">+91 98450 12345</span>
+          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+            <span className="text-xs font-mono font-bold text-slate-700 truncate">+91 98450 12345</span>
             <a
               href="tel:+919845012345"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition-colors no-underline"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition-colors no-underline shrink-0"
             >
               <Phone size={13} /> Call Helpline
             </a>
@@ -334,9 +334,9 @@ export const AdsPromotion: React.FC = () => {
       </div>
 
       {/* Main Content Grid */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6 items-start">
         {/* Ad Inquiry Form (2 Cols) */}
-        <div className="xl:col-span-2 bg-white border border-slate-100 rounded-3xl p-6 shadow-sm space-y-6">
+        <div className="xl:col-span-2 bg-white border border-slate-100 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-sm space-y-4 sm:space-y-6">
           <div className="flex items-center justify-between border-b border-slate-100 pb-4">
             <div>
               <h3 className="text-base font-black text-slate-800">Send Ad Promotion Inquiry</h3>
@@ -908,7 +908,7 @@ export const AdsPromotion: React.FC = () => {
               <button
                 type="submit"
                 disabled={submitting}
-                className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-xl text-xs font-black cursor-pointer shadow-md shadow-blue-500/20 transition-all flex items-center gap-2 border-none"
+                className="w-full sm:w-auto justify-center px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-xl text-xs font-black cursor-pointer shadow-md shadow-blue-500/20 transition-all flex items-center gap-2 border-none"
               >
                 {submitting ? (
                   <>Submitting Inquiry...</>
@@ -923,23 +923,23 @@ export const AdsPromotion: React.FC = () => {
         </div>
 
         {/* Right Column: Info & Recent Inquiries (1 Col) */}
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           {/* Ad Guidelines Card */}
-          <div className="bg-slate-900 text-white rounded-3xl p-5 shadow-sm space-y-3">
+          <div className="bg-slate-900 text-white rounded-2xl sm:rounded-3xl p-4 sm:p-5 shadow-sm space-y-3">
             <div className="flex items-center gap-2">
               <Info size={16} className="text-blue-400" />
               <h4 className="text-xs font-black uppercase tracking-wider">How Ads Work</h4>
             </div>
             <ul className="text-[11px] text-slate-300 space-y-2 pl-4 list-disc">
               <li>Your ad banner is reviewed by the InstaToken Super Admin team.</li>
-              <li>Once approved, the banner appears dynamically on the patient homepage carousel matching your targeted location (state, city or national).</li>
+              <li>Once approved, the banner appears dynamically on the patient homepage carousel matching your targeted location.</li>
               <li>Clicking the banner takes patients directly to your hospital booking page.</li>
               <li>You can contact Super Admin at any time via <strong className="text-white">ads@instatoken.com</strong>.</li>
             </ul>
           </div>
 
           {/* Recent Inquiries List */}
-          <div className="bg-white border border-slate-100 rounded-3xl p-5 shadow-sm space-y-4">
+          <div className="bg-white border border-slate-100 rounded-2xl sm:rounded-3xl p-4 sm:p-5 shadow-sm space-y-4">
             <div className="flex items-center justify-between">
               <h4 className="text-xs font-black text-slate-800 uppercase tracking-wide">
                 My Ad Inquiries ({inquiries.length})

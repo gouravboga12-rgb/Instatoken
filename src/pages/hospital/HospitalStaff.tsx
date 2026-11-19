@@ -168,15 +168,15 @@ export const HospitalStaff: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 animate-fadeIn pb-12">
+    <div className="p-3.5 sm:p-6 space-y-4 sm:space-y-6 animate-fadeIn pb-12 max-w-[1600px] mx-auto">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-100 shadow-xs">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 bg-white p-4 sm:p-6 rounded-2xl border border-slate-100 shadow-xs">
         <div>
           <div className="flex items-center gap-2">
             <span className="p-2 rounded-xl bg-blue-50 text-blue-600">
               <Users size={20} />
             </span>
-            <h1 className="text-xl font-black text-slate-900">Hospital Staff &amp; Employee Directory</h1>
+            <h1 className="text-lg sm:text-xl font-black text-slate-900">Hospital Staff &amp; Employee Directory</h1>
           </div>
           <p className="text-xs text-slate-500 font-semibold mt-1">
             Maintain complete hospital employee records by clinical section, designation, post, duty shifts, and payroll compensation.
@@ -184,41 +184,41 @@ export const HospitalStaff: React.FC = () => {
         </div>
         <button
           onClick={handleOpenAdd}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-bold text-xs shadow-md shadow-blue-600/20 transition-all cursor-pointer border-none"
+          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-bold text-xs shadow-md shadow-blue-600/20 transition-all cursor-pointer border-none shrink-0"
         >
           <UserPlus size={16} /> Add Employee
         </button>
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-xs">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4">
+        <div className="bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-100 shadow-xs">
           <p className="text-xs font-bold text-slate-500">Total Employees</p>
-          <p className="text-2xl font-black text-slate-900 mt-1">{totalEmployees}</p>
-          <p className="text-[11px] text-blue-600 font-bold mt-1">Active Hospital Team</p>
+          <p className="text-xl sm:text-2xl font-black text-slate-900 mt-1">{totalEmployees}</p>
+          <p className="text-[10px] sm:text-[11px] text-blue-600 font-bold mt-1">Active Hospital Team</p>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-xs">
+        <div className="bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-100 shadow-xs">
           <p className="text-xs font-bold text-slate-500">Hospital Sections</p>
-          <p className="text-2xl font-black text-emerald-600 mt-1">{departments.length}</p>
-          <p className="text-[11px] text-emerald-600 font-bold mt-1">Department Divisions</p>
+          <p className="text-xl sm:text-2xl font-black text-emerald-600 mt-1">{departments.length}</p>
+          <p className="text-[10px] sm:text-[11px] text-emerald-600 font-bold mt-1">Department Divisions</p>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-xs">
+        <div className="bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-100 shadow-xs">
           <p className="text-xs font-bold text-slate-500">Active Roles / Posts</p>
-          <p className="text-2xl font-black text-indigo-600 mt-1">{uniquePosts.length}</p>
-          <p className="text-[11px] text-indigo-600 font-bold mt-1">Staff Specializations</p>
+          <p className="text-xl sm:text-2xl font-black text-indigo-600 mt-1">{uniquePosts.length}</p>
+          <p className="text-[10px] sm:text-[11px] text-indigo-600 font-bold mt-1">Staff Specializations</p>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-xs">
+        <div className="bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-100 shadow-xs">
           <p className="text-xs font-bold text-slate-500">Monthly Compensation</p>
-          <p className="text-2xl font-black text-purple-600 mt-1">₹{totalMonthlyPayroll.toLocaleString('en-IN')}</p>
-          <p className="text-[11px] text-purple-600 font-bold mt-1">Staff Payroll Estimate</p>
+          <p className="text-xl sm:text-2xl font-black text-purple-600 mt-1">₹{totalMonthlyPayroll.toLocaleString('en-IN')}</p>
+          <p className="text-[10px] sm:text-[11px] text-purple-600 font-bold mt-1">Staff Payroll Estimate</p>
         </div>
       </div>
 
       {/* ── Section Numbers & Department Employee Breakdown ─────────────────── */}
-      <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-xs space-y-3">
+      <div className="bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-100 shadow-xs space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Layers size={16} className="text-blue-600" />
@@ -347,8 +347,8 @@ export const HospitalStaff: React.FC = () => {
 
       {/* Staff Table */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+        <div className="overflow-x-auto -mx-3.5 px-3.5 sm:mx-0 sm:px-0">
+          <table className="w-full text-left text-xs min-w-[700px]">
             <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 uppercase tracking-wider font-bold">
               <tr>
                 <th className="py-3.5 px-4">Section &amp; ID</th>
@@ -482,8 +482,8 @@ export const HospitalStaff: React.FC = () => {
 
       {/* Add / Edit Staff Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 animate-scaleUp max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white rounded-2xl sm:rounded-3xl max-w-lg w-full p-4 sm:p-6 shadow-2xl border border-slate-100 animate-scaleUp max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <div className="flex items-center gap-2">
                 <div className="p-2 rounded-xl bg-blue-50 text-blue-600">

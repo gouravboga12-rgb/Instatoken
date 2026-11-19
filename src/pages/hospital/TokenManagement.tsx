@@ -100,8 +100,8 @@ const CreateCustomerModal: React.FC<{
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-3 sm:p-4">
+      <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-lg p-4 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
@@ -584,11 +584,11 @@ const WalkInGenerator: React.FC<{
   };
 
   return (
-    <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 max-w-3xl space-y-5">
+    <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm p-4 sm:p-6 max-w-3xl space-y-4 sm:space-y-5">
       {/* Search Existing Patient Section */}
       {!generated && (
-        <div className="bg-blue-50/60 border border-blue-100 rounded-2xl p-4 space-y-2 relative">
-          <div className="flex items-center justify-between">
+        <div className="bg-blue-50/60 border border-blue-100 rounded-2xl p-3.5 sm:p-4 space-y-2 relative">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <span className="text-xs font-black text-blue-900 flex items-center gap-1.5">
               <Search size={14} className="text-blue-600" />
               <span>Search Existing Patient Database</span>
@@ -1527,9 +1527,9 @@ const TokenTable: React.FC<{
     .reduce((acc, t) => acc + (t.consultationFee || 0), 0);
 
   return (
-    <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden space-y-0">
+    <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm overflow-hidden space-y-0">
       {/* Table Header & Summary KPI Strip */}
-      <div className="p-5 border-b border-slate-100 space-y-4">
+      <div className="p-3.5 sm:p-5 border-b border-slate-100 space-y-3 sm:space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
@@ -1684,8 +1684,8 @@ const TokenTable: React.FC<{
       </div>
 
       {/* Table Body */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-xs border-collapse">
+      <div className="overflow-x-auto -mx-3.5 px-3.5 sm:mx-0 sm:px-0">
+        <table className="w-full text-left text-xs border-collapse min-w-[700px]">
           <thead>
             <tr className="border-b border-slate-100 bg-slate-50/50 text-[10px] font-black text-slate-400 uppercase tracking-wider">
               <th className="py-3 px-4">Token #</th>
@@ -2238,18 +2238,18 @@ export const TokenManagement: React.FC = () => {
   // "Add Token" page view
   if (!tokenSet) {
     return (
-      <div className="p-6 space-y-6 max-w-4xl mx-auto">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="p-3.5 sm:p-6 space-y-4 sm:space-y-6 max-w-4xl mx-auto">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
           <div>
-            <h2 className="text-xl font-black text-slate-800">Add Walk-in Token</h2>
-            <p className="text-xs text-slate-400 mt-1">
+            <h2 className="text-lg sm:text-xl font-black text-slate-800">Add Walk-in Token</h2>
+            <p className="text-xs text-slate-400 mt-0.5 sm:mt-1">
               Register an offline / walk-in patient and immediately assign a queue token number
             </p>
           </div>
 
           <button
             onClick={() => setShowCreateCustomerModal(true)}
-            className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl cursor-pointer border-none shadow-sm shadow-blue-500/20 flex items-center gap-2 self-start sm:self-auto transition-colors"
+            className="px-3.5 sm:px-4 py-2 sm:py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl cursor-pointer border-none shadow-sm shadow-blue-500/20 flex items-center gap-2 self-start sm:self-auto transition-colors"
           >
             <UserPlus size={15} /> + Create Customer Account
           </button>
@@ -2275,16 +2275,16 @@ export const TokenManagement: React.FC = () => {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="p-3.5 sm:p-6 space-y-4 sm:space-y-6 max-w-[1600px] mx-auto">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
-          <h2 className="text-xl font-black text-slate-800">{tokenSet.title}</h2>
-          <p className="text-xs text-slate-400 mt-1">{tokenSet.subtitle}</p>
+          <h2 className="text-lg sm:text-xl font-black text-slate-800">{tokenSet.title}</h2>
+          <p className="text-xs text-slate-400 mt-0.5 sm:mt-1">{tokenSet.subtitle}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
           <button
             onClick={() => setShowCreateCustomerModal(true)}
-            className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-bold px-3.5 py-2.5 rounded-xl cursor-pointer flex items-center gap-1.5 text-xs shadow-2xs"
+            className="flex-1 sm:flex-initial justify-center bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-bold px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl cursor-pointer flex items-center gap-1.5 text-xs shadow-2xs"
           >
             <UserPlus size={14} className="text-blue-600" /> Create Customer Account
           </button>
@@ -2293,7 +2293,7 @@ export const TokenManagement: React.FC = () => {
               setFollowUpPatient(null);
               setShowWalkInModal(true);
             }}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2.5 rounded-xl cursor-pointer border-none flex items-center gap-2 text-xs shadow-md shadow-blue-500/20 self-start sm:self-auto"
+            className="flex-1 sm:flex-initial justify-center bg-blue-600 hover:bg-blue-700 text-white font-bold px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl cursor-pointer border-none flex items-center gap-2 text-xs shadow-md shadow-blue-500/20"
           >
             <Plus size={14} /> Add Walk-in Token
           </button>

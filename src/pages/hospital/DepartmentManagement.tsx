@@ -124,7 +124,7 @@ export const DepartmentManagement: React.FC = () => {
     ];
 
     return (
-      <div className="p-6 space-y-6 max-w-[1600px] mx-auto animate-in fade-in duration-200">
+      <div className="p-3.5 sm:p-6 space-y-4 sm:space-y-6 max-w-[1600px] mx-auto animate-in fade-in duration-200">
         {/* Breadcrumb Navigation */}
         <div className="flex items-center justify-between gap-4">
           <button
@@ -155,12 +155,12 @@ export const DepartmentManagement: React.FC = () => {
         </div>
 
         {/* Department Hero Banner */}
-        <div className="bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-700 rounded-3xl p-6 sm:p-8 text-white shadow-lg relative overflow-hidden">
+        <div className="bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-700 rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 text-white shadow-lg relative overflow-hidden">
           <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-radial from-white/10 to-transparent pointer-events-none" />
           
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 relative z-10">
-            <div className="flex items-center gap-5">
-              <div className="w-18 h-18 bg-white/15 backdrop-blur-md border border-white/20 rounded-2xl flex items-center justify-center text-4xl shadow-inner shrink-0">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-6 relative z-10">
+            <div className="flex items-center gap-3.5 sm:gap-5">
+              <div className="w-14 h-14 sm:w-18 sm:h-18 bg-white/15 backdrop-blur-md border border-white/20 rounded-2xl flex items-center justify-center text-3xl sm:text-4xl shadow-inner shrink-0">
                 {selectedDept.icon}
               </div>
               <div>
@@ -174,7 +174,7 @@ export const DepartmentManagement: React.FC = () => {
                     {selectedDept.active ? 'Operational' : 'Paused'}
                   </span>
                 </div>
-                <h1 className="text-2xl sm:text-3xl font-black tracking-tight mt-1.5">{selectedDept.name} Department</h1>
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight mt-1.5">{selectedDept.name} Department</h1>
                 <p className="text-xs text-blue-100 font-semibold mt-1">
                   Head Doctor: <strong className="text-white">{selectedDept.headDoctor || 'Not Assigned'}</strong>
                 </p>
@@ -360,9 +360,9 @@ export const DepartmentManagement: React.FC = () => {
   // ─────────────────────────────────────────────────────────────────────────────
   function renderModal() {
     return (
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-          <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-slate-50/50">
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-3 sm:p-4">
+        <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
+          <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 bg-slate-50/50">
             <div className="flex items-center gap-2.5">
               <div className="p-2 bg-blue-600 text-white rounded-xl">
                 <Building2 size={18} />
@@ -382,7 +382,7 @@ export const DepartmentManagement: React.FC = () => {
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4">
             <div>
               <label className="text-xs font-extrabold text-slate-700 block mb-1.5">Department Name</label>
               <input
@@ -470,9 +470,9 @@ export const DepartmentManagement: React.FC = () => {
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-[1600px] mx-auto animate-in fade-in duration-200">
+    <div className="p-3.5 sm:p-6 space-y-4 sm:space-y-6 max-w-[1600px] mx-auto animate-in fade-in duration-200">
       {/* Top Banner & Quick Metrics */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-xs">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-100 shadow-xs">
         <div className="flex items-center gap-3">
           <div className="p-3 bg-blue-600 text-white rounded-2xl shadow-sm shadow-blue-500/20">
             <Building2 size={22} />

@@ -96,18 +96,18 @@ export const CommunicationCenter: React.FC = () => {
   });
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3.5 sm:p-6 space-y-4 sm:space-y-6 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <div>
-          <h2 className="text-xl font-black text-slate-800">Communication & Notifications</h2>
-          <p className="text-xs text-slate-400 mt-1">Broadcast system alerts, queue updates, or custom reminders to patient apps and website</p>
+          <h2 className="text-lg sm:text-xl font-black text-slate-800">Communication & Notifications</h2>
+          <p className="text-xs text-slate-400 mt-0.5 sm:mt-1">Broadcast system alerts, queue updates, or custom reminders to patient apps and website</p>
         </div>
 
         {/* Device Push Status Pill */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           {pushPermission === 'granted' ? (
-            <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl text-xs font-extrabold text-emerald-700 shadow-2xs">
+            <div className="flex items-center gap-1.5 sm:gap-2 bg-emerald-50 border border-emerald-200 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-extrabold text-emerald-700 shadow-2xs">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               <span>Device Push Active</span>
               <button
@@ -133,7 +133,7 @@ export const CommunicationCenter: React.FC = () => {
       </div>
 
       {/* Tabs */}
-      <div className="flex bg-slate-100 rounded-2xl p-1 self-start flex-wrap gap-1">
+      <div className="flex bg-slate-100 rounded-xl sm:rounded-2xl p-1 overflow-x-auto max-w-full gap-1">
         {[
           { id: 'inapp', label: 'App & Website In-App Alert', icon: <Bell size={13} /> },
           { id: 'push', label: 'External Device Push Notification', icon: <Smartphone size={13} className="text-blue-500" /> }
@@ -142,7 +142,7 @@ export const CommunicationCenter: React.FC = () => {
             key={t.id}
             type="button"
             onClick={() => { setActiveTab(t.id as any); setSuccess(false); }}
-            className={`flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-xl cursor-pointer border-none transition-all ${
+            className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 text-xs font-bold rounded-lg sm:rounded-xl cursor-pointer border-none whitespace-nowrap transition-all ${
               activeTab === t.id ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'
             }`}
           >
@@ -154,7 +154,7 @@ export const CommunicationCenter: React.FC = () => {
 
       {/* Push Notice Alert Banner */}
       {activeTab === 'push' && pushPermission !== 'granted' && (
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 text-xs text-amber-800 flex items-center justify-between gap-3 shadow-2xs">
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 text-xs text-amber-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
           <div className="flex items-center gap-2 font-bold">
             <AlertCircle size={16} className="text-amber-600 shrink-0" />
             <span>To allow broadcasted push notifications to pop up on desktop and mobile screens, enable device permission.</span>
@@ -162,31 +162,31 @@ export const CommunicationCenter: React.FC = () => {
           <button
             type="button"
             onClick={requestPushPermission}
-            className="bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-black px-3 py-1 rounded-xl cursor-pointer border-none shrink-0 shadow-2xs"
+            className="bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-black px-3 py-1.5 rounded-xl cursor-pointer border-none shrink-0 shadow-2xs self-start sm:self-auto"
           >
             Allow Permission
           </button>
         </div>
       )}
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6">
         {/* Left Form */}
         <div className="xl:col-span-2">
-          <form onSubmit={handleSubmit} className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm space-y-5">
+          <form onSubmit={handleSubmit} className="bg-white border border-slate-100 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-sm space-y-4 sm:space-y-5">
             <div>
               <label className="text-xs font-bold text-slate-700 block mb-2">Recipient Category</label>
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
                 {[
                   { id: 'all', label: 'All Patients' },
                   { id: 'waiting', label: `Waiting List (${waitingCount})` },
                   { id: 'today', label: `Today's List (${todayCount})` },
-                  { id: 'custom', label: 'Custom Mobile Numbers' }
+                  { id: 'custom', label: 'Custom Mobile' }
                 ].map(r => (
                   <button
                     type="button"
                     key={r.id}
                     onClick={() => setForm(f => ({ ...f, recipientGroup: r.id }))}
-                    className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                    className={`py-2 px-2.5 sm:px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer truncate ${
                       form.recipientGroup === r.id
                         ? 'border-blue-600 bg-blue-50 text-blue-700'
                         : 'border-slate-200 text-slate-600 bg-white hover:border-slate-300'
@@ -238,21 +238,21 @@ export const CommunicationCenter: React.FC = () => {
               </div>
             </div>
 
-            <div className="flex items-center gap-3 pt-3 border-t border-slate-100 flex-wrap">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 pt-3 border-t border-slate-100">
               <button
                 type="submit"
                 disabled={sending}
-                className="bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-bold px-6 py-2.5 rounded-xl cursor-pointer border-none flex items-center gap-2 text-xs shadow-md shadow-blue-500/10 transition-all"
+                className="bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-bold px-5 py-2.5 rounded-xl cursor-pointer border-none flex items-center justify-center gap-2 text-xs shadow-md shadow-blue-500/10 transition-all"
               >
                 {sending ? <RefreshCw className="animate-spin" size={13} /> : <Send size={13} />}
-                {sending ? 'Broadcasting...' : activeTab === 'inapp' ? 'Send In-App Notification' : 'Send External Push Notification'}
+                {sending ? 'Broadcasting...' : activeTab === 'inapp' ? 'Send In-App Notification' : 'Send Push Notification'}
               </button>
 
               {activeTab === 'push' && pushPermission === 'granted' && (
                 <button
                   type="button"
                   onClick={handleTestPush}
-                  className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-3 py-2.5 rounded-xl cursor-pointer border-none text-xs flex items-center gap-1.5 transition-colors"
+                  className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-3 py-2.5 rounded-xl cursor-pointer border-none text-xs flex items-center justify-center gap-1.5 transition-colors"
                 >
                   <Zap size={13} className="text-amber-500" /> Test Push on this Screen
                 </button>
@@ -269,7 +269,7 @@ export const CommunicationCenter: React.FC = () => {
 
         {/* Right Broadcast logs */}
         <div className="space-y-4">
-          <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5 space-y-3">
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm p-4 sm:p-5 space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Recent Transmissions</h3>
               {notifications.length > 0 && (

@@ -143,25 +143,25 @@ export const HospitalPayouts: React.FC = () => {
   );
 
   return (
-    <div className="p-6 space-y-6 max-w-5xl mx-auto">
+    <div className="p-3.5 sm:p-6 space-y-4 sm:space-y-6 max-w-5xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-black text-slate-800 tracking-tight">InstaToken Payouts & Settlements</h1>
+          <h1 className="text-lg sm:text-xl font-black text-slate-800 tracking-tight">InstaToken Payouts & Settlements</h1>
           <p className="text-xs text-slate-500 mt-0.5 font-medium">
             {isFullOnline
               ? 'Full Online Payment enabled · Doctor fees collected online & remitted to your bank.'
               : 'Standard mode · Only token booking fees collected online. Doctor fees paid at cabin.'}
           </p>
         </div>
-        <button onClick={fetchData} className="p-2 rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 cursor-pointer border-solid">
+        <button onClick={fetchData} className="p-2 rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 cursor-pointer border-solid shrink-0">
           <RefreshCw size={15} />
         </button>
       </div>
 
       {/* Not Full-Online Banner */}
       {!isFullOnline && (
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 flex items-start gap-4">
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 sm:p-5 flex items-start gap-3 sm:gap-4">
           <AlertCircle size={20} className="text-amber-600 shrink-0 mt-0.5" />
           <div>
             <h3 className="text-sm font-black text-amber-900">Full Online Payment Not Enabled</h3>
@@ -176,20 +176,20 @@ export const HospitalPayouts: React.FC = () => {
       {isFullOnline && (
         <>
           {/* KPI Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-4">
+            <div className="bg-white border border-slate-100 rounded-2xl p-3.5 sm:p-5 shadow-xs">
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Total Collected Online</span>
-              <div className="text-3xl font-black text-slate-800 mt-1">₹{(summary?.totalCollectedOnline || 0).toLocaleString('en-IN')}</div>
+              <div className="text-2xl sm:text-3xl font-black text-slate-800 mt-1">₹{(summary?.totalCollectedOnline || 0).toLocaleString('en-IN')}</div>
               <p className="text-[11px] text-slate-400 font-medium mt-1">Doctor fees from full-online bookings</p>
             </div>
-            <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-xs">
+            <div className="bg-white border border-slate-100 rounded-2xl p-3.5 sm:p-5 shadow-xs">
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Total Cleared to Bank</span>
-              <div className="text-3xl font-black text-emerald-600 mt-1">₹{(summary?.totalSettled || 0).toLocaleString('en-IN')}</div>
+              <div className="text-2xl sm:text-3xl font-black text-emerald-600 mt-1">₹{(summary?.totalSettled || 0).toLocaleString('en-IN')}</div>
               <p className="text-[11px] text-slate-400 font-medium mt-1">Already sent to your account</p>
             </div>
-            <div className={`rounded-2xl p-5 shadow-xs border ${(summary?.pendingDue || 0) > 0 ? 'bg-amber-50 border-amber-200' : 'bg-white border-slate-100'}`}>
+            <div className={`rounded-2xl p-3.5 sm:p-5 shadow-xs border ${(summary?.pendingDue || 0) > 0 ? 'bg-amber-50 border-amber-200' : 'bg-white border-slate-100'}`}>
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Pending Due from InstaToken</span>
-              <div className={`text-3xl font-black mt-1 ${(summary?.pendingDue || 0) > 0 ? 'text-amber-700' : 'text-emerald-600'}`}>
+              <div className={`text-2xl sm:text-3xl font-black mt-1 ${(summary?.pendingDue || 0) > 0 ? 'text-amber-700' : 'text-emerald-600'}`}>
                 ₹{(summary?.pendingDue || 0).toLocaleString('en-IN')}
               </div>
               <p className="text-[11px] text-slate-400 font-medium mt-1">
@@ -199,7 +199,7 @@ export const HospitalPayouts: React.FC = () => {
           </div>
 
           {/* Bank Details Card + Request Payout */}
-          <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-xs">
+          <div className="bg-white border border-slate-100 rounded-2xl p-3.5 sm:p-5 shadow-xs">
             <div className="flex items-start justify-between gap-4 flex-wrap">
               <div className="flex-1 min-w-0">
                 <h3 className="text-xs font-black text-slate-700 uppercase tracking-wider mb-3 flex items-center gap-1.5">
@@ -276,12 +276,12 @@ export const HospitalPayouts: React.FC = () => {
 
           {/* Tabs */}
           <div className="bg-white border border-slate-100 rounded-2xl shadow-xs overflow-hidden">
-            <div className="flex border-b border-slate-100">
+            <div className="flex border-b border-slate-100 overflow-x-auto">
               {(['pending', 'history', 'requests'] as const).map(tab => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
-                  className={`flex-1 py-3 text-xs font-black uppercase tracking-wider transition-colors cursor-pointer border-none ${
+                  className={`flex-1 min-w-[130px] py-3 px-2 text-xs font-black uppercase tracking-wider transition-colors cursor-pointer border-none whitespace-nowrap ${
                     activeTab === tab ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600' : 'text-slate-400 hover:bg-slate-50'
                   }`}
                 >
@@ -408,8 +408,8 @@ export const HospitalPayouts: React.FC = () => {
 
       {/* Request Payout Modal */}
       {showRequestModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl shadow-xl w-full max-w-sm p-6 space-y-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3 sm:p-4">
+          <div className="bg-white rounded-2xl sm:rounded-3xl shadow-xl w-full max-w-sm p-4 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between">
               <h3 className="text-base font-black text-slate-800">Request Payout from InstaToken</h3>
               <button onClick={() => setShowRequestModal(false)} className="p-1.5 rounded-lg hover:bg-slate-100 cursor-pointer border-none text-slate-400">

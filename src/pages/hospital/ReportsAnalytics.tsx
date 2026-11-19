@@ -102,19 +102,19 @@ export const ReportsAnalytics: React.FC = () => {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3.5 sm:p-6 space-y-4 sm:space-y-6 max-w-[1600px] mx-auto">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
-          <h2 className="text-xl font-black text-slate-800">Reports & Diagnostics</h2>
-          <p className="text-xs text-slate-400 mt-1">Audit operational efficiency, doctor footprints, and financial settlements</p>
+          <h2 className="text-lg sm:text-xl font-black text-slate-800">Reports & Diagnostics</h2>
+          <p className="text-xs text-slate-400 mt-0.5 sm:mt-1">Audit operational efficiency, doctor footprints, and financial settlements</p>
         </div>
         <div className="flex bg-slate-100 rounded-xl p-1 shrink-0 self-start">
           {['daily', 'weekly', 'monthly'].map(r => (
             <button
               key={r}
               onClick={() => setReportType(r as any)}
-              className={`px-4 py-2 text-xs font-bold rounded-lg cursor-pointer capitalize transition-all border-none ${
+              className={`px-3 sm:px-4 py-1.5 sm:py-2 text-xs font-bold rounded-lg cursor-pointer capitalize transition-all border-none ${
                 reportType === r ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'
               }`}
             >
@@ -126,62 +126,64 @@ export const ReportsAnalytics: React.FC = () => {
 
       {downloadNotice && (
         <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-2 text-xs text-emerald-800 font-bold animate-in fade-in duration-200">
-          <CheckCircle2 size={16} className="text-emerald-600" />
-          {downloadNotice}
+          <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+          <span>{downloadNotice}</span>
         </div>
       )}
 
       {/* Overview Metric Indicators */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
         {[
-          { label: 'Settled Revenue', val: `₹${totalRevenue.toLocaleString('en-IN')}`, change: `${completed} Completed`, sub: 'realized clinical revenue', color: 'text-emerald-500' },
+          { label: 'Settled Revenue', val: `₹${totalRevenue.toLocaleString('en-IN')}`, change: `${completed} Done`, sub: 'realized revenue', color: 'text-emerald-500' },
           { label: 'Total OPD Tokens', val: total, change: `${waiting} Active`, sub: 'total tokens logged', color: 'text-blue-500' },
-          { label: 'Cancellation Rate', val: `${cancelRate}%`, change: `${cancelled} Cancelled`, sub: 'patient dropped tokens', color: 'text-red-500' },
-          { label: 'Avg Waiting Queue', val: `${avgWait}m`, change: `${waiting} in queue`, sub: 'estimated cabin latency', color: 'text-purple-500' }
+          { label: 'Cancellation Rate', val: `${cancelRate}%`, change: `${cancelled} Dropped`, sub: 'patient dropped', color: 'text-red-500' },
+          { label: 'Avg Waiting Queue', val: `${avgWait}m`, change: `${waiting} in queue`, sub: 'estimated latency', color: 'text-purple-500' }
         ].map(s => (
-          <div key={s.label} className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm">
-            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">{s.label}</span>
-            <div className="flex items-baseline gap-2 mt-1">
-              <h3 className="text-2xl font-black text-slate-800">{s.val}</h3>
-              <span className={`text-[10px] font-bold ${s.color}`}>{s.change}</span>
+          <div key={s.label} className="bg-white border border-slate-100 rounded-2xl p-3 sm:p-4 shadow-sm">
+            <span className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider block truncate">{s.label}</span>
+            <div className="flex items-baseline gap-1.5 sm:gap-2 mt-1">
+              <h3 className="text-lg sm:text-2xl font-black text-slate-800 truncate">{s.val}</h3>
+              <span className={`text-[9px] sm:text-[10px] font-bold shrink-0 ${s.color}`}>{s.change}</span>
             </div>
-            <span className="text-[9px] text-slate-400 mt-0.5 block">{s.sub}</span>
+            <span className="text-[9px] sm:text-[10px] text-slate-400 mt-0.5 block truncate">{s.sub}</span>
           </div>
         ))}
       </div>
 
       {/* Main Grid split */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6">
         {/* Left chart */}
-        <div className="xl:col-span-2 space-y-6">
+        <div className="xl:col-span-2 space-y-4 sm:space-y-6">
           {/* Hourly Peak occupancy chart */}
-          <div className="bg-white rounded-3xl border border-slate-100 p-5 shadow-sm">
-            <div className="flex items-center justify-between mb-5">
-              <h4 className="text-xs font-bold text-slate-850 uppercase tracking-wide">OPD Load by Hours</h4>
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 p-4 sm:p-5 shadow-sm">
+            <div className="flex items-center justify-between mb-4 sm:mb-5">
+              <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">OPD Load by Hours</h4>
               <span className="text-[10px] font-extrabold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
                 {total} Tokens Tracked
               </span>
             </div>
-            <div className="flex items-end justify-between h-48 gap-2 pt-6 border-b border-slate-100 px-2">
-              {hourlyDistribution.map(h => (
-                <div key={h.hr} className="flex-1 flex flex-col items-center gap-2 group cursor-pointer h-full justify-end">
-                  <div
-                    className="w-full bg-blue-600 rounded-t-lg transition-all group-hover:bg-blue-700 relative min-h-[4px]"
-                    style={{ height: `${Math.max(4, h.load)}%` }}
-                  >
-                    <span className="absolute -top-6 left-1/2 -translate-x-1/2 text-[9px] font-bold bg-slate-900 text-white rounded px-1.5 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                      {h.count} tokens
-                    </span>
+            <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+              <div className="flex items-end justify-between h-44 sm:h-48 gap-2 pt-6 border-b border-slate-100 px-2 min-w-[500px]">
+                {hourlyDistribution.map(h => (
+                  <div key={h.hr} className="flex-1 flex flex-col items-center gap-2 group cursor-pointer h-full justify-end">
+                    <div
+                      className="w-full bg-blue-600 rounded-t-lg transition-all group-hover:bg-blue-700 relative min-h-[4px]"
+                      style={{ height: `${Math.max(4, h.load)}%` }}
+                    >
+                      <span className="absolute -top-6 left-1/2 -translate-x-1/2 text-[9px] font-bold bg-slate-900 text-white rounded px-1.5 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                        {h.count} tokens
+                      </span>
+                    </div>
+                    <span className="text-[9px] text-slate-400 font-bold tracking-tight">{h.hr}</span>
                   </div>
-                  <span className="text-[9px] text-slate-400 font-bold tracking-tight">{h.hr}</span>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
 
           {/* Doctor Performance Summary */}
-          <div className="bg-white rounded-3xl border border-slate-100 p-5 shadow-sm">
-            <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-4">Doctor Performance Analytics</h4>
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 p-4 sm:p-5 shadow-sm">
+            <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-3 sm:mb-4">Doctor Performance Analytics</h4>
             <div className="space-y-3">
               {doctors.map(d => {
                 const docTokens = tokens.filter(t => t.doctorId === d.id);
@@ -191,12 +193,12 @@ export const ReportsAnalytics: React.FC = () => {
                 const docCompleted = docTokens.filter(t => t.status === 'completed').length;
                 const docLoad = docTokens.length;
                 return (
-                  <div key={d.id} className="flex items-center justify-between text-xs py-3 border-b border-slate-50 last:border-none">
+                  <div key={d.id} className="flex flex-col sm:flex-row sm:items-center justify-between text-xs py-3 border-b border-slate-50 last:border-none gap-2 sm:gap-0">
                     <div>
                       <p className="font-bold text-slate-800">{d.name}</p>
                       <p className="text-[10px] text-slate-400 mt-0.5">{d.specialization || d.departmentName}</p>
                     </div>
-                    <div className="flex gap-8 text-right">
+                    <div className="flex gap-4 sm:gap-8 text-left sm:text-right">
                       <div>
                         <span className="text-[9px] text-slate-400 block font-bold uppercase tracking-wider">Bookings</span>
                         <span className="text-slate-800 font-extrabold">{docLoad} ({docCompleted} done)</span>
@@ -215,7 +217,7 @@ export const ReportsAnalytics: React.FC = () => {
 
         {/* Right Download Panel */}
         <div className="space-y-4">
-          <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5 space-y-4">
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm p-4 sm:p-5 space-y-3 sm:space-y-4">
             <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Download Audits</h3>
             <p className="text-[11px] text-slate-400 leading-relaxed font-semibold">Generate structured exports of current clinical logs and financial records</p>
             
@@ -225,13 +227,13 @@ export const ReportsAnalytics: React.FC = () => {
                 className="w-full flex items-center justify-between border border-slate-100 hover:border-slate-200 hover:bg-slate-50 p-3 rounded-2xl transition-all cursor-pointer bg-white"
               >
                 <div className="flex items-center gap-2 text-left">
-                  <FileText className="text-red-500" size={16} />
+                  <FileText className="text-red-500 shrink-0" size={16} />
                   <div>
                     <p className="text-xs font-bold text-slate-700">Patient Footprint Report</p>
                     <p className="text-[9px] text-slate-400">Download CSV of all patient visits</p>
                   </div>
                 </div>
-                <Download size={14} className="text-slate-400" />
+                <Download size={14} className="text-slate-400 shrink-0" />
               </button>
 
               <button
@@ -239,13 +241,13 @@ export const ReportsAnalytics: React.FC = () => {
                 className="w-full flex items-center justify-between border border-slate-100 hover:border-slate-200 hover:bg-slate-50 p-3 rounded-2xl transition-all cursor-pointer bg-white"
               >
                 <div className="flex items-center gap-2 text-left">
-                  <FileSpreadsheet className="text-emerald-500" size={16} />
+                  <FileSpreadsheet className="text-emerald-500 shrink-0" size={16} />
                   <div>
                     <p className="text-xs font-bold text-slate-700">Financial Settlement Ledger</p>
                     <p className="text-[9px] text-slate-400">Download CSV of financial settlements</p>
                   </div>
                 </div>
-                <Download size={14} className="text-slate-400" />
+                <Download size={14} className="text-slate-400 shrink-0" />
               </button>
 
               <button
@@ -253,13 +255,13 @@ export const ReportsAnalytics: React.FC = () => {
                 className="w-full flex items-center justify-between border border-slate-100 hover:border-slate-200 hover:bg-slate-50 p-3 rounded-2xl transition-all cursor-pointer bg-white"
               >
                 <div className="flex items-center gap-2 text-left">
-                  <FileSpreadsheet className="text-blue-500" size={16} />
+                  <FileSpreadsheet className="text-blue-500 shrink-0" size={16} />
                   <div>
                     <p className="text-xs font-bold text-slate-700">Queue & Doctor Analytics</p>
                     <p className="text-[9px] text-slate-400">Download CSV of doctor-wise metrics</p>
                   </div>
                 </div>
-                <Download size={14} className="text-slate-400" />
+                <Download size={14} className="text-slate-400 shrink-0" />
               </button>
             </div>
           </div>

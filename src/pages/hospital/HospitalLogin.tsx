@@ -99,7 +99,7 @@ export const HospitalLogin: React.FC = () => {
       </div>
 
       {/* Right Panel – Login Form */}
-      <div className="w-full lg:w-[45%] flex items-center justify-center p-8 bg-white min-h-screen">
+      <div className="w-full lg:w-[45%] flex items-center justify-center p-4 sm:p-8 lg:p-12 bg-white min-h-screen">
         <div className="w-full max-w-md">
           {/* Mobile Logo */}
           <div className="lg:hidden flex items-center gap-2 mb-8">

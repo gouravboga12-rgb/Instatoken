@@ -67,18 +67,18 @@ export const ScheduleManagement: React.FC<{ tab?: string }> = () => {
   const daysOfWeek = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="p-3.5 sm:p-6 space-y-4 sm:space-y-6 max-w-7xl mx-auto">
       {/* Top Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-xs">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 bg-white p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-100 shadow-xs">
         <div>
           <div className="flex items-center gap-2.5">
-            <div className="p-2.5 bg-blue-600 text-white rounded-2xl shadow-sm shadow-blue-500/20">
-              <Calendar size={20} />
+            <div className="p-2 sm:p-2.5 bg-blue-600 text-white rounded-xl sm:rounded-2xl shadow-sm shadow-blue-500/20 shrink-0">
+              <Calendar size={18} />
             </div>
             <div>
-              <h1 className="text-xl font-black text-slate-800 leading-tight">Doctor OPD Shifts & Weekly Schedules</h1>
+              <h1 className="text-lg sm:text-xl font-black text-slate-800 leading-tight">Doctor OPD Shifts & Weekly Schedules</h1>
               <p className="text-xs text-slate-400 font-semibold mt-0.5">
-                Configure doctor-wise working days, shift hours, and consultation limits synchronized with customer bookings.
+                Configure doctor-wise working days, shift hours, and consultation limits.
               </p>
             </div>
           </div>
@@ -86,7 +86,7 @@ export const ScheduleManagement: React.FC<{ tab?: string }> = () => {
 
         <button
           onClick={() => navigate('/hospital/tokens/manage')}
-          className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white px-4 py-2.5 rounded-xl font-bold text-xs cursor-pointer border-none transition-colors"
+          className="self-start sm:self-auto flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl font-bold text-xs cursor-pointer border-none transition-colors"
         >
           <span>Global Token Sessions</span>
           <ArrowRight size={13} />
@@ -101,7 +101,7 @@ export const ScheduleManagement: React.FC<{ tab?: string }> = () => {
       )}
 
       {/* Main Grid: Doctor Selector + Schedule Editor */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
         {/* Left Column: Doctor Selection (4 cols) */}
         <div className="lg:col-span-4 space-y-3">
           <h2 className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
@@ -109,14 +109,14 @@ export const ScheduleManagement: React.FC<{ tab?: string }> = () => {
             <span>Select Doctor ({doctors.length})</span>
           </h2>
 
-          <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
+          <div className="flex lg:flex-col overflow-x-auto lg:overflow-y-auto gap-2 max-h-none lg:max-h-[600px] pb-1 lg:pb-0 pr-0 lg:pr-1">
             {doctors.map(doc => {
               const isSelected = doc.id === (selectedDoctor?.id || selectedDoctorId);
               return (
                 <div
                   key={doc.id}
                   onClick={() => handleSelectDoctor(doc)}
-                  className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center gap-3 ${
+                  className={`p-3 sm:p-3.5 rounded-xl sm:rounded-2xl border transition-all cursor-pointer flex items-center gap-2.5 sm:gap-3 shrink-0 lg:shrink min-w-[220px] lg:min-w-0 ${
                     isSelected
                       ? 'bg-blue-50/70 border-blue-500 shadow-sm text-blue-900'
                       : 'bg-white border-slate-100 hover:border-slate-200 text-slate-700'
@@ -125,12 +125,12 @@ export const ScheduleManagement: React.FC<{ tab?: string }> = () => {
                   <img
                     src={doc.photo || 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&auto=format&fit=crop&q=80'}
                     alt={doc.name}
-                    className="w-11 h-11 rounded-2xl object-cover border border-slate-200 shrink-0"
+                    className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl object-cover border border-slate-200 shrink-0"
                   />
                   <div className="flex-1 min-w-0">
                     <p className="font-extrabold text-xs truncate leading-tight">{doc.name}</p>
                     <p className="text-[10px] text-blue-600 font-bold truncate mt-0.5">{doc.specialization}</p>
-                    <p className="text-[9px] text-slate-400 font-semibold mt-0.5">
+                    <p className="text-[9px] text-slate-400 font-semibold mt-0.5 truncate">
                       {doc.opdDays?.join(', ') || 'Mon-Fri'} · {doc.opdStartTime}
                     </p>
                   </div>
@@ -143,18 +143,18 @@ export const ScheduleManagement: React.FC<{ tab?: string }> = () => {
         {/* Right Column: Schedule Editor for Selected Doctor (8 cols) */}
         <div className="lg:col-span-8">
           {selectedDoctor ? (
-            <form onSubmit={handleSaveDoctorSchedule} className="bg-white rounded-3xl border border-slate-100 shadow-xs p-6 space-y-6">
+            <form onSubmit={handleSaveDoctorSchedule} className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-xs p-4 sm:p-6 space-y-4 sm:space-y-6">
               {/* Doctor Details Header */}
-              <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center justify-between pb-3 sm:pb-4 border-b border-slate-100">
                 <div className="flex items-center gap-3">
                   <img
                     src={selectedDoctor.photo || 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&auto=format&fit=crop&q=80'}
                     alt={selectedDoctor.name}
-                    className="w-12 h-12 rounded-2xl object-cover border border-slate-200"
+                    className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl object-cover border border-slate-200 shrink-0"
                   />
-                  <div>
-                    <h3 className="text-base font-black text-slate-800">{selectedDoctor.name}</h3>
-                    <p className="text-xs text-blue-600 font-bold">
+                  <div className="min-w-0">
+                    <h3 className="text-sm sm:text-base font-black text-slate-800 truncate">{selectedDoctor.name}</h3>
+                    <p className="text-xs text-blue-600 font-bold truncate">
                       {selectedDoctor.specialization} · {selectedDoctor.departmentName} · Fee: ₹{selectedDoctor.consultationFee}
                     </p>
                   </div>
@@ -164,7 +164,7 @@ export const ScheduleManagement: React.FC<{ tab?: string }> = () => {
               {/* Working Days Selector */}
               <div>
                 <label className="text-xs font-bold text-slate-700 block mb-2">Available OPD Working Days *</label>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-1.5 sm:gap-2">
                   {daysOfWeek.map(d => {
                     const isSelected = scheduleForm.opdDays.includes(d);
                     return (
@@ -172,7 +172,7 @@ export const ScheduleManagement: React.FC<{ tab?: string }> = () => {
                         type="button"
                         key={d}
                         onClick={() => handleDayToggle(d)}
-                        className={`px-3.5 py-2 rounded-xl text-xs font-extrabold cursor-pointer transition-all border ${
+                        className={`px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-extrabold cursor-pointer transition-all border ${
                           isSelected
                             ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
                             : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
@@ -186,7 +186,7 @@ export const ScheduleManagement: React.FC<{ tab?: string }> = () => {
               </div>
 
               {/* Working Hours */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">OPD Shift Start Time *</label>
                   <input
@@ -195,7 +195,7 @@ export const ScheduleManagement: React.FC<{ tab?: string }> = () => {
                     value={scheduleForm.opdStartTime}
                     onChange={e => setScheduleForm({ ...scheduleForm, opdStartTime: e.target.value })}
                     placeholder="e.g. 09:00 AM"
-                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-bold"
+                    className="w-full px-3.5 py-2 sm:py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-bold"
                   />
                 </div>
                 <div>
@@ -206,13 +206,13 @@ export const ScheduleManagement: React.FC<{ tab?: string }> = () => {
                     value={scheduleForm.opdEndTime}
                     onChange={e => setScheduleForm({ ...scheduleForm, opdEndTime: e.target.value })}
                     placeholder="e.g. 01:00 PM"
-                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-bold"
+                    className="w-full px-3.5 py-2 sm:py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-bold"
                   />
                 </div>
               </div>
 
               {/* Duration and Limits */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">Avg Consultation Duration (Mins)</label>
                   <input
@@ -221,7 +221,7 @@ export const ScheduleManagement: React.FC<{ tab?: string }> = () => {
                     max={120}
                     value={scheduleForm.consultationDuration}
                     onChange={e => setScheduleForm({ ...scheduleForm, consultationDuration: e.target.value })}
-                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-bold"
+                    className="w-full px-3.5 py-2 sm:py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-bold"
                   />
                   <span className="text-[10px] text-slate-400 font-medium">Used to estimate live queue waiting times</span>
                 </div>
@@ -233,19 +233,19 @@ export const ScheduleManagement: React.FC<{ tab?: string }> = () => {
                     max={200}
                     value={scheduleForm.maxTokensPerDay}
                     onChange={e => setScheduleForm({ ...scheduleForm, maxTokensPerDay: e.target.value })}
-                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-bold"
+                    className="w-full px-3.5 py-2 sm:py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-bold"
                   />
                 </div>
               </div>
 
               {/* Consultation Modes */}
-              <div className="grid grid-cols-2 gap-4 pt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 pt-1">
                 <label className="flex items-center gap-2.5 p-3 rounded-2xl bg-slate-50 border border-slate-100 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={scheduleForm.onlineConsult}
                     onChange={e => setScheduleForm({ ...scheduleForm, onlineConsult: e.target.checked })}
-                    className="h-4 w-4 rounded text-blue-600 focus:ring-blue-500 accent-blue-600"
+                    className="h-4 w-4 rounded text-blue-600 focus:ring-blue-500 accent-blue-600 shrink-0"
                   />
                   <div>
                     <span className="text-xs font-bold text-slate-800 block">Accept Online Patient Bookings</span>
@@ -258,7 +258,7 @@ export const ScheduleManagement: React.FC<{ tab?: string }> = () => {
                     type="checkbox"
                     checked={scheduleForm.offlineConsult}
                     onChange={e => setScheduleForm({ ...scheduleForm, offlineConsult: e.target.checked })}
-                    className="h-4 w-4 rounded text-blue-600 focus:ring-blue-500 accent-blue-600"
+                    className="h-4 w-4 rounded text-blue-600 focus:ring-blue-500 accent-blue-600 shrink-0"
                   />
                   <div>
                     <span className="text-xs font-bold text-slate-800 block">Accept Walk-in Counter Tokens</span>
@@ -268,17 +268,17 @@ export const ScheduleManagement: React.FC<{ tab?: string }> = () => {
               </div>
 
               {/* Submit */}
-              <div className="flex justify-end pt-4 border-t border-slate-100">
+              <div className="flex justify-end pt-3 sm:pt-4 border-t border-slate-100">
                 <button
                   type="submit"
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs px-6 py-2.5 rounded-xl flex items-center gap-2 cursor-pointer border-none shadow-sm shadow-blue-500/20 transition-all"
+                  className="w-full sm:w-auto justify-center bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs px-6 py-2.5 rounded-xl flex items-center gap-2 cursor-pointer border-none shadow-sm shadow-blue-500/20 transition-all"
                 >
                   <Save size={14} /> Save {selectedDoctor.name}'s Schedule
                 </button>
               </div>
             </form>
           ) : (
-            <div className="bg-white rounded-3xl border border-slate-100 p-8 text-center text-slate-400 text-xs font-semibold">
+            <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 p-8 text-center text-slate-400 text-xs font-semibold">
               Select a doctor from the left to view and customize their schedule.
             </div>
           )}
