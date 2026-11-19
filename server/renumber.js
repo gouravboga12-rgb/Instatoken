@@ -1,6 +1,9 @@
 const fs = require('fs');
 const { Client } = require('pg');
-require('dotenv').config({ path: '/home/ubuntu/Instatoken/.env' });
+require('dotenv').config({ path: '/home/ubuntu/Instatoken/server/.env' });
+if (!process.env.DATABASE_URL) {
+  require('dotenv').config({ path: './server/.env' });
+}
 
 async function renumber() {
   const possiblePaths = [
