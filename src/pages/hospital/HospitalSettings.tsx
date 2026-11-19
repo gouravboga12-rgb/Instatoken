@@ -4,7 +4,7 @@ import { geocodeLocation, reverseGeocodeAddressDetails } from '../../utils/googl
 import {
   Building2, Save, Check, MapPin, Layers, Compass,
   ExternalLink, Sparkles, Loader2, Upload, ImageIcon, Phone,
-  AlertCircle, Video, Trash2, Plus, Film, Star, Banknote, CheckCircle2
+  AlertCircle, Video, Trash2, Plus, Film, Star, Banknote, CheckCircle2, Clock
 } from 'lucide-react';
 
 const COMMON_FACILITIES = [
@@ -1141,6 +1141,26 @@ export const HospitalSettings: React.FC = () => {
                           className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:border-blue-500"
                         />
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Settlement SLA & Clearance Terms Notice */}
+                  <div className="bg-gradient-to-r from-blue-50/90 to-indigo-50/80 border border-blue-200/80 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5">
+                    <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                      <Clock size={18} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                          Settlement Timeline: 2 to 3 Business Working Days
+                        </h4>
+                        <span className="text-[9px] font-black uppercase tracking-wider bg-blue-100 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full">
+                          RBI Gateway Rails
+                        </span>
+                      </div>
+                      <p className="text-[11.5px] text-slate-600 font-medium leading-relaxed mt-1">
+                        Doctor consultation fees collected online via Razorpay undergo RBI-mandated nodal account clearance. Collected funds are remitted to your verified bank account or UPI ID within <strong>2 to 3 business working days</strong> (excluding bank holidays and Sundays). Please ensure your IFSC code and account number match your bank passbook exactly to prevent clearance delays.
+                      </p>
                     </div>
                   </div>
 

@@ -184,6 +184,26 @@ export const HospitalPayouts: React.FC = () => {
 
       {(isFullOnline || hasDuesOrHistory) && (
         <>
+          {/* Settlement SLA & Clearance Cycle Notice */}
+          <div className="bg-gradient-to-r from-blue-50/90 via-indigo-50/70 to-blue-50/90 border border-blue-200/80 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5 shadow-2xs">
+            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <Clock size={20} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-xs sm:text-sm font-black text-slate-900 tracking-tight">
+                  Standard Settlement SLA: 2 to 3 Business Working Days (T+2 / T+3)
+                </h3>
+                <span className="text-[9.5px] font-black uppercase tracking-wider bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full border border-blue-200">
+                  RBI Gateway Rail
+                </span>
+              </div>
+              <p className="text-[11.5px] text-slate-600 font-medium leading-relaxed mt-1">
+                Doctor consultation fees collected online via Razorpay undergo RBI-mandated payment gateway clearance. Funds are automatically batched and disbursed via NEFT / IMPS / UPI directly to your registered bank account within <strong>2 to 3 business working days</strong> (excluding bank holidays and Sundays).
+              </p>
+            </div>
+          </div>
+
           {/* KPI Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-4">
             <div className="bg-white border border-slate-100 rounded-2xl p-3.5 sm:p-5 shadow-xs">
@@ -282,7 +302,7 @@ export const HospitalPayouts: React.FC = () => {
                       </span>
                     </div>
                     <p className="text-[10px] text-amber-700 font-medium mt-0.5">
-                      ₹{Number(pendingRequest?.requested_amount || summary?.pendingDue).toLocaleString('en-IN')} requested · Processing within 24–48 working hours
+                      ₹{Number(pendingRequest?.requested_amount || summary?.pendingDue).toLocaleString('en-IN')} requested · Processing within 2 to 3 business working days
                     </p>
                   </div>
                 </div>
@@ -466,6 +486,14 @@ export const HospitalPayouts: React.FC = () => {
                       <span className="text-slate-700 font-black">{bd.bank_name} · ****{bd.bank_account_number?.slice(-4)}</span>
                     </div>
                   )}
+                </div>
+
+                {/* Settlement SLA Notice */}
+                <div className="bg-blue-50/80 border border-blue-200/70 rounded-xl p-3 text-[11px] text-blue-900 font-medium flex items-start gap-2">
+                  <Clock size={14} className="text-blue-600 shrink-0 mt-0.5" />
+                  <span>
+                    Payout requests are reviewed and disbursed via NEFT / UPI within <strong>2 to 3 business working days</strong> (excluding bank holidays and Sundays).
+                  </span>
                 </div>
 
                 <div>
