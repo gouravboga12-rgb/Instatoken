@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { Button } from '../../components/ui/Button';
-import { QRCodeSVG } from 'qrcode.react';
 import { jsPDF } from 'jspdf';
 import { 
   Calendar, Download, Share2, CheckCircle2, 
@@ -214,38 +213,6 @@ export const TokenConfirmation: React.FC = () => {
     ((appointment as any)?.paymentMethod && (appointment as any).paymentMethod.toLowerCase().includes('full online')) ||
     (fee > 0 && totalPaid >= fee && totalPaid > 60);
 
-  const getQrDataUrl = async (): Promise<string | null> => {
-    try {
-      const svg = document.querySelector('#token-qr-code svg') || document.querySelector('svg');
-      if (!svg) return null;
-      const xml = new XMLSerializer().serializeToString(svg);
-      const svg64 = btoa(unescape(encodeURIComponent(xml)));
-      const image64 = `data:image/svg+xml;base64,${svg64}`;
-
-      return new Promise((resolve) => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          canvas.width = 200;
-          canvas.height = 200;
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            ctx.fillStyle = '#FFFFFF';
-            ctx.fillRect(0, 0, 200, 200);
-            ctx.drawImage(img, 0, 0, 200, 200);
-            resolve(canvas.toDataURL('image/png'));
-          } else {
-            resolve(null);
-          }
-        };
-        img.onerror = () => resolve(null);
-        img.src = image64;
-      });
-    } catch (e) {
-      return null;
-    }
-  };
-
   const handleDownload = async () => {
     setIsDownloading(true);
     try {
@@ -299,11 +266,20 @@ export const TokenConfirmation: React.FC = () => {
       doc.setFont('helvetica', 'bold');
       doc.text('TOKEN CONFIRMED', 142, 52.5);
 
-      // QR Code PNG from DOM
-      const qrDataUrl = await getQrDataUrl();
-      if (qrDataUrl) {
-        doc.addImage(qrDataUrl, 'PNG', 151, 57, 22, 22);
-      }
+      // 2. Doctor Cabin Consultation Stamp in PDF
+      doc.setFillColor(239, 246, 255);
+      doc.setDrawColor(191, 219, 254);
+      doc.roundedRect(138, 57, 48, 22, 2, 2, 'FD');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(30, 64, 175);
+      doc.text('CABIN APPOINTMENT', 162, 64, { align: 'center' });
+      doc.setFontSize(9.5);
+      doc.setTextColor(15, 23, 42);
+      doc.text((appointment.doctorName || 'Doctor').slice(0, 20), 162, 70, { align: 'center' });
+      doc.setFontSize(7.5);
+      doc.setTextColor(100, 116, 139);
+      doc.text(`Slot: ${appointment.time || 'Morning OPD'}`, 162, 75, { align: 'center' });
 
       // 3. Grid: Patient Details & Doctor Details
       // Left: Patient
@@ -413,7 +389,7 @@ export const TokenConfirmation: React.FC = () => {
       doc.setFontSize(8);
       doc.setTextColor(113, 63, 18);
       doc.text('1. Please reach the hospital 10-15 minutes prior to your allocated slot time.', 20, 186);
-      doc.text('2. Present this token pass or show the QR code at the reception desk.', 20, 191);
+      doc.text('2. Present this token pass or mention your Token Number at the reception desk.', 20, 191);
       doc.text(
         isFullOnlineBooking
           ? '3. Consultation fee has been paid online in full (No fee to be paid at doctor cabin).'
@@ -493,16 +469,6 @@ export const TokenConfirmation: React.FC = () => {
     }
   };
 
-  const qrPayload = JSON.stringify({
-    appointmentId: appointment.id,
-    token: appointment.tokenNumber,
-    doctor: appointment.doctorName,
-    hospital: appointment.hospitalName,
-    patient: appointment.patientName,
-    date: appointment.date,
-    status: appointment.status
-  });
-
   return (
     <div className="pb-24 bg-slate-50 min-h-screen md:min-h-0 md:pb-6 max-w-5xl mx-auto px-4 sm:px-6 pt-4">
       
@@ -580,36 +546,34 @@ export const TokenConfirmation: React.FC = () => {
           {/* Ticket Body Content */}
           <div className="p-5 space-y-4">
             
-            {/* 1. Large High-Visibility Token Number & Inline QR Code matching Image 57 */}
+            {/* 1. Large High-Visibility Token Number & Assigned Doctor Card */}
             <div className="bg-gradient-to-br from-blue-50 via-slate-50 to-indigo-50/50 border border-blue-100 rounded-3xl p-4 sm:p-5 shadow-2xs relative overflow-hidden flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="text-center sm:text-left flex-1 min-w-0">
                 <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest block">
                   YOUR TOKEN NUMBER
                 </span>
                 
-                <div className="text-5xl sm:text-6xl font-black text-blue-700 tracking-tight my-0.5 font-heading">
-                  #{appointment.tokenNumber || 1}
+                <div className="text-4xl sm:text-5xl font-black text-blue-700 tracking-tight my-0.5 font-heading">
+                  #{appointment.tokenNumber || 1} <span className="text-slate-300 font-light">·</span> <span className="text-slate-900 text-2xl sm:text-3xl font-extrabold">{appointment.doctorName}</span>
                 </div>
 
                 <div className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 mt-1">
                   <Clock size={13} className="text-blue-600 shrink-0" />
                   <span>{appointment.time || 'Morning OPD'}</span>
+                  <span>·</span>
+                  <span>{appointment.departmentName}</span>
                 </div>
                 <div className="text-[10px] font-semibold text-slate-400 mt-0.5">
                   {formattedDate} ({dayOfWeek})
                 </div>
               </div>
 
-              {/* Inline QR Code matching Image 57 */}
-              <div id="token-qr-code" className="flex flex-col items-center shrink-0 bg-white p-2.5 rounded-2xl border border-slate-200 shadow-2xs">
-                <QRCodeSVG 
-                  value={qrPayload}
-                  size={95}
-                  level="M"
-                />
-                <span className="text-[8.5px] font-bold text-slate-400 mt-1.5">
-                  Show this QR at Hospital
-                </span>
+              {/* Verified Cabin Pass Badge */}
+              <div className="flex flex-col items-center justify-center shrink-0 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs text-center min-w-[140px]">
+                <ShieldCheck size={26} className="text-emerald-600 mb-1" />
+                <span className="text-xs font-black text-slate-800 block">Verified Pass</span>
+                <span className="text-[9.5px] font-bold text-blue-600 block mt-0.5">Cabin Consultation</span>
+                <span className="text-[8px] font-semibold text-slate-400 mt-1 block">Present at OPD Desk</span>
               </div>
             </div>
 
@@ -814,7 +778,7 @@ export const TokenConfirmation: React.FC = () => {
 
             <ul className="text-[10px] text-slate-700 font-semibold space-y-1 list-disc pl-4 leading-snug">
               <li>Reach hospital 10–15 minutes before your session.</li>
-              <li>Show QR Code or downloaded token PDF at reception.</li>
+              <li>Present this token pass or state your Token Number at the reception desk.</li>
               <li>
                 {isFullOnlineBooking 
                   ? "Consultation fee paid in advance online via InstaToken Razorpay (No cabin fee)." 

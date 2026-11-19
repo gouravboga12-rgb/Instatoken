@@ -6,7 +6,6 @@ import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { ArrowLeft, Clock, Calendar, CheckCircle2, XCircle, AlertCircle, Trash2, RotateCw } from 'lucide-react';
-import { QRCodeSVG } from 'qrcode.react';
 import { subscribeGlobalSync } from '../../utils/syncBus';
 
 export const MyBookings: React.FC = () => {
@@ -126,13 +125,6 @@ export const MyBookings: React.FC = () => {
     const isActive = currentStatus === 'booked' || currentStatus === 'checked-in' || currentStatus === 'in-cabin' || currentStatus === 'calling';
     const bookingIdDisplay = appt.id.startsWith('apt-') ? `ITK${appt.id.replace('apt-', '').slice(0, 6).toUpperCase()}` : appt.id.toUpperCase();
 
-    const qrPayload = JSON.stringify({
-      id: appt.id,
-      token: appt.tokenNumber,
-      doctor: appt.doctorName,
-      hospital: appt.hospitalName
-    });
-
     return (
       <Card
         key={appt.id}
@@ -193,27 +185,29 @@ export const MyBookings: React.FC = () => {
             </div>
           </div>
 
-          {/* High Visibility Token Box with QR code matching Image 57 */}
-          <div className="bg-gradient-to-r from-blue-50/70 to-indigo-50/70 border border-blue-100 rounded-2xl p-3 my-3 flex items-center justify-between">
-            <div>
-              <span className="text-[9px] text-blue-600 font-extrabold uppercase tracking-wider block">Token Number</span>
-              <span className="text-3xl font-black text-blue-700 font-heading block leading-none mt-0.5">#{appt.tokenNumber}</span>
-              <span className="text-[9.5px] text-slate-600 font-bold block mt-1.5">
-                Consultation: ₹{appt.fee} ({appt.collectionMode === 'full_online' || appt.paymentMethod?.toLowerCase().includes('full online') ? 'Paid Online' : 'Pay at Hospital'})
+          {/* High Visibility Token Box */}
+          <div className="bg-gradient-to-r from-blue-50/70 via-indigo-50/50 to-slate-50 border border-blue-100 rounded-2xl p-3.5 my-3 flex items-center justify-between gap-3 shadow-2xs">
+            <div className="min-w-0">
+              <span className="text-[9px] text-blue-600 font-extrabold uppercase tracking-wider block">
+                Token & Consulting Doctor
               </span>
-              <span className="text-[8.5px] text-emerald-700 font-semibold block">
-                Online Paid: ₹{appt.totalFee || appt.platformFee || (appt as any).totalBookingCharges || (appt.collectionMode === 'full_online' ? (Number(appt.fee || 500) + 25.75) : 25.75)}
-              </span>
+              <div className="text-2xl sm:text-3xl font-black text-blue-700 font-heading leading-tight mt-0.5 truncate">
+                #{appt.tokenNumber} <span className="text-slate-300 font-light">·</span> <span className="text-slate-900 text-lg sm:text-xl font-extrabold">{appt.doctorName}</span>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap mt-1.5 text-[9.5px]">
+                <span className="text-slate-600 font-bold">
+                  Consultation: ₹{appt.fee} ({appt.collectionMode === 'full_online' || appt.paymentMethod?.toLowerCase().includes('full online') ? 'Paid Online' : 'Pay at Hospital'})
+                </span>
+                <span className="text-emerald-700 font-extrabold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                  {appt.collectionMode === 'full_online' || appt.paymentMethod?.toLowerCase().includes('full online') ? '✓ Fee Paid Online' : 'Pay at Desk'}
+                </span>
+              </div>
             </div>
 
-            {/* QR Code */}
-            <div className="flex flex-col items-center bg-white p-1.5 rounded-xl border border-slate-200 shadow-2xs">
-              <QRCodeSVG 
-                value={qrPayload}
-                size={58}
-                level="L"
-              />
-              <span className="text-[7.5px] font-bold text-slate-400 mt-1">Show at Hospital</span>
+            <div className="shrink-0 text-right bg-white/90 border border-slate-200/80 px-2.5 py-2 rounded-xl shadow-2xs">
+              <span className="text-[8.5px] font-black uppercase tracking-wider text-slate-400 block">Session</span>
+              <span className="text-xs font-black text-slate-800 capitalize block">{appt.session || 'Morning'}</span>
+              <span className="text-[9px] font-bold text-blue-600 block mt-0.5">OPD Cabin</span>
             </div>
           </div>
 

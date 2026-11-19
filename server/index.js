@@ -4186,6 +4186,40 @@ app.post('/api/appointments', async (req, res) => {
   appt.gatewayFee = baseGatewayFee;
   appt.collectionMode = isFullOnlineBooking ? 'full_online' : 'token_only';
 
+  const apptDate = appt.date || new Date().toISOString().split('T')[0];
+  const apptSession = (appt.session || ((appt.time && parseInt(appt.time.split(':')[0], 10) >= 12 && parseInt(appt.time.split(':')[0], 10) < 17) ? 'afternoon' : (appt.time && parseInt(appt.time.split(':')[0], 10) >= 17) ? 'evening' : 'morning')).toLowerCase();
+
+  // Find max existing token number for this doctor on this date & session
+  let assignedTokenNumber = Number(appt.tokenNumber || 0);
+  const existingDocTokens = (store.tokens || []).filter(t =>
+    t.doctorId === appt.doctorId &&
+    (t.bookingDate === apptDate || t.date === apptDate) &&
+    (t.session || 'morning').toLowerCase() === apptSession &&
+    t.status !== 'cancelled' &&
+    t.id !== appt.id
+  );
+  const maxExisting = existingDocTokens.reduce((max, t) => Math.max(max, Number(t.tokenNo || t.tokenNumber || 0)), 0);
+
+  if (!assignedTokenNumber || assignedTokenNumber <= maxExisting) {
+    assignedTokenNumber = maxExisting + 1;
+  }
+
+  if (isDbConnected) {
+    try {
+      const maxDbRes = await query(
+        `SELECT COALESCE(MAX(token_number), 0) as max_tok FROM tokens WHERE doctor_id = $1 AND (token_date = $2 OR data->>'bookingDate' = $2) AND session = $3 AND status != 'cancelled' AND id != $4`,
+        [appt.doctorId, apptDate, apptSession, appt.id]
+      );
+      if (maxDbRes.rows && maxDbRes.rows.length > 0 && Number(maxDbRes.rows[0].max_tok) >= assignedTokenNumber) {
+        assignedTokenNumber = Number(maxDbRes.rows[0].max_tok) + 1;
+      }
+    } catch (e) {
+      console.warn('Error querying max token from RDS:', e.message);
+    }
+  }
+
+  appt.tokenNumber = assignedTokenNumber;
+
   store.appointments = [appt, ...store.appointments.filter(a => a.id !== appt.id)];
 
   const tokenRecord = {

@@ -1441,9 +1441,54 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       throw new Error("Token booking is currently unavailable. This hospital account has been temporarily disabled by administration.");
     }
 
-    const tokenAssigned = targetDoc.nextAvailableToken;
-    const patientsAhead = Math.max(0, tokenAssigned - targetDoc.currentQueue - 1);
-    const computedWaitTime = Math.max(0, patientsAhead * targetDoc.estimatedWaitPerPatient);
+    const lowerTime = (time || '').toLowerCase();
+    const resolvedSession: 'morning' | 'afternoon' | 'evening' = (() => {
+      if (lowerTime.includes('morn')) return 'morning';
+      if (lowerTime.includes('after') || lowerTime.includes('noon')) return 'afternoon';
+      if (lowerTime.includes('eve') || lowerTime.includes('night')) return 'evening';
+      const match = lowerTime.match(/(\d{1,2}):?(\d{2})?\s*(am|pm)?/);
+      if (match) {
+        let h = parseInt(match[1], 10);
+        const meridiem = match[3];
+        if (meridiem === 'pm' && h < 12) h += 12;
+        if (meridiem === 'am' && h === 12) h = 0;
+        if (h < 12) return 'morning';
+        if (h < 17) return 'afternoon';
+        return 'evening';
+      }
+      return 'morning';
+    })();
+
+    // Compute next unique sequential token number for this doctor on this date & session
+    let currentSavedTokens: any[] = [];
+    try {
+      const st = localStorage.getItem('insta_hospital_tokens');
+      if (st) currentSavedTokens = JSON.parse(st);
+    } catch (e) {}
+
+    const existingDocSessionTokens = [
+      ...appointments.filter(a =>
+        a.doctorId === doctorId &&
+        (a.date === date || (a as any).bookingDate === date) &&
+        (a.session || 'morning').toLowerCase() === resolvedSession.toLowerCase() &&
+        a.status !== 'cancelled'
+      ),
+      ...currentSavedTokens.filter(t =>
+        t.doctorId === doctorId &&
+        (t.bookingDate === date || t.date === date) &&
+        (t.session || 'morning').toLowerCase() === resolvedSession.toLowerCase() &&
+        t.status !== 'cancelled'
+      )
+    ];
+
+    const maxExistingTokNo = existingDocSessionTokens.reduce((max, tok) => {
+      const num = Number(tok.tokenNumber || tok.tokenNo || 0);
+      return Math.max(max, num);
+    }, 0);
+
+    const tokenAssigned = maxExistingTokNo + 1;
+    const patientsAhead = Math.max(0, tokenAssigned - 1);
+    const computedWaitTime = Math.max(0, patientsAhead * (targetDoc.estimatedWaitPerPatient || 15));
 
     const isFullOnline = targetHosp.payment_mode === 'full_online' || (targetHosp as any).paymentMode === 'full_online';
 
@@ -1466,24 +1511,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Ensure customer account exists & is updated
     getOrCreateCustomerAccount(patientDetails.name, patientDetails.phone, patientDetails.email);
-
-    const lowerTime = (time || '').toLowerCase();
-    const resolvedSession: 'morning' | 'afternoon' | 'evening' = (() => {
-      if (lowerTime.includes('morn')) return 'morning';
-      if (lowerTime.includes('after') || lowerTime.includes('noon')) return 'afternoon';
-      if (lowerTime.includes('eve') || lowerTime.includes('night')) return 'evening';
-      const match = lowerTime.match(/(\d{1,2}):?(\d{2})?\s*(am|pm)?/);
-      if (match) {
-        let h = parseInt(match[1], 10);
-        const meridiem = match[3];
-        if (meridiem === 'pm' && h < 12) h += 12;
-        if (meridiem === 'am' && h === 12) h = 0;
-        if (h < 12) return 'morning';
-        if (h < 17) return 'afternoon';
-        return 'evening';
-      }
-      return 'morning';
-    })();
 
     const newAppt: Appointment = {
       id: `tok-${Date.now().toString().slice(-4)}`,
