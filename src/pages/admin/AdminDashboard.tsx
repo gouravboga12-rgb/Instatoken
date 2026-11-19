@@ -591,14 +591,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
         </div>
 
         {/* ── MAIN CONTENT SCROLLABLE AREA ────────────────────────────────── */}
-        <main className="flex-1 overflow-y-auto px-4 py-6 md:p-8 w-full">
-          <div className="max-w-[1400px] mx-auto w-full space-y-6 pb-24">
+        <main className="flex-1 overflow-y-auto px-3 py-4 sm:px-6 sm:py-6 md:p-8 w-full">
+          <div className="max-w-[1400px] mx-auto w-full space-y-4 sm:space-y-6 pb-24">
         
         {/* ── TAB 1: SYSTEM OVERVIEW (MATCHING IMAGE COPY 76.PNG) ────── */}
         {adminTab === 'stats' && (
-          <div className="space-y-6 animate-in fade-in duration-200">
+          <div className="space-y-4 sm:space-y-6 animate-in fade-in duration-200">
             {/* Top Bar Header with Actions & Date Pill */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 bg-white p-4 sm:p-5 rounded-2xl border border-slate-100 shadow-xs">
               <div>
                 <h2 className="text-xl sm:text-2xl font-black text-slate-800 tracking-tight">Super Admin Dashboard</h2>
                 <p className="text-xs text-slate-400 font-semibold mt-0.5">Manage and monitor the entire InstaToken healthcare network.</p>
@@ -971,7 +971,66 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                 </button>
               </div>
 
-              <div className="overflow-x-auto">
+              {/* Mobile Recent Hospital Cards (< md) */}
+              <div className="block md:hidden divide-y divide-slate-100 p-3 space-y-3">
+                {safeHospitals.slice(0, 5).map((hosp) => {
+                  const hospAppts = safeAppointments.filter(a => a.hospitalId === hosp.id || a.hospitalName === hosp.name);
+                  const rev = hospAppts.reduce((sum, a) => sum + (Number(a.fee) || 0), 0);
+                  const displayTokens = hospAppts.length;
+                  const isDisabled = hosp.status === 'disabled';
+
+                  return (
+                    <div key={hosp.id} className="bg-slate-50/70 rounded-2xl p-3.5 border border-slate-100 space-y-2.5">
+                      <div className="flex items-start gap-3">
+                        <img 
+                          src={hosp.image || "https://images.unsplash.com/photo-1587351021759-3e566b6af7cc?w=800&auto=format&fit=crop&q=80"} 
+                          alt={hosp.name} 
+                          className="w-10 h-10 rounded-xl object-cover shrink-0 border border-slate-200" 
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-1">
+                            <h4 className="font-extrabold text-slate-800 text-sm truncate">{hosp.name}</h4>
+                            <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full shrink-0 ${
+                              isDisabled ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
+                            }`}>
+                              {isDisabled ? 'Disabled' : 'Active'}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-400 truncate mt-0.5">{getHospitalLocationDisplay(hosp)}</p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-1 bg-white p-2 rounded-xl border border-slate-100 text-center">
+                        <div>
+                          <div className="text-[9px] uppercase tracking-wider text-slate-400 font-bold">Doctors</div>
+                          <div className="text-xs font-black text-slate-800 font-mono">{(hosp.doctors || []).length}</div>
+                        </div>
+                        <div className="border-x border-slate-100">
+                          <div className="text-[9px] uppercase tracking-wider text-slate-400 font-bold">Tokens</div>
+                          <div className="text-xs font-black text-blue-600 font-mono">{displayTokens}</div>
+                        </div>
+                        <div>
+                          <div className="text-[9px] uppercase tracking-wider text-slate-400 font-bold">Revenue</div>
+                          <div className="text-xs font-black text-emerald-600 font-mono">₹{rev.toLocaleString()}</div>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          setSelectedHospitalLedger(hosp);
+                          setAdminTab('financials');
+                        }}
+                        className="w-full py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-xl text-xs font-bold border-none transition-colors cursor-pointer text-center"
+                      >
+                        View Financial Ledger
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Desktop Recent Hospitals Table (>= md) */}
+              <div className="hidden md:block overflow-x-auto">
                 <table className="w-full text-left border-collapse text-xs">
                   <thead className="bg-slate-50 border-b border-slate-100 text-[10px] font-black text-slate-500 uppercase tracking-wider">
                     <tr>
@@ -1307,8 +1366,102 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
               </div>
             </div>
 
-            {/* Hospital Roster Table */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-xs overflow-hidden">
+            {/* Mobile Hospital Cards (< md) */}
+            <div className="block md:hidden space-y-3">
+              {hospitals
+                .filter(h => {
+                  const matchesSearch = h.name.toLowerCase().includes(hospitalSearch.toLowerCase()) || 
+                    (h.address && h.address.toLowerCase().includes(hospitalSearch.toLowerCase())) ||
+                    (h.contact && h.contact.includes(hospitalSearch)) ||
+                    (h.email && h.email.toLowerCase().includes(hospitalSearch.toLowerCase()));
+                  const isCurrentlyDisabled = h.status === 'disabled';
+                  if (hospitalStatusFilter === 'active') return matchesSearch && !isCurrentlyDisabled;
+                  if (hospitalStatusFilter === 'disabled') return matchesSearch && isCurrentlyDisabled;
+                  return matchesSearch;
+                })
+                .map((hosp) => {
+                  const isDisabled = hosp.status === 'disabled';
+                  const hospEmail = hosp.email || (hosp as any).data?.email || (hosp.id === 'hosp-apollo' ? 'info@instatoken.in' : 'contact@hospital.com');
+                  const hospPhone = hosp.phone || hosp.contact || (hosp as any).data?.phone || '+91 80 4668 8888';
+
+                  return (
+                    <div key={hosp.id} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-xs space-y-3">
+                      {/* Top: Photo, Name, Status */}
+                      <div className="flex items-start gap-3">
+                        <img 
+                          src={hosp.image || "https://images.unsplash.com/photo-1587351021759-3e566b6af7cc?w=800&auto=format&fit=crop&q=80"} 
+                          alt={hosp.name} 
+                          className="w-12 h-12 rounded-xl object-cover shrink-0 border border-slate-200" 
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <h3 className="font-extrabold text-slate-900 text-sm truncate">{hosp.name}</h3>
+                            {isDisabled ? (
+                              <span className="bg-amber-100 text-amber-800 text-[10px] font-extrabold px-2 py-0.5 rounded-full shrink-0">
+                                Disabled
+                              </span>
+                            ) : (
+                              <span className="bg-emerald-100 text-emerald-700 text-[10px] font-extrabold px-2 py-0.5 rounded-full shrink-0">
+                                Active
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-0.5 text-xs text-slate-500">
+                            <MapPin size={11} className="text-rose-500 shrink-0" />
+                            <span className="truncate">{getHospitalLocationDisplay(hosp)}</span>
+                          </div>
+                          <span className="font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded text-[10px] inline-block mt-1">
+                            {hosp.category} · {(hosp.doctors || []).length} Doctors
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Contacts Strip */}
+                      <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 flex items-center justify-between text-xs font-bold text-slate-700">
+                        <a href={`tel:${hospPhone.replace(/\s+/g, '')}`} className="flex items-center gap-1 text-emerald-600 no-underline">
+                          <Phone size={12} />
+                          <span>{hospPhone}</span>
+                        </a>
+                        <a href={`mailto:${hospEmail}`} className="flex items-center gap-1 text-blue-600 no-underline truncate max-w-[140px]">
+                          <Mail size={12} />
+                          <span className="truncate">{hospEmail}</span>
+                        </a>
+                      </div>
+
+                      {/* Actions Row */}
+                      <div className="flex items-center gap-2 pt-1">
+                        <a 
+                          href={`tel:${hospPhone.replace(/\s+/g, '')}`}
+                          className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black flex items-center justify-center gap-1.5 no-underline shadow-xs"
+                        >
+                          <PhoneCall size={12} />
+                          <span>Call</span>
+                        </a>
+                        <button
+                          onClick={() => toggleDisableHospital(hosp.id)}
+                          className={`flex-1 py-2 rounded-xl text-xs font-black cursor-pointer border-none shadow-xs transition-colors ${
+                            isDisabled 
+                              ? 'bg-emerald-600 hover:bg-emerald-700 text-white' 
+                              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                          }`}
+                        >
+                          {isDisabled ? 'Enable' : 'Disable'}
+                        </button>
+                        <button
+                          onClick={() => setHospitalToDelete(hosp)}
+                          className="px-3 py-2 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-xl text-xs font-black cursor-pointer border border-red-200 transition-colors"
+                          title="Delete Hospital"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+
+            {/* Hospital Roster Table (Desktop >= md) */}
+            <div className="hidden md:block bg-white rounded-2xl border border-slate-100 shadow-xs overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[1050px] text-left border-collapse">
                   <thead className="bg-slate-50 border-b border-slate-100 text-[10px] font-black text-slate-500 uppercase tracking-wider">
@@ -1545,8 +1698,91 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
               </div>
             </div>
 
-            {/* Customers Table */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-xs overflow-hidden">
+            {/* Mobile Customer Cards (< md) */}
+            <div className="block md:hidden space-y-3">
+              {customers
+                .filter(c => {
+                  const matchesSearch = c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
+                    c.phone.includes(customerSearch) ||
+                    c.email.toLowerCase().includes(customerSearch.toLowerCase()) ||
+                    c.location.toLowerCase().includes(customerSearch.toLowerCase());
+                  if (customerStatusFilter === 'active') return matchesSearch && c.status === 'active';
+                  if (customerStatusFilter === 'suspended') return matchesSearch && c.status === 'suspended';
+                  return matchesSearch;
+                })
+                .map((cust) => {
+                  const uniqueHospitalsCount = new Set((cust.bookings || []).map(b => b.hospitalId)).size;
+                  const customerSpendTotal = (cust.bookings || []).reduce((sum, b) => sum + (b?.fee || 0), 0);
+
+                  return (
+                    <div key={cust.id} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-xs space-y-3">
+                      {/* Avatar, Name, Email, Status */}
+                      <div className="flex items-start gap-3">
+                        <img 
+                          src={cust.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80"} 
+                          alt={cust.name} 
+                          className="w-10 h-10 rounded-full object-cover shrink-0 border border-slate-200" 
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <h3 className="font-extrabold text-slate-900 text-sm truncate">{cust.name}</h3>
+                            {cust.status === 'suspended' ? (
+                              <span className="bg-red-100 text-red-800 text-[10px] font-extrabold px-2 py-0.5 rounded-full shrink-0">
+                                Suspended
+                              </span>
+                            ) : (
+                              <span className="bg-emerald-100 text-emerald-700 text-[10px] font-extrabold px-2 py-0.5 rounded-full shrink-0">
+                                Active Patient
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-slate-400 font-medium truncate">{cust.email}</p>
+                          <p className="text-[11px] text-slate-500 font-bold">{cust.phone} · <span className="font-normal">{cust.location}</span></p>
+                        </div>
+                      </div>
+
+                      {/* Customer Metrics Chip Row */}
+                      <div className="grid grid-cols-3 gap-1.5 bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-center">
+                        <div>
+                          <div className="text-[9px] uppercase tracking-wider text-slate-400 font-bold">Tokens</div>
+                          <div className="text-xs font-black text-blue-600 mt-0.5 font-mono">{(cust.bookings || []).length}</div>
+                        </div>
+                        <div className="border-x border-slate-200">
+                          <div className="text-[9px] uppercase tracking-wider text-slate-400 font-bold">Hospitals</div>
+                          <div className="text-xs font-black text-purple-600 mt-0.5 font-mono">{uniqueHospitalsCount}</div>
+                        </div>
+                        <div>
+                          <div className="text-[9px] uppercase tracking-wider text-slate-400 font-bold">Total Spend</div>
+                          <div className="text-xs font-black text-emerald-600 mt-0.5 font-mono">₹{customerSpendTotal.toLocaleString()}</div>
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="grid grid-cols-2 gap-2 pt-1">
+                        <button
+                          onClick={() => setSelectedCustomerModal(cust)}
+                          className="py-2 px-3 text-xs font-bold bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-xl transition-colors cursor-pointer border-none text-center"
+                        >
+                          View Tokens & History
+                        </button>
+                        <button
+                          onClick={() => toggleCustomerStatus(cust.id)}
+                          className={`py-2 px-3 text-xs font-bold rounded-xl transition-colors cursor-pointer border-none text-center ${
+                            cust.status === 'suspended'
+                              ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
+                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                          }`}
+                        >
+                          {cust.status === 'suspended' ? 'Unsuspend' : 'Suspend'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+
+            {/* Customers Table (Desktop >= md) */}
+            <div className="hidden md:block bg-white rounded-2xl border border-slate-100 shadow-xs overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[950px] text-left border-collapse">
                   <thead className="bg-slate-50 border-b border-slate-100 text-[10px] font-black text-slate-500 uppercase tracking-wider">
@@ -1802,7 +2038,85 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                 </div>
               </div>
 
-              <div className="overflow-x-auto">
+              {/* Mobile Hospital Revenue Cards (< md) */}
+              <div className="block md:hidden divide-y divide-slate-100 p-3 space-y-3">
+                {safeHospitals
+                  .filter(h => {
+                    if (!hospitalRevenueSearch) return true;
+                    const q = hospitalRevenueSearch.toLowerCase();
+                    return (h.name && h.name.toLowerCase().includes(q)) || 
+                           (h.address && h.address.toLowerCase().includes(q));
+                  })
+                  .map((hosp) => {
+                    const hospAppts = periodFilteredAppointments.filter(a => 
+                      a.hospitalId === hosp.id || 
+                      (a.hospitalName && hosp.name && a.hospitalName.toLowerCase() === hosp.name.toLowerCase())
+                    );
+
+                    const tokenCount = hospAppts.length;
+                    const docConsultationTotal = hospAppts.reduce((sum, a) => sum + (Number(a.fee) || 500), 0);
+                    const platRevenueTotal = hospAppts.reduce((sum, a) => 
+                      sum + (Number(a.platformFee) || Math.max(10, Math.round((Number(a.fee) || 500) * (platformFeePercent / 100)))), 0);
+
+                    const isDisabled = hosp.status === 'disabled';
+
+                    return (
+                      <div 
+                        key={hosp.id}
+                        onClick={() => setSelectedHospitalLedger(hosp)}
+                        className="bg-slate-50/70 rounded-2xl p-4 border border-slate-100 shadow-2xs space-y-3 cursor-pointer"
+                      >
+                        <div className="flex items-start gap-3">
+                          <img
+                            src={hosp.image || "https://images.unsplash.com/photo-1587351021759-3e566b6af7cc?w=800&auto=format&fit=crop&q=80"}
+                            alt={hosp.name}
+                            className="w-10 h-10 rounded-xl object-cover border border-slate-200 shrink-0"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-1">
+                              <h4 className="font-extrabold text-slate-800 text-sm truncate">{hosp.name}</h4>
+                              <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full shrink-0 ${
+                                isDisabled ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
+                              }`}>
+                                {isDisabled ? 'Disabled' : 'Active'}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-slate-400 truncate mt-0.5">{hosp.address || 'Location on file'}</p>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-1 bg-white p-2.5 rounded-xl border border-slate-100 text-center">
+                          <div>
+                            <div className="text-[9px] uppercase tracking-wider text-slate-400 font-bold">Bookings</div>
+                            <div className="text-xs font-black text-blue-600 mt-0.5 font-mono">{tokenCount} tokens</div>
+                          </div>
+                          <div className="border-x border-slate-100">
+                            <div className="text-[9px] uppercase tracking-wider text-slate-400 font-bold">Doc Volume</div>
+                            <div className="text-xs font-black text-slate-900 mt-0.5 font-mono">₹{docConsultationTotal.toLocaleString('en-IN')}</div>
+                          </div>
+                          <div>
+                            <div className="text-[9px] uppercase tracking-wider text-emerald-600 font-bold">Platform Rev</div>
+                            <div className="text-xs font-black text-emerald-600 mt-0.5 font-mono">₹{platRevenueTotal.toLocaleString('en-IN')}</div>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedHospitalLedger(hosp);
+                          }}
+                          className="w-full py-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-xl text-xs font-bold border border-blue-200 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          <Eye size={12} />
+                          <span>View Hospital Ledger</span>
+                        </button>
+                      </div>
+                    );
+                  })}
+              </div>
+
+              {/* Desktop Table (>= md) */}
+              <div className="hidden md:block overflow-x-auto">
                 <table className="w-full text-left border-collapse text-xs">
                   <thead className="bg-slate-50 border-b border-slate-100 text-[10px] font-black text-slate-500 uppercase tracking-wider">
                     <tr>
@@ -1944,7 +2258,56 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab }) =>
                 </span>
               </div>
 
-              <div className="overflow-x-auto">
+              {/* Mobile Transactions List (< md) */}
+              <div className="block md:hidden divide-y divide-slate-100 space-y-3">
+                {periodFilteredAppointments.length === 0 ? (
+                  <div className="py-6 text-center text-slate-400 font-semibold text-xs">
+                    No transactions found for this date range.
+                  </div>
+                ) : (
+                  periodFilteredAppointments.map((appt) => {
+                    const fee = Number(appt.fee) || 500;
+                    const platFee = Number(appt.platformFee) || Math.max(10, Math.round(fee * (platformFeePercent / 100)));
+                    const istDate = new Intl.DateTimeFormat('en-IN', {
+                      timeZone: 'Asia/Kolkata',
+                      day: '2-digit',
+                      month: 'short',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      hour12: true
+                    }).format(new Date(appt.createdAt || Date.now()));
+
+                    return (
+                      <div key={appt.id} className="p-3 bg-slate-50/70 rounded-2xl border border-slate-100 space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-mono font-bold text-slate-900">{appt.paymentId || `TXN-${appt.id}`}</span>
+                          <span className="text-[10px] font-extrabold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                            #{appt.tokenNumber || appt.tokenNo}
+                          </span>
+                        </div>
+
+                        <div className="text-xs">
+                          <div className="font-extrabold text-slate-800">{appt.hospitalName}</div>
+                          <div className="text-slate-500 text-[11px] font-medium">{appt.doctorName} · <span className="text-blue-600">{appt.departmentName}</span></div>
+                          <div className="text-slate-400 text-[11px] mt-0.5">Patient: <strong className="text-slate-700">{appt.patientName}</strong> ({appt.phone})</div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 text-xs">
+                          <div>
+                            <span className="font-black text-slate-900">₹{fee}</span>
+                            <span className="text-[10px] text-emerald-600 font-bold ml-1.5">(Fee: ₹{platFee})</span>
+                          </div>
+                          <span className="text-[10px] font-bold text-slate-500">{istDate}</span>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Desktop Table (>= md) */}
+              <div className="hidden md:block overflow-x-auto">
                 <table className="w-full text-xs text-left border-collapse min-w-[900px]">
                   <thead className="bg-slate-50 border-b border-slate-100 text-[10px] font-black text-slate-500 uppercase tracking-wider">
                     <tr>

@@ -183,36 +183,35 @@ export const HospitalPayoutsManagement: React.FC = () => {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-sm">
-          <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Total Online Doctor Fees</span>
-          <div className="text-2xl font-black text-white mt-1">₹{totalCollectedAll.toLocaleString('en-IN')}</div>
-          <p className="text-[11px] text-slate-400 font-medium mt-0.5">Collected via Razorpay</p>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+        <div className="bg-slate-900/80 border border-slate-800 rounded-xl sm:rounded-2xl p-3 sm:p-4 shadow-sm">
+          <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-slate-400 block truncate">Total Doctor Fees</span>
+          <div className="text-lg sm:text-2xl font-black text-white mt-0.5 sm:mt-1 font-mono">₹{totalCollectedAll.toLocaleString('en-IN')}</div>
+          <p className="text-[10px] sm:text-[11px] text-slate-400 font-medium mt-0.5 truncate">Via Razorpay</p>
         </div>
 
-        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-sm">
-          <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Total Remitted to Hospitals</span>
-          <div className="text-2xl font-black text-emerald-400 mt-1">₹{totalSettledAll.toLocaleString('en-IN')}</div>
-          <p className="text-[11px] text-slate-400 font-medium mt-0.5">Cleared via Bank / UPI</p>
+        <div className="bg-slate-900/80 border border-slate-800 rounded-xl sm:rounded-2xl p-3 sm:p-4 shadow-sm">
+          <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-slate-400 block truncate">Total Remitted</span>
+          <div className="text-lg sm:text-2xl font-black text-emerald-400 mt-0.5 sm:mt-1 font-mono">₹{totalSettledAll.toLocaleString('en-IN')}</div>
+          <p className="text-[10px] sm:text-[11px] text-slate-400 font-medium mt-0.5 truncate">Via Bank / UPI</p>
         </div>
 
-        <div className="bg-slate-900/80 border border-amber-500/30 rounded-2xl p-4 shadow-sm bg-linear-to-br from-slate-900 to-amber-950/20">
-          <span className="text-[10px] font-black uppercase tracking-wider text-amber-400">Net Due Across Hospitals</span>
-          <div className="text-2xl font-black text-amber-300 mt-1">₹{totalDue.toLocaleString('en-IN')}</div>
-          <p className="text-[11px] text-amber-400/80 font-medium mt-0.5">Pending disbursement</p>
+        <div className="bg-slate-900/80 border border-amber-500/30 rounded-xl sm:rounded-2xl p-3 sm:p-4 shadow-sm bg-linear-to-br from-slate-900 to-amber-950/20">
+          <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-amber-400 block truncate">Net Due Across Hosp</span>
+          <div className="text-lg sm:text-2xl font-black text-amber-300 mt-0.5 sm:mt-1 font-mono">₹{totalDue.toLocaleString('en-IN')}</div>
+          <p className="text-[10px] sm:text-[11px] text-amber-400/80 font-medium mt-0.5 truncate">Pending payout</p>
         </div>
 
-        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-sm">
-          <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Enrolled Full-Online Hospitals</span>
-          <div className="text-2xl font-black text-blue-400 mt-1">{hospitals.length}</div>
-          <p className="text-[11px] text-slate-400 font-medium mt-0.5">
+        <div className="bg-slate-900/80 border border-slate-800 rounded-xl sm:rounded-2xl p-3 sm:p-4 shadow-sm">
+          <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-slate-400 block truncate">Full-Online Hosp</span>
+          <div className="text-lg sm:text-2xl font-black text-blue-400 mt-0.5 sm:mt-1 font-mono">{hospitals.length}</div>
+          <p className="text-[10px] sm:text-[11px] text-slate-400 font-medium mt-0.5 truncate">
             {hospitals.filter(h => h.pendingRequests && h.pendingRequests.length > 0).length > 0 ? (
               <span className="text-amber-400 font-bold">
-                {hospitals.filter(h => h.pendingRequests && h.pendingRequests.length > 0).length} hospital(s) requesting payout
-                {totalPendingRequests > hospitals.filter(h => h.pendingRequests && h.pendingRequests.length > 0).length ? ` (${totalPendingRequests} submissions)` : ''}
+                {hospitals.filter(h => h.pendingRequests && h.pendingRequests.length > 0).length} hospital requesting {totalPendingRequests > 1 ? `(${totalPendingRequests}x)` : ''}
               </span>
             ) : (
-              'All payout requests processed'
+              'All settled'
             )}
           </p>
         </div>
@@ -267,7 +266,108 @@ export const HospitalPayoutsManagement: React.FC = () => {
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          {/* Mobile Card List (< md: No horizontal scroll, complete details at a glance) */}
+          <div className="block md:hidden divide-y divide-slate-800">
+            {filteredHospitals.length === 0 ? (
+              <div className="text-center py-10 text-slate-500 font-bold text-xs">
+                No hospitals with Full Online Payment found.
+              </div>
+            ) : (
+              filteredHospitals.map(h => (
+                <div key={h.id} className="p-4 space-y-3 bg-slate-900/60">
+                  {/* Header: Name, City, ID, and Pending Badge */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="font-black text-white text-base leading-tight">{h.name}</div>
+                      <div className="text-[11px] text-slate-400 font-medium mt-0.5">
+                        {h.city} · <span className="font-mono text-slate-500">ID: {h.id}</span>
+                      </div>
+                    </div>
+                    {h.pendingRequests && h.pendingRequests.length > 0 && (
+                      <span className="inline-flex items-center gap-1 shrink-0 bg-amber-500/20 text-amber-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-500/30">
+                        <Clock size={10} /> Requested ₹{Number(h.pendingRequests[0].requested_amount).toLocaleString('en-IN')}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Financials Chip Row (3 columns) */}
+                  <div className="grid grid-cols-3 gap-1.5 bg-slate-950/70 p-2.5 rounded-xl border border-slate-800/80 text-center">
+                    <div>
+                      <div className="text-[9px] uppercase tracking-wider text-slate-400 font-bold">Collected</div>
+                      <div className="text-xs font-black text-white mt-0.5 font-mono">₹{h.totalCollected.toLocaleString('en-IN')}</div>
+                    </div>
+                    <div className="border-x border-slate-800/80">
+                      <div className="text-[9px] uppercase tracking-wider text-slate-400 font-bold">Cleared</div>
+                      <div className="text-xs font-black text-emerald-400 mt-0.5 font-mono">₹{h.totalSettled.toLocaleString('en-IN')}</div>
+                    </div>
+                    <div>
+                      <div className="text-[9px] uppercase tracking-wider text-amber-400 font-bold">Pending Due</div>
+                      <div className="text-xs font-black text-amber-300 mt-0.5 font-mono">₹{h.pendingDue.toLocaleString('en-IN')}</div>
+                    </div>
+                  </div>
+
+                  {/* Bank & UPI Info Strip */}
+                  <div className="bg-slate-800/40 p-2.5 rounded-xl border border-slate-800 space-y-1.5 text-xs">
+                    {h.bank_account_number ? (
+                      <div className="flex items-center justify-between text-[11px]">
+                        <div className="truncate pr-2">
+                          <span className="text-slate-400 font-medium">{h.bank_name || 'Bank'}: </span>
+                          <span className="font-mono font-bold text-white">{h.bank_account_number}</span>
+                          <span className="text-emerald-400 font-mono text-[10px] ml-1.5">({h.bank_ifsc})</span>
+                        </div>
+                        <button
+                          onClick={() => copyText(h.bank_account_number!, `${h.id}-ac`)}
+                          className="text-blue-400 hover:text-blue-300 text-[10px] shrink-0 font-bold bg-slate-800 px-2 py-0.5 rounded border border-slate-700 cursor-pointer"
+                        >
+                          {copiedKey === `${h.id}-ac` ? 'Copied' : 'Copy A/C'}
+                        </button>
+                      </div>
+                    ) : null}
+
+                    {h.upi_id ? (
+                      <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-800/60">
+                        <div className="truncate pr-2">
+                          <span className="text-slate-400 font-medium">UPI: </span>
+                          <span className="font-mono font-bold text-blue-300">{h.upi_id}</span>
+                        </div>
+                        <button
+                          onClick={() => copyText(h.upi_id!, `${h.id}-upi`)}
+                          className="text-blue-400 hover:text-blue-300 text-[10px] shrink-0 font-bold bg-slate-800 px-2 py-0.5 rounded border border-slate-700 cursor-pointer"
+                        >
+                          {copiedKey === `${h.id}-upi` ? 'Copied' : 'Copy UPI'}
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+
+                  {/* Actions: Full-width touch buttons */}
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <button
+                      onClick={() => openSettleModal(h)}
+                      disabled={h.pendingDue <= 0}
+                      className={`py-2.5 px-3 rounded-xl font-black text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer border-none shadow-sm ${
+                        h.pendingDue > 0
+                          ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/30'
+                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      }`}
+                    >
+                      <Send size={12} />
+                      <span>Record Payout</span>
+                    </button>
+                    <button
+                      onClick={() => openStatementModal(h)}
+                      className="py-2.5 px-3 rounded-xl font-bold text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 cursor-pointer transition-colors flex items-center justify-center"
+                    >
+                      Statement
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Desktop Table View (>= md: original full columns) */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="border-b border-slate-800 bg-slate-950/50 text-[10px] font-black uppercase tracking-wider text-slate-400">
