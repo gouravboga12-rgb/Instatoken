@@ -326,6 +326,7 @@ interface HospitalContextType {
     deskDifference?: number
   ) => Promise<TokenRecord>;
   callPatientToken: (id: string) => Promise<any>;
+  admitPatientToCabin: (tokenId: string) => Promise<any>;
   updateTokenSession: (id: string, newSession: string) => void;
 
   // Patients
@@ -1092,6 +1093,22 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             !idSet.has((t as any).appointmentId) &&
             !idSet.has((t as any).tokenId)
           );
+          localStorage.setItem('insta_hospital_tokens', JSON.stringify(updated));
+          if (targetHospId) {
+            localStorage.setItem(`insta_hospital_tokens_${targetHospId}`, JSON.stringify(updated));
+          }
+          broadcastGlobalSync('HOSPITAL_TOKENS_UPDATED', updated);
+          return updated;
+        });
+      });
+
+      // 6. Live Tokens Batch Status Changed (e.g. out-of-order auto-hold)
+      socket.on('tokens_batch_status_changed', ({ ids, status }: { ids: string[]; status: any }) => {
+        if (!Array.isArray(ids) || ids.length === 0) return;
+        console.log('🔔 [Socket.io] Live tokens_batch_status_changed received:', ids.length, status);
+        const idSet = new Set(ids);
+        setTokens(prev => {
+          const updated = prev.map(t => idSet.has(t.id) ? { ...t, status } : t);
           localStorage.setItem('insta_hospital_tokens', JSON.stringify(updated));
           if (targetHospId) {
             localStorage.setItem(`insta_hospital_tokens_${targetHospId}`, JSON.stringify(updated));
@@ -2268,6 +2285,71 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   };
 
+  const admitPatientToCabin = async (tokenId: string) => {
+    const targetToken = tokens.find(t => t.id === tokenId);
+    if (!targetToken) return;
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const targetDocId = targetToken.doctorId;
+    const targetSession = targetToken.session || 'morning';
+    const targetTokNo = Number(targetToken.tokenNo || (targetToken as any).tokenNumber || 0);
+
+    // 1. Identify all earlier waiting tokens for this doctor today in the same session that were skipped
+    const skippedEarlierIds: string[] = [];
+    tokens.forEach(t => {
+      const isSameDoc = t.doctorId === targetDocId;
+      const isToday = (t.bookingDate === todayStr || !t.bookingDate);
+      const isSameSession = (t.session || 'morning').toLowerCase() === targetSession.toLowerCase();
+      const isWaiting = ['booked', 'waiting', 'calling', 'arrived'].includes(t.status);
+      const isEarlierNo = Number(t.tokenNo || (t as any).tokenNumber || 0) < targetTokNo;
+
+      if (isSameDoc && isToday && isSameSession && isWaiting && isEarlierNo && t.id !== tokenId) {
+        skippedEarlierIds.push(t.id);
+      }
+    });
+
+    const skippedSet = new Set(skippedEarlierIds);
+
+    // 2. Update local state: target token becomes 'in-consultation', skipped tokens become 'late-coming' (On-Hold)
+    setTokens(prev => {
+      const updated = prev.map(t => {
+        if (t.id === tokenId) {
+          return { ...t, status: 'in-consultation' as const };
+        }
+        if (skippedSet.has(t.id)) {
+          return { ...t, status: 'late-coming' as const };
+        }
+        return t;
+      });
+      localStorage.setItem('insta_hospital_tokens', JSON.stringify(updated));
+      if (targetHospId) {
+        localStorage.setItem(`insta_hospital_tokens_${targetHospId}`, JSON.stringify(updated));
+      }
+      broadcastGlobalSync('HOSPITAL_TOKENS_UPDATED', updated);
+      return updated;
+    });
+
+    // 3. Ring patient chime and push calling notification
+    await callPatientToken(tokenId);
+
+    // 4. Update backend via batch status update
+    try {
+      await fetch(`/api/hospitals/${targetHospId}/tokens/admit-cabin`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({
+          admittedTokenId: tokenId,
+          skippedTokenIds: skippedEarlierIds
+        })
+      });
+    } catch (e) {
+      console.warn('Backend admit-cabin error:', e);
+    }
+  };
+
   const updateTokenSession = (id: string, newSession: string) => {
     const normalizedSession = (newSession.toLowerCase()) as TokenRecord['session'];
     setTokens(prev => {
@@ -2991,7 +3073,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       addDoctor, updateDoctor, deleteDoctor, toggleDoctorActive,
       addDepartment, updateDepartment, deleteDepartment, toggleDepartmentActive,
       addStaffMember, updateStaffMember, deleteStaffMember, markStaffAttendance,
-      generateWalkInToken, updateTokenStatus, updateTokenPayment, cancelToken, deleteToken, deleteTokens, markTokensUnvisited, readmitToken, callPatientToken, updateTokenSession,
+      generateWalkInToken, updateTokenStatus, updateTokenPayment, cancelToken, deleteToken, deleteTokens, markTokensUnvisited, readmitToken, callPatientToken, admitPatientToCabin, updateTokenSession,
       addPatient, updatePatient, searchPatients, validateToken,
       updateScheduleConfig, updateSession,
       sendNotification, clearHospitalNotifications,

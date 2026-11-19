@@ -6,7 +6,7 @@ import {
   CheckCircle, Clock, Play,
   XCircle, Calendar, Search,
   Printer, Eye, Phone, Wifi, WifiOff,
-  Volume2, Stethoscope, Sparkles, UserX,
+  Volume2, Sparkles, UserX,
   Wallet, MapPin
 } from 'lucide-react';
 import { TokenPaymentModal } from '../../components/hospital/TokenPaymentModal';
@@ -14,7 +14,7 @@ import { TokenPaymentModal } from '../../components/hospital/TokenPaymentModal';
 export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorIdProp }) => {
   const params = useParams<{ doctorId: string }>();
   const doctorId = doctorIdProp || params.doctorId;
-  const { doctors, tokens, updateTokenStatus, callPatientToken, markTokensUnvisited, updateTokenPayment, updateTokenSession, hospitalProfile } = useHospital();
+  const { doctors, tokens, updateTokenStatus, callPatientToken, admitPatientToCabin, markTokensUnvisited, updateTokenPayment, updateTokenSession, hospitalProfile } = useHospital();
   const navigate = useNavigate();
 
   const doctor = doctors.find(d => d.id === doctorId) || doctors[0];
@@ -201,7 +201,7 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
     return true;
   });
   const notVisitedToday = doctorTokens.filter(t => {
-    if (!isDateMatching(t) || !['not-visited', 'skipped'].includes(t.status)) return false;
+    if (!isDateMatching(t) || !['not-visited', 'skipped', 'late-coming'].includes(t.status)) return false;
     if (selectedSessionFilter !== 'all') {
       return (t.session || 'morning').toLowerCase() === selectedSessionFilter.toLowerCase();
     }
@@ -231,12 +231,15 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
     );
   }
 
-  const handleCallNext = (tokenId?: string) => {
+  const handleAdmitCabin = async (tokenId: string) => {
     playCallChime();
+    await admitPatientToCabin(tokenId);
+  };
+
+  const handleCallNext = (tokenId?: string) => {
     const targetId = tokenId || (nextInLine.length > 0 ? nextInLine[0].id : activeQueue.length > 0 ? activeQueue[0].id : undefined);
     if (targetId) {
-      callPatientToken(targetId);
-      updateTokenStatus(targetId, 'checked-in');
+      handleAdmitCabin(targetId);
     }
   };
 
@@ -256,7 +259,7 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
   const handleRecallToken = (id: string) => {
     playCallChime();
     callPatientToken(id);
-    updateTokenStatus(id, 'checked-in');
+    updateTokenStatus(id, 'in-consultation');
   };
 
   // Tokens for this doctor that are NOT visited (can be cleared at the end of the day)
@@ -317,212 +320,201 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
 
   return (
     <div className="p-3.5 sm:p-6 space-y-4 sm:space-y-6 max-w-[1600px] mx-auto">
-      {/* ── Doctor Cabin Switcher Tabs ────────────────────────────────────────── */}
-      <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 p-3 sm:p-4 shadow-xs">
-        <div className="flex items-center justify-between mb-2.5 sm:mb-3 px-1">
-          <span className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-            <Stethoscope size={14} className="text-blue-600" />
-            <span>Doctor Cabin Token Monitors ({doctors.length} Doctors Available)</span>
-          </span>
-        </div>
-
-        <div className="flex items-center gap-2.5 overflow-x-auto pb-1">
-          {doctors.map(doc => {
-            const isSelected = doctor.id === doc.id;
-            const docWaiting = tokens.filter(t => t.doctorId === doc.id && ['booked', 'waiting', 'checked-in'].includes(t.status) && (t.bookingDate === todayStr || !t.bookingDate)).length;
-            return (
-              <button
-                key={doc.id}
-                type="button"
-                onClick={() => navigate(`/hospital/tokens/doctor/${doc.id}`)}
-                className={`px-3.5 py-2 rounded-2xl text-xs font-black flex items-center gap-2.5 shrink-0 cursor-pointer border transition-all ${isSelected
-                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-500/20'
-                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                  }`}
-              >
-                <img
-                  src={doc.photo || 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&auto=format&fit=crop&q=80'}
-                  alt={doc.name}
-                  className="w-5 h-5 rounded-full object-cover border border-white/40"
-                />
-                <span>{doc.name}</span>
-                {docWaiting > 0 && (
-                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${isSelected ? 'bg-red-500 text-white' : 'bg-red-100 text-red-600'
-                    }`}>
-                    {docWaiting}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* ── Top Doctor Banner Header ──────────────────────────────────────── */}
-      <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-xs p-4 sm:p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div className="flex items-center gap-3.5 sm:gap-4">
+      {/* ── Compact Streamlined Doctor OPD Header ────────────────────────── */}
+      <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-xs p-4 sm:p-5 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+        {/* Doctor Identity */}
+        <div className="flex items-center gap-3.5 shrink-0">
           <div className="relative shrink-0">
             <img
               src={doctor.photo || 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&auto=format&fit=crop&q=80'}
               alt={doctor.name}
-              className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl object-cover border border-slate-200 shadow-xs"
+              className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl object-cover border border-slate-200 shadow-xs"
             />
-            <span className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full border-2 border-white ${doctor.active ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+            <span className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-white ${doctor.active ? 'bg-emerald-500' : 'bg-slate-400'}`} />
           </div>
 
           <div className="min-w-0">
-            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-lg sm:text-xl font-black text-slate-800 leading-tight">{doctor.name}</h1>
-              <span className="text-[9.5px] sm:text-[10px] font-black px-2 sm:px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100 uppercase tracking-wide">
+              <span className="text-[9.5px] font-black px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100 uppercase tracking-wide">
                 {doctor.specialization} · Cabin Active
               </span>
             </div>
-            <p className="text-[11px] sm:text-xs text-slate-400 font-semibold mt-1">
-              Dept: <strong className="text-slate-600">{doctor.departmentName}</strong> · Fee: <strong className="text-emerald-600">₹{doctor.consultationFee}</strong> · Avg Consult: <strong className="text-slate-600">{doctor.consultationDuration} mins</strong>
+            <p className="text-[11px] text-slate-400 font-semibold mt-0.5">
+              Dept: <strong className="text-slate-600">{doctor.departmentName}</strong> · Fee: <strong className="text-emerald-600">₹{doctor.consultationFee}</strong> · Avg: <strong className="text-slate-600">{doctor.consultationDuration}m</strong>
             </p>
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap w-full md:w-auto">
-          <button
-            onClick={() => handleCallNext()}
-            disabled={activeQueue.length === 0}
-            className="flex-1 sm:flex-initial justify-center px-4 sm:px-5 py-2 sm:py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl sm:rounded-2xl font-black text-xs cursor-pointer border-none shadow-sm shadow-blue-500/20 flex items-center gap-2 transition-transform active:scale-95"
-          >
-            <Volume2 size={15} /> Call Next Patient
-          </button>
-          <button
-            onClick={() => navigate(`/hospital/tokens/add?doctorId=${doctor.id}&departmentId=${doctor.departmentId || ''}`)}
-            className="flex-1 sm:flex-initial justify-center px-3.5 sm:px-4 py-2 sm:py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl sm:rounded-2xl font-extrabold text-xs cursor-pointer border-none shadow-xs flex items-center gap-1.5"
-          >
-            Add Walk-in Token
-          </button>
-        </div>
-      </div>
-
-      {/* ── Doctor OPD Shift / Session Switcher ────────────────────────────── */}
-      <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 p-3.5 sm:p-4 shadow-xs">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-              <span>🩺 OPD Shifts &amp; Time Slots</span>
-            </span>
-            <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              Live Ongoing Now: {currentOngoingSession.toUpperCase()}
-            </span>
-          </div>
-          <span className="text-[11px] text-slate-400 font-semibold">
-            Select a session to filter live queue &amp; call patients per shift
-          </span>
-        </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+        {/* Inline Shift Selector Pills (Replaces oversized 110px block) */}
+        <div className="flex items-center gap-1.5 p-1 bg-slate-50 border border-slate-200 rounded-2xl overflow-x-auto w-full lg:w-auto">
           <button
             type="button"
             onClick={() => setSelectedSessionFilter('all')}
-            className={`p-3 rounded-2xl border text-left cursor-pointer transition-all flex flex-col justify-between ${selectedSessionFilter === 'all'
-                ? 'bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-500/20'
-                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-              }`}
+            className={`px-3 py-1.5 rounded-xl text-xs font-black cursor-pointer transition-all flex items-center gap-1.5 shrink-0 border-none ${
+              selectedSessionFilter === 'all'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'text-slate-600 hover:bg-slate-200/70'
+            }`}
           >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-black">All Shifts</span>
-              <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${selectedSessionFilter === 'all' ? 'bg-white/20 text-white' : 'bg-blue-50 text-blue-700'
-                }`}>
-                {sessionStats.all.total} Tokens
-              </span>
-            </div>
-            <div className={`text-[11px] font-bold mt-2 ${selectedSessionFilter === 'all' ? 'text-blue-100' : 'text-slate-400'}`}>
-              {sessionStats.all.waiting} waiting in queue
-            </div>
+            <span>All Shifts</span>
+            <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${selectedSessionFilter === 'all' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'}`}>
+              {sessionStats.all.total}
+            </span>
           </button>
 
           {doctorSessions.map(sess => {
             const sKey = sess.name.toLowerCase();
             const isSelected = selectedSessionFilter === sKey;
             const isCurrentNow = currentOngoingSession === sKey;
-            const icon = sKey.includes('morn') ? '🌅' : sKey.includes('even') ? '🌙' : '☀️';
             const sStat = sessionStats[sKey] || { waiting: 0, total: 0 };
+            const icon = sKey.includes('morn') ? '🌅' : sKey.includes('even') ? '🌙' : '☀️';
 
             return (
               <button
                 key={sess.id}
                 type="button"
                 onClick={() => setSelectedSessionFilter(sKey)}
-                className={`p-3 rounded-2xl border text-left cursor-pointer transition-all flex flex-col justify-between relative overflow-hidden ${isSelected
-                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-500/20'
+                className={`px-3 py-1.5 rounded-xl text-xs font-black cursor-pointer transition-all flex items-center gap-1.5 shrink-0 border-none ${
+                  isSelected
+                    ? 'bg-blue-600 text-white shadow-xs'
                     : isCurrentNow
-                      ? 'bg-emerald-50/70 text-slate-800 border-emerald-300 hover:bg-emerald-50'
-                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                  }`}
+                      ? 'bg-emerald-100/80 text-emerald-800 font-black'
+                      : 'text-slate-600 hover:bg-slate-200/70'
+                }`}
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <span>{icon}</span>
-                    <span className="text-xs font-black">{sess.name}</span>
-                    {isCurrentNow && !isSelected && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-                    )}
-                  </div>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${isSelected ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-700'
-                    }`}>
-                    {sStat.waiting} Waiting
-                  </span>
-                </div>
-                <div className={`text-[10px] font-bold mt-2 ${isSelected ? 'text-blue-100' : 'text-slate-400'}`}>
-                  {sess.startTime} – {sess.endTime} ({sStat.total} booked)
-                </div>
+                <span>{icon}</span>
+                <span>{sess.name}</span>
+                {isCurrentNow && !isSelected && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                )}
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+                  isSelected ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+                }`}>
+                  {sStat.waiting}
+                </span>
               </button>
             );
           })}
         </div>
+
+        {/* Action Buttons */}
+        <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
+          <button
+            onClick={() => handleCallNext()}
+            disabled={activeQueue.length === 0}
+            className="flex-1 sm:flex-initial justify-center px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl font-black text-xs cursor-pointer border-none shadow-sm shadow-blue-500/20 flex items-center gap-1.5 transition-transform active:scale-95"
+          >
+            <Volume2 size={14} /> Call Next Patient
+          </button>
+          <button
+            onClick={() => navigate(`/hospital/tokens/add?doctorId=${doctor.id}&departmentId=${doctor.departmentId || ''}`)}
+            className="flex-1 sm:flex-initial justify-center px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-extrabold text-xs cursor-pointer border-none shadow-xs flex items-center gap-1.5"
+          >
+            + Add Walk-in
+          </button>
+        </div>
       </div>
 
-      {/* ── Key Metrics Cards (Compact & Screen Compatible) ─────────────────── */}
+      {/* ── 4 Interactive Operational Metric Cards (Click to filter queue instantly) ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
-        <div className="bg-white rounded-2xl p-3 border border-slate-150 shadow-2xs flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-            <Clock size={16} />
+        {/* 1. Waiting in Queue */}
+        <button
+          type="button"
+          onClick={() => setStatusTab('active')}
+          className={`p-3 rounded-2xl border text-left cursor-pointer transition-all flex items-center gap-3 ${
+            statusTab === 'active'
+              ? 'bg-blue-600 text-white border-blue-600 shadow-md ring-2 ring-blue-500/30'
+              : 'bg-white text-slate-800 border-slate-200 hover:border-blue-300 hover:bg-blue-50/20'
+          }`}
+        >
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+            statusTab === 'active' ? 'bg-white/20 text-white' : 'bg-blue-50 text-blue-600'
+          }`}>
+            <Clock size={18} />
           </div>
           <div className="min-w-0">
-            <span className="text-[9.5px] text-slate-400 font-black uppercase tracking-wider block truncate">Waiting in Queue</span>
-            <span className="text-lg sm:text-xl font-black text-slate-800 leading-tight block">{activeQueue.length}</span>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-2xl p-3 border border-slate-150 shadow-2xs flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-            <CheckCircle size={16} />
-          </div>
-          <div className="min-w-0">
-            <span className="text-[9.5px] text-slate-400 font-black uppercase tracking-wider block truncate">
-              {dateFilter === 'today' ? 'Visited Today' : 'Visited'}
+            <span className={`text-[10px] font-black uppercase tracking-wider block truncate ${
+              statusTab === 'active' ? 'text-blue-100' : 'text-slate-400'
+            }`}>
+              Waiting in Queue
             </span>
-            <span className="text-lg sm:text-xl font-black text-emerald-600 leading-tight block">{completedToday.length}</span>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-2xl p-3 border border-slate-150 shadow-2xs flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-            <UserX size={16} />
-          </div>
-          <div className="min-w-0">
-            <span className="text-[9.5px] text-slate-400 font-black uppercase tracking-wider block truncate">Not Visited / Absent</span>
-            <span className="text-lg sm:text-xl font-black text-amber-600 leading-tight block">{notVisitedToday.length}</span>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-2xl p-3 border border-slate-150 shadow-2xs flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
-            <Sparkles size={16} />
-          </div>
-          <div className="min-w-0">
-            <span className="text-[9.5px] text-slate-400 font-black uppercase tracking-wider block truncate">
-              {dateFilter === 'today' ? "Today's Earned Revenue" : 'Earned Revenue'}
+            <span className="text-xl font-black leading-tight block">
+              {activeQueue.length}
             </span>
-            <span className="text-lg sm:text-xl font-black text-slate-800 leading-tight block truncate">₹{todayDoctorRevenue.toLocaleString('en-IN')}</span>
+          </div>
+        </button>
+
+        {/* 2. On-Hold / Late-Coming */}
+        <button
+          type="button"
+          onClick={() => setStatusTab('not-visited')}
+          className={`p-3 rounded-2xl border text-left cursor-pointer transition-all flex items-center gap-3 ${
+            statusTab === 'not-visited'
+              ? 'bg-amber-500 text-white border-amber-500 shadow-md ring-2 ring-amber-400/30'
+              : 'bg-white text-slate-800 border-slate-200 hover:border-amber-300 hover:bg-amber-50/20'
+          }`}
+        >
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+            statusTab === 'not-visited' ? 'bg-white/20 text-white' : 'bg-amber-50 text-amber-600'
+          }`}>
+            <UserX size={18} />
+          </div>
+          <div className="min-w-0">
+            <span className={`text-[10px] font-black uppercase tracking-wider block truncate ${
+              statusTab === 'not-visited' ? 'text-amber-100' : 'text-slate-400'
+            }`}>
+              On-Hold / Late
+            </span>
+            <span className={`text-xl font-black leading-tight block ${
+              statusTab === 'not-visited' ? 'text-white' : 'text-amber-600'
+            }`}>
+              {notVisitedToday.length}
+            </span>
+          </div>
+        </button>
+
+        {/* 3. Visited / Completed */}
+        <button
+          type="button"
+          onClick={() => setStatusTab('completed')}
+          className={`p-3 rounded-2xl border text-left cursor-pointer transition-all flex items-center gap-3 ${
+            statusTab === 'completed'
+              ? 'bg-emerald-600 text-white border-emerald-600 shadow-md ring-2 ring-emerald-500/30'
+              : 'bg-white text-slate-800 border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/20'
+          }`}
+        >
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+            statusTab === 'completed' ? 'bg-white/20 text-white' : 'bg-emerald-50 text-emerald-600'
+          }`}>
+            <CheckCircle size={18} />
+          </div>
+          <div className="min-w-0">
+            <span className={`text-[10px] font-black uppercase tracking-wider block truncate ${
+              statusTab === 'completed' ? 'text-emerald-100' : 'text-slate-400'
+            }`}>
+              Visited / Done
+            </span>
+            <span className={`text-xl font-black leading-tight block ${
+              statusTab === 'completed' ? 'text-white' : 'text-emerald-600'
+            }`}>
+              {completedToday.length}
+            </span>
+          </div>
+        </button>
+
+        {/* 4. Earned Revenue */}
+        <div className="p-3 rounded-2xl border border-slate-200 bg-white text-slate-800 flex items-center gap-3 shadow-2xs">
+          <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+            <Sparkles size={18} />
+          </div>
+          <div className="min-w-0">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block truncate">
+              Earned Revenue
+            </span>
+            <span className="text-xl font-black text-slate-900 leading-tight block truncate">
+              ₹{todayDoctorRevenue.toLocaleString('en-IN')}
+            </span>
           </div>
         </div>
       </div>
@@ -554,6 +546,13 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
 
           <div className="flex items-center gap-2 self-end md:self-auto shrink-0">
             <button
+              onClick={() => handleRecallToken(inConsultation.id)}
+              className="px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-black text-xs cursor-pointer border-none shadow-xs flex items-center gap-1 transition-colors"
+              title="Ring patient chime again"
+            >
+              <Volume2 size={13} /> Re-Call
+            </button>
+            <button
               onClick={() => handleCompleteToken(inConsultation.id)}
               className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-black text-xs cursor-pointer border-none shadow-xs flex items-center gap-1.5 transition-colors"
             >
@@ -563,7 +562,7 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
               onClick={() => handleMarkNotVisited(inConsultation.id)}
               className="px-3 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-xl font-bold text-xs cursor-pointer flex items-center gap-1 transition-colors"
             >
-              <UserX size={13} /> Absent
+              <UserX size={13} /> Absent / Hold
             </button>
             <button
               onClick={() => setPrintToken(inConsultation)}
@@ -576,57 +575,32 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
         </div>
       )}
 
-      {/* ── Filters & Search Toolbar ───────────────────────────────────────── */}
-      <div className="bg-white rounded-3xl border border-slate-100 shadow-xs p-4 space-y-3">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-          {/* Status Tabs */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-            {[
-              { key: 'all', label: `All (${doctorTokens.length})` },
-              { key: 'active', label: `Waiting / In Cabin (${activeQueue.length})` },
-              { key: 'completed', label: `Visited (${completedToday.length})` },
-              { key: 'not-visited', label: `Not Visited / Absent (${notVisitedToday.length})` },
-              { key: 'cancelled', label: `Cancelled (${doctorTokens.filter(t => t.status === 'cancelled').length})` }
-            ].map(tab => (
-              <button
-                key={tab.key}
-                onClick={() => setStatusTab(tab.key as any)}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-black cursor-pointer border transition-all shrink-0 ${statusTab === tab.key
-                    ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                    : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                  }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+      {/* ── Compact Filter & Search Toolbar ─────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-xs p-3 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs">
+        {/* Left: Quick status toggle (All vs Active) + Filters */}
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <button
+            type="button"
+            onClick={() => setStatusTab('all')}
+            className={`px-3 py-1 rounded-xl text-xs font-black cursor-pointer border transition-all ${
+              statusTab === 'all'
+                ? 'bg-slate-800 text-white border-slate-800'
+                : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+            }`}
+          >
+            Show All ({doctorTokens.length})
+          </button>
 
-          {/* Search Box */}
-          <div className="relative w-full md:w-72">
-            <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search token #, patient name, phone..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-semibold"
-            />
-          </div>
-        </div>
-
-        {/* Secondary Filter Badges (Date + Source + Session) */}
-        <div className="flex items-center gap-3 flex-wrap pt-2 border-t border-slate-100 text-xs">
           {/* Date Selector */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-xl">
             <Calendar size={13} className="text-slate-400" />
-            <span className="text-[10px] font-bold text-slate-500 uppercase">Date:</span>
             <select
               value={dateFilter}
               onChange={e => setDateFilter(e.target.value as any)}
-              className="px-2.5 py-1 border border-slate-200 rounded-lg text-xs font-bold outline-none bg-white text-slate-700 cursor-pointer"
+              className="bg-transparent text-xs font-bold text-slate-700 outline-none cursor-pointer border-none"
             >
-              <option value="all">All Dates</option>
               <option value="today">Today</option>
+              <option value="all">All Dates</option>
               <option value="tomorrow">Tomorrow</option>
               <option value="yesterday">Yesterday</option>
               <option value="custom">Custom Date</option>
@@ -636,49 +610,46 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
                 type="date"
                 value={customDate}
                 onChange={e => setCustomDate(e.target.value)}
-                className="px-2 py-1 border border-slate-200 rounded-lg text-xs font-bold outline-none"
+                className="bg-white border border-slate-200 rounded px-1 text-[10px] font-bold outline-none"
               />
             )}
           </div>
 
           {/* Source Filter */}
-          <div className="flex items-center gap-1">
-            <span className="text-[10px] font-bold text-slate-500 uppercase">Source:</span>
+          <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-xl">
             <select
               value={sourceFilter}
               onChange={e => setSourceFilter(e.target.value as any)}
-              className="px-2.5 py-1 border border-slate-200 rounded-lg text-xs font-bold outline-none bg-white text-slate-700"
+              className="bg-transparent text-xs font-bold text-slate-700 outline-none cursor-pointer border-none"
             >
               <option value="all">All Sources</option>
               <option value="online">Online App</option>
-              <option value="offline">Hospital Counter</option>
+              <option value="offline">Hospital Desk</option>
             </select>
           </div>
+        </div>
 
-          {/* Session Filter */}
-          <div className="flex items-center gap-1">
-            <span className="text-[10px] font-bold text-slate-500 uppercase">Session:</span>
-            <select
-              value={selectedSessionFilter}
-              onChange={e => setSelectedSessionFilter(e.target.value)}
-              className="px-2.5 py-1 border border-slate-200 rounded-lg text-xs font-bold outline-none bg-white text-slate-700"
-            >
-              <option value="all">All Sessions</option>
-              <option value="morning">Morning</option>
-              <option value="afternoon">Afternoon</option>
-              <option value="evening">Evening</option>
-            </select>
+        {/* Right: Search Box + Route to Unvisited Action */}
+        <div className="flex items-center gap-2 w-full md:w-auto">
+          <div className="relative flex-1 md:w-64">
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search token #, patient name..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="w-full pl-8 pr-3 py-1.5 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-semibold"
+            />
           </div>
 
-          {/* End of Day Route Unvisited Button */}
           {unvisitedDoctorTokens.length > 0 && (
             <button
               onClick={handleRouteAllToUnvisited}
-              className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-black cursor-pointer flex items-center gap-1.5 transition-colors shadow-xs ml-auto"
-              title="Safely route all unvisited/absent tokens to the Unvisited Directory for smart re-admission"
+              className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-black cursor-pointer flex items-center gap-1.5 transition-colors shadow-xs shrink-0"
+              title="Safely archive unvisited tokens into Unvisited Directory"
             >
               <UserX size={13} />
-              <span>Route to Unvisited ({unvisitedDoctorTokens.length})</span>
+              <span>Route Unvisited ({unvisitedDoctorTokens.length})</span>
             </button>
           )}
         </div>
@@ -709,7 +680,7 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
               ) : (
                 filteredTokens.map(tok => {
                   const isCurrent = inConsultation?.id === tok.id;
-                  const isNotVisited = ['not-visited', 'skipped'].includes(tok.status);
+                  const isNotVisited = ['not-visited', 'skipped', 'late-coming'].includes(tok.status);
                   const isCompleted = tok.status === 'completed';
                   const otherSessions = doctorSessions.filter(s => s.name.toLowerCase() !== (tok.session || 'morning').toLowerCase());
 
@@ -821,41 +792,65 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
                         <span className={`inline-flex items-center gap-1 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider ${tok.status === 'completed'
                             ? 'bg-emerald-100 text-emerald-700'
                             : (tok.status === 'checked-in' || tok.status === 'in-consultation')
-                              ? 'bg-blue-600 text-white'
-                              : isNotVisited
-                                ? 'bg-amber-100 text-amber-700'
-                                : tok.status === 'cancelled'
-                                  ? 'bg-red-100 text-red-700'
-                                  : 'bg-blue-50 text-blue-700'
+                              ? 'bg-blue-600 text-white shadow-xs animate-pulse'
+                              : tok.status === 'calling'
+                                ? 'bg-amber-500 text-white animate-bounce'
+                                : tok.status === 'late-coming'
+                                  ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                                  : isNotVisited
+                                    ? 'bg-amber-100 text-amber-700'
+                                    : tok.status === 'cancelled'
+                                      ? 'bg-red-100 text-red-700'
+                                      : 'bg-blue-50 text-blue-700'
                           }`}>
-                          {tok.status === 'checked-in' || tok.status === 'in-consultation' ? 'In Cabin' : tok.status === 'completed' ? 'Visited' : isNotVisited ? 'Not Visited' : tok.status}
+                          {tok.status === 'checked-in' || tok.status === 'in-consultation'
+                            ? '🩺 In Cabin'
+                            : tok.status === 'calling'
+                              ? '🔊 Calling'
+                              : tok.status === 'completed'
+                                ? '✓ Visited'
+                                : tok.status === 'late-coming'
+                                  ? '⏸️ On-Hold / Late'
+                                  : isNotVisited
+                                    ? 'Not Visited'
+                                    : tok.status}
                         </span>
                       </td>
 
                       <td className="py-3.5 px-4 text-right">
                         <div className="flex items-center justify-end gap-1.5 flex-wrap">
-                          {['booked', 'waiting', 'calling', 'arrived'].includes(tok.status) && (
+                          {['booked', 'waiting', 'arrived'].includes(tok.status) && (
                             <button
-                              onClick={() => handleCallNext(tok.id)}
-                              className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold cursor-pointer border-none shadow-xs flex items-center gap-1"
-                              title="Call this patient into cabin"
+                              onClick={() => handleAdmitCabin(tok.id)}
+                              className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold cursor-pointer border-none shadow-xs flex items-center gap-1 transition-transform active:scale-95"
+                              title="Call and admit patient into cabin (auto-holds any skipped earlier tokens)"
                             >
-                              <Play size={11} /> Call
+                              <Play size={11} /> Call & Admit
                             </button>
                           )}
 
-                          {(tok.status === 'checked-in' || tok.status === 'in-consultation' || tok.status === 'calling') && (
+                          {tok.status === 'calling' && (
+                            <button
+                              onClick={() => handleAdmitCabin(tok.id)}
+                              className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold cursor-pointer border-none shadow-xs flex items-center gap-1 transition-transform active:scale-95"
+                              title="Patient arrived - admit into cabin"
+                            >
+                              <Play size={11} /> In Cabin
+                            </button>
+                          )}
+
+                          {(tok.status === 'checked-in' || tok.status === 'in-consultation') && (
                             <>
                               <button
                                 onClick={() => handleRecallToken(tok.id)}
-                                className="px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold cursor-pointer border-none shadow-xs flex items-center gap-1"
+                                className="px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold cursor-pointer border-none shadow-xs flex items-center gap-1 transition-colors"
                                 title="Ring patient alert chime again"
                               >
                                 <Volume2 size={11} /> Re-Call
                               </button>
                               <button
                                 onClick={() => handleCompleteToken(tok.id)}
-                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold cursor-pointer border-none shadow-xs flex items-center gap-1"
+                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold cursor-pointer border-none shadow-xs flex items-center gap-1 transition-colors"
                                 title="Complete consultation (adds to revenue)"
                               >
                                 <CheckCircle size={11} /> Visited
@@ -866,28 +861,28 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
                           {['booked', 'waiting', 'checked-in', 'calling', 'in-consultation', 'arrived'].includes(tok.status) && (
                             <button
                               onClick={() => handleMarkNotVisited(tok.id)}
-                              className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-lg text-xs font-bold cursor-pointer flex items-center gap-1"
-                              title="Mark as Not Visited / Absent"
+                              className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-lg text-xs font-bold cursor-pointer flex items-center gap-1 transition-colors"
+                              title="Put token On-Hold / Absent"
                             >
-                              <UserX size={11} /> Not Visited
+                              <UserX size={11} /> Hold / Absent
                             </button>
                           )}
 
                           {isNotVisited && (
                             <>
                               <button
-                                onClick={() => handleCompleteToken(tok.id)}
-                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold cursor-pointer border-none shadow-xs flex items-center gap-1"
-                                title="Patient arrived late - mark as visited and add revenue"
+                                onClick={() => handleAdmitCabin(tok.id)}
+                                className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold cursor-pointer border-none shadow-xs flex items-center gap-1 transition-transform active:scale-95"
+                                title="Patient arrived late - admit directly into cabin"
                               >
-                                <CheckCircle size={11} /> Mark Visited
+                                <Play size={11} /> Admit Cabin
                               </button>
                               <button
-                                onClick={() => handleRecallToken(tok.id)}
-                                className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-xs font-bold cursor-pointer flex items-center gap-1"
-                                title="Re-call into cabin"
+                                onClick={() => handleCompleteToken(tok.id)}
+                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold cursor-pointer border-none shadow-xs flex items-center gap-1 transition-colors"
+                                title="Patient arrived - mark as visited and add revenue"
                               >
-                                <Play size={11} /> Call Cabin
+                                <CheckCircle size={11} /> Mark Visited
                               </button>
                             </>
                           )}

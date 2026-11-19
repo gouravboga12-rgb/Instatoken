@@ -3516,6 +3516,95 @@ app.post('/api/hospitals/:hospitalId/tokens/:tokenId/call', requireHospitalAuth,
   res.json({ success: true, callPayload, token: targetToken });
 });
 
+// ─── Out-of-Order Cabin Admission & Auto-Hold ───────────────────────
+app.post('/api/hospitals/:hospitalId/tokens/admit-cabin', requireHospitalAuth, async (req, res) => {
+  const { hospitalId } = req.params;
+  const { admittedTokenId, skippedTokenIds = [] } = req.body;
+  const store = await getUnifiedStore();
+
+  const skippedSet = new Set(skippedTokenIds);
+  let admittedToken = null;
+
+  store.tokens = (store.tokens || []).map(t => {
+    if (t.id === admittedTokenId || (t.appointmentId && t.appointmentId === admittedTokenId)) {
+      admittedToken = {
+        ...t,
+        status: 'in-consultation',
+        lastAdmittedAt: new Date().toISOString()
+      };
+      return admittedToken;
+    }
+    if (skippedSet.has(t.id) || (t.appointmentId && skippedSet.has(t.appointmentId))) {
+      return {
+        ...t,
+        status: 'late-coming',
+        autoHeldAt: new Date().toISOString()
+      };
+    }
+    return t;
+  });
+
+  if (!admittedToken) {
+    return res.status(404).json({ success: false, message: 'Token to admit not found' });
+  }
+
+  store.appointments = (store.appointments || []).map(a => {
+    if (a.id === admittedTokenId || a.id === admittedToken.id) {
+      return { ...a, status: 'in-cabin', lastAdmittedAt: new Date().toISOString() };
+    }
+    if (skippedSet.has(a.id)) {
+      return { ...a, status: 'late-coming', autoHeldAt: new Date().toISOString() };
+    }
+    return a;
+  });
+
+  if (isDbConnected) {
+    try {
+      await query(
+        `UPDATE tokens SET status = 'in-consultation', updated_at = NOW(),
+         data = (COALESCE(data, '{}'::jsonb) || jsonb_build_object('status', 'in-consultation', 'lastAdmittedAt', NOW()))
+         WHERE id = $1`,
+        [admittedToken.id]
+      );
+      await query(
+        `UPDATE appointments SET status = 'in-cabin', updated_at = NOW(),
+         data = (COALESCE(data, '{}'::jsonb) || jsonb_build_object('status', 'in-cabin', 'lastAdmittedAt', NOW()))
+         WHERE id = $1`,
+        [admittedToken.id]
+      );
+
+      if (skippedTokenIds.length > 0) {
+        await query(
+          `UPDATE tokens SET status = 'late-coming', updated_at = NOW(),
+           data = (COALESCE(data, '{}'::jsonb) || jsonb_build_object('status', 'late-coming', 'autoHeldAt', NOW()))
+           WHERE id = ANY($1::text[])`,
+          [skippedTokenIds]
+        );
+        await query(
+          `UPDATE appointments SET status = 'late-coming', updated_at = NOW(),
+           data = (COALESCE(data, '{}'::jsonb) || jsonb_build_object('status', 'late-coming', 'autoHeldAt', NOW()))
+           WHERE id = ANY($1::text[])`,
+          [skippedTokenIds]
+        );
+      }
+    } catch (e) {
+      console.warn('RDS admit-cabin error:', e.message);
+    }
+  }
+
+  await saveUnifiedStore(store);
+
+  // Broadcast updates via Socket.io
+  io.to(`hospital_${hospitalId}`).emit('token_status_changed', admittedToken);
+  if (skippedTokenIds.length > 0) {
+    io.to(`hospital_${hospitalId}`).emit('tokens_batch_status_changed', { ids: skippedTokenIds, status: 'late-coming' });
+  }
+
+  console.log(`📡 [Socket.io] Emitted admit-cabin for token ${admittedToken.id} (#${admittedToken.tokenNo}), auto-held ${skippedTokenIds.length} skipped tokens`);
+
+  res.json({ success: true, admittedToken, skippedCount: skippedTokenIds.length });
+});
+
 // ─── Re-Admit Unvisited / Missed Token ─────────────────────────────────────────
 app.post('/api/hospitals/:hospitalId/tokens/:tokenId/readmit', requireHospitalAuth, async (req, res) => {
   const { hospitalId, tokenId } = req.params;
