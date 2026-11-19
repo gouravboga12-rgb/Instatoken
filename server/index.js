@@ -5036,12 +5036,42 @@ app.get('/api/hospitals/:hospitalId/payout-settlements', requireHospitalAuth, as
   res.json({ success: true, settlements });
 });
 
+// ─── Financial Helpers for Payouts & Settlements ──────────────────
+function isFullOnlineToken(t) {
+  if (!t) return false;
+  const d = t.data || {};
+  const pc = t.paymentCollection || d.paymentCollection || {};
+  const mode = pc.mode || t.collectionMode || d.collectionMode;
+  if (mode === 'full_online') return true;
+  const method = (t.paymentMethod || d.paymentMethod || '').toLowerCase();
+  if (method.includes('full online')) return true;
+  if (t.isFullOnline || d.isFullOnline) return true;
+  const totalFee = Number(t.totalFee || d.totalFee || 0);
+  const docFee = Number(pc.consultationFee || t.consultationFee || d.consultationFee || t.fee || d.fee || 0);
+  if (docFee > 0 && totalFee >= docFee) return true;
+  return false;
+}
+
+function getDoctorFee(t) {
+  if (!t) return 0;
+  const d = t.data || {};
+  const pc = t.paymentCollection || d.paymentCollection || {};
+  return Number(pc.consultationFee || t.consultationFee || d.consultationFee || t.fee || d.fee || 0);
+}
+
+function getSettlementStatus(t) {
+  if (!t) return 'unsettled';
+  const d = t.data || {};
+  const pc = t.paymentCollection || d.paymentCollection || {};
+  return pc.settlementStatus || d.settlementStatus || 'unsettled';
+}
+
 // GET /api/hospitals/:hospitalId/payout-summary
 app.get('/api/hospitals/:hospitalId/payout-summary', requireHospitalAuth, async (req, res) => {
   const { hospitalId } = req.params;
   const store = await getUnifiedStore();
 
-  // Get payment mode
+  // Get payment mode & bank details
   let paymentMode = 'token_only';
   let bankDetails = {};
   if (isDbConnected) {
@@ -5058,16 +5088,48 @@ app.get('/api/hospitals/:hospitalId/payout-summary', requireHospitalAuth, async 
     bankDetails = prof;
   }
 
-  // Get tokens with full_online payment collection (both booked and completed)
-  let totalCollectedOnline = 0;
-  let totalSettled = 0;
-  let unsettledTokens = [];
-
-  const allTokens = [...(store.tokens || []), ...(store.appointments || []).map(a => ({ ...a, consultationFee: a.fee }))];
+  // Get all tokens for this hospital from both RDS and store
   const seenIds = new Set();
   const hospTokens = [];
-  allTokens.forEach(t => {
-    // Match this hospital, or if hosp-mu0838sg has legacy tokens from hosp-gandhi
+
+  if (isDbConnected) {
+    try {
+      const r = await query(
+        `SELECT id, token_number, doctor_id, patient_name, patient_phone, status, session, token_date, data, created_at
+         FROM tokens
+         WHERE (hospital_id = $1 OR ($1 = 'hosp-mu0838sg' AND hospital_id = 'hosp-gandhi'))
+         ORDER BY created_at DESC`,
+        [hospitalId]
+      );
+      r.rows.forEach(row => {
+        if (!seenIds.has(row.id)) {
+          seenIds.add(row.id);
+          const d = row.data || {};
+          hospTokens.push({
+            id: row.id,
+            tokenNo: row.token_number || d.tokenNo || d.tokenNumber || 1,
+            patientName: row.patient_name || d.patientName || 'Patient',
+            patientPhone: row.patient_phone || d.patientPhone || '',
+            doctorId: row.doctor_id || d.doctorId,
+            doctorName: d.doctorName || 'Doctor',
+            departmentName: d.departmentName || 'General OPD',
+            status: row.status,
+            consultationFee: getDoctorFee(d),
+            totalFee: Number(d.totalFee || 0),
+            bookingDate: d.bookingDate || row.token_date || (row.created_at ? new Date(row.created_at).toISOString().split('T')[0] : 'Today'),
+            paymentCollection: d.paymentCollection || {},
+            paymentMethod: d.paymentMethod || 'Razorpay (Full Online)',
+            data: d
+          });
+        }
+      });
+    } catch (e) {
+      console.warn('Error fetching tokens from RDS in payout-summary:', e.message);
+    }
+  }
+
+  const allStoreTokens = [...(store.tokens || []), ...(store.appointments || []).map(a => ({ ...a, consultationFee: a.fee }))];
+  allStoreTokens.forEach(t => {
     const matchesHosp = t.hospitalId === hospitalId || 
       (hospitalId === 'hosp-mu0838sg' && t.hospitalId === 'hosp-gandhi');
     if (matchesHosp && t.id && !seenIds.has(t.id)) {
@@ -5076,17 +5138,17 @@ app.get('/api/hospitals/:hospitalId/payout-summary', requireHospitalAuth, async 
     }
   });
 
-  hospTokens.forEach(t => {
-    const pc = t.paymentCollection || {};
-    const isFullOnline = pc.mode === 'full_online' || 
-      t.collectionMode === 'full_online' || 
-      (t.paymentMethod && t.paymentMethod.toLowerCase().includes('full online')) ||
-      (Number(t.totalFee || 0) > (Number(t.consultationFee || t.fee || 0) + 5));
+  let totalCollectedOnline = 0;
+  let totalSettled = 0;
+  const unsettledTokens = [];
 
+  hospTokens.forEach(t => {
+    const isFullOnline = isFullOnlineToken(t);
     if (isFullOnline && t.status !== 'cancelled') {
-      const docFee = Number(pc.consultationFee || t.consultationFee || t.fee || 0);
+      const docFee = getDoctorFee(t);
       totalCollectedOnline += docFee;
-      if (pc.settlementStatus === 'settled') {
+      const sStatus = getSettlementStatus(t);
+      if (sStatus === 'settled') {
         totalSettled += docFee;
       } else {
         unsettledTokens.push(t);
@@ -5094,33 +5156,34 @@ app.get('/api/hospitals/:hospitalId/payout-summary', requireHospitalAuth, async 
     }
   });
 
-  // Also count settled from settlement records
-  let settledCount = 0;
+  // Check actual disbursed sum from hospital_payout_settlements
+  let settledFromDb = 0;
   if (isDbConnected) {
     try {
-      const sr = await query(`SELECT SUM(payout_amount) as total FROM hospital_payout_settlements WHERE hospital_id=$1`, [hospitalId]);
-      if (sr.rows[0]?.total) settledCount = Number(sr.rows[0].total);
+      const sr = await query(`SELECT SUM(payout_amount) as total FROM hospital_payout_settlements WHERE hospital_id=$1 OR ($1='hosp-mu0838sg' AND hospital_id='hosp-gandhi')`, [hospitalId]);
+      if (sr.rows[0]?.total) settledFromDb = Number(sr.rows[0].total);
     } catch (e) {}
   }
 
-  const pendingDue = Math.max(0, totalCollectedOnline - (settledCount || totalSettled));
+  const effectiveSettled = Math.max(totalSettled, settledFromDb);
+  const pendingDue = Math.max(0, totalCollectedOnline - effectiveSettled);
 
   res.json({
     success: true,
     paymentMode,
     bankDetails,
     totalCollectedOnline,
-    totalSettled: settledCount || totalSettled,
+    totalSettled: effectiveSettled,
     pendingDue,
     unsettledCount: unsettledTokens.length,
     unsettledTokens: unsettledTokens.map(t => ({
       id: t.id,
       tokenNo: t.tokenNo || t.tokenNumber || 1,
-      patientName: t.patientName || (t.data && t.data.patientName) || 'Patient',
-      doctorName: t.doctorName || (t.data && t.data.doctorName) || 'Doctor',
-      departmentName: t.departmentName || (t.data && t.data.departmentName) || 'General',
-      consultationFee: Number(t.paymentCollection?.consultationFee || t.consultationFee || t.fee || 0),
-      bookingDate: t.bookingDate || t.date || (t.createdAt ? t.createdAt.split('T')[0] : 'Today'),
+      patientName: t.patientName || 'Patient',
+      doctorName: t.doctorName || 'Doctor',
+      departmentName: t.departmentName || 'General OPD',
+      consultationFee: getDoctorFee(t),
+      bookingDate: t.bookingDate || 'Today',
       paymentMethod: t.paymentMethod || 'Razorpay (Full Online)',
       status: t.status || 'booked'
     }))
@@ -5133,7 +5196,6 @@ app.get('/api/hospitals/:hospitalId/payout-summary', requireHospitalAuth, async 
 app.get('/api/admin/hospital-settlements', async (req, res) => {
   const store = await getUnifiedStore();
 
-  // Fetch all hospitals with payment_mode = 'full_online' (excluding decommissioned hosp-gandhi)
   let hospitals = [];
   if (isDbConnected) {
     try {
@@ -5149,53 +5211,78 @@ app.get('/api/admin/hospital-settlements', async (req, res) => {
     hospitals = hospitals.filter(h => h.id !== 'hosp-gandhi');
   }
 
-  // For each hospital, calculate dues
   const result = await Promise.all(hospitals.map(async (h) => {
     let totalCollected = 0;
     let totalSettled = 0;
     let tokenCount = 0;
 
-    // Collect from tokens (all non-cancelled full_online bookings)
-    const allTokens = [...(store.tokens || []), ...(store.appointments || []).map(a => ({ ...a, consultationFee: a.fee }))];
-    const seenTokenIds = new Set();
+    const seenIds = new Set();
     const hospTokens = [];
-    allTokens.forEach(t => {
+
+    if (isDbConnected) {
+      try {
+        const r = await query(
+          `SELECT id, token_number, doctor_id, patient_name, patient_phone, status, session, token_date, data, created_at
+           FROM tokens
+           WHERE (hospital_id = $1 OR ($1 = 'hosp-mu0838sg' AND hospital_id = 'hosp-gandhi'))`,
+          [h.id]
+        );
+        r.rows.forEach(row => {
+          if (!seenIds.has(row.id)) {
+            seenIds.add(row.id);
+            const d = row.data || {};
+            hospTokens.push({
+              id: row.id,
+              tokenNo: row.token_number || d.tokenNo || 1,
+              status: row.status,
+              consultationFee: getDoctorFee(d),
+              totalFee: Number(d.totalFee || 0),
+              paymentCollection: d.paymentCollection || {},
+              paymentMethod: d.paymentMethod || 'Razorpay (Full Online)',
+              data: d
+            });
+          }
+        });
+      } catch (e) {}
+    }
+
+    const allStoreTokens = [...(store.tokens || []), ...(store.appointments || []).map(a => ({ ...a, consultationFee: a.fee }))];
+    allStoreTokens.forEach(t => {
       const matchesHosp = t.hospitalId === h.id || 
         (h.id === 'hosp-mu0838sg' && t.hospitalId === 'hosp-gandhi');
-      if (matchesHosp && t.id && !seenTokenIds.has(t.id)) {
-        seenTokenIds.add(t.id);
+      if (matchesHosp && t.id && !seenIds.has(t.id)) {
+        seenIds.add(t.id);
         hospTokens.push(t);
       }
     });
 
     hospTokens.forEach(t => {
-      const pc = t.paymentCollection || {};
-      const isFullOnline = pc.mode === 'full_online' || 
-        t.collectionMode === 'full_online' || 
-        (t.paymentMethod && t.paymentMethod.toLowerCase().includes('full online')) ||
-        (Number(t.totalFee || 0) > (Number(t.consultationFee || t.fee || 0) + 5));
-
+      const isFullOnline = isFullOnlineToken(t);
       if (isFullOnline && t.status !== 'cancelled') {
-        const docFee = Number(pc.consultationFee || t.consultationFee || t.fee || 0);
+        const docFee = getDoctorFee(t);
         totalCollected += docFee;
         tokenCount++;
-        if (pc.settlementStatus === 'settled') totalSettled += docFee;
+        if (getSettlementStatus(t) === 'settled') {
+          totalSettled += docFee;
+        }
       }
     });
 
-    // Get settled from records
+    let settledFromDb = 0;
     if (isDbConnected) {
       try {
-        const sr = await query(`SELECT SUM(payout_amount) as total FROM hospital_payout_settlements WHERE hospital_id=$1`, [h.id]);
-        if (sr.rows[0]?.total) totalSettled = Number(sr.rows[0].total);
+        const sr = await query(`SELECT SUM(payout_amount) as total FROM hospital_payout_settlements WHERE hospital_id=$1 OR ($1='hosp-mu0838sg' AND hospital_id='hosp-gandhi')`, [h.id]);
+        if (sr.rows[0]?.total) settledFromDb = Number(sr.rows[0].total);
       } catch (e) {}
     }
 
-    // Pending payout requests
+    const effectiveSettled = Math.max(totalSettled, settledFromDb);
+    const pendingDue = Math.max(0, totalCollected - effectiveSettled);
+
     let pendingRequests = [];
     if (isDbConnected) {
       try {
-        const rr = await query(`SELECT * FROM hospital_payout_requests WHERE hospital_id=$1 AND status='pending' ORDER BY created_at DESC`, [h.id]);
+        const rr = await query(`SELECT * FROM hospital_payout_requests WHERE (hospital_id=$1 OR ($1='hosp-mu0838sg' AND hospital_id='hosp-gandhi')) AND status='pending' ORDER BY created_at DESC`, [h.id]);
         pendingRequests = rr.rows;
       } catch (e) {}
     }
@@ -5203,14 +5290,13 @@ app.get('/api/admin/hospital-settlements', async (req, res) => {
     return {
       ...h,
       totalCollected,
-      totalSettled,
-      pendingDue: Math.max(0, totalCollected - totalSettled),
+      totalSettled: effectiveSettled,
+      pendingDue,
       tokenCount,
       pendingRequests
     };
   }));
 
-  // Also fetch pending payout requests count
   let totalPendingRequests = 0;
   if (isDbConnected) {
     try {
@@ -5231,18 +5317,115 @@ app.get('/api/admin/hospital-settlements/:hospitalId/statement', async (req, res
   const { hospitalId } = req.params;
   const store = await getUnifiedStore();
 
-  const hospTokens = (store.tokens || []).filter(t => t.hospitalId === hospitalId && t.status === 'completed');
-  const fullOnlineTokens = hospTokens.filter(t => (t.paymentCollection?.mode === 'full_online'));
+  const seenIds = new Set();
+  const allTokens = [];
+
+  if (isDbConnected) {
+    try {
+      const r = await query(
+        `SELECT id, token_number, doctor_id, patient_name, patient_phone, status, session, token_date, data, created_at
+         FROM tokens
+         WHERE (hospital_id = $1 OR ($1 = 'hosp-mu0838sg' AND hospital_id = 'hosp-gandhi'))
+         ORDER BY created_at DESC`,
+        [hospitalId]
+      );
+      r.rows.forEach(row => {
+        if (!seenIds.has(row.id)) {
+          seenIds.add(row.id);
+          const d = row.data || {};
+          const isOnline = isFullOnlineToken({ ...row, data: d });
+          const docFee = getDoctorFee({ ...row, data: d });
+          allTokens.push({
+            id: row.id,
+            tokenNo: row.token_number || d.tokenNo || d.tokenNumber || 1,
+            patientName: row.patient_name || d.patientName || 'Patient',
+            patientPhone: row.patient_phone || d.patientPhone || '',
+            doctorId: row.doctor_id || d.doctorId,
+            doctorName: d.doctorName || 'Doctor',
+            departmentName: d.departmentName || 'General OPD',
+            status: row.status,
+            consultationFee: docFee,
+            totalFee: Number(d.totalFee || 0),
+            bookingDate: d.bookingDate || row.token_date || (row.created_at ? new Date(row.created_at).toISOString().split('T')[0] : 'Today'),
+            collectionMode: isOnline ? 'full_online' : 'counter',
+            isFullOnline: isOnline,
+            netDueToHospital: isOnline ? docFee : 0,
+            settlementStatus: getSettlementStatus({ ...row, data: d }),
+            paymentMethod: d.paymentMethod || (isOnline ? 'Razorpay (Full Online)' : 'Pay at Hospital'),
+            paymentCollection: d.paymentCollection || {}
+          });
+        }
+      });
+    } catch (e) {
+      console.warn('Error fetching statement tokens from RDS:', e.message);
+    }
+  }
+
+  const allStoreTokens = [...(store.tokens || []), ...(store.appointments || []).map(a => ({ ...a, consultationFee: a.fee }))];
+  allStoreTokens.forEach(t => {
+    const matchesHosp = t.hospitalId === hospitalId || 
+      (hospitalId === 'hosp-mu0838sg' && t.hospitalId === 'hosp-gandhi');
+    if (matchesHosp && t.id && !seenIds.has(t.id)) {
+      seenIds.add(t.id);
+      const isOnline = isFullOnlineToken(t);
+      const docFee = getDoctorFee(t);
+      allTokens.push({
+        id: t.id,
+        tokenNo: t.tokenNo || t.tokenNumber || 1,
+        patientName: t.patientName || 'Patient',
+        patientPhone: t.patientPhone || '',
+        doctorId: t.doctorId,
+        doctorName: t.doctorName || 'Doctor',
+        departmentName: t.departmentName || 'General OPD',
+        status: t.status,
+        consultationFee: docFee,
+        totalFee: Number(t.totalFee || 0),
+        bookingDate: t.bookingDate || 'Today',
+        collectionMode: isOnline ? 'full_online' : 'counter',
+        isFullOnline: isOnline,
+        netDueToHospital: isOnline ? docFee : 0,
+        settlementStatus: getSettlementStatus(t),
+        paymentMethod: t.paymentMethod || (isOnline ? 'Razorpay (Full Online)' : 'Pay at Hospital'),
+        paymentCollection: t.paymentCollection || {}
+      });
+    }
+  });
 
   let settlements = [];
   if (isDbConnected) {
     try {
-      const sr = await query(`SELECT * FROM hospital_payout_settlements WHERE hospital_id=$1 ORDER BY created_at DESC`, [hospitalId]);
+      const sr = await query(
+        `SELECT * FROM hospital_payout_settlements WHERE (hospital_id=$1 OR ($1='hosp-mu0838sg' AND hospital_id='hosp-gandhi')) ORDER BY created_at DESC`,
+        [hospitalId]
+      );
       settlements = sr.rows;
     } catch (e) {}
   }
+  if (settlements.length === 0) {
+    settlements = (store.payoutSettlements || []).filter(s => s.hospital_id === hospitalId || (hospitalId === 'hosp-mu0838sg' && s.hospital_id === 'hosp-gandhi'));
+  }
 
-  res.json({ success: true, tokens: fullOnlineTokens, settlements });
+  // Calculate summary metrics
+  const fullOnlineTokens = allTokens.filter(t => t.isFullOnline && t.status !== 'cancelled');
+  const totalCollectedOnline = fullOnlineTokens.reduce((sum, t) => sum + t.consultationFee, 0);
+  const totalSettledFromDb = settlements.reduce((sum, s) => sum + Number(s.payout_amount || 0), 0);
+  const totalSettledFromTokens = fullOnlineTokens.filter(t => t.settlementStatus === 'settled').reduce((sum, t) => sum + t.consultationFee, 0);
+  const effectiveSettled = Math.max(totalSettledFromDb, totalSettledFromTokens);
+  const pendingDue = Math.max(0, totalCollectedOnline - effectiveSettled);
+
+  res.json({
+    success: true,
+    tokens: allTokens,
+    fullOnlineTokens,
+    settlements,
+    summary: {
+      totalCollectedOnline,
+      totalSettled: effectiveSettled,
+      pendingDue,
+      fullOnlineCount: fullOnlineTokens.length,
+      allTokensCount: allTokens.length
+    }
+  });
 });
 
 // POST /api/admin/hospital-settlements/:hospitalId/settle
@@ -5273,39 +5456,76 @@ app.post('/api/admin/hospital-settlements/:hospitalId/settle', async (req, res) 
   const settlementId = `settle-${Date.now().toString(36)}`;
   const nowIST = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true, day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
+  // Resolve target token IDs to settle
+  let targetTokenIds = Array.isArray(token_ids) && token_ids.length > 0 ? token_ids : [];
+  if (targetTokenIds.length === 0) {
+    // Auto-discover unsettled full online tokens for this hospital
+    if (isDbConnected) {
+      try {
+        const r = await query(
+          `SELECT id, data FROM tokens WHERE (hospital_id = $1 OR ($1 = 'hosp-mu0838sg' AND hospital_id = 'hosp-gandhi')) AND status != 'cancelled'`
+        );
+        r.rows.forEach(row => {
+          const d = row.data || {};
+          if (isFullOnlineToken({ ...row, data: d }) && getSettlementStatus({ ...row, data: d }) !== 'settled') {
+            targetTokenIds.push(row.id);
+          }
+        });
+      } catch (e) {}
+    }
+    if (targetTokenIds.length === 0) {
+      (store.tokens || []).forEach(t => {
+        const matchesHosp = t.hospitalId === hospitalId || (hospitalId === 'hosp-mu0838sg' && t.hospitalId === 'hosp-gandhi');
+        if (matchesHosp && isFullOnlineToken(t) && getSettlementStatus(t) !== 'settled' && t.status !== 'cancelled') {
+          targetTokenIds.push(t.id);
+        }
+      });
+    }
+  }
+
   if (isDbConnected) {
     try {
-      // Check for duplicate UTR
-      const existing = await query(`SELECT id FROM hospital_payout_settlements WHERE utr_reference=$1`, [utr_reference]);
+      // Check for duplicate UTR Reference
+      const existing = await query(`SELECT id FROM hospital_payout_settlements WHERE utr_reference=$1`, [utr_reference.trim()]);
       if (existing.rows.length > 0) {
-        return res.status(409).json({ success: false, message: `UTR Reference "${utr_reference}" already recorded. Duplicate settlement prevented.` });
+        return res.status(409).json({ success: false, message: `UTR Reference "${utr_reference}" has already been recorded. Duplicate settlement prevented.` });
       }
+
       await query(
         `INSERT INTO hospital_payout_settlements (id, hospital_id, hospital_name, payout_amount, tokens_count, token_ids, payment_method, utr_reference, beneficiary_bank_account, beneficiary_ifsc, beneficiary_upi, settled_by_admin, notes, created_at_ist)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
-        [settlementId, hospitalId, hospitalName, Number(payout_amount), (token_ids || []).length, JSON.stringify(token_ids || []), payment_method, utr_reference, bankAccount, ifsc, upiId, settled_by_admin || 'super-admin', notes || '', nowIST]
+        [settlementId, hospitalId, hospitalName, Number(payout_amount), targetTokenIds.length, JSON.stringify(targetTokenIds), payment_method, utr_reference.trim(), bankAccount, ifsc, upiId, settled_by_admin || 'Super Admin', notes || '', nowIST]
       );
 
-      // Mark tokens as settled in paymentCollection
-      if (token_ids && token_ids.length > 0) {
-        for (const tid of token_ids) {
-          const tidx = store.tokens?.findIndex(t => t.id === tid);
-          if (tidx !== undefined && tidx !== -1) {
-            store.tokens[tidx].paymentCollection = {
-              ...(store.tokens[tidx].paymentCollection || {}),
-              settlementStatus: 'settled',
-              settlementId,
-              settledAt: nowIST
-            };
-          }
-        }
-        await saveUnifiedStore(store);
+      // Lock tokens as settled in PostgreSQL RDS tokens and appointments tables
+      if (targetTokenIds.length > 0) {
+        await query(
+          `UPDATE tokens
+           SET data = (COALESCE(data, '{}'::jsonb) || jsonb_build_object(
+             'paymentCollection', (COALESCE(data->'paymentCollection', '{}'::jsonb) || jsonb_build_object('settlementStatus', 'settled', 'settlementId', $1::text, 'settledAt', $2::text, 'utrReference', $3::text)),
+             'settlementStatus', 'settled',
+             'settlementId', $1::text
+           ))
+           WHERE id = ANY($4::text[])`,
+          [settlementId, nowIST, utr_reference.trim(), targetTokenIds]
+        );
+
+        await query(
+          `UPDATE appointments
+           SET data = (COALESCE(data, '{}'::jsonb) || jsonb_build_object(
+             'paymentCollection', (COALESCE(data->'paymentCollection', '{}'::jsonb) || jsonb_build_object('settlementStatus', 'settled', 'settlementId', $1::text, 'settledAt', $2::text, 'utrReference', $3::text)),
+             'settlementStatus', 'settled',
+             'settlementId', $1::text
+           ))
+           WHERE id = ANY($4::text[])`,
+          [settlementId, nowIST, utr_reference.trim(), targetTokenIds]
+        );
       }
 
       // Mark pending payout requests as fulfilled
       await query(
         `UPDATE hospital_payout_requests SET status='fulfilled', admin_notes=$1, updated_at=NOW() WHERE (hospital_id=$2 OR ($2='hosp-mu0838sg' AND hospital_id='hosp-gandhi')) AND status='pending'`,
-        [`Settled via UTR: ${utr_reference}`, hospitalId]
+        [`Settled via ${payment_method} UTR: ${utr_reference}`, hospitalId]
       );
     } catch (dbErr) {
       if (dbErr.message?.includes('duplicate')) {
@@ -5313,14 +5533,84 @@ app.post('/api/admin/hospital-settlements/:hospitalId/settle', async (req, res) 
       }
       return res.status(500).json({ success: false, message: dbErr.message });
     }
-  } else {
-    // Fallback: in-memory
-    store.payoutSettlements = store.payoutSettlements || [];
-    store.payoutSettlements.push({ id: settlementId, hospital_id: hospitalId, hospital_name: hospitalName, payout_amount: Number(payout_amount), tokens_count: (token_ids||[]).length, token_ids: token_ids||[], payment_method, utr_reference, beneficiary_bank_account: bankAccount, beneficiary_ifsc: ifsc, beneficiary_upi: upiId, settled_by_admin: settled_by_admin||'super-admin', notes: notes||'', created_at: new Date().toISOString(), created_at_ist: nowIST });
-    await saveUnifiedStore(store);
   }
 
-  res.json({ success: true, message: `Settlement of ₹${payout_amount} recorded successfully with UTR ${utr_reference}.`, settlementId });
+  // Update in-memory unified store
+  const targetIdSet = new Set(targetTokenIds);
+  store.tokens = (store.tokens || []).map(t => {
+    if (targetIdSet.has(t.id)) {
+      return {
+        ...t,
+        settlementStatus: 'settled',
+        settlementId,
+        paymentCollection: {
+          ...(t.paymentCollection || {}),
+          settlementStatus: 'settled',
+          settlementId,
+          settledAt: nowIST,
+          utrReference: utr_reference.trim()
+        }
+      };
+    }
+    return t;
+  });
+
+  store.appointments = (store.appointments || []).map(a => {
+    if (targetIdSet.has(a.id)) {
+      return {
+        ...a,
+        settlementStatus: 'settled',
+        settlementId,
+        paymentCollection: {
+          ...(a.paymentCollection || {}),
+          settlementStatus: 'settled',
+          settlementId,
+          settledAt: nowIST,
+          utrReference: utr_reference.trim()
+        }
+      };
+    }
+    return a;
+  });
+
+  store.payoutSettlements = store.payoutSettlements || [];
+  store.payoutSettlements.unshift({
+    id: settlementId,
+    hospital_id: hospitalId,
+    hospital_name: hospitalName,
+    payout_amount: Number(payout_amount),
+    tokens_count: targetTokenIds.length,
+    token_ids: targetTokenIds,
+    payment_method,
+    utr_reference: utr_reference.trim(),
+    beneficiary_bank_account: bankAccount,
+    beneficiary_ifsc: ifsc,
+    beneficiary_upi: upiId,
+    settled_by_admin: settled_by_admin || 'Super Admin',
+    notes: notes || '',
+    created_at: new Date().toISOString(),
+    created_at_ist: nowIST
+  });
+
+  await saveUnifiedStore(store);
+
+  // Notify hospital room and admin room of settlement
+  io.to(`hospital_${hospitalId}`).emit('payout_settled', {
+    settlementId,
+    payout_amount: Number(payout_amount),
+    utr_reference: utr_reference.trim(),
+    tokens_count: targetTokenIds.length,
+    created_at_ist: nowIST
+  });
+
+  console.log(`💰 [Settlement] Disbursed ₹${payout_amount} to ${hospitalName} (${hospitalId}). UTR: ${utr_reference}. Settled ${targetTokenIds.length} tokens.`);
+
+  res.json({
+    success: true,
+    message: `Settlement of ₹${payout_amount} recorded successfully with UTR ${utr_reference}.`,
+    settlementId,
+    tokensSettledCount: targetTokenIds.length
+  });
 });
 
 // GET /api/admin/payout-requests (super admin sees all pending requests)

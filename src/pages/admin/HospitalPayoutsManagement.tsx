@@ -47,6 +47,10 @@ export const HospitalPayoutsManagement: React.FC = () => {
   const [statementTokens, setStatementTokens] = useState<any[]>([]);
   const [statementSettlements, setStatementSettlements] = useState<any[]>([]);
   const [statementLoading, setStatementLoading] = useState(false);
+  const [statementSummary, setStatementSummary] = useState<any>(null);
+
+  // Unsettled tokens for Settle Modal
+  const [unsettledTokensForSettle, setUnsettledTokensForSettle] = useState<any[]>([]);
 
   // Copy helper
   const [copiedKey, setCopiedKey] = useState('');
@@ -81,7 +85,7 @@ export const HospitalPayoutsManagement: React.FC = () => {
   }, []);
 
   // Open Settle Modal
-  const openSettleModal = (h: HospitalSettlementRecord, prefilledAmt?: number) => {
+  const openSettleModal = async (h: HospitalSettlementRecord, prefilledAmt?: number) => {
     setSettleTarget(h);
     setPayoutAmount(String(prefilledAmt !== undefined ? prefilledAmt : h.pendingDue));
     setPaymentMethod(h.upi_id && !h.bank_account_number ? 'UPI' : 'Bank Transfer');
@@ -89,6 +93,16 @@ export const HospitalPayoutsManagement: React.FC = () => {
     setSettleNotes('');
     setSettleError('');
     setSettleSuccess('');
+    setUnsettledTokensForSettle([]);
+
+    try {
+      const res = await fetch(`/api/admin/hospital-settlements/${h.id}/statement`);
+      const data = await res.json();
+      if (data.success) {
+        const unsettled = (data.tokens || []).filter((t: any) => t.isFullOnline && t.settlementStatus !== 'settled' && t.status !== 'cancelled');
+        setUnsettledTokensForSettle(unsettled);
+      }
+    } catch (e) {}
   };
 
   // Submit Settlement
@@ -108,6 +122,7 @@ export const HospitalPayoutsManagement: React.FC = () => {
     setSettleLoading(true);
     setSettleError('');
     try {
+      const targetIds = unsettledTokensForSettle.map(t => t.id);
       const res = await fetch(`/api/admin/hospital-settlements/${settleTarget.id}/settle`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -115,6 +130,7 @@ export const HospitalPayoutsManagement: React.FC = () => {
           payout_amount: amt,
           payment_method: paymentMethod,
           utr_reference: utrReference.trim(),
+          token_ids: targetIds,
           notes: settleNotes.trim(),
           settled_by_admin: 'Super Admin'
         })
@@ -140,12 +156,16 @@ export const HospitalPayoutsManagement: React.FC = () => {
   const openStatementModal = async (h: HospitalSettlementRecord) => {
     setStatementTarget(h);
     setStatementLoading(true);
+    setStatementSummary(null);
     try {
       const res = await fetch(`/api/admin/hospital-settlements/${h.id}/statement`);
       const data = await res.json();
       if (data.success) {
         setStatementTokens(data.tokens || []);
         setStatementSettlements(data.settlements || []);
+        if (data.summary) {
+          setStatementSummary(data.summary);
+        }
       }
     } catch (e) {
       console.warn('Error fetching hospital statement:', e);
@@ -764,7 +784,7 @@ export const HospitalPayoutsManagement: React.FC = () => {
       {/* Hospital Statement Drawer / Modal */}
       {statementTarget && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-3xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col p-6 text-white space-y-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col p-6 text-white space-y-4">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div>
                 <h3 className="text-base font-black text-white">{statementTarget.name} — Financial Statement</h3>
@@ -785,19 +805,27 @@ export const HospitalPayoutsManagement: React.FC = () => {
               </div>
             ) : (
               <div className="space-y-4 overflow-y-auto flex-1 pr-1">
-                {/* Summary bar */}
-                <div className="grid grid-cols-3 gap-3 bg-slate-800/80 p-3.5 rounded-2xl border border-slate-700 text-xs">
+                {/* Unified 4-Card Financial Summary Bar */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 bg-slate-800/80 p-3.5 rounded-2xl border border-slate-700 text-xs">
                   <div>
                     <span className="text-slate-400 block text-[10px] uppercase font-bold">Total Collected Online</span>
-                    <strong className="text-white font-black text-sm">₹{statementTarget.totalCollected.toLocaleString('en-IN')}</strong>
+                    <strong className="text-white font-black text-sm">₹{(statementSummary?.totalCollectedOnline ?? statementTarget.totalCollected).toLocaleString('en-IN')}</strong>
+                    <span className="text-[10px] text-slate-500 block mt-0.5">Full Online bookings</span>
                   </div>
                   <div>
-                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Total Settled</span>
-                    <strong className="text-emerald-400 font-black text-sm">₹{statementTarget.totalSettled.toLocaleString('en-IN')}</strong>
+                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Total Settled to Bank</span>
+                    <strong className="text-emerald-400 font-black text-sm">₹{(statementSummary?.totalSettled ?? statementTarget.totalSettled).toLocaleString('en-IN')}</strong>
+                    <span className="text-[10px] text-emerald-500/80 block mt-0.5">Cleared via Bank/UPI UTR</span>
                   </div>
                   <div>
-                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Pending Due</span>
-                    <strong className="text-amber-300 font-black text-sm">₹{statementTarget.pendingDue.toLocaleString('en-IN')}</strong>
+                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Pending Due from InstaToken</span>
+                    <strong className="text-amber-300 font-black text-sm">₹{(statementSummary?.pendingDue ?? statementTarget.pendingDue).toLocaleString('en-IN')}</strong>
+                    <span className="text-[10px] text-amber-500/80 block mt-0.5">Net payable to hospital</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Online Consultations</span>
+                    <strong className="text-blue-400 font-black text-sm">{statementSummary?.fullOnlineCount ?? statementTokens.filter(t => t.isFullOnline).length} / {statementTokens.length}</strong>
+                    <span className="text-[10px] text-slate-500 block mt-0.5">Online vs Total tokens</span>
                   </div>
                 </div>
 
@@ -813,9 +841,9 @@ export const HospitalPayoutsManagement: React.FC = () => {
                           <div>
                             <div className="font-black text-emerald-300">₹{Number(s.payout_amount).toLocaleString('en-IN')}</div>
                             <div className="text-[11px] text-slate-400 mt-0.5">
-                              {s.payment_method} · UTR: <span className="font-mono text-white font-bold">{s.utr_reference}</span>
+                              {s.payment_method} · UTR / Ref: <span className="font-mono text-white font-bold">{s.utr_reference}</span>
                             </div>
-                            <div className="text-[10px] text-slate-500">{s.created_at_ist}</div>
+                            <div className="text-[10px] text-slate-500">{s.created_at_ist} {s.settled_by_admin ? `· by ${s.settled_by_admin}` : ''}</div>
                           </div>
                           <span className="bg-emerald-500/20 text-emerald-400 text-[10px] font-bold px-2.5 py-1 rounded-full border border-emerald-500/30">
                             Settled ✓
@@ -826,11 +854,19 @@ export const HospitalPayoutsManagement: React.FC = () => {
                   )}
                 </div>
 
-                {/* Tokens List */}
+                {/* Tokens List with Segregated Breakdown */}
                 <div>
-                  <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 mb-2">Patient Advance Bookings ({statementTokens.length})</h4>
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-400">
+                      Patient Token Transactions ({statementTokens.length})
+                    </h4>
+                    <span className="text-[10px] text-slate-500 font-medium">
+                      Segregated: Full Online vs Counter / Desk
+                    </span>
+                  </div>
+
                   {statementTokens.length === 0 ? (
-                    <p className="text-xs text-slate-500 italic p-3 bg-slate-800/40 rounded-xl">No completed full-online tokens recorded.</p>
+                    <p className="text-xs text-slate-500 italic p-3 bg-slate-800/40 rounded-xl">No tokens recorded for this hospital.</p>
                   ) : (
                     <div className="overflow-x-auto border border-slate-800 rounded-xl">
                       <table className="w-full text-left text-xs">
@@ -839,30 +875,81 @@ export const HospitalPayoutsManagement: React.FC = () => {
                             <th className="py-2.5 px-3">Token #</th>
                             <th className="py-2.5 px-3">Patient</th>
                             <th className="py-2.5 px-3">Doctor</th>
-                            <th className="py-2.5 px-3">Date (IST)</th>
-                            <th className="py-2.5 px-3 text-right">Fee (₹)</th>
-                            <th className="py-2.5 px-3 text-center">Settlement</th>
+                            <th className="py-2.5 px-3">Payment Mode</th>
+                            <th className="py-2.5 px-3 text-right">Doctor Fee</th>
+                            <th className="py-2.5 px-3 text-right">Due to Hospital</th>
+                            <th className="py-2.5 px-3 text-center">OPD Status</th>
+                            <th className="py-2.5 px-3 text-center">Settlement Status</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-800">
-                          {statementTokens.map((t: any) => (
-                            <tr key={t.id} className="hover:bg-slate-800/30">
-                              <td className="py-2 px-3 font-mono font-bold text-white">#{t.tokenNo || t.tokenNumber}</td>
-                              <td className="py-2 px-3 font-medium text-slate-200">{t.patientName}</td>
-                              <td className="py-2 px-3 text-slate-400">{t.doctorName}</td>
-                              <td className="py-2 px-3 text-slate-400 text-[11px]">{t.bookingDate || t.date}</td>
-                              <td className="py-2 px-3 text-right font-black text-white">₹{t.consultationFee || 500}</td>
-                              <td className="py-2 px-3 text-center">
-                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                  t.paymentCollection?.settlementStatus === 'settled'
-                                    ? 'bg-emerald-500/20 text-emerald-400'
-                                    : 'bg-amber-500/20 text-amber-300'
-                                }`}>
-                                  {t.paymentCollection?.settlementStatus === 'settled' ? 'Settled' : 'Unsettled'}
-                                </span>
-                              </td>
-                            </tr>
-                          ))}
+                          {statementTokens.map((t: any) => {
+                            const isOnline = Boolean(t.isFullOnline || t.collectionMode === 'full_online');
+                            const isSettled = t.settlementStatus === 'settled' || t.paymentCollection?.settlementStatus === 'settled';
+
+                            return (
+                              <tr key={t.id} className="hover:bg-slate-800/30">
+                                <td className="py-2 px-3 font-mono font-bold text-white">#{t.tokenNo || t.tokenNumber}</td>
+                                <td className="py-2 px-3">
+                                  <div className="font-medium text-slate-200">{t.patientName}</div>
+                                  {t.patientPhone && <div className="text-[10px] text-slate-400 font-mono">{t.patientPhone}</div>}
+                                </td>
+                                <td className="py-2 px-3">
+                                  <div className="text-slate-300 font-medium">{t.doctorName}</div>
+                                  <div className="text-[10px] text-slate-500">{t.departmentName || 'OPD'}</div>
+                                </td>
+                                <td className="py-2 px-3">
+                                  {isOnline ? (
+                                    <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                                      Full Online (Razorpay)
+                                    </span>
+                                  ) : (
+                                    <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-black bg-slate-700 text-slate-300 border border-slate-600">
+                                      Counter / Desk Cash
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="py-2 px-3 text-right font-bold text-slate-300">
+                                  ₹{t.consultationFee || 0}
+                                </td>
+                                <td className="py-2 px-3 text-right font-black">
+                                  {isOnline ? (
+                                    <span className="text-emerald-400">₹{t.consultationFee || 0}</span>
+                                  ) : (
+                                    <span className="text-slate-500" title="Hospital collected directly at desk">₹0 (Desk)</span>
+                                  )}
+                                </td>
+                                <td className="py-2 px-3 text-center">
+                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                    t.status === 'completed'
+                                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                      : t.status === 'calling'
+                                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse'
+                                      : t.status === 'in-consultation'
+                                      ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                                      : t.status === 'late-coming'
+                                      ? 'bg-orange-500/20 text-orange-300'
+                                      : 'bg-slate-800 text-slate-400'
+                                  }`}>
+                                    {t.status === 'completed' ? '✓ Visited' : t.status === 'in-consultation' ? 'In Cabin' : t.status === 'calling' ? 'Calling' : t.status === 'late-coming' ? 'On-Hold' : t.status}
+                                  </span>
+                                </td>
+                                <td className="py-2 px-3 text-center">
+                                  {!isOnline ? (
+                                    <span className="text-[10px] font-semibold text-slate-500">N/A (Desk)</span>
+                                  ) : isSettled ? (
+                                    <span className="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" title={t.paymentCollection?.utrReference ? `UTR: ${t.paymentCollection.utrReference}` : 'Settled'}>
+                                      Settled ✓
+                                    </span>
+                                  ) : (
+                                    <span className="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                      Unsettled (Due)
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
