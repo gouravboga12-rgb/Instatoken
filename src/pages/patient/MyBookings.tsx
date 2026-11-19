@@ -199,10 +199,10 @@ export const MyBookings: React.FC = () => {
               <span className="text-[9px] text-blue-600 font-extrabold uppercase tracking-wider block">Token Number</span>
               <span className="text-3xl font-black text-blue-700 font-heading block leading-none mt-0.5">#{appt.tokenNumber}</span>
               <span className="text-[9.5px] text-slate-600 font-bold block mt-1.5">
-                Consultation: ₹{appt.fee} (Pay at Hospital)
+                Consultation: ₹{appt.fee} ({appt.collectionMode === 'full_online' || appt.paymentMethod?.toLowerCase().includes('full online') ? 'Paid Online' : 'Pay at Hospital'})
               </span>
               <span className="text-[8.5px] text-emerald-700 font-semibold block">
-                Booking Charges: ₹{appt.totalFee || appt.platformFee || 19.47} (incl. GST Paid Online)
+                Online Paid: ₹{appt.totalFee || appt.platformFee || (appt as any).totalBookingCharges || (appt.collectionMode === 'full_online' ? (Number(appt.fee || 500) + 25.75) : 25.75)}
               </span>
             </div>
 

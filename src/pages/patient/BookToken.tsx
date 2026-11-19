@@ -403,12 +403,12 @@ export const BookToken: React.FC = () => {
 
     const isFullOnline = hospital?.payment_mode === 'full_online' || (hospital as any)?.paymentMode === 'full_online';
     const docFee = doctor.consultationFee || 500;
-    const platFee = Math.max(10, Math.round(docFee * ((platformFeePercent || 5) / 100)));
-    const gatewayFee = 1.5;
-    const taxableSum = platFee + gatewayFee;
-    const gstFee = parseFloat((taxableSum * 0.18).toFixed(2));
-    const tokenCharges = parseFloat((taxableSum + gstFee).toFixed(2));
-    const totalPayable = isFullOnline ? parseFloat((docFee + tokenCharges).toFixed(2)) : tokenCharges;
+    const tokenFee = Math.max(10, Math.round(docFee * ((platformFeePercent || 5) / 100)));
+    
+    // Unified 3% Payment Gateway Engine (Base Amount + 3% Gateway Fee)
+    const onlineBase = isFullOnline ? (docFee + tokenFee) : tokenFee;
+    const platformFee = parseFloat((onlineBase * 0.03).toFixed(2));
+    const totalPayable = parseFloat((onlineBase + platformFee).toFixed(2));
 
     const ref = showRmpFields && rmpName.trim() ? { 
       name: rmpName.trim(), 
@@ -428,16 +428,17 @@ export const BookToken: React.FC = () => {
       isExisting,
       doctorReference: ref,
       rmpReference: ref,
-      platformFee: platFee,
-      gatewayFee,
-      gstFee,
+      tokenBaseFee: tokenFee,
+      platformFee: platformFee,
+      gatewayFee: platformFee,
+      gstFee: 0,
       totalBookingCharges: totalPayable
     };
 
     const activeSessionObj = sessionOptions.find(s => s.id === selectedSession);
     const slotTime = activeSessionObj ? `${activeSessionObj.title} (${activeSessionObj.timing})` : '10:00 AM - 12:00 PM';
 
-    // Navigate to Razorpay/UPI Payment Gateway - collecting online charges including GST
+    // Navigate to Razorpay/UPI Payment Gateway
     navigate('/payment', {
       state: {
         patientDetails,
@@ -446,10 +447,11 @@ export const BookToken: React.FC = () => {
         date: selectedDate,
         time: slotTime,
         fee: docFee,
+        tokenBaseFee: tokenFee,
         tokenFee: totalPayable,
-        platformFee: platFee,
-        gatewayFee,
-        gstFee,
+        platformFee: platformFee,
+        gatewayFee: platformFee,
+        gstFee: 0,
         totalBookingCharges: totalPayable,
         isFullOnline,
         collectionMode: isFullOnline ? 'full_online' : 'token_only',
@@ -842,12 +844,10 @@ export const BookToken: React.FC = () => {
           {(() => {
             const isFullOnline = hospital?.payment_mode === 'full_online' || (hospital as any)?.paymentMode === 'full_online';
             const docFee = doctor.consultationFee || 500;
-            const platFee = Math.max(10, Math.round(docFee * ((platformFeePercent || 5) / 100)));
-            const gatewayFee = 1.5;
-            const taxableSum = platFee + gatewayFee;
-            const gstFee = parseFloat((taxableSum * 0.18).toFixed(2));
-            const tokenCharges = parseFloat((taxableSum + gstFee).toFixed(2));
-            const totalPayable = isFullOnline ? parseFloat((docFee + tokenCharges).toFixed(2)) : tokenCharges;
+            const tokenFee = Math.max(10, Math.round(docFee * ((platformFeePercent || 5) / 100)));
+            const onlineBase = isFullOnline ? (docFee + tokenFee) : tokenFee;
+            const platformFee = parseFloat((onlineBase * 0.03).toFixed(2));
+            const totalPayable = parseFloat((onlineBase + platformFee).toFixed(2));
 
             return (
               <div className="space-y-3">
@@ -867,7 +867,7 @@ export const BookToken: React.FC = () => {
                         <Info size={13} className="text-slate-400" />
                       </div>
                       <p className="text-[11px] text-slate-500 font-semibold mt-0.5">
-                        {isFullOnline ? 'Pay online now with InstaToken.' : 'Pay directly at the hospital.'}
+                        {isFullOnline ? 'Pay online now with InstaToken.' : 'Pay directly at hospital cabin / desk.'}
                       </p>
                     </div>
                   </div>
@@ -883,7 +883,7 @@ export const BookToken: React.FC = () => {
                   </div>
                 </div>
 
-                {/* 2. InstaToken Booking Charges with 18% GST (Blue Card) */}
+                {/* 2. InstaToken Booking Charges Card */}
                 <div className="bg-blue-50/60 border border-blue-200/90 rounded-2xl p-4 space-y-3 shadow-2xs">
                   <div className="flex items-center gap-3 pb-3 border-b border-blue-100">
                     <div className="w-10 h-10 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
@@ -891,7 +891,7 @@ export const BookToken: React.FC = () => {
                     </div>
                     <div>
                       <h4 className="text-sm font-black text-slate-900">
-                        {isFullOnline ? 'Full Booking Breakdown' : 'InstaToken Booking Charges'}
+                        {isFullOnline ? 'Full Online Booking Breakdown' : 'InstaToken Token Booking Charges'}
                       </h4>
                       <p className="text-[11px] text-slate-500 font-medium">
                         {isFullOnline ? 'Doctor consultation fee + token charges' : 'This is for our token booking service.'}
@@ -911,33 +911,25 @@ export const BookToken: React.FC = () => {
 
                     <div className="flex justify-between items-center text-slate-700 font-bold">
                       <div className="flex items-center gap-1.5">
-                        <span>Platform Fee ({platformFeePercent || 5}%)</span>
+                        <span>Token Fee</span>
                         <Info size={12} className="text-slate-400" />
                       </div>
-                      <span className="font-black text-slate-900">₹{platFee.toFixed(2)}</span>
+                      <span className="font-black text-slate-900">₹{tokenFee.toFixed(2)}</span>
                     </div>
 
-                    <div className="flex justify-between items-center text-slate-700 font-bold border-t border-blue-100/60 pt-2.5">
+                    <div className="flex justify-between items-center text-slate-700 font-bold">
                       <div className="flex items-center gap-1.5">
-                        <span>Payment Gateway Fee</span>
+                        <span>Platform Fee (incl. GST)</span>
                         <Info size={12} className="text-slate-400" />
                       </div>
-                      <span className="font-black text-slate-900">₹{gatewayFee.toFixed(2)}</span>
-                    </div>
-
-                    <div className="flex justify-between items-center text-slate-700 font-bold border-t border-blue-100/60 pt-2.5">
-                      <div className="flex items-center gap-1.5">
-                        <span>GST (18% on ₹{taxableSum.toFixed(2)})</span>
-                        <Info size={12} className="text-slate-400" />
-                      </div>
-                      <span className="font-black text-slate-900">₹{gstFee.toFixed(2)}</span>
+                      <span className="font-black text-slate-900">₹{platformFee.toFixed(2)}</span>
                     </div>
 
                     <div className="flex justify-between items-center border-t border-blue-200 pt-3">
                       <div>
                         <span className="text-sm font-black text-slate-900 block leading-tight">Total Payable Now</span>
                         <span className="text-[10px] text-slate-500 font-semibold">
-                          {isFullOnline ? '(Consultation + Token Charges)' : '(InstaToken Booking Charges)'}
+                          {isFullOnline ? '(Full Consultation + Token & Platform Charges)' : '(Token & Platform Charges Paid Online)'}
                         </span>
                       </div>
                       <span className="text-2xl font-black text-blue-700 font-heading">₹{totalPayable.toFixed(2)}</span>

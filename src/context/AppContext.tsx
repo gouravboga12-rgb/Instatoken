@@ -53,6 +53,7 @@ export interface Appointment {
   date: string;
   time: string;
   fee: number;
+  tokenFee?: number;
   platformFee?: number;
   gatewayFee?: number;
   gstFee?: number;
@@ -1443,18 +1444,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const isFullOnline = targetHosp.payment_mode === 'full_online' || (targetHosp as any).paymentMode === 'full_online';
 
-    // Calculate dynamic booking charges breakdown matching Image 78
+    // Calculate dynamic booking charges breakdown matching unified 3% engine
     const baseConsultation = targetDoc.consultationFee || 500;
-    const platformFee = patientDetails.platformFee !== undefined
-      ? patientDetails.platformFee
+    const tokenFee = (patientDetails as any).tokenBaseFee !== undefined
+      ? (patientDetails as any).tokenBaseFee
       : Math.max(10, Math.round(baseConsultation * (platformFeePercent / 100)));
-    const gatewayFee = patientDetails.gatewayFee !== undefined ? patientDetails.gatewayFee : 1.5;
-    const taxableAmount = platformFee + gatewayFee;
-    const gstFee = patientDetails.gstFee !== undefined ? patientDetails.gstFee : parseFloat((taxableAmount * 0.18).toFixed(2));
-    const tokenCharges = parseFloat((taxableAmount + gstFee).toFixed(2));
+    const onlineBase = isFullOnline ? (baseConsultation + tokenFee) : tokenFee;
+    const platformFee = patientDetails.gatewayFee !== undefined
+      ? patientDetails.gatewayFee
+      : parseFloat((onlineBase * 0.03).toFixed(2));
     const totalFee = patientDetails.totalBookingCharges !== undefined
       ? patientDetails.totalBookingCharges
-      : (isFullOnline ? parseFloat((baseConsultation + tokenCharges).toFixed(2)) : tokenCharges);
+      : parseFloat((onlineBase + platformFee).toFixed(2));
 
     const ref = patientDetails.doctorReference || patientDetails.rmpReference || null;
 
@@ -1497,9 +1498,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       time,
       session: resolvedSession,
       fee: targetDoc.consultationFee,
+      tokenFee,
       platformFee,
-      gatewayFee,
-      gstFee,
+      gatewayFee: platformFee,
+      gstFee: 0,
       totalFee,
       status: 'booked',
       collectionMode: isFullOnline ? 'full_online' : 'token_only',

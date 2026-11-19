@@ -84,12 +84,15 @@ export const Payment: React.FC = () => {
   }
 
   const { fee, patientDetails, hospitalId, doctorId, date, time, redirectUrl } = state;
-  const platFee = state.platformFee || patientDetails?.platformFee || Math.max(10, Math.round((fee || 500) * 0.05));
-  const gatewayFee = state.gatewayFee || patientDetails?.gatewayFee || 1.50;
-  const taxableSum = platFee + gatewayFee;
-  const gstFee = state.gstFee || patientDetails?.gstFee || parseFloat((taxableSum * 0.18).toFixed(2));
-  const totalAmount = state.totalBookingCharges || state.tokenFee || patientDetails?.totalBookingCharges || parseFloat((taxableSum + gstFee).toFixed(2));
-  const subPlan = state.subscriptionPlan || { name: "InstaToken Booking Charges", price: totalAmount, days: 3 };
+  const isFullOnlineBooking = Boolean((state as any).isFullOnline || (state as any).collectionMode === 'full_online');
+  const docFee = Number(fee) || 0;
+  const tokenFee = (state as any).tokenBaseFee || (patientDetails as any)?.tokenBaseFee || state.platformFee || patientDetails?.platformFee || Math.max(10, Math.round((docFee || 500) * 0.05));
+  
+  // Unified 3% Payment Gateway Engine (Base Amount + 3% Gateway Fee)
+  const onlineBase = isFullOnlineBooking ? (docFee + tokenFee) : tokenFee;
+  const platformFee = state.gatewayFee !== undefined ? Number(state.gatewayFee) : parseFloat((onlineBase * 0.03).toFixed(2));
+  const totalAmount = state.totalBookingCharges || state.tokenFee || patientDetails?.totalBookingCharges || parseFloat((onlineBase + platformFee).toFixed(2));
+  const subPlan = state.subscriptionPlan || { name: isFullOnlineBooking ? "Doctor Consultation + Booking Fee" : "InstaToken Booking Charges", price: totalAmount, days: 3 };
 
   // ─── Initiate Razorpay Payment ──────────────────────────────────────────────
   const handleRazorpayPayment = async () => {
@@ -316,26 +319,28 @@ export const Payment: React.FC = () => {
             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-3">Billing Summary</h3>
             
             <div className="space-y-2 pb-3 border-b border-slate-100 text-xs">
+              {isFullOnlineBooking && (
+                <div className="flex justify-between text-slate-700 font-extrabold">
+                  <span>Doctor Consultation Fee</span>
+                  <span className="text-slate-900 font-black">₹{docFee.toFixed(2)}</span>
+                </div>
+              )}
               <div className="flex justify-between text-slate-700 font-extrabold">
-                <span>Platform Fee (5%)</span>
-                <span className="text-slate-900 font-black">₹{platFee.toFixed(2)}</span>
+                <span>Token Fee</span>
+                <span className="text-slate-900 font-black">₹{tokenFee.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between text-slate-600 text-[11px] font-medium">
-                <span>Payment Gateway Fee</span>
-                <span className="text-slate-900 font-bold">₹{gatewayFee.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-slate-600 text-[11px] font-medium">
-                <span>GST (18% on ₹{taxableSum.toFixed(2)})</span>
-                <span className="text-slate-900 font-bold">₹{gstFee.toFixed(2)}</span>
+              <div className="flex justify-between text-slate-700 font-extrabold">
+                <span>Platform Fee (incl. GST)</span>
+                <span className="text-slate-900 font-black">₹{platformFee.toFixed(2)}</span>
               </div>
               
-              {patientDetails && fee > 0 && (
+              {!isFullOnlineBooking && patientDetails && docFee > 0 && (
                 <div className="flex justify-between items-center text-slate-500 font-bold border-t border-dashed border-slate-200 pt-2.5 text-[10px] bg-emerald-50/70 p-2.5 rounded-xl mt-1">
                   <div>
                     <span className="text-slate-800 font-black block">Doctor Consultation Fee</span>
                     <span className="text-[9px] text-emerald-700 font-semibold">Pay directly at hospital cabin / desk</span>
                   </div>
-                  <span className="text-emerald-800 font-black text-xs">₹{fee.toFixed(2)} (Pay at Hospital)</span>
+                  <span className="text-emerald-800 font-black text-xs">₹{docFee.toFixed(2)} (Pay at Hospital)</span>
                 </div>
               )}
             </div>
@@ -343,7 +348,9 @@ export const Payment: React.FC = () => {
             <div className="flex justify-between items-center pt-3 font-heading font-black text-sm text-slate-850">
               <div>
                 <span>Total Payable Now</span>
-                <p className="text-[9.5px] text-slate-400 font-normal">InstaToken Booking Charges (incl. GST)</p>
+                <p className="text-[9.5px] text-slate-400 font-normal">
+                  {isFullOnlineBooking ? 'Consultation + Token & Platform Charges' : 'Token & Platform Charges Paid Online'}
+                </p>
               </div>
               <span className="text-blue-600 text-xl font-black font-heading">₹{totalAmount.toFixed(2)}</span>
             </div>
