@@ -117,10 +117,10 @@ export const HospitalPayouts: React.FC = () => {
       });
       const data = await res.json();
       if (data.success) {
-        setRequestSuccess('Payout request submitted! InstaToken admin will process within 2–3 business days.');
+        setRequestSuccess('Your amount will be credited to your registered bank account within 24 to 48 working hours.');
         setRequestAmount(''); setRequestNotes('');
         await fetchData();
-        setTimeout(() => { setShowRequestModal(false); setRequestSuccess(''); }, 3000);
+        setTimeout(() => { setShowRequestModal(false); setRequestSuccess(''); }, 3500);
       } else {
         setRequestError(data.message || 'Failed to submit request.');
       }
@@ -418,9 +418,14 @@ export const HospitalPayouts: React.FC = () => {
             </div>
 
             {requestSuccess ? (
-              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 text-center">
-                <CheckCircle2 size={32} className="text-emerald-600 mx-auto mb-2" />
-                <p className="text-sm font-black text-emerald-800">{requestSuccess}</p>
+              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-6 text-center space-y-1.5">
+                <CheckCircle2 size={36} className="text-emerald-600 mx-auto mb-2" />
+                <h4 className="text-sm font-black text-emerald-900 font-heading">
+                  Payout Request Submitted!
+                </h4>
+                <p className="text-xs font-bold text-emerald-700 leading-relaxed max-w-xs mx-auto">
+                  {requestSuccess}
+                </p>
               </div>
             ) : (
               <form onSubmit={handleRequestPayout} className="space-y-4">
