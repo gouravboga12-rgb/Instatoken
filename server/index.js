@@ -3488,13 +3488,12 @@ app.post('/api/hospitals/:hospitalId/tokens/:tokenId/readmit', requireHospitalAu
       try {
         await query(
           `UPDATE tokens 
-           SET status = 'booked', session = $1, doctor_id = $2, doctor_name = $3, booking_date = $4, token_no = $5,
-               data = (COALESCE(data, '{}'::jsonb) || $6::jsonb), updated_at = NOW() 
-           WHERE id = $7`,
+           SET status = 'booked', session = $1, doctor_id = $2, token_date = $3, token_number = $4,
+               data = (COALESCE(data, '{}'::jsonb) || $5::jsonb), updated_at = NOW() 
+           WHERE id = $6`,
           [
             updatedToken.session,
             updatedToken.doctorId,
-            updatedToken.doctorName,
             todayStr,
             updatedToken.tokenNo,
             JSON.stringify(updatedToken),
