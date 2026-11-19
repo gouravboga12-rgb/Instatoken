@@ -79,7 +79,7 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
   }, [tokens, doctor?.id, doctor?.name]);
 
   const filteredTokens = useMemo(() => {
-    return doctorTokens.filter(t => {
+    const list = doctorTokens.filter(t => {
       // 1. Status Tab
       if (statusTab === 'active' && !['booked', 'waiting', 'checked-in', 'calling', 'in-consultation', 'arrived'].includes(t.status)) return false;
       if (statusTab === 'completed' && t.status !== 'completed') return false;
@@ -112,6 +112,32 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
       }
 
       return true;
+    });
+
+    const getPriority = (status: string) => {
+      // 1. In Cabin (Currently consulting)
+      if (status === 'in-consultation' || status === 'checked-in') return 1;
+      // 2. Calling (Patient is being called right now)
+      if (status === 'calling') return 2;
+      // 3. Waiting / Booked / Arrived (Active queue ready to enter next)
+      if (['booked', 'waiting', 'arrived'].includes(status)) return 3;
+      // 4. On-Hold / Late-coming / Skipped (Arrived late or held)
+      if (['late-coming', 'not-visited', 'skipped'].includes(status)) return 4;
+      // 5. Visited / Completed (Done - sinks below pending tokens)
+      if (status === 'completed') return 5;
+      // 6. Cancelled
+      if (status === 'cancelled') return 6;
+      return 7;
+    };
+
+    return list.sort((a, b) => {
+      const pA = getPriority(a.status);
+      const pB = getPriority(b.status);
+      if (pA !== pB) return pA - pB;
+      // Within same priority, order by token number ascending (e.g. #3 before #4)
+      const tokA = Number(a.tokenNo || (a as any).tokenNumber || 0);
+      const tokB = Number(b.tokenNo || (b as any).tokenNumber || 0);
+      return tokA - tokB;
     });
   }, [doctorTokens, statusTab, dateFilter, customDate, sourceFilter, selectedSessionFilter, searchQuery, todayStr, tomorrowStr, yesterdayStr]);
 
@@ -202,6 +228,20 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
   });
   const notVisitedToday = doctorTokens.filter(t => {
     if (!isDateMatching(t) || !['not-visited', 'skipped', 'late-coming'].includes(t.status)) return false;
+    if (selectedSessionFilter !== 'all') {
+      return (t.session || 'morning').toLowerCase() === selectedSessionFilter.toLowerCase();
+    }
+    return true;
+  });
+  const cancelledToday = doctorTokens.filter(t => {
+    if (!isDateMatching(t) || t.status !== 'cancelled') return false;
+    if (selectedSessionFilter !== 'all') {
+      return (t.session || 'morning').toLowerCase() === selectedSessionFilter.toLowerCase();
+    }
+    return true;
+  });
+  const totalSessionDoctorTokens = doctorTokens.filter(t => {
+    if (!isDateMatching(t)) return false;
     if (selectedSessionFilter !== 'all') {
       return (t.session || 'morning').toLowerCase() === selectedSessionFilter.toLowerCase();
     }
@@ -576,70 +616,89 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
       )}
 
       {/* ── Compact Filter & Search Toolbar ─────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-xs p-3 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs">
-        {/* Left: Quick status toggle (All vs Active) + Filters */}
-        <div className="flex items-center gap-2.5 flex-wrap">
-          <button
-            type="button"
-            onClick={() => setStatusTab('all')}
-            className={`px-3 py-1 rounded-xl text-xs font-black cursor-pointer border transition-all ${
-              statusTab === 'all'
-                ? 'bg-slate-800 text-white border-slate-800'
-                : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-            }`}
-          >
-            Show All ({doctorTokens.length})
-          </button>
-
-          {/* Date Selector */}
-          <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-xl">
-            <Calendar size={13} className="text-slate-400" />
-            <select
-              value={dateFilter}
-              onChange={e => setDateFilter(e.target.value as any)}
-              className="bg-transparent text-xs font-bold text-slate-700 outline-none cursor-pointer border-none"
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-xs p-3 space-y-2.5 text-xs">
+        {/* Row 1: Status Filter Tabs Strip */}
+        <div className="flex items-center justify-between gap-2 flex-wrap pb-2 border-b border-slate-100">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <button
+              type="button"
+              onClick={() => setStatusTab('all')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-black cursor-pointer border transition-all ${
+                statusTab === 'all'
+                  ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                  : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+              }`}
             >
-              <option value="today">Today</option>
-              <option value="all">All Dates</option>
-              <option value="tomorrow">Tomorrow</option>
-              <option value="yesterday">Yesterday</option>
-              <option value="custom">Custom Date</option>
-            </select>
-            {dateFilter === 'custom' && (
-              <input
-                type="date"
-                value={customDate}
-                onChange={e => setCustomDate(e.target.value)}
-                className="bg-white border border-slate-200 rounded px-1 text-[10px] font-bold outline-none"
-              />
-            )}
-          </div>
+              All ({totalSessionDoctorTokens.length})
+            </button>
 
-          {/* Source Filter */}
-          <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-xl">
-            <select
-              value={sourceFilter}
-              onChange={e => setSourceFilter(e.target.value as any)}
-              className="bg-transparent text-xs font-bold text-slate-700 outline-none cursor-pointer border-none"
+            <button
+              type="button"
+              onClick={() => setStatusTab('active')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-black cursor-pointer border transition-all flex items-center gap-1.5 ${
+                statusTab === 'active'
+                  ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                  : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+              }`}
             >
-              <option value="all">All Sources</option>
-              <option value="online">Online App</option>
-              <option value="offline">Hospital Desk</option>
-            </select>
-          </div>
-        </div>
+              <span>Waiting / Cabin</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                statusTab === 'active' ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-700'
+              }`}>
+                {activeQueue.length}
+              </span>
+            </button>
 
-        {/* Right: Search Box + Route to Unvisited Action */}
-        <div className="flex items-center gap-2 w-full md:w-auto">
-          <div className="relative flex-1 md:w-64">
-            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search token #, patient name..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-semibold"
-            />
+            <button
+              type="button"
+              onClick={() => setStatusTab('not-visited')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-black cursor-pointer border transition-all flex items-center gap-1.5 ${
+                statusTab === 'not-visited'
+                  ? 'bg-amber-500 text-white border-amber-500 shadow-xs'
+                  : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+              }`}
+            >
+              <span>On-Hold / Late</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                statusTab === 'not-visited' ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-700'
+              }`}>
+                {notVisitedToday.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setStatusTab('completed')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-black cursor-pointer border transition-all flex items-center gap-1.5 ${
+                statusTab === 'completed'
+                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                  : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+              }`}
+            >
+              <span>Visited</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                statusTab === 'completed' ? 'bg-white/20 text-white' : 'bg-emerald-100 text-emerald-700'
+              }`}>
+                {completedToday.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setStatusTab('cancelled')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-black cursor-pointer border transition-all flex items-center gap-1.5 ${
+                statusTab === 'cancelled'
+                  ? 'bg-red-600 text-white border-red-600 shadow-xs'
+                  : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+              }`}
+            >
+              <span>Cancelled</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                statusTab === 'cancelled' ? 'bg-white/20 text-white' : 'bg-red-100 text-red-700'
+              }`}>
+                {cancelledToday.length}
+              </span>
+            </button>
           </div>
 
           {unvisitedDoctorTokens.length > 0 && (
@@ -652,6 +711,60 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
               <span>Route Unvisited ({unvisitedDoctorTokens.length})</span>
             </button>
           )}
+        </div>
+
+        {/* Row 2: Secondary Filters & Search Box */}
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Date Selector */}
+            <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 px-2 py-1 rounded-xl">
+              <Calendar size={13} className="text-slate-400" />
+              <select
+                value={dateFilter}
+                onChange={e => setDateFilter(e.target.value as any)}
+                className="bg-transparent text-xs font-bold text-slate-700 outline-none cursor-pointer border-none"
+              >
+                <option value="today">Today</option>
+                <option value="all">All Dates</option>
+                <option value="tomorrow">Tomorrow</option>
+                <option value="yesterday">Yesterday</option>
+                <option value="custom">Custom Date</option>
+              </select>
+              {dateFilter === 'custom' && (
+                <input
+                  type="date"
+                  value={customDate}
+                  onChange={e => setCustomDate(e.target.value)}
+                  className="bg-white border border-slate-200 rounded px-1 text-[10px] font-bold outline-none"
+                />
+              )}
+            </div>
+
+            {/* Source Filter */}
+            <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 px-2 py-1 rounded-xl">
+              <select
+                value={sourceFilter}
+                onChange={e => setSourceFilter(e.target.value as any)}
+                className="bg-transparent text-xs font-bold text-slate-700 outline-none cursor-pointer border-none"
+              >
+                <option value="all">All Sources</option>
+                <option value="online">Online App</option>
+                <option value="offline">Hospital Desk</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Search Box */}
+          <div className="relative w-full md:w-64">
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search token #, patient name..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="w-full pl-8 pr-3 py-1.5 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-semibold"
+            />
+          </div>
         </div>
       </div>
 
