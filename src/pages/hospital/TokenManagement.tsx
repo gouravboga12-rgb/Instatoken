@@ -2473,13 +2473,23 @@ export const TokenManagement: React.FC = () => {
   const initialDoctorId = searchParams.get('doctorId') || (location.state as any)?.doctorId || '';
   const initialDepartmentId = searchParams.get('departmentId') || (location.state as any)?.departmentId || '';
 
+  const dedupeTokens = (list: TokenRecord[]) => {
+    const seen = new Set<string>();
+    return list.filter(t => {
+      const key = t.id || (t as any).appointmentId;
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
+
   const getTokenSet = () => {
     const path = location.pathname;
     if (path.includes('online')) {
       return {
         title: 'Online Booked Tokens',
         subtitle: 'Tokens scheduled via mobile customer app & web portal',
-        toks: tokens.filter(t => t.type === 'online'),
+        toks: dedupeTokens(tokens.filter(t => t.type === 'online')),
         defaultDateFilter: undefined,
         isRevisitView: false
       };
@@ -2488,7 +2498,7 @@ export const TokenManagement: React.FC = () => {
       return {
         title: 'Hospital Counter Walk-in Tokens',
         subtitle: 'Tokens registered at hospital desk counter',
-        toks: tokens.filter(t => t.type === 'offline'),
+        toks: dedupeTokens(tokens.filter(t => t.type === 'offline')),
         defaultDateFilter: undefined,
         isRevisitView: false
       };
@@ -2498,7 +2508,7 @@ export const TokenManagement: React.FC = () => {
       return {
         title: "Today's Live Tokens",
         subtitle: `Tokens booked for today (${today})`,
-        toks: tokens.filter(t => t.bookingDate === today || !t.bookingDate),
+        toks: dedupeTokens(tokens.filter(t => t.bookingDate === today || !t.bookingDate)),
         defaultDateFilter: today,
         isRevisitView: false
       };
@@ -2507,7 +2517,7 @@ export const TokenManagement: React.FC = () => {
       return {
         title: 'Completed Tokens',
         subtitle: 'Consultations finished and discharged by hospital doctors',
-        toks: tokens.filter(t => t.status === 'completed'),
+        toks: dedupeTokens(tokens.filter(t => t.status === 'completed')),
         defaultDateFilter: undefined,
         isRevisitView: false
       };
@@ -2516,7 +2526,7 @@ export const TokenManagement: React.FC = () => {
       return {
         title: 'Cancelled Tokens',
         subtitle: 'Appointments cancelled or refunded',
-        toks: tokens.filter(t => t.status === 'cancelled'),
+        toks: dedupeTokens(tokens.filter(t => t.status === 'cancelled')),
         defaultDateFilter: undefined,
         isRevisitView: false
       };
@@ -2525,7 +2535,7 @@ export const TokenManagement: React.FC = () => {
       return {
         title: 'Repeat Visiting Patients & Revisit Tokens',
         subtitle: 'Directory of returning patients, follow-up consultations, and valid revisit records',
-        toks: tokens.filter(t => Boolean(t.isRevisit || t.isExisting)),
+        toks: dedupeTokens(tokens.filter(t => Boolean(t.isRevisit || t.isExisting))),
         defaultDateFilter: '',
         isRevisitView: true,
         isUnvisitedView: false
@@ -2536,7 +2546,7 @@ export const TokenManagement: React.FC = () => {
       return {
         title: 'Unvisited & Missed Patient Tokens',
         subtitle: 'Directory of absent past tokens eligible for smart re-admission without repayment penalty',
-        toks: tokens.filter(t => t.status === 'not-visited' || t.status === 'unvisited' || (['booked', 'waiting'].includes(t.status) && t.bookingDate && t.bookingDate < today)),
+        toks: dedupeTokens(tokens.filter(t => t.status === 'not-visited' || t.status === 'unvisited' || (['booked', 'waiting'].includes(t.status) && t.bookingDate && t.bookingDate < today))),
         defaultDateFilter: '',
         isRevisitView: false,
         isUnvisitedView: true
@@ -2548,7 +2558,7 @@ export const TokenManagement: React.FC = () => {
     return {
       title: 'All Tokens',
       subtitle: 'Unified repository of all online and walk-in patient tokens',
-      toks: tokens,
+      toks: dedupeTokens(tokens),
       defaultDateFilter: undefined,
       isRevisitView: false
     };

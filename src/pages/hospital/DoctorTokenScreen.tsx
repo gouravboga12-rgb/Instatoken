@@ -57,15 +57,25 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
     } catch (e) { }
   };
 
-  // Filter Tokens strictly for this Doctor (matching both ID and normalized Doctor Name)
+  // Filter Tokens strictly for this Doctor (matching both ID and normalized Doctor Name, deduplicated by Token ID)
   const doctorTokens = useMemo(() => {
     if (!doctor) return [];
     const docName = (doctor.name || '').toLowerCase().trim();
-    return tokens.filter(t => {
-      if (t.doctorId === doctor.id) return true;
-      if (docName && t.doctorName && t.doctorName.toLowerCase().trim() === docName) return true;
-      return false;
+    const seenIds = new Set<string>();
+    const list: TokenRecord[] = [];
+
+    tokens.forEach(t => {
+      const isDocMatch = t.doctorId === doctor.id || (docName && t.doctorName && t.doctorName.toLowerCase().trim() === docName);
+      if (!isDocMatch) return;
+      const key = t.id || (t as any).appointmentId;
+      if (key) {
+        if (seenIds.has(key)) return;
+        seenIds.add(key);
+      }
+      list.push(t);
     });
+
+    return list;
   }, [tokens, doctor?.id, doctor?.name]);
 
   const filteredTokens = useMemo(() => {

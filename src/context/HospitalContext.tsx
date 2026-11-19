@@ -1023,11 +1023,10 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       socket.on('token_booked', (newTok: any) => {
         if (!newTok || isDummyToken(newTok)) return;
         console.log('🔔 [Socket.io] Live token_booked received:', newTok);
-        const incomingNo = String(newTok.tokenNo || newTok.tokenNumber || '');
         setTokens(prev => {
-          const exists = prev.some(t => t.id === newTok.id || (t.hospitalId === newTok.hospitalId && t.doctorId === newTok.doctorId && String(t.tokenNo) === incomingNo));
+          const exists = prev.some(t => t.id === newTok.id || ((t as any).appointmentId && (t as any).appointmentId === newTok.id) || (newTok.appointmentId && t.id === newTok.appointmentId));
           if (exists) {
-            return prev.map(t => (t.id === newTok.id || (t.hospitalId === newTok.hospitalId && t.doctorId === newTok.doctorId && String(t.tokenNo) === incomingNo)) ? { ...t, ...newTok } : t);
+            return prev.map(t => (t.id === newTok.id || ((t as any).appointmentId && (t as any).appointmentId === newTok.id) || (newTok.appointmentId && t.id === newTok.appointmentId)) ? { ...t, ...newTok } : t);
           }
           return [newTok, ...prev];
         });
@@ -1037,8 +1036,20 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       socket.on('token_status_changed', (updatedTok: any) => {
         if (!updatedTok) return;
         console.log('🔔 [Socket.io] Live token_status_changed received:', updatedTok);
-        const incomingNo = String(updatedTok.tokenNo || updatedTok.tokenNumber || '');
-        setTokens(prev => prev.map(t => (t.id === updatedTok.id || (t.hospitalId === updatedTok.hospitalId && t.doctorId === updatedTok.doctorId && String(t.tokenNo) === incomingNo)) ? { ...t, ...updatedTok } : t));
+        setTokens(prev => prev.map(t => (t.id === updatedTok.id || ((t as any).appointmentId && (t as any).appointmentId === updatedTok.id) || (updatedTok.appointmentId && t.id === updatedTok.appointmentId)) ? { ...t, ...updatedTok } : t));
+      });
+
+      // 2b. Live Token Re-Admitted
+      socket.on('token_readmitted', ({ tokenId, token: readmittedTok }: { tokenId: string; token: any }) => {
+        if (!readmittedTok) return;
+        console.log('🔔 [Socket.io] Live token_readmitted received for:', tokenId, readmittedTok);
+        setTokens(prev => {
+          const exists = prev.some(t => t.id === tokenId || t.id === readmittedTok.id || ((t as any).appointmentId && (t as any).appointmentId === tokenId));
+          if (exists) {
+            return prev.map(t => (t.id === tokenId || t.id === readmittedTok.id || ((t as any).appointmentId && (t as any).appointmentId === tokenId)) ? { ...t, ...readmittedTok } : t);
+          }
+          return [readmittedTok, ...prev];
+        });
       });
 
       // 3. Live Token Session Shifted (Morning -> Evening)
@@ -2425,12 +2436,19 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     setTokens(prev => {
       const updated = prev.map(t => (t.id === tokenId || (t as any).appointmentId === tokenId ? updatedToken : t));
-      localStorage.setItem('insta_hospital_tokens', JSON.stringify(updated));
+      const seen = new Set<string>();
+      const deduped = updated.filter(t => {
+        const key = t.id || (t as any).appointmentId;
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      localStorage.setItem('insta_hospital_tokens', JSON.stringify(deduped));
       if (targetHospId) {
-        localStorage.setItem(`insta_hospital_tokens_${targetHospId}`, JSON.stringify(updated));
+        localStorage.setItem(`insta_hospital_tokens_${targetHospId}`, JSON.stringify(deduped));
       }
-      broadcastGlobalSync('HOSPITAL_TOKENS_UPDATED', updated);
-      return updated;
+      broadcastGlobalSync('HOSPITAL_TOKENS_UPDATED', deduped);
+      return deduped;
     });
 
     // Notify backend
@@ -2449,6 +2467,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           session,
           tokenNo: newTokNo,
           feeDifference: computedFeeDiff,
+          bookingDate: todayStr,
           originalToken: targetToken
         })
       });

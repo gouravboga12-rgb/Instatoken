@@ -3422,10 +3422,10 @@ app.patch('/api/hospitals/:hospitalId/tokens/:tokenId/status', requireHospitalAu
 // ─── Re-Admit Unvisited / Missed Token ─────────────────────────────────────────
 app.post('/api/hospitals/:hospitalId/tokens/:tokenId/readmit', requireHospitalAuth, async (req, res) => {
   const { hospitalId, tokenId } = req.params;
-  const { targetDoctorId, targetDoctorName, departmentId, departmentName, session, tokenNo, feeDifference } = req.body;
+  const { targetDoctorId, targetDoctorName, departmentId, departmentName, session, tokenNo, feeDifference, bookingDate } = req.body;
   const store = await getUnifiedStore();
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = bookingDate || new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
 
   let updatedToken = null;
   store.tokens = (store.tokens || []).map(t => {
