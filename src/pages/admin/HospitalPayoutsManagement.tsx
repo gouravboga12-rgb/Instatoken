@@ -63,11 +63,12 @@ export const HospitalPayoutsManagement: React.FC = () => {
       const res = await fetch('/api/admin/hospital-settlements');
       const data = await res.json();
       if (data.success) {
-        setHospitals(data.hospitals || []);
-        setTotalDue(data.totalDue || 0);
-        setTotalCollectedAll(data.totalCollectedAll || 0);
-        setTotalSettledAll(data.totalSettledAll || 0);
-        setTotalPendingRequests(data.totalPendingRequests || 0);
+        const cleanHospitals = (data.hospitals || []).filter((h: any) => h.id !== 'hosp-gandhi');
+        setHospitals(cleanHospitals);
+        setTotalDue(cleanHospitals.reduce((acc: number, h: any) => acc + (h.pendingDue || 0), 0));
+        setTotalCollectedAll(cleanHospitals.reduce((acc: number, h: any) => acc + (h.totalCollected || 0), 0));
+        setTotalSettledAll(cleanHospitals.reduce((acc: number, h: any) => acc + (h.totalSettled || 0), 0));
+        setTotalPendingRequests(cleanHospitals.filter((h: any) => h.pendingRequests && h.pendingRequests.length > 0).length);
       }
     } catch (e) {
       console.warn('Error fetching admin hospital settlements:', e);

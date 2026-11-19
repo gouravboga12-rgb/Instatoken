@@ -162,6 +162,17 @@ testConnection().then(async (connected) => {
     } catch (e) {
       console.warn('Could not auto-create hospital_payout_requests table:', e.message);
     }
+    // Auto-migrate: reassign any legacy 'hosp-gandhi' tokens/records to active 'hosp-mu0838sg' and delete hosp-gandhi
+    try {
+      await query(`UPDATE tokens SET hospital_id = 'hosp-mu0838sg' WHERE hospital_id = 'hosp-gandhi'`);
+      await query(`UPDATE appointments SET hospital_id = 'hosp-mu0838sg' WHERE hospital_id = 'hosp-gandhi'`);
+      await query(`UPDATE hospital_payout_settlements SET hospital_id = 'hosp-mu0838sg', hospital_name = 'Gandi Hospital' WHERE hospital_id = 'hosp-gandhi'`);
+      await query(`DELETE FROM hospital_payout_requests WHERE hospital_id = 'hosp-gandhi'`);
+      await query(`DELETE FROM hospitals WHERE id = 'hosp-gandhi'`);
+      console.log('✅ Legacy hosp-gandhi records remapped to hosp-mu0838sg and purged.');
+    } catch (e) {
+      console.warn('Legacy hosp-gandhi cleanup notice:', e.message);
+    }
   } else {
     console.log('📁 Active Data Layer: Local File Store (Fallback)');
   }
@@ -688,7 +699,7 @@ async function getUnifiedStore() {
           console.warn('Error merging appointments from RDS:', apptErr.message);
         }
 
-        const DUMMY_HOSPITAL_IDS = ['hosp-rainbow', 'hosp-nethra', 'hosp-fortis', 'hosp-continental', 'hosp-ramesh', 'hosp-care-vizag'];
+        const DUMMY_HOSPITAL_IDS = ['hosp-rainbow', 'hosp-nethra', 'hosp-fortis', 'hosp-continental', 'hosp-ramesh', 'hosp-care-vizag', 'hosp-gandhi'];
         store.hospitals = (store.hospitals || []).filter(h => !DUMMY_HOSPITAL_IDS.includes(h.id));
         if (store.hospitals.length === 0) {
           store.hospitals = INITIAL_HOSPITALS;
@@ -4551,9 +4562,9 @@ app.get('/api/hospitals/:hospitalId/payout-summary', requireHospitalAuth, async 
   const seenIds = new Set();
   const hospTokens = [];
   allTokens.forEach(t => {
-    // Match this hospital, or if hosp-mu0838sg and hosp-gandhi are aliases of Gandi Hospital
+    // Match this hospital, or if hosp-mu0838sg has legacy tokens from hosp-gandhi
     const matchesHosp = t.hospitalId === hospitalId || 
-      ((hospitalId === 'hosp-mu0838sg' || hospitalId === 'hosp-gandhi') && (t.hospitalId === 'hosp-mu0838sg' || t.hospitalId === 'hosp-gandhi'));
+      (hospitalId === 'hosp-mu0838sg' && t.hospitalId === 'hosp-gandhi');
     if (matchesHosp && t.id && !seenIds.has(t.id)) {
       seenIds.add(t.id);
       hospTokens.push(t);
@@ -4617,18 +4628,20 @@ app.get('/api/hospitals/:hospitalId/payout-summary', requireHospitalAuth, async 
 app.get('/api/admin/hospital-settlements', async (req, res) => {
   const store = await getUnifiedStore();
 
-  // Fetch all hospitals with payment_mode = 'full_online'
+  // Fetch all hospitals with payment_mode = 'full_online' (excluding decommissioned hosp-gandhi)
   let hospitals = [];
   if (isDbConnected) {
     try {
-      const r = await query(`SELECT id, name, city, payment_mode, bank_account_holder, bank_account_number, bank_name, bank_ifsc, upi_id, upi_phone FROM hospitals WHERE payment_mode='full_online'`);
+      const r = await query(`SELECT id, name, city, payment_mode, bank_account_holder, bank_account_number, bank_name, bank_ifsc, upi_id, upi_phone FROM hospitals WHERE payment_mode='full_online' AND id != 'hosp-gandhi'`);
       hospitals = r.rows;
     } catch (e) {
       console.warn('Error fetching full-online hospitals:', e.message);
     }
   }
   if (hospitals.length === 0) {
-    hospitals = (store.hospitals || []).filter(h => h.payment_mode === 'full_online');
+    hospitals = (store.hospitals || []).filter(h => h.payment_mode === 'full_online' && h.id !== 'hosp-gandhi');
+  } else {
+    hospitals = hospitals.filter(h => h.id !== 'hosp-gandhi');
   }
 
   // For each hospital, calculate dues
@@ -4643,7 +4656,7 @@ app.get('/api/admin/hospital-settlements', async (req, res) => {
     const hospTokens = [];
     allTokens.forEach(t => {
       const matchesHosp = t.hospitalId === h.id || 
-        ((h.id === 'hosp-mu0838sg' || h.id === 'hosp-gandhi') && (t.hospitalId === 'hosp-mu0838sg' || t.hospitalId === 'hosp-gandhi'));
+        (h.id === 'hosp-mu0838sg' && t.hospitalId === 'hosp-gandhi');
       if (matchesHosp && t.id && !seenTokenIds.has(t.id)) {
         seenTokenIds.add(t.id);
         hospTokens.push(t);
@@ -4696,7 +4709,7 @@ app.get('/api/admin/hospital-settlements', async (req, res) => {
   let totalPendingRequests = 0;
   if (isDbConnected) {
     try {
-      const rr = await query(`SELECT COUNT(*) as cnt FROM hospital_payout_requests WHERE status='pending'`);
+      const rr = await query(`SELECT COUNT(*) as cnt FROM hospital_payout_requests WHERE status='pending' AND hospital_id != 'hosp-gandhi'`);
       totalPendingRequests = Number(rr.rows[0]?.cnt || 0);
     } catch (e) {}
   }
@@ -4786,7 +4799,7 @@ app.post('/api/admin/hospital-settlements/:hospitalId/settle', async (req, res) 
 
       // Mark pending payout requests as fulfilled
       await query(
-        `UPDATE hospital_payout_requests SET status='fulfilled', admin_notes=$1, updated_at=NOW() WHERE hospital_id=$2 AND status='pending'`,
+        `UPDATE hospital_payout_requests SET status='fulfilled', admin_notes=$1, updated_at=NOW() WHERE (hospital_id=$2 OR ($2='hosp-mu0838sg' AND hospital_id='hosp-gandhi')) AND status='pending'`,
         [`Settled via UTR: ${utr_reference}`, hospitalId]
       );
     } catch (dbErr) {
@@ -4810,7 +4823,7 @@ app.get('/api/admin/payout-requests', async (req, res) => {
   let requests = [];
   if (isDbConnected) {
     try {
-      const r = await query(`SELECT * FROM hospital_payout_requests ORDER BY created_at DESC LIMIT 100`);
+      const r = await query(`SELECT * FROM hospital_payout_requests WHERE hospital_id != 'hosp-gandhi' ORDER BY created_at DESC LIMIT 100`);
       requests = r.rows;
     } catch (e) {
       console.warn('Error fetching payout requests:', e.message);
@@ -4818,7 +4831,7 @@ app.get('/api/admin/payout-requests', async (req, res) => {
   }
   if (requests.length === 0) {
     const store = await getUnifiedStore();
-    requests = store.payoutRequests || [];
+    requests = (store.payoutRequests || []).filter(r => r.hospital_id !== 'hosp-gandhi');
   }
   const pendingCount = requests.filter(r => r.status === 'pending').length;
   res.json({ success: true, requests, pendingCount });
