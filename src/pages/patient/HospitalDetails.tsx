@@ -164,6 +164,16 @@ export const HospitalDetails: React.FC<HospitalDetailsProps> = ({ onDoctorSelect
     return getGroupedTimings(raw);
   }, [liveProfile, hospital]);
 
+  const isOpenToday = useMemo(() => {
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const todayKey = dayNames[new Date().getDay()];
+    const raw = liveProfile?.timings || (hospital as any)?.timings;
+    if (!Array.isArray(raw)) return true;
+    const todayTiming = raw.find((t: any) => t && (t.day === todayKey || t.day?.startsWith(todayKey)));
+    if (!todayTiming || !todayTiming.open || !todayTiming.close) return false;
+    return true;
+  }, [liveProfile, hospital]);
+
   const formattedFacilities = useMemo(() => {
     const raw = (hospital as any)?.facilities;
     if (!Array.isArray(raw)) return [];
@@ -583,7 +593,9 @@ export const HospitalDetails: React.FC<HospitalDetailsProps> = ({ onDoctorSelect
                   <Clock size={14} className="text-blue-600" />
                   <span>OPD Timings</span>
                 </div>
-                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-full">Open</span>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isOpenToday ? 'text-emerald-700 bg-emerald-100/70' : 'text-slate-500 bg-slate-200'}`}>
+                  {isOpenToday ? 'Open Today' : 'Closed Today'}
+                </span>
               </div>
               <div className="space-y-1.5 pt-1">
                 {groupedTimings.map((t, idx) => (

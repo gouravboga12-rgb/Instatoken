@@ -22,6 +22,43 @@ const COMMON_FACILITIES = [
   'Physiotherapy & Rehabilitation',
 ];
 
+const DAYS_OF_WEEK = [
+  { key: 'Mon', label: 'Monday' },
+  { key: 'Tue', label: 'Tuesday' },
+  { key: 'Wed', label: 'Wednesday' },
+  { key: 'Thu', label: 'Thursday' },
+  { key: 'Fri', label: 'Friday' },
+  { key: 'Sat', label: 'Saturday' },
+  { key: 'Sun', label: 'Sunday' },
+];
+
+const DEFAULT_TIMINGS = [
+  { day: 'Mon', open: '09:00', close: '18:00' },
+  { day: 'Tue', open: '09:00', close: '18:00' },
+  { day: 'Wed', open: '09:00', close: '18:00' },
+  { day: 'Thu', open: '09:00', close: '18:00' },
+  { day: 'Fri', open: '09:00', close: '18:00' },
+  { day: 'Sat', open: '09:00', close: '14:00' },
+  { day: 'Sun', open: '10:00', close: '13:00' },
+];
+
+const normalizeTimings = (raw: any): { day: string; open: string; close: string }[] => {
+  const dayKeys = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  if (!Array.isArray(raw) || raw.length === 0) return DEFAULT_TIMINGS;
+  return dayKeys.map(d => {
+    const existing = raw.find((item: any) => item && (item.day === d || item.day?.startsWith(d)));
+    if (existing) {
+      return {
+        day: d,
+        open: existing.open || '',
+        close: existing.close || ''
+      };
+    }
+    const def = DEFAULT_TIMINGS.find(dt => dt.day === d);
+    return def || { day: d, open: '', close: '' };
+  });
+};
+
 export const HospitalSettings: React.FC = () => {
   const { hospitalProfile, updateHospitalProfile, authToken } = useHospital();
   const [activeTab, setActiveTab] = useState<'basic' | 'contact' | 'location' | 'about' | 'payouts'>('basic');
@@ -141,7 +178,8 @@ export const HospitalSettings: React.FC = () => {
     mission: hospitalProfile?.mission || '',
     vision: hospitalProfile?.vision || '',
     brandColor: hospitalProfile?.brandColor || '#2563EB',
-    facilities: hospitalProfile?.facilities || []
+    facilities: hospitalProfile?.facilities || [],
+    timings: normalizeTimings(hospitalProfile?.timings)
   });
 
   // Synchronize form with loaded hospital profile
@@ -179,7 +217,8 @@ export const HospitalSettings: React.FC = () => {
           mission: hospitalProfile.mission || '',
           vision: hospitalProfile.vision || '',
           brandColor: hospitalProfile.brandColor || '#2563EB',
-          facilities: hospitalProfile.facilities || []
+          facilities: hospitalProfile.facilities || [],
+          timings: normalizeTimings(hospitalProfile.timings)
         });
       }
     }
@@ -190,6 +229,50 @@ export const HospitalSettings: React.FC = () => {
       const exists = prev.facilities.includes(fac);
       const updated = exists ? prev.facilities.filter(f => f !== fac) : [...prev.facilities, fac];
       return { ...prev, facilities: updated };
+    });
+  };
+
+  const handleTimingChange = (dayKey: string, field: 'open' | 'close', value: string) => {
+    setForm(prev => {
+      const nextTimings = (prev.timings || []).map(t => {
+        if (t.day === dayKey) {
+          return { ...t, [field]: value };
+        }
+        return t;
+      });
+      return { ...prev, timings: nextTimings };
+    });
+  };
+
+  const handleTimingToggle = (dayKey: string, shouldOpen: boolean) => {
+    setForm(prev => {
+      const nextTimings = (prev.timings || []).map(t => {
+        if (t.day === dayKey) {
+          if (shouldOpen) {
+            return { ...t, open: t.open || '09:00', close: t.close || '18:00' };
+          } else {
+            return { ...t, open: '', close: '' };
+          }
+        }
+        return t;
+      });
+      return { ...prev, timings: nextTimings };
+    });
+  };
+
+  const handleApplyMondayToWeekdays = () => {
+    setForm(prev => {
+      const mon = (prev.timings || []).find(t => t.day === 'Mon');
+      const open = mon?.open || '09:00';
+      const close = mon?.close || '18:00';
+      const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+      const nextTimings = (prev.timings || []).map(t => {
+        if (weekdays.includes(t.day)) {
+          return { ...t, open, close };
+        }
+        return t;
+      });
+      return { ...prev, timings: nextTimings };
     });
   };
 
@@ -453,7 +536,7 @@ export const HospitalSettings: React.FC = () => {
             { id: 'basic', label: 'Basic Profile & Photo', desc: 'Name, photo, registration', icon: <Building2 size={16} /> },
             { id: 'contact', label: 'Contacts & Emergency', desc: 'Phone, WhatsApp, helpline', icon: <Phone size={16} /> },
             { id: 'location', label: 'GPS Location & Maps', desc: 'Address, geocoding, coordinates', icon: <MapPin size={16} /> },
-            { id: 'about', label: 'About & Amenities', desc: 'Facilities, mission, description', icon: <Layers size={16} /> },
+            { id: 'about', label: 'About, OPD Timings & Facilities', desc: 'Operating hours, amenities, bio', icon: <Layers size={16} /> },
             { id: 'payouts', label: 'Payout & Online Payments', desc: 'Bank details, payment mode', icon: <Banknote size={16} /> }
           ].map(t => (
             <button
@@ -482,7 +565,7 @@ export const HospitalSettings: React.FC = () => {
             <div className="flex items-center justify-between pb-4 border-b border-slate-100 flex-wrap gap-2">
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-black uppercase tracking-wider text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full border border-blue-100">
-                  {activeTab === 'basic' ? 'Basic Identity & Photo' : activeTab === 'contact' ? 'Contacts & Digital' : activeTab === 'location' ? 'GPS & Maps' : activeTab === 'about' ? 'Amenities' : 'Payouts & Banking'}
+                  {activeTab === 'basic' ? 'Basic Identity & Photo' : activeTab === 'contact' ? 'Contacts & Digital' : activeTab === 'location' ? 'GPS & Maps' : activeTab === 'about' ? 'About, OPD Timings & Facilities' : 'Payouts & Banking'}
                 </span>
                 {saveSuccess && activeTab !== 'payouts' && (
                   <span className="text-xs font-bold text-emerald-600 flex items-center gap-1 bg-emerald-50 px-2.5 py-1 rounded-xl border border-emerald-200 animate-fadeIn">
@@ -869,6 +952,91 @@ export const HospitalSettings: React.FC = () => {
                     rows={2}
                     className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 resize-none transition-all"
                   />
+                </div>
+
+                {/* ─── HOSPITAL OPD OPERATING HOURS ─── */}
+                <div className="bg-slate-50/80 p-4 sm:p-5 rounded-3xl border border-slate-200/80 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-200/60">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-blue-100/80 text-blue-600 flex items-center justify-center shrink-0">
+                        <Clock size={16} />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">Hospital OPD Working Hours</h4>
+                        <p className="text-[11px] text-slate-500 font-medium">Displayed on the patient-facing hospital page under "OPD Timings".</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleApplyMondayToWeekdays}
+                      className="text-[11px] font-bold text-blue-600 hover:text-blue-700 bg-white border border-blue-200 hover:border-blue-300 px-3 py-1.5 rounded-xl transition-all shadow-2xs cursor-pointer self-start sm:self-auto flex items-center gap-1.5"
+                    >
+                      <Sparkles size={12} className="text-amber-500" />
+                      <span>Apply Mon Timings to Mon–Fri</span>
+                    </button>
+                  </div>
+
+                  <div className="space-y-2">
+                    {DAYS_OF_WEEK.map(({ key, label }) => {
+                      const timing = (form.timings || []).find(t => t.day === key) || { day: key, open: '', close: '' };
+                      const isOpen = Boolean(timing.open && timing.close);
+
+                      return (
+                        <div
+                          key={key}
+                          className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-2xl border transition-all ${
+                            isOpen ? 'bg-white border-slate-200 shadow-2xs' : 'bg-slate-100/50 border-slate-200/60'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-[140px]">
+                            <label className="relative inline-flex items-center cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={isOpen}
+                                onChange={(e) => handleTimingToggle(key, e.target.checked)}
+                                className="sr-only peer"
+                              />
+                              <div className="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                            </label>
+                            <div>
+                              <span className="text-xs font-black text-slate-800 block">{label}</span>
+                              <span className={`text-[10px] font-extrabold uppercase ${isOpen ? 'text-emerald-600' : 'text-slate-400'}`}>
+                                {isOpen ? 'Open' : 'Closed'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {isOpen ? (
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[11px] font-bold text-slate-500">Opens:</span>
+                                <input
+                                  type="time"
+                                  value={timing.open}
+                                  onChange={(e) => handleTimingChange(key, 'open', e.target.value)}
+                                  className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:border-blue-500 focus:bg-white transition-all"
+                                />
+                              </div>
+                              <span className="text-slate-400 font-bold text-xs">—</span>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[11px] font-bold text-slate-500">Closes:</span>
+                                <input
+                                  type="time"
+                                  value={timing.close}
+                                  onChange={(e) => handleTimingChange(key, 'close', e.target.value)}
+                                  className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:border-blue-500 focus:bg-white transition-all"
+                                />
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-xs font-semibold text-slate-400 italic">
+                              Hospital OPD Closed on this day
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
                 <div>
                   <label className={labelCls}>Hospital Amenities & Clinical Facilities <span className="text-slate-400 font-semibold">(shown on patient-facing page)</span></label>
