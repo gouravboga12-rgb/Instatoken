@@ -38,6 +38,16 @@
             {
               "scheme": "https",
               "host": "instatoken.in",
+              "pathPrefix": "/confirmation"
+            },
+            {
+              "scheme": "https",
+              "host": "instatoken.in",
+              "pathPrefix": "/bookings"
+            },
+            {
+              "scheme": "https",
+              "host": "instatoken.in",
               "pathPrefix": "/tracker"
             }
           ],

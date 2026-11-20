@@ -410,7 +410,28 @@ export const TokenConfirmation: React.FC = () => {
 
       const safePatient = (appointment.patientName || 'Patient').replace(/[^a-zA-Z0-9]/g, '_');
       const filename = `InstaToken_Token_${appointment.tokenNumber || 1}_${safePatient}.pdf`;
-      doc.save(filename);
+      const downloadUrl = `${window.location.origin}/api/appointments/${appointment.id}/download-pass`;
+
+      // 1. If running inside native Android/iOS WebView container, trigger native download
+      if ((window as any).ReactNativeWebView) {
+        (window as any).ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'DOWNLOAD_PDF',
+          url: downloadUrl,
+          filename: filename
+        }));
+      }
+
+      // 2. Client-side jsPDF download with direct link fallback
+      try {
+        doc.save(filename);
+      } catch (saveErr) {
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
 
       addNotification(
         "Token Downloaded",
@@ -419,7 +440,8 @@ export const TokenConfirmation: React.FC = () => {
       );
     } catch (err: any) {
       console.error('PDF generation error:', err);
-      window.print();
+      const downloadUrl = `${window.location.origin}/api/appointments/${appointment.id}/download-pass`;
+      window.open(downloadUrl, '_blank');
     } finally {
       setIsDownloading(false);
     }
@@ -436,6 +458,19 @@ export const TokenConfirmation: React.FC = () => {
       `Date & Time: ${formattedDate} (${appointment.time})\n` +
       `Payment: ${isFullOnlineBooking ? 'Doctor Fee Paid Online' : 'Pay Doctor Fee at OPD Desk'}\n\n` +
       `👉 Track Live Queue & Digital Pass:\n${passUrl}`;
+
+    // Bridge to native Android app share dialog
+    if ((window as any).ReactNativeWebView) {
+      (window as any).ReactNativeWebView.postMessage(JSON.stringify({
+        type: 'SHARE',
+        title: `OPD Token #${appointment.tokenNumber} - ${appointment.hospitalName}`,
+        text: shareText,
+        url: passUrl,
+      }));
+      setCopiedShare(true);
+      setTimeout(() => setCopiedShare(false), 3000);
+      return;
+    }
 
     if (navigator.share) {
       try {
@@ -482,8 +517,18 @@ export const TokenConfirmation: React.FC = () => {
       `📅 *Date & Time:* ${formattedDate} (${appointment.time})\n` +
       `💳 *Payment:* ${isFullOnlineBooking ? 'Doctor Fee Paid Online' : 'Pay Doctor Fee at OPD Desk'}\n\n` +
       `📲 *Live Digital Token Pass & Queue Tracker:*\n${passUrl}`;
-    const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
-    window.open(waUrl, '_blank');
+    const waUrl = `whatsapp://send?text=${encodeURIComponent(text)}`;
+    const webWaUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+
+    if ((window as any).ReactNativeWebView) {
+      (window as any).ReactNativeWebView.postMessage(JSON.stringify({
+        type: 'OPEN_URL',
+        url: waUrl
+      }));
+      return;
+    }
+
+    window.open(webWaUrl, '_blank');
   };
 
   return (
@@ -504,6 +549,28 @@ export const TokenConfirmation: React.FC = () => {
           >
             <span>← Return to Hospital Panel</span>
           </button>
+        </div>
+      )}
+
+      {/* Deep Link to App Banner when opened from mobile web (WhatsApp / SMS) */}
+      {!((window as any).__IS_INSTATOKEN_NATIVE_APP__) && (
+        <div className="mb-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white p-3.5 rounded-2xl flex items-center justify-between shadow-md">
+          <div className="flex items-center gap-2.5">
+            <img src="/favicon.png" className="w-8 h-8 rounded-xl object-contain bg-white p-0.5" alt="InstaToken" />
+            <div>
+              <div className="text-xs font-black">View in InstaToken Mobile App</div>
+              <div className="text-[10px] text-blue-100 font-semibold">Track queue live with audio calling alerts</div>
+            </div>
+          </div>
+          <a
+            href={`instatoken://confirmation/${appointment.id}`}
+            onClick={() => {
+              window.location.href = `instatoken://confirmation/${appointment.id}`;
+            }}
+            className="px-3.5 py-1.5 bg-white text-blue-700 hover:bg-blue-50 font-black text-xs rounded-xl shadow-xs border-none cursor-pointer"
+          >
+            Open App
+          </a>
         </div>
       )}
 

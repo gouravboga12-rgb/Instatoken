@@ -9,11 +9,14 @@ import {
   SafeAreaView,
   Platform,
   PermissionsAndroid,
+  Share,
+  Linking,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import { GOOGLE_WEB_CLIENT_ID } from '../context/AuthContext';
 import * as Haptics from 'expo-haptics';
+import * as Speech from 'expo-speech';
 
 interface WebContainerScreenProps {
   route: any;
@@ -83,9 +86,29 @@ export const WebContainerScreen: React.FC<WebContainerScreenProps> = ({
         });
       } else if (data.type === 'GOOGLE_SIGN_IN') {
         await triggerNativeGoogleSignIn();
+      } else if (data.type === 'SHARE') {
+        try {
+          await Share.share({
+            title: data.title || 'InstaToken Appointment Pass',
+            message: data.text ? `${data.text}\n${data.url || ''}` : data.url,
+            url: data.url,
+          });
+        } catch (e) {}
+      } else if (data.type === 'OPEN_URL' || data.type === 'DOWNLOAD_PDF') {
+        if (data.url) {
+          Linking.openURL(data.url).catch(() => {});
+        }
       } else if (data.type === 'HAPTIC_CHIME' || data.type === 'TOKEN_CALLED') {
         try {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+          if (data.payload) {
+            const tok = data.payload.tokenNo || '';
+            const doc = (data.payload.doctorName || 'Doctor').replace(/^Dr\.?\s*/i, '');
+            Speech.speak(`Token ${tok}, Doctor ${doc} is calling.`, {
+              language: 'en-IN',
+              rate: 0.95,
+            });
+          }
         } catch (e) {
           // ignore
         }
@@ -193,6 +216,22 @@ export const WebContainerScreen: React.FC<WebContainerScreenProps> = ({
         geolocationEnabled={true}
         allowFileAccess={true}
         allowsBackForwardNavigationGestures={true}
+        mediaPlaybackRequiresUserAction={false}
+        allowsInlineMediaPlayback={true}
+        onShouldStartLoadWithRequest={(request) => {
+          const url = request.url;
+          if (
+            url.startsWith('tel:') ||
+            url.startsWith('mailto:') ||
+            url.startsWith('whatsapp:') ||
+            url.startsWith('intent:') ||
+            url.includes('api.whatsapp.com')
+          ) {
+            Linking.openURL(url).catch(() => {});
+            return false;
+          }
+          return true;
+        }}
         userAgent="InstaToken-Android-App/1.0"
         pullToRefreshEnabled={true}
       />

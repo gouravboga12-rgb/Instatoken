@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Volume2, VolumeX, Bell, X } from 'lucide-react';
+import { Volume2, Bell, X } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { subscribeGlobalSync } from '../../utils/syncBus';
 import io, { Socket } from 'socket.io-client';
@@ -64,8 +64,9 @@ export const PatientCallAlertBanner: React.FC = () => {
         const callTarget = payload || activeCall;
         const tokNo = callTarget?.tokenNo || '';
         const docClean = (callTarget?.doctorName || 'Doctor').replace(/^Dr\.?\s*/i, '');
-        const msg = new SpeechSynthesisUtterance(`Token ${tokNo}, Dr. ${docClean} is calling.`);
-        msg.rate = 1.0;
+        const msg = new SpeechSynthesisUtterance(`Token ${tokNo}, Doctor ${docClean} is calling.`);
+        msg.rate = 0.95;
+        msg.lang = 'en-IN';
         window.speechSynthesis.speak(msg);
       }
     } catch (e) {}
@@ -77,6 +78,14 @@ export const PatientCallAlertBanner: React.FC = () => {
 
     // Initial chime
     playAlertChime(payload);
+
+    // Bridge to native Android/iOS app via WebView
+    try {
+      (window as any).ReactNativeWebView?.postMessage(JSON.stringify({
+        type: 'TOKEN_CALLED',
+        payload
+      }));
+    } catch (e) {}
 
     // Haptic vibration on mobile devices
     try {
@@ -272,14 +281,16 @@ export const PatientCallAlertBanner: React.FC = () => {
           </button>
           
           <button
+            type="button"
             onClick={() => {
-              if (audioIntervalRef.current) clearInterval(audioIntervalRef.current);
-              setIsMuted(prev => !prev);
+              setIsMuted(false);
+              playAlertChime();
             }}
-            className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-colors cursor-pointer border-none"
-            title={isMuted ? "Unmute alert" : "Mute audio chime"}
+            className="px-3 py-2 bg-white/20 hover:bg-white/30 text-white rounded-xl transition-colors cursor-pointer border border-white/20 flex items-center gap-1.5 text-xs font-bold"
+            title="Play calling chime & voice announcement"
           >
-            {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+            <Volume2 size={16} />
+            <span>Play Sound</span>
           </button>
         </div>
       </div>

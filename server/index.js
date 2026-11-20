@@ -4911,6 +4911,204 @@ app.get('/api/appointments/:id', async (req, res) => {
   res.status(404).json({ success: false, message: 'Appointment not found' });
 });
 
+// GET /api/appointments/:id/download-pass - Stream PDF pass directly for mobile and web downloads
+app.get(['/api/appointments/:id/download-pass', '/api/tokens/:id/download-pass'], async (req, res) => {
+  const { id } = req.params;
+  let appt = null;
+
+  if (isDbConnected) {
+    try {
+      const dbRes = await query(`SELECT id, status, data FROM appointments WHERE id = $1`, [id]);
+      if (dbRes.rows.length > 0 && dbRes.rows[0].data) {
+        const raw = dbRes.rows[0].data;
+        const dataObj = typeof raw === 'string' ? JSON.parse(raw) : (raw || {});
+        appt = { ...dataObj, id: dbRes.rows[0].id || dataObj.id, status: dbRes.rows[0].status || dataObj.status || 'booked' };
+      } else {
+        const tokRes = await query(`SELECT id, status, data FROM tokens WHERE id = $1`, [id]);
+        if (tokRes.rows.length > 0 && tokRes.rows[0].data) {
+          const rawTok = tokRes.rows[0].data;
+          const tok = typeof rawTok === 'string' ? JSON.parse(rawTok) : (rawTok || {});
+          appt = {
+            id: tok.id,
+            tokenNumber: tok.tokenNo || tok.tokenNumber || 1,
+            patientName: tok.patientName || 'Patient',
+            age: tok.patientAge || 28,
+            gender: tok.patientGender || 'Male',
+            phone: tok.patientPhone || '',
+            hospitalName: tok.hospitalName || 'Hospital',
+            doctorName: tok.doctorName || 'Doctor',
+            departmentName: tok.departmentName || 'General Medicine',
+            date: tok.bookingDate || new Date().toISOString().split('T')[0],
+            time: tok.time || '10:00 AM',
+            fee: tok.consultationFee || 500,
+            platformFee: tok.platformFee || 25,
+            totalFee: tok.totalFee || tok.platformFee || 25,
+            paymentMethod: tok.paymentMethod || 'Online',
+            paymentId: tok.paymentId || `PAY-${tok.id}`,
+            estimatedWaitTime: tok.estimatedWait || 15
+          };
+        }
+      }
+    } catch (err) {
+      console.warn('Error fetching appointment for PDF download:', err.message);
+    }
+  }
+
+  if (!appt) {
+    const store = await getUnifiedStore();
+    appt = (store.appointments || []).find(a => a.id === id) || (store.tokens || []).find(t => t.id === id);
+  }
+
+  if (!appt) {
+    return res.status(404).send('Appointment record not found');
+  }
+
+  try {
+    const { jsPDF } = require('jspdf');
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+    // 1. Top Header Banner (Blue)
+    doc.setFillColor(30, 64, 175);
+    doc.roundedRect(15, 15, 180, 24, 3, 3, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.text('INSTATOKEN · OFFICIAL OPD APPOINTMENT PASS', 20, 22);
+    doc.setFontSize(14);
+    doc.text(String(appt.hospitalName || 'Hospital OPD Facility'), 20, 30);
+
+    // 2. Token Number & Slot
+    doc.setFillColor(239, 246, 255);
+    doc.setDrawColor(191, 219, 254);
+    doc.roundedRect(15, 43, 180, 36, 3, 3, 'FD');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(37, 99, 235);
+    doc.text('YOUR TOKEN NUMBER', 22, 51);
+    doc.setFontSize(28);
+    doc.setTextColor(29, 78, 216);
+    doc.text(`#${appt.tokenNumber || appt.tokenNo || 1}`, 22, 63);
+    doc.setFontSize(9);
+    doc.setTextColor(71, 85, 105);
+    doc.text(`Slot Time: ${appt.time || 'Morning OPD'}`, 22, 70);
+    doc.text(`Date: ${appt.date || appt.bookingDate || 'Today'}`, 22, 75);
+
+    // Status Badge
+    doc.setFillColor(16, 185, 129);
+    doc.roundedRect(140, 48, 45, 8, 2, 2, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'bold');
+    doc.text('TOKEN CONFIRMED', 145, 53.5);
+
+    // 3. Grid: Patient Details & Doctor Details
+    doc.setFillColor(248, 250, 252);
+    doc.setDrawColor(226, 232, 240);
+    doc.roundedRect(15, 83, 87, 44, 3, 3, 'FD');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(30, 64, 175);
+    doc.text('PATIENT DETAILS', 20, 90);
+    doc.setFontSize(10);
+    doc.setTextColor(15, 23, 42);
+    doc.text(String(appt.patientName || 'Patient'), 20, 97);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(71, 85, 105);
+    doc.text(`Age / Gender: ${appt.age || '28'} Yrs (${appt.gender || 'Male'})`, 20, 103);
+    doc.text(`Contact: ${appt.phone || 'On File'}`, 20, 109);
+    doc.text(`Booking ID: ${appt.id}`, 20, 115);
+    doc.text('Queue Status: On Schedule', 20, 121);
+
+    doc.setFillColor(248, 250, 252);
+    doc.setDrawColor(226, 232, 240);
+    doc.roundedRect(108, 83, 87, 44, 3, 3, 'FD');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(30, 64, 175);
+    doc.text('CONSULTING DOCTOR', 113, 90);
+    doc.setFontSize(10);
+    doc.setTextColor(15, 23, 42);
+    doc.text(String(appt.doctorName || 'Doctor'), 113, 97);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(71, 85, 105);
+    doc.text(`Department: ${appt.departmentName || 'General OPD'}`, 113, 103);
+    doc.text('OPD Room: Cabin Consultation', 113, 109);
+    doc.text(`Est. Wait: ~${appt.estimatedWaitTime || 15} mins`, 113, 115);
+    doc.text('Consultation Validity: 7 Days', 113, 121);
+
+    // 4. Payment breakdown
+    doc.setFillColor(241, 245, 249);
+    doc.setDrawColor(203, 213, 225);
+    doc.roundedRect(15, 131, 180, 36, 3, 3, 'FD');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(51, 65, 85);
+    doc.text('PAYMENT & CHARGES BREAKDOWN', 20, 138);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(71, 85, 105);
+    doc.text('Doctor Consultation Fee:', 20, 145);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(15, 23, 42);
+    doc.text(`Rs. ${(Number(appt.fee) || 250).toFixed(2)}`, 85, 145);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(71, 85, 105);
+    doc.text('Platform & Gateway Charges:', 20, 151);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(15, 23, 42);
+    doc.text(`Rs. ${(Number(appt.platformFee) || 15).toFixed(2)}`, 85, 151);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(71, 85, 105);
+    doc.text('Payment Status:', 20, 157);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(22, 101, 52);
+    doc.text(appt.paymentMethod === 'Online' ? 'PAID ONLINE VIA RAZORPAY' : 'CONFIRMED APPOINTMENT', 85, 157);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text(`Transaction Ref: ${appt.paymentId || 'PAYID-INSTATOKEN'} · Verified Online`, 20, 163);
+
+    // 5. Instructions
+    doc.setFillColor(254, 252, 232);
+    doc.setDrawColor(254, 240, 138);
+    doc.roundedRect(15, 171, 180, 34, 3, 3, 'FD');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(133, 77, 14);
+    doc.text('IMPORTANT PATIENT INSTRUCTIONS', 20, 178);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(113, 63, 18);
+    doc.text('1. Please reach hospital 10-15 minutes prior to your allocated slot time.', 20, 184);
+    doc.text('2. Present this token pass at the hospital OPD reception upon arrival.', 20, 189);
+    doc.text('3. Carry previous medical prescriptions and health reports.', 20, 194);
+    doc.text('4. Consultation Fee is valid for 7 Days (up to 2 Follow-up visits).', 20, 199);
+
+    // 6. Security Footer
+    doc.setDrawColor(226, 232, 240);
+    doc.line(15, 215, 195, 215);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(148, 163, 184);
+    doc.text('Generated by InstaToken OPD Platform · 100% Spot Guaranteed Pass', 15, 221);
+    doc.text(`Issued On: ${new Date().toLocaleString('en-IN')} · Support: help@instatoken.in`, 15, 226);
+
+    const safePatient = (appt.patientName || 'Patient').replace(/[^a-zA-Z0-9]/g, '_');
+    const filename = `InstaToken_Pass_${appt.tokenNumber || appt.tokenNo || 1}_${safePatient}.pdf`;
+
+    const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    return res.end(pdfBuffer);
+  } catch (pdfErr) {
+    console.error('Server PDF generation error:', pdfErr);
+    return res.status(500).send('Error generating PDF');
+  }
+});
+
 // GET all appointments
 app.get('/api/appointments', async (req, res) => {
   if (isDbConnected) {
