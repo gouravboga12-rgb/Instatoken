@@ -3943,7 +3943,7 @@ app.post('/api/hospitals/:hospitalId/tokens/:tokenId/readmit', requireHospitalAu
       try {
         await query(
           `UPDATE tokens 
-           SET status = 'booked', session = $1, doctor_id = $2, token_date = $3, token_number = $4,
+           SET status = 'booked', session = $1, doctor_id = $2, token_date = $3::date, token_number = $4,
                data = (COALESCE(data, '{}'::jsonb) || $5::jsonb), updated_at = NOW() 
            WHERE id = $6`,
           [
@@ -3958,19 +3958,19 @@ app.post('/api/hospitals/:hospitalId/tokens/:tokenId/readmit', requireHospitalAu
 
         await query(
           `UPDATE appointments 
-           SET status = 'booked', appointment_date = $1, doctor_id = $2,
+           SET status = 'booked', appointment_date = $1::date, doctor_id = $2,
                data = (COALESCE(data, '{}'::jsonb) || jsonb_build_object(
                  'status', 'booked',
-                 'date', $1::varchar,
-                 'doctorId', $2::varchar,
-                 'doctorName', $3::varchar,
+                 'date', $1::text,
+                 'doctorId', $2::text,
+                 'doctorName', $3::text,
                  'tokenNumber', $4::numeric,
-                 'session', $5::varchar,
+                 'session', $5::text,
                  'isExisting', true,
                  'revisitDetails', $6::jsonb
                )), 
                updated_at = NOW() 
-           WHERE id = $7`,
+           WHERE id = $7 OR (data->>'tokenId') = $7`,
           [
             todayStr,
             updatedToken.doctorId,
