@@ -2810,6 +2810,19 @@ app.post('/api/customers/signup', async (req, res) => {
 
     store.customers.unshift(newCustomer);
     await saveUnifiedStore(store);
+
+    if (isDbConnected) {
+      try {
+        await query(`
+          INSERT INTO customers (id, name, phone, email, location, data, created_at, updated_at)
+          VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+          ON CONFLICT (id) DO UPDATE SET name = $2, phone = $3, email = $4, data = $6, updated_at = NOW()
+        `, [newCustomer.id, newCustomer.name, newCustomer.phone, newCustomer.email, newCustomer.location, JSON.stringify(newCustomer)]);
+      } catch (dbErr) {
+        console.warn('[DB Sync Warn] Failed to insert customer into Postgres:', dbErr.message);
+      }
+    }
+
     console.log(`✅ Registered new customer: ${newCustomer.name} (${newCustomer.phone})`);
     res.status(201).json({ success: true, customer: newCustomer });
   } catch (err) {
