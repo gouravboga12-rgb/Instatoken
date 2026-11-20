@@ -7,7 +7,7 @@ import {
   XCircle, Calendar, Search,
   Printer, Eye, Phone, Wifi, WifiOff,
   Volume2, Sparkles, UserX,
-  Wallet, MapPin
+  Wallet, MapPin, AlertTriangle, CheckCircle2, X
 } from 'lucide-react';
 import { TokenPaymentModal } from '../../components/hospital/TokenPaymentModal';
 
@@ -32,6 +32,7 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
   const [printToken, setPrintToken] = useState<TokenRecord | null>(null);
   const [visitingToken, setVisitingToken] = useState<TokenRecord | null>(null);
   const [paymentTargetToken, setPaymentTargetToken] = useState<TokenRecord | null>(null);
+  const [confirmVisitToken, setConfirmVisitToken] = useState<TokenRecord | null>(null);
 
   const todayStr = new Date().toISOString().split('T')[0];
   const tomorrowStr = new Date(Date.now() + 86400000).toISOString().split('T')[0];
@@ -290,10 +291,18 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
 
   const handleCompleteToken = (id: string) => {
     const target = tokens.find(t => t.id === id);
-    if (target && target.paymentStatus !== 'paid') {
-      setVisitingToken(target);
+    if (!target) return;
+    setConfirmVisitToken(target);
+  };
+
+  const handleConfirmVisitExecution = () => {
+    if (!confirmVisitToken) return;
+    const tok = confirmVisitToken;
+    setConfirmVisitToken(null);
+    if (tok.paymentStatus !== 'paid') {
+      setVisitingToken(tok);
     } else {
-      updateTokenStatus(id, 'completed');
+      updateTokenStatus(tok.id, 'completed');
     }
   };
 
@@ -1252,6 +1261,95 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold cursor-pointer border-none shadow-xs flex items-center gap-1.5"
               >
                 <Printer size={13} /> Print
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Confirm Mark Visited Safeguard Modal ───────────────────────── */}
+      {confirmVisitToken && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-xs">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                  <CheckCircle2 size={20} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-800">Confirm Patient Visit</h3>
+                  <p className="text-[11px] text-slate-400 font-semibold">Verify consultation status before updating records</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setConfirmVisitToken(null)}
+                className="p-1.5 rounded-xl hover:bg-slate-100 cursor-pointer border-none text-slate-400 hover:text-slate-600 font-bold transition-colors"
+                aria-label="Close"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Token & Patient Details */}
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400 font-bold">Token Number:</span>
+                <span className="font-black text-lg text-slate-900">#{confirmVisitToken.tokenNo}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400 font-bold">Patient Name:</span>
+                <span className="font-extrabold text-slate-800">{confirmVisitToken.patientName || 'Patient'}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400 font-bold">Doctor:</span>
+                <span className="font-extrabold text-blue-600">{confirmVisitToken.doctorName || doctor?.name}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400 font-bold">Session:</span>
+                <span className="font-semibold text-slate-700 capitalize">{confirmVisitToken.session || 'Morning'} OPD</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400 font-bold">Consultation Fee:</span>
+                <span className="font-black text-emerald-600">
+                  ₹{confirmVisitToken.consultationFee || (confirmVisitToken as any).fee || doctor?.consultationFee || 400} ({confirmVisitToken.paymentStatus === 'paid' ? `Paid • ${confirmVisitToken.paymentMethod || 'Online'}` : 'Pending Pay-at-Hospital'})
+                </span>
+              </div>
+            </div>
+
+            {/* Warning if on Hold / Absent vs Normal */}
+            {['not-visited', 'skipped', 'late-coming', 'hold', 'late'].includes(confirmVisitToken.status) ? (
+              <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-2.5">
+                <AlertTriangle size={18} className="text-amber-600 shrink-0 mt-0.5" />
+                <div className="text-[11px] text-amber-800 leading-relaxed font-semibold">
+                  <strong className="block text-amber-900 font-black">Warning: Patient is currently marked Absent / On-Hold!</strong>
+                  Are you sure you want to mark this patient as <strong>Visited</strong> directly? If they did not attend the doctor consultation, click <strong>Cancel</strong> to preserve their token for future re-admission.
+                </div>
+              </div>
+            ) : (
+              <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-2xl flex items-start gap-2.5">
+                <CheckCircle size={18} className="text-blue-600 shrink-0 mt-0.5" />
+                <div className="text-[11px] text-blue-800 leading-relaxed font-semibold">
+                  Are you sure you want to complete the visit for <strong>{confirmVisitToken.patientName || `Token #${confirmVisitToken.tokenNo}`}</strong>? This will record the consultation as completed and realize the earned revenue.
+                </div>
+              </div>
+            )}
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setConfirmVisitToken(null)}
+                className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmVisitExecution}
+                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black cursor-pointer border-none shadow-md shadow-emerald-600/20 flex items-center gap-1.5 transition-all active:scale-95"
+              >
+                <CheckCircle2 size={13} /> OK, Mark Visited
               </button>
             </div>
           </div>

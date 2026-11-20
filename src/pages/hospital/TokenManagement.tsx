@@ -2172,6 +2172,11 @@ const TokenTable: React.FC<{
                           <button
                             type="button"
                             onClick={() => {
+                              const patName = t.patientName || `Token #${t.tokenNo}`;
+                              const feeStr = t.consultationFee ? `₹${t.consultationFee}` : 'Consultation Fee';
+                              if (!window.confirm(`Mark ${patName} as Visited & complete consultation?\n\n• Fee: ${feeStr}\n• Status: ${t.status}\n\nClick OK to confirm visit, or Cancel to abort.`)) {
+                                return;
+                              }
                               if (t.paymentStatus !== 'paid') {
                                 setCompletingPaymentToken(t);
                               } else {
