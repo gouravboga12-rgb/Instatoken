@@ -4,6 +4,14 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      // Restore native Storage prototype method to prevent false LOGOUT triggers inside native WebView
+      if (typeof window !== 'undefined' && window.Storage && window.localStorage) {
+        try {
+          window.localStorage.removeItem = Storage.prototype.removeItem.bind(window.localStorage);
+        } catch (e) {}
+      }
+    </script>
     <title>InstaToken - Skip the OPD Waiting Lines. Book Digital OPD Tokens Online.</title>
     <meta name="description" content="InstaToken - Official Digital OPD Token Booking & Real-Time Hospital Queue Tracker. Book verified hospital tokens online and skip waiting lines." />
     <meta name="keywords" content="hospital token booking, digital OPD queue, skip line, secure medical appointment, book doctor online, real-time queue tracker" />

@@ -310,7 +310,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (parsed) {
           // Completely remove legacy "Guest Patient" account
           if (parsed.name === "Guest Patient" || parsed.email === "patient@example.com") {
-            localStorage.removeItem('insta_user');
+            delete localStorage['insta_user'];
             return null;
           }
           if (parsed.phone && isDummyPhone(parsed.phone)) {
@@ -1274,8 +1274,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     if (user) {
       localStorage.setItem('insta_user', JSON.stringify(user));
-    } else {
-      localStorage.removeItem('insta_user');
     }
   }, [user]);
 

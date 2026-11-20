@@ -351,6 +351,7 @@ const AppContent: React.FC = () => {
     if (typeof window === 'undefined') return false;
     const path = window.location.pathname;
     const isMgmt = (
+      path === '/login' ||
       path.startsWith('/hospital/') ||
       path === '/hospital' ||
       path.startsWith('/hospital-login') ||
@@ -373,6 +374,11 @@ const AppContent: React.FC = () => {
   }, [onboarded]);
 
   const isConfirmationRoute = location.pathname.startsWith('/confirmation/');
+  const isAuthRoute = (
+    location.pathname === '/login' ||
+    location.pathname.startsWith('/hospital-login') ||
+    location.pathname.startsWith('/hospital/login')
+  );
   const isLegalRoute = (
     location.pathname.startsWith('/terms') ||
     location.pathname.startsWith('/privacy') ||
@@ -380,10 +386,10 @@ const AppContent: React.FC = () => {
     location.pathname.startsWith('/cancellation') ||
     location.pathname.startsWith('/contact')
   );
-  const isPublicRoute = isManagementRoute || isConfirmationRoute || isLegalRoute;
+  const isPublicRoute = isManagementRoute || isConfirmationRoute || isLegalRoute || isAuthRoute;
 
   // Always show Splash Screen first only for customer account routes (400ms ultra-short)
-  if (showSplash && !isManagementRoute && !isConfirmationRoute && !isLegalRoute) {
+  if (showSplash && !isManagementRoute && !isConfirmationRoute && !isLegalRoute && !isAuthRoute) {
     return (
       <SplashScreen 
         duration={400} 
@@ -395,8 +401,13 @@ const AppContent: React.FC = () => {
     );
   }
 
-  if (!onboarded && !isManagementRoute && !isConfirmationRoute && !isLegalRoute) {
+  if (!onboarded && !isManagementRoute && !isConfirmationRoute && !isLegalRoute && !isAuthRoute) {
     return <Onboarding onComplete={() => setOnboarded(true)} />;
+  }
+
+  // If on /login and already logged in, go straight to home
+  if (location.pathname === '/login' && user) {
+    return <Navigate to="/" replace />;
   }
 
   if (!user && !isPublicRoute) {
@@ -500,6 +511,7 @@ const AppContent: React.FC = () => {
           <Route path="/admin/payouts" element={<AdminGuard><AdminDashboard initialTab="hospital-payouts" /></AdminGuard>} />
 
           {/* Hospital Panel routes */}
+          <Route path="/login" element={<Login onSuccess={() => navigate('/')} />} />
           <Route path="/hospital-login" element={<HospitalLogin />} />
           <Route path="/hospital-signup" element={<HospitalSignup />} />
           <Route path="/hospital/login" element={<HospitalLogin />} />
