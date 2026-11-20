@@ -9,36 +9,157 @@ import {
 
 const DAYS_OF_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-const generateClinicalTimeSlots = (): string[] => {
-  const slots: string[] = [];
-  for (let h = 0; h < 24; h++) {
-    for (let m = 0; m < 60; m += 15) {
-      const period = h < 12 ? 'AM' : 'PM';
-      const displayHour = h === 0 ? 12 : h > 12 ? h - 12 : h;
-      const hourStr = String(displayHour).padStart(2, '0');
-      const minStr = String(m).padStart(2, '0');
-      slots.push(`${hourStr}:${minStr} ${period}`);
-    }
-  }
-  const morningIdx = slots.indexOf('06:00 AM');
-  return [...slots.slice(morningIdx), ...slots.slice(0, morningIdx)];
-};
-
-const CLINICAL_TIME_SLOTS = generateClinicalTimeSlots();
-
-const normalizeTimeSlot = (val: string): string => {
-  if (!val) return '09:00 AM';
+const parseTime = (val: string) => {
+  if (!val) return { hour: '09', minute: '00', period: 'AM' as const };
   const clean = val.trim();
   const match = clean.match(/^(\d{1,2}):(\d{2})\s*(am|pm)?$/i);
   if (match) {
     let h = parseInt(match[1]);
     const m = match[2];
-    const period = match[3] ? match[3].toUpperCase() : (h < 12 ? 'AM' : 'PM');
-    if (h === 0) h = 12;
-    if (h > 12) h -= 12;
-    return `${String(h).padStart(2, '0')}:${m} ${period}`;
+    let p = match[3] ? match[3].toUpperCase() : 'AM';
+    if (!match[3]) {
+      if (h >= 12) {
+        p = 'PM';
+        if (h > 12) h -= 12;
+      } else if (h === 0) {
+        h = 12;
+      }
+    }
+    if (h > 12) h = 12;
+    if (h < 1) h = 12;
+    return {
+      hour: String(h).padStart(2, '0'),
+      minute: m,
+      period: p as 'AM' | 'PM'
+    };
   }
-  return clean;
+  return { hour: '09', minute: '00', period: 'AM' as const };
+};
+
+const normalizeTimeSlot = (val: string): string => {
+  const p = parseTime(val);
+  return `${p.hour}:${p.minute} ${p.period}`;
+};
+
+const SegmentedTimePicker: React.FC<{
+  value: string;
+  onChange: (val: string) => void;
+  className?: string;
+}> = ({ value, onChange, className }) => {
+  const parsed = parseTime(value);
+  const [hour, setHour] = useState(parsed.hour);
+  const [minute, setMinute] = useState(parsed.minute);
+  const [period, setPeriod] = useState<'AM' | 'PM'>(parsed.period);
+
+  useEffect(() => {
+    const p = parseTime(value);
+    setHour(p.hour);
+    setMinute(p.minute);
+    setPeriod(p.period);
+  }, [value]);
+
+  const update = (newH: string, newM: string, newP: 'AM' | 'PM') => {
+    setHour(newH);
+    setMinute(newM);
+    setPeriod(newP);
+    onChange(`${newH}:${newM} ${newP}`);
+  };
+
+  const handleHourChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value.replace(/\D/g, '').slice(0, 2);
+    setHour(raw);
+    if (raw.length === 2) {
+      let num = parseInt(raw);
+      if (num > 12) num = 12;
+      if (num < 1) num = 1;
+      const formatted = String(num).padStart(2, '0');
+      update(formatted, minute, period);
+    }
+  };
+
+  const handleHourBlur = () => {
+    let num = parseInt(hour) || 9;
+    if (num > 12) num = 12;
+    if (num < 1) num = 1;
+    const formatted = String(num).padStart(2, '0');
+    update(formatted, minute, period);
+  };
+
+  const handleMinuteChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value.replace(/\D/g, '').slice(0, 2);
+    setMinute(raw);
+    if (raw.length === 2) {
+      let num = parseInt(raw);
+      if (num > 59) num = 59;
+      if (num < 0) num = 0;
+      const formatted = String(num).padStart(2, '0');
+      update(hour, formatted, period);
+    }
+  };
+
+  const handleMinuteBlur = () => {
+    let num = parseInt(minute);
+    if (isNaN(num) || num < 0) num = 0;
+    if (num > 59) num = 59;
+    const formatted = String(num).padStart(2, '0');
+    update(hour, formatted, period);
+  };
+
+  const handlePeriodChange = (newP: 'AM' | 'PM') => {
+    update(hour, minute, newP);
+  };
+
+  return (
+    <div className={`flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 rounded-xl shadow-2xs focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100 transition-all ${className || ''}`}>
+      <input
+        type="text"
+        inputMode="numeric"
+        maxLength={2}
+        value={hour}
+        onChange={handleHourChange}
+        onBlur={handleHourBlur}
+        className="w-8 text-center text-xs font-black text-slate-800 bg-slate-50 border border-slate-200/80 outline-none py-1 rounded-lg focus:bg-blue-50/50 focus:border-blue-400"
+        placeholder="HH"
+        title="Hour (01-12)"
+      />
+      <span className="text-slate-400 font-black text-xs select-none">:</span>
+      <input
+        type="text"
+        inputMode="numeric"
+        maxLength={2}
+        value={minute}
+        onChange={handleMinuteChange}
+        onBlur={handleMinuteBlur}
+        className="w-8 text-center text-xs font-black text-slate-800 bg-slate-50 border border-slate-200/80 outline-none py-1 rounded-lg focus:bg-blue-50/50 focus:border-blue-400"
+        placeholder="MM"
+        title="Minute (00-59)"
+      />
+      <div className="flex items-center bg-slate-100 p-0.5 rounded-lg ml-auto">
+        <button
+          type="button"
+          onClick={() => handlePeriodChange('AM')}
+          className={`px-2 py-0.5 text-[10px] font-black rounded-md transition-all border-none cursor-pointer ${
+            period === 'AM'
+              ? 'bg-blue-600 text-white shadow-2xs'
+              : 'text-slate-500 hover:text-slate-800 bg-transparent'
+          }`}
+        >
+          AM
+        </button>
+        <button
+          type="button"
+          onClick={() => handlePeriodChange('PM')}
+          className={`px-2 py-0.5 text-[10px] font-black rounded-md transition-all border-none cursor-pointer ${
+            period === 'PM'
+              ? 'bg-blue-600 text-white shadow-2xs'
+              : 'text-slate-500 hover:text-slate-800 bg-transparent'
+          }`}
+        >
+          PM
+        </button>
+      </div>
+    </div>
+  );
 };
 
 export const TokenManage: React.FC = () => {
@@ -584,34 +705,18 @@ export const TokenManage: React.FC = () => {
                         />
                       </div>
                       <div>
-                        <label className="text-[10px] font-bold text-slate-600 block mb-1">Start Time</label>
-                        <select
+                        <label className="text-[10px] font-bold text-slate-600 block mb-1">Start Time (HH : MM AM/PM)</label>
+                        <SegmentedTimePicker
                           value={sessForm.startTime}
-                          onChange={e => setSessForm({ ...sessForm, startTime: e.target.value })}
-                          className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500 bg-white cursor-pointer"
-                        >
-                          {sessForm.startTime && !CLINICAL_TIME_SLOTS.includes(sessForm.startTime) && (
-                            <option value={sessForm.startTime}>{sessForm.startTime}</option>
-                          )}
-                          {CLINICAL_TIME_SLOTS.map(t => (
-                            <option key={t} value={t}>{t}</option>
-                          ))}
-                        </select>
+                          onChange={val => setSessForm({ ...sessForm, startTime: val })}
+                        />
                       </div>
                       <div>
-                        <label className="text-[10px] font-bold text-slate-600 block mb-1">End Time</label>
-                        <select
+                        <label className="text-[10px] font-bold text-slate-600 block mb-1">End Time (HH : MM AM/PM)</label>
+                        <SegmentedTimePicker
                           value={sessForm.endTime}
-                          onChange={e => setSessForm({ ...sessForm, endTime: e.target.value })}
-                          className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500 bg-white cursor-pointer"
-                        >
-                          {sessForm.endTime && !CLINICAL_TIME_SLOTS.includes(sessForm.endTime) && (
-                            <option value={sessForm.endTime}>{sessForm.endTime}</option>
-                          )}
-                          {CLINICAL_TIME_SLOTS.map(t => (
-                            <option key={t} value={t}>{t}</option>
-                          ))}
-                        </select>
+                          onChange={val => setSessForm({ ...sessForm, endTime: val })}
+                        />
                       </div>
                       <div>
                         <label className="text-[10px] font-bold text-slate-600 block mb-1">Max Token Limit</label>
@@ -734,30 +839,18 @@ export const TokenManage: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">Start Time *</label>
-                  <select
-                    required
+                  <label className="text-xs font-bold text-slate-700 block mb-1">Start Time (HH : MM AM/PM) *</label>
+                  <SegmentedTimePicker
                     value={newSess.startTime}
-                    onChange={e => setNewSess({ ...newSess, startTime: e.target.value })}
-                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-bold bg-white cursor-pointer"
-                  >
-                    {CLINICAL_TIME_SLOTS.map(t => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
-                  </select>
+                    onChange={val => setNewSess({ ...newSess, startTime: val })}
+                  />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">End Time *</label>
-                  <select
-                    required
+                  <label className="text-xs font-bold text-slate-700 block mb-1">End Time (HH : MM AM/PM) *</label>
+                  <SegmentedTimePicker
                     value={newSess.endTime}
-                    onChange={e => setNewSess({ ...newSess, endTime: e.target.value })}
-                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-bold bg-white cursor-pointer"
-                  >
-                    {CLINICAL_TIME_SLOTS.map(t => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
-                  </select>
+                    onChange={val => setNewSess({ ...newSess, endTime: val })}
+                  />
                 </div>
               </div>
 
