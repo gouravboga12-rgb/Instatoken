@@ -1584,6 +1584,13 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     localStorage.removeItem('insta_hospital_user');
     localStorage.removeItem('insta_current_hospital_id');
     setActiveSection('dashboard');
+    if (typeof window !== 'undefined' && (window as any).ReactNativeWebView) {
+      try {
+        (window as any).ReactNativeWebView.postMessage(JSON.stringify({ type: 'LOGOUT' }));
+      } catch (e) {
+        // ignore
+      }
+    }
   };
 
   // Helper to sync doctors changes to AppContext (website patient side) and AWS backend

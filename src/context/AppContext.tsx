@@ -1622,6 +1622,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setUser(null);
     localStorage.removeItem('insta_user');
     addNotification("Logged Out", "You have successfully logged out of your account.", "info");
+    if (typeof window !== 'undefined' && (window as any).ReactNativeWebView) {
+      try {
+        (window as any).ReactNativeWebView.postMessage(JSON.stringify({ type: 'LOGOUT' }));
+      } catch (e) {
+        // ignore
+      }
+    }
   };
 
   // --- Profile / Family Members ---
