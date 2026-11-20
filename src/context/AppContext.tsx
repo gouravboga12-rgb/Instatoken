@@ -283,7 +283,9 @@ export const getHydratedHospitals = (): Hospital[] => {
         lat: (prof.lat !== undefined && !isNaN(Number(prof.lat))) ? Number(prof.lat) : h.lat,
         lng: (prof.lng !== undefined && !isNaN(Number(prof.lng))) ? Number(prof.lng) : h.lng,
         departments: (h.id === targetHospitalId && hospitalPanelDepts && hospitalPanelDepts.length > 0) ? hospitalPanelDepts : h.departments,
-        doctors: (h.id === targetHospitalId && hospitalPanelDoctors && hospitalPanelDoctors.length > 0) ? hospitalPanelDoctors : h.doctors
+        doctors: (h.id === targetHospitalId && hospitalPanelDoctors && hospitalPanelDoctors.length > 0) ? hospitalPanelDoctors : h.doctors,
+        payment_mode: prof.payment_mode || prof.paymentMode || h.payment_mode || 'token_only',
+        paymentMode: prof.payment_mode || prof.paymentMode || (h as any).paymentMode || 'token_only'
       };
     }
     return h;

@@ -787,7 +787,7 @@ async function getUnifiedStore() {
 
         // Merge live hospitals and profiles from PostgreSQL
         try {
-          const hospRows = await query(`SELECT id, name, email, phone, city, state, data FROM hospitals`);
+          const hospRows = await query(`SELECT id, name, email, phone, city, state, payment_mode, data FROM hospitals`);
           const activeDbHospitalIds = new Set(hospRows.rows.map(r => r.id));
           activeDbHospitalIds.add('hosp-apollo');
           store.hospitals = (store.hospitals || []).filter(h => activeDbHospitalIds.has(h.id) && !DUMMY_HOSPITAL_IDS.includes(h.id));
@@ -804,7 +804,9 @@ async function getUnifiedStore() {
                 phone: r.phone || r.data?.phone || r.data?.contact || (r.id === 'hosp-apollo' ? '+91 80 4668 8888' : ''),
                 contact: r.phone || r.data?.contact || r.data?.phone || (r.id === 'hosp-apollo' ? '+91 80 4668 8888' : ''),
                 city: r.city || r.data?.city || '',
-                state: r.state || r.data?.state || ''
+                state: r.state || r.data?.state || '',
+                payment_mode: r.payment_mode || r.data?.payment_mode || 'token_only',
+                paymentMode: r.payment_mode || r.data?.payment_mode || 'token_only'
               };
               if (idx === -1) store.hospitals.push(merged);
               else store.hospitals[idx] = { ...store.hospitals[idx], ...merged };
@@ -925,7 +927,9 @@ function syncProfileToHospitalsList(store, hospitalId, profile) {
     image: profile.coverImage || profile.image || profile.logo,
     gallery: profile.gallery || [],
     lat: profile.lat !== undefined ? Number(profile.lat) : undefined,
-    lng: profile.lng !== undefined ? Number(profile.lng) : undefined
+    lng: profile.lng !== undefined ? Number(profile.lng) : undefined,
+    payment_mode: profile.payment_mode || profile.paymentMode,
+    paymentMode: profile.payment_mode || profile.paymentMode
   };
 
   Object.keys(updatedData).forEach(k => updatedData[k] === undefined && delete updatedData[k]);
@@ -5471,7 +5475,37 @@ app.put('/api/hospitals/:hospitalId/payment-settings', requireHospitalAuth, asyn
   }
 
   await saveUnifiedStore(store);
+
+  // Broadcast to all active clients (e.g. patients viewing the booking page)
+  try {
+    if (typeof io !== 'undefined' && io) {
+      io.emit('HOSPITAL_UPDATED', { hospitalId, payment_mode });
+      io.emit('HOSPITAL_PAYMENT_SETTINGS_CHANGED', { hospitalId, payment_mode });
+    }
+  } catch (ioErr) {}
+
   res.json({ success: true, message: 'Payment settings updated successfully', paymentSettings });
+});
+
+// GET /api/hospitals/:hospitalId/public-payment-settings (Unauthenticated patient access)
+app.get('/api/hospitals/:hospitalId/public-payment-settings', async (req, res) => {
+  const { hospitalId } = req.params;
+  let payment_mode = 'token_only';
+  if (isDbConnected) {
+    try {
+      const r = await query('SELECT payment_mode FROM hospitals WHERE id=$1', [hospitalId]);
+      if (r.rows.length > 0 && r.rows[0].payment_mode) {
+        payment_mode = r.rows[0].payment_mode;
+      }
+    } catch (e) {
+      console.warn('Error fetching public payment mode from RDS:', e.message);
+    }
+  } else {
+    const store = await getUnifiedStore();
+    const hosp = (store.hospitals || []).find(h => h.id === hospitalId);
+    if (hosp?.payment_mode) payment_mode = hosp.payment_mode;
+  }
+  res.json({ success: true, hospitalId, payment_mode });
 });
 
 // GET /api/hospitals/:hospitalId/payment-settings

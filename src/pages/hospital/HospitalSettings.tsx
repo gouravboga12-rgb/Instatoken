@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useHospital } from '../../context/HospitalContext';
 import { geocodeLocation, reverseGeocodeAddressDetails } from '../../utils/googleMaps';
+import { broadcastGlobalSync } from '../../utils/syncBus';
 import {
   Building2, Save, Check, MapPin, Layers, Compass,
   ExternalLink, Sparkles, Loader2, Upload, ImageIcon, Phone,
@@ -141,6 +142,14 @@ export const HospitalSettings: React.FC = () => {
       const data = await res.json();
       if (data.success) {
         setPayoutSuccess('Payment settings saved successfully! Changes are live for new bookings.');
+        if (hospitalProfile?.id) {
+          const updatedProf = { ...hospitalProfile, payment_mode: paymentMode, paymentMode };
+          try {
+            localStorage.setItem('insta_hospital_profile', JSON.stringify(updatedProf));
+            localStorage.setItem(`insta_hospital_profile_${hospitalProfile.id}`, JSON.stringify(updatedProf));
+          } catch (e) {}
+          broadcastGlobalSync('HOSPITAL_UPDATED', { hospitalId: hospitalProfile.id, payment_mode: paymentMode });
+        }
       } else {
         setPayoutError(data.message || 'Failed to save payment settings.');
       }

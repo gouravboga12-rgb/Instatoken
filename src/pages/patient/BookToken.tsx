@@ -73,13 +73,32 @@ export const BookToken: React.FC = () => {
   const doctor = hospital?.doctors.find(d => d.id === doctorId) || hospital?.doctors[0];
 
   const [syncVersion, setSyncVersion] = useState(0);
+  const [livePaymentMode, setLivePaymentMode] = useState<string | null>(null);
 
   useEffect(() => {
-    const unsubscribe = subscribeGlobalSync(() => {
+    const unsubscribe = subscribeGlobalSync((event: any) => {
       setSyncVersion(v => v + 1);
+      if (event?.type === 'HOSPITAL_UPDATED' && event?.payload?.payment_mode) {
+        setLivePaymentMode(event.payload.payment_mode);
+      }
     });
     return unsubscribe;
   }, []);
+
+  // Fetch real-time payment mode directly from backend on mount and sync changes
+  useEffect(() => {
+    if (!hospitalId) return;
+    let isMounted = true;
+    fetch(`/api/hospitals/${hospitalId}/public-payment-settings`)
+      .then(res => res.json())
+      .then(data => {
+        if (isMounted && data.success && data.payment_mode) {
+          setLivePaymentMode(data.payment_mode);
+        }
+      })
+      .catch(() => {});
+    return () => { isMounted = false; };
+  }, [hospitalId, syncVersion]);
 
   // Dynamic Sessions prioritized per Doctor
   const activeSessionsList = useMemo(() => {
@@ -576,7 +595,8 @@ export const BookToken: React.FC = () => {
 
     const computedAgeDisplay = `${ageVal} ${ageUnit}`;
 
-    const isFullOnline = hospital?.payment_mode === 'full_online' || (hospital as any)?.paymentMode === 'full_online';
+    const effectivePaymentMode = livePaymentMode || hospital?.payment_mode || (hospital as any)?.paymentMode || 'token_only';
+    const isFullOnline = effectivePaymentMode === 'full_online';
     const docFee = doctor.consultationFee || 500;
     const tokenFee = Math.max(10, Math.round(docFee * ((platformFeePercent || 5) / 100)));
     
@@ -1225,7 +1245,8 @@ export const BookToken: React.FC = () => {
 
           {/* Exact fee breakdown matching Image copy 78.png */}
           {(() => {
-            const isFullOnline = hospital?.payment_mode === 'full_online' || (hospital as any)?.paymentMode === 'full_online';
+            const effectivePaymentMode = livePaymentMode || hospital?.payment_mode || (hospital as any)?.paymentMode || 'token_only';
+    const isFullOnline = effectivePaymentMode === 'full_online';
             const docFee = doctor.consultationFee || 500;
             const tokenFee = Math.max(10, Math.round(docFee * ((platformFeePercent || 5) / 100)));
             const onlineBase = isFullOnline ? (docFee + tokenFee) : tokenFee;
