@@ -1970,12 +1970,23 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     paymentMethod?: 'Online' | 'Cash' | string;
     notes?: string;
   }): TokenRecord => {
-    const maxToken = tokens.length > 0 ? Math.max(...tokens.map(t => t.tokenNo || 0)) : 0;
-    const doctor = doctors.find(d => d.id === form.doctorId);
-    const dept = departments.find(d => d.id === form.departmentId);
-    const waitingInSession = tokens.filter(t => t.session === form.session && ['booked', 'waiting', 'checked-in'].includes(t.status)).length;
     const todayStr = new Date().toISOString().split('T')[0];
     const timeStr = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+
+    // Scope strictly to target doctor, today's date, and shift session
+    const docSessionTokens = tokens.filter(t =>
+      t.doctorId === form.doctorId &&
+      (t.bookingDate === todayStr || t.date === todayStr || (!t.bookingDate && t.status !== 'not-visited')) &&
+      (t.session || 'morning').toLowerCase() === form.session.toLowerCase() &&
+      t.status !== 'cancelled'
+    );
+    const maxToken = docSessionTokens.length > 0
+      ? docSessionTokens.reduce((max, t) => Math.max(max, Number(t.tokenNo || t.tokenNumber || 0)), 0)
+      : 0;
+
+    const doctor = doctors.find(d => d.id === form.doctorId);
+    const dept = departments.find(d => d.id === form.departmentId);
+    const waitingInSession = tokens.filter(t => t.doctorId === form.doctorId && t.session === form.session && ['booked', 'waiting', 'checked-in'].includes(t.status)).length;
 
     const resolvedHospitalName = hospitalProfile?.name || hospitals.find(h => h.id === targetHospId)?.name || 'Hospital';
 
