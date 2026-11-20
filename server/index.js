@@ -7003,6 +7003,47 @@ app.get('/api/reverse-geocode', async (req, res) => {
   res.json({ success: false });
 });
 
+// Client IP Geolocation endpoint
+app.get('/api/ip-location', async (req, res) => {
+  try {
+    let clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '';
+    if (clientIp.includes(',')) {
+      clientIp = clientIp.split(',')[0].trim();
+    }
+    clientIp = clientIp.replace(/^::ffff:/, '');
+
+    const url = clientIp && !clientIp.startsWith('10.') && !clientIp.startsWith('192.168.') && !clientIp.startsWith('127.') && !clientIp.startsWith('::1')
+      ? `https://ipwho.is/${clientIp}`
+      : 'https://ipwho.is/';
+
+    const ipRes = await fetch(url);
+    if (ipRes.ok) {
+      const data = await ipRes.json();
+      if (data && data.success !== false && data.latitude && data.longitude) {
+        return res.json({
+          success: true,
+          city: data.city || 'Chennai',
+          region: data.region || 'Tamil Nadu',
+          country: data.country || 'India',
+          lat: Number(data.latitude),
+          lng: Number(data.longitude),
+          ip: data.ip
+        });
+      }
+    }
+  } catch (e) {
+    console.warn('IP location endpoint error:', e.message);
+  }
+  res.json({
+    success: true,
+    city: 'Chennai',
+    region: 'Tamil Nadu',
+    country: 'India',
+    lat: 13.0827,
+    lng: 80.2707
+  });
+});
+
 // Proxy Geocode endpoint
 app.get('/api/geocode', async (req, res) => {
   const { query: queryParam } = req.query;

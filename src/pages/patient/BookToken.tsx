@@ -376,17 +376,45 @@ export const BookToken: React.FC = () => {
           setIsDetectingLocation(false);
         }
       },
-      (geoErr) => {
+      async (geoErr) => {
         console.warn('Geolocation error:', geoErr);
+        try {
+          const res = await fetch('/api/ip-location');
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data.city) {
+              const placeName = `${data.city}, ${data.region || ''}`.trim().replace(/,\s*$/, '');
+              setPlace(placeName);
+              setFieldErrors(prev => ({ ...prev, place: false }));
+              setIsDetectingLocation(false);
+              return;
+            }
+          }
+        } catch (e) {}
+
+        try {
+          const directRes = await fetch('https://ipwho.is/');
+          if (directRes.ok) {
+            const d = await directRes.json();
+            if (d && d.city) {
+              const placeName = `${d.city}, ${d.region || ''}`.trim().replace(/,\s*$/, '');
+              setPlace(placeName);
+              setFieldErrors(prev => ({ ...prev, place: false }));
+              setIsDetectingLocation(false);
+              return;
+            }
+          }
+        } catch (e) {}
+
         setIsDetectingLocation(false);
         if (currentLocation) {
           setPlace(currentLocation);
           setFieldErrors(prev => ({ ...prev, place: false }));
         } else {
-          setError('Location access denied or unavailable. Please enter your place manually.');
+          setError('Location access unavailable. Please enter your town or address manually.');
         }
       },
-      { timeout: 10000, enableHighAccuracy: true }
+      { timeout: 7000, enableHighAccuracy: true }
     );
   };
 

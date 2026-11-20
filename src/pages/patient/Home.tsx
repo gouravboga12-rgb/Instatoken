@@ -85,6 +85,7 @@ export const Home: React.FC<HomeProps> = ({
   };
 
   const locations = [
+    "Chennai, Tamil Nadu",
     "Karimnagar, Telangana",
     "Choppadandi, Karimnagar",
     "Warangal, Telangana",

@@ -56,6 +56,7 @@ const TopNavbar: React.FC = () => {
   };
 
   const defaultLocations = [
+    "Chennai, Tamil Nadu",
     "Warangal, Telangana",
     "Karimnagar, Telangana",
     "Choppadandi, Karimnagar",

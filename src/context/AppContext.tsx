@@ -2722,9 +2722,83 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addNotification("Location Updated", `Recorded location: ${locationName}. Real-time hospital distance updated.`, "success");
   };
 
+  const fallbackIpLocation = async (): Promise<boolean> => {
+    try {
+      let data: any = null;
+      try {
+        const res = await fetch('/api/ip-location');
+        if (res.ok) data = await res.json();
+      } catch (e) {}
+
+      if (!data || !data.lat || !data.lng) {
+        try {
+          const directRes = await fetch('https://ipwho.is/');
+          if (directRes.ok) {
+            const d = await directRes.json();
+            if (d && d.success !== false) {
+              data = {
+                city: d.city,
+                region: d.region,
+                country: d.country,
+                lat: Number(d.latitude),
+                lng: Number(d.longitude)
+              };
+            }
+          }
+        } catch (e) {}
+      }
+
+      if (data && data.lat && data.lng) {
+        const city = data.city || 'Chennai';
+        const region = data.region || 'Tamil Nadu';
+        const areaName = `${city}, ${region}`;
+        const coords = { lat: Number(data.lat), lng: Number(data.lng) };
+
+        setUserCoords(coords);
+        localStorage.setItem('insta_user_coords', JSON.stringify(coords));
+        setCurrentLocationState(areaName);
+        localStorage.setItem('insta_location', areaName);
+
+        const geoObj: GeoLocationDetails = {
+          country: data.country || 'India',
+          state: region,
+          district: city,
+          mandal: city,
+          village: city,
+          city,
+          formattedAddress: areaName,
+          lat: coords.lat,
+          lng: coords.lng
+        };
+        setUserGeoHierarchy(geoObj);
+        localStorage.setItem('insta_user_geo_hierarchy', JSON.stringify(geoObj));
+        fetchActiveBanners(geoObj);
+
+        setUser(prev => {
+          if (!prev) return null;
+          const updated = { ...prev, location: areaName, lat: coords.lat, lng: coords.lng };
+          localStorage.setItem('insta_user', JSON.stringify(updated));
+          return updated;
+        });
+
+        addNotification(
+          "Location Detected",
+          `Live location: ${areaName}. Hospital distances updated in real-time.`,
+          "success"
+        );
+        return true;
+      }
+    } catch (e) {
+      console.warn('IP location fallback error:', e);
+    }
+    return false;
+  };
+
   const detectAndSetLocation = () => {
     if (!navigator.geolocation) {
-      addNotification("Location Error", "Your browser does not support GPS location detection.", "warning");
+      fallbackIpLocation().then(ok => {
+        if (!ok) addNotification("Location Error", "Location service unavailable. Please select your city from the top menu.", "warning");
+      });
       return;
     }
     navigator.geolocation.getCurrentPosition(
@@ -2743,8 +2817,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const details = await reverseGeocodeAddressDetails(latitude, longitude);
         const geoObj: GeoLocationDetails = {
           country: details.country || 'India',
-          state: details.state || 'Telangana',
-          district: details.district || details.city || 'Karimnagar',
+          state: details.state || 'Tamil Nadu',
+          district: details.district || details.city || 'Chennai',
           mandal: details.mandal || '',
           village: details.village || details.area || '',
           city: details.city || '',
@@ -2782,7 +2856,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         const isIpEstimate = (accuracy || 0) > 4000;
         const accuracyNote = isIpEstimate 
-          ? ` (Approximate network estimate ±${Math.round((accuracy || 0) / 1000)}km)` 
+          ? ` (Network location ±${Math.round((accuracy || 0) / 1000)}km)` 
           : '';
 
         addNotification(
@@ -2791,13 +2865,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           "success"
         );
       },
-      (err) => {
-        const msg = err.code === 1
-          ? "Location access was not granted. Please select your city or area from the top location menu."
-          : "Unable to retrieve device GPS. Please choose your city/area from the location menu.";
-        addNotification("Location Error", msg, "warning");
+      async (err) => {
+        console.warn('Geolocation unavailable, falling back to IP detection:', err?.message);
+        const ok = await fallbackIpLocation();
+        if (!ok) {
+          const msg = "Location access not available. Please choose your city or area from the location menu.";
+          addNotification("Location Notice", msg, "warning");
+        }
       },
-      { timeout: 15000, maximumAge: 0, enableHighAccuracy: true }
+      { timeout: 7000, maximumAge: 60000, enableHighAccuracy: true }
     );
   };
 

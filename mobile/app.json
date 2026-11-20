@@ -1,0 +1,63 @@
+{
+  "expo": {
+    "name": "InstaToken",
+    "slug": "instatoken",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "scheme": "instatoken",
+    "splash": {
+      "backgroundColor": "#0F52BA",
+      "resizeMode": "contain"
+    },
+    "android": {
+      "package": "in.instatoken.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "backgroundColor": "#198BCE",
+        "foregroundImage": "./assets/android-icon-foreground.png"
+      },
+      "permissions": [
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "VIBRATE"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "instatoken.in",
+              "pathPrefix": "/book"
+            },
+            {
+              "scheme": "https",
+              "host": "instatoken.in",
+              "pathPrefix": "/tracker"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
+    },
+    "plugins": [
+      [
+        "@react-native-google-signin/google-signin"
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "aab07772-7fdc-4c4f-a777-2dbf89f1debf"
+      }
+    },
+    "owner": "instatoken"
+  }
+}

@@ -51,6 +51,15 @@ export const SearchHospitals: React.FC<SearchHospitalsProps> = ({
     return ['All', ...Array.from(set)];
   }, [hospitals]);
 
+  const normalizeSearch = (str: string) => {
+    return (str || '')
+      .toLowerCase()
+      .replace(/gandhi/g, 'gandi')
+      .replace(/hospital[s]?/g, '')
+      .replace(/dr\.?\s*/g, 'dr ')
+      .replace(/[^a-z0-9]/g, '');
+  };
+
   // Filter & sort logic
   const getFilteredHospitals = () => {
     let list = hospitals.map(h => {
@@ -61,28 +70,76 @@ export const SearchHospitals: React.FC<SearchHospitalsProps> = ({
       return { ...h, distance: dynamicDistance };
     });
 
-    // Filter by radius if radiusFilter is active (not 0/all)
-    if (radiusFilter > 0) {
-      list = list.filter(h => h.distance <= radiusFilter);
+    const hasTextQuery = !!query.trim();
+
+    // 1. Text search (name, address, category, doctors) with phonetic/alias support (Gandhi <-> Gandi)
+    if (hasTextQuery) {
+      const qLower = query.toLowerCase().trim();
+      const qNorm = normalizeSearch(query);
+      const qWords = qLower.split(/\s+/).filter(Boolean);
+
+      list = list.filter(h => {
+        const hName = (h.name || '').toLowerCase();
+        const hNorm = normalizeSearch(h.name);
+        const hAddr = (h.address || '').toLowerCase();
+        const hCity = (h.city || '').toLowerCase();
+        const hCat = (h.category || '').toLowerCase();
+
+        // Exact, substring or normalized match
+        if (
+          hName.includes(qLower) || 
+          hNorm.includes(qNorm) || 
+          (qNorm.length >= 3 && hNorm.includes(qNorm)) || 
+          (hNorm.length >= 3 && qNorm.includes(hNorm)) ||
+          hAddr.includes(qLower) || 
+          hCity.includes(qLower) || 
+          hCat.includes(qLower)
+        ) {
+          return true;
+        }
+
+        // Multi-word check (e.g. "Gandhi Hospital" matches "Gandi Hospital")
+        const wordMatch = qWords.every(w => {
+          const wNorm = normalizeSearch(w);
+          return (
+            hName.includes(w) || 
+            (wNorm.length >= 3 && hNorm.includes(wNorm)) || 
+            hAddr.includes(w) || 
+            hCat.includes(w)
+          );
+        });
+        if (wordMatch) return true;
+
+        // Doctor search (e.g. Dr.Mamitha or Heart Specialist)
+        return (h.doctors || []).some(d => {
+          const dName = (d.name || '').toLowerCase();
+          const dNorm = normalizeSearch(d.name);
+          const dSpec = (d.specialty || '').toLowerCase();
+          return (
+            dName.includes(qLower) || 
+            (qNorm.length >= 3 && dNorm.includes(qNorm)) || 
+            dSpec.includes(qLower)
+          );
+        });
+      });
     }
 
-    // Filter by text search (name, address, category, doctors)
-    if (query.trim()) {
-      const qLower = query.toLowerCase();
-      list = list.filter(h => 
-        h.name.toLowerCase().includes(qLower) || 
-        h.category.toLowerCase().includes(qLower) ||
-        h.address.toLowerCase().includes(qLower) ||
-        h.doctors.some(d => d.name.toLowerCase().includes(qLower) || d.specialty.toLowerCase().includes(qLower))
-      );
-    }
-
-    // Filter by specialty dropdown/pill
+    // 2. Specialty filter
     if (selectedSpecialty !== 'All') {
-      list = list.filter(h => h.category === selectedSpecialty || h.departments.some(d => d.name === selectedSpecialty));
+      list = list.filter(h => h.category === selectedSpecialty || (h.departments || []).some(d => d.name === selectedSpecialty));
     }
 
-    // Apply quick filters & sorts
+    // 3. Radius filter (If user typed a search query, never hide matching hospitals outside the radius)
+    if (!hasTextQuery && radiusFilter > 0) {
+      list = list.filter(h => h.distance <= radiusFilter);
+    } else if (hasTextQuery && radiusFilter > 0) {
+      const withinRadius = list.filter(h => h.distance <= radiusFilter);
+      if (withinRadius.length > 0) {
+        list = withinRadius;
+      }
+    }
+
+    // 4. Sorting
     if (activeFilter === 'nearby') {
       list.sort((a, b) => a.distance - b.distance);
     } else if (activeFilter === 'top-rated') {
@@ -101,6 +158,8 @@ export const SearchHospitals: React.FC<SearchHospitalsProps> = ({
       });
     } else if (activeFilter === 'emergency') {
       list = list.filter(h => h.facilities.includes("24/7 Emergency") || h.facilities.includes("24/7 Emergency Care") || h.facilities.includes("24/7 Neonatal Emergency"));
+    } else if (hasTextQuery) {
+      list.sort((a, b) => a.distance - b.distance);
     }
 
     return list;

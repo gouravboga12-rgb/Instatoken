@@ -262,6 +262,11 @@ function getKnownCityFallback(lat: number, lng: number): ReverseGeocodeDetails {
     district = 'Visakhapatnam';
     mandal = 'Visakhapatnam Urban';
     village = area;
+  } else if (closestCity.name.includes('Chennai')) {
+    state = 'Tamil Nadu';
+    district = 'Chennai';
+    mandal = 'Chennai';
+    village = area;
   }
 
   return {
