@@ -3956,28 +3956,27 @@ app.post('/api/hospitals/:hospitalId/tokens/:tokenId/readmit', requireHospitalAu
           ]
         );
 
+        const apptDataObj = {
+          status: 'booked',
+          date: todayStr,
+          doctorId: updatedToken.doctorId,
+          doctorName: updatedToken.doctorName,
+          tokenNumber: Number(updatedToken.tokenNo),
+          session: updatedToken.session,
+          isExisting: true,
+          revisitDetails: updatedToken.revisitDetails
+        };
+
         await query(
           `UPDATE appointments 
            SET status = 'booked', appointment_date = $1::date, doctor_id = $2,
-               data = (COALESCE(data, '{}'::jsonb) || jsonb_build_object(
-                 'status', 'booked',
-                 'date', $1::text,
-                 'doctorId', $2::text,
-                 'doctorName', $3::text,
-                 'tokenNumber', $4::numeric,
-                 'session', $5::text,
-                 'isExisting', true,
-                 'revisitDetails', $6::jsonb
-               )), 
+               data = (COALESCE(data, '{}'::jsonb) || $3::jsonb), 
                updated_at = NOW() 
-           WHERE id = $7 OR (data->>'tokenId') = $7`,
+           WHERE id = $4 OR (data->>'tokenId') = $4`,
           [
             todayStr,
             updatedToken.doctorId,
-            updatedToken.doctorName,
-            updatedToken.tokenNo,
-            updatedToken.session,
-            JSON.stringify(updatedToken.revisitDetails),
+            JSON.stringify(apptDataObj),
             tokenId
           ]
         );
