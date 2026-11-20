@@ -3833,9 +3833,73 @@ app.post('/api/hospitals/:hospitalId/tokens/:tokenId/readmit', requireHospitalAu
     return t;
   });
 
+  // Fallback: If not found in in-memory store.tokens, check req.body.originalToken or query RDS PostgreSQL
+  if (!updatedToken) {
+    let baseToken = req.body.originalToken;
+    if (!baseToken && isDbConnected) {
+      try {
+        const dbRes = await query('SELECT * FROM tokens WHERE id = $1', [tokenId]);
+        if (dbRes.rows && dbRes.rows.length > 0) {
+          const row = dbRes.rows[0];
+          const parsed = typeof row.data === 'string' ? JSON.parse(row.data) : (row.data || {});
+          baseToken = {
+            id: row.id,
+            hospitalId: row.hospital_id,
+            doctorId: row.doctor_id,
+            patientName: row.patient_name,
+            patientPhone: row.patient_phone,
+            tokenNo: Number(row.token_number) || 1,
+            tokenNumber: Number(row.token_number) || 1,
+            session: row.session,
+            ...parsed
+          };
+        }
+      } catch (err) {
+        console.error('Error querying token from DB in readmit:', err.message);
+      }
+    }
+
+    if (baseToken) {
+      const origBookingDate = baseToken.bookingDate;
+      const origTokNo = baseToken.tokenNo || baseToken.tokenNumber;
+      const origDocId = baseToken.doctorId;
+      const origDocName = baseToken.doctorName;
+      const origFee = Number(baseToken.consultationFee || 0);
+
+      updatedToken = {
+        ...baseToken,
+        id: tokenId,
+        doctorId: targetDoctorId || baseToken.doctorId,
+        doctorName: targetDoctorName || baseToken.doctorName,
+        departmentId: departmentId || baseToken.departmentId,
+        departmentName: departmentName || baseToken.departmentName,
+        session: session || baseToken.session || 'morning',
+        bookingDate: todayStr,
+        tokenNo: Number(tokenNo) || baseToken.tokenNo || 1,
+        tokenNumber: Number(tokenNo) || baseToken.tokenNumber || 1,
+        status: 'booked',
+        isRevisit: true,
+        revisitDetails: {
+          originalBookingDate: origBookingDate,
+          originalTokenNo: origTokNo,
+          originalDoctorId: origDocId,
+          originalDoctorName: origDocName,
+          originalFee: origFee,
+          feeDifference: Number(feeDifference || 0),
+          deskCollectedDifference: Number(feeDifference || 0),
+          readmittedAt: new Date().toISOString()
+        }
+      };
+      store.tokens = store.tokens || [];
+      store.tokens.push(updatedToken);
+    }
+  }
+
   if (updatedToken) {
+    let foundAppt = false;
     store.appointments = (store.appointments || []).map(a => {
       if (a.id === tokenId || (a.hospitalId === hospitalId && (a.id === updatedToken.id || a.id === updatedToken.appointmentId))) {
+        foundAppt = true;
         return {
           ...a,
           doctorId: updatedToken.doctorId,
@@ -3852,6 +3916,28 @@ app.post('/api/hospitals/:hospitalId/tokens/:tokenId/readmit', requireHospitalAu
       }
       return a;
     });
+
+    if (!foundAppt) {
+      store.appointments = store.appointments || [];
+      store.appointments.push({
+        id: updatedToken.appointmentId || updatedToken.id,
+        hospitalId: hospitalId,
+        hospitalName: updatedToken.hospitalName || 'Hospital',
+        doctorId: updatedToken.doctorId,
+        doctorName: updatedToken.doctorName,
+        patientName: updatedToken.patientName,
+        patientPhone: updatedToken.patientPhone,
+        departmentName: updatedToken.departmentName,
+        date: todayStr,
+        bookingDate: todayStr,
+        session: updatedToken.session,
+        tokenNumber: updatedToken.tokenNo,
+        status: 'booked',
+        isExisting: true,
+        revisitDetails: updatedToken.revisitDetails,
+        createdAt: new Date().toISOString()
+      });
+    }
 
     if (isDbConnected) {
       try {
