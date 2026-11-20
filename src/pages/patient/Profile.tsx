@@ -7,7 +7,7 @@ import { HealthRecordsVault } from '../../components/patient/HealthRecordsVault'
 import { 
   Bell, Settings, Camera, Edit2, Calendar,
   FileText, Heart, User,
-  Shield, Trash2, LogOut, ChevronRight,
+  Shield, Trash2, LogOut, ChevronRight, AlertTriangle,
   ArrowLeft, MapPin, Navigation, Loader2, CheckCircle2
 } from 'lucide-react';
 
@@ -23,7 +23,8 @@ export const Profile: React.FC = () => {
     currentLocation,
     userCoords,
     detectAndSetLocation,
-    updateUserProfile
+    updateUserProfile,
+    deleteAccount
   } = useApp();
   const unreadNotifs = (notifications || []).filter(n => !n.read).length;
   const navigate = useNavigate();
@@ -58,6 +59,9 @@ export const Profile: React.FC = () => {
   const [isAddFamilyOpen, setIsAddFamilyOpen] = useState(false);
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [isFavDoctorsOpen, setIsFavDoctorsOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [famName, setFamName] = useState('');
   const [famAge, setFamAge] = useState('');
   const [famGender, setFamGender] = useState('Male');
@@ -75,6 +79,20 @@ export const Profile: React.FC = () => {
     if (!phone) return false;
     const digits = phone.replace(/\D/g, '').slice(-10);
     return digits === '9876543210' || digits === '9999999999' || digits === '1234567890';
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText.trim().toLowerCase() !== 'confirm me') return;
+    setIsDeletingAccount(true);
+    try {
+      const ok = await deleteAccount();
+      if (ok) {
+        setIsDeleteModalOpen(false);
+        navigate('/', { replace: true });
+      }
+    } finally {
+      setIsDeletingAccount(false);
+    }
   };
 
   useEffect(() => {
@@ -362,12 +380,18 @@ export const Profile: React.FC = () => {
           </button>
 
           <button 
-            onClick={() => alert("Account deletion request initiated.")}
-            className="w-full p-3 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer text-left rounded-xl"
+            onClick={() => {
+              setDeleteConfirmText('');
+              setIsDeleteModalOpen(true);
+            }}
+            className="w-full p-3 flex items-center justify-between hover:bg-red-50/60 transition-colors cursor-pointer text-left rounded-xl group"
           >
             <div className="flex items-center gap-3">
-              <Trash2 size={18} className="text-red-500" />
-              <span className="text-xs sm:text-sm font-extrabold text-slate-800">Delete Account</span>
+              <Trash2 size={18} className="text-red-500 group-hover:scale-110 transition-transform" />
+              <div>
+                <span className="text-xs sm:text-sm font-extrabold text-red-600 block">Delete Account</span>
+                <span className="text-[10px] text-slate-400 font-medium">Permanently purge login credentials</span>
+              </div>
             </div>
             <ChevronRight size={14} className="text-slate-400" />
           </button>
@@ -636,6 +660,91 @@ export const Profile: React.FC = () => {
       {/* Medical Records Modal */}
       <Modal isOpen={isMedicalRecordsOpen} onClose={() => setIsMedicalRecordsOpen(false)} title="Health Records">
         <HealthRecordsVault isModal onClose={() => setIsMedicalRecordsOpen(false)} />
+      </Modal>
+
+      {/* Delete Account Confirmation Modal */}
+      <Modal 
+        isOpen={isDeleteModalOpen} 
+        onClose={() => !isDeletingAccount && setIsDeleteModalOpen(false)} 
+        title="Delete Account Confirmation"
+      >
+        <div className="py-2 text-left space-y-4">
+          <div className="w-12 h-12 rounded-2xl bg-red-50 border border-red-100 text-red-600 flex items-center justify-center mx-auto shadow-inner">
+            <AlertTriangle size={26} />
+          </div>
+
+          <div className="text-center space-y-1">
+            <h3 className="text-base font-black text-slate-900">Are you absolutely sure?</h3>
+            <p className="text-xs text-slate-500 font-medium">
+              This action permanently removes your login credentials and personal profile identity from InstaToken.
+            </p>
+          </div>
+
+          {/* Compliance & Audit Policy Details */}
+          <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-3.5 space-y-2.5 text-xs">
+            <div className="flex items-start gap-2.5">
+              <div className="w-2 h-2 rounded-full bg-red-500 mt-1.5 shrink-0" />
+              <p className="text-slate-700 font-medium">
+                <strong className="text-slate-900 font-bold">Deleted immediately:</strong> Your phone/email login access, password, active sessions, and personal profile information.
+              </p>
+            </div>
+            <div className="flex items-start gap-2.5">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
+              <p className="text-slate-700 font-medium">
+                <strong className="text-slate-900 font-bold">Preserved for audit:</strong> Past consultation tokens, payment transaction receipts, and hospital revenue records remain archived in hospital &amp; admin ledgers for healthcare compliance and statutory accounting.
+              </p>
+            </div>
+          </div>
+
+          {/* User Confirmation Input */}
+          <div className="space-y-1.5 pt-1">
+            <label className="block text-xs font-bold text-slate-700">
+              Type <span className="font-mono text-red-600 font-black px-1.5 py-0.5 bg-red-50 rounded border border-red-200 select-all">confirm me</span> to proceed:
+            </label>
+            <input 
+              type="text"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder="confirm me"
+              disabled={isDeletingAccount}
+              autoFocus
+              className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold focus:outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 transition-all font-mono placeholder:text-slate-300"
+            />
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-2.5 pt-2">
+            <button
+              type="button"
+              onClick={() => {
+                setDeleteConfirmText('');
+                setIsDeleteModalOpen(false);
+              }}
+              disabled={isDeletingAccount}
+              className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors cursor-pointer border-none"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleDeleteAccount}
+              disabled={deleteConfirmText.trim().toLowerCase() !== 'confirm me' || isDeletingAccount}
+              className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-extrabold rounded-xl transition-all cursor-pointer shadow-md shadow-red-500/20 flex items-center justify-center gap-1.5 border-none"
+            >
+              {isDeletingAccount ? (
+                <>
+                  <Loader2 size={13} className="animate-spin" />
+                  <span>Deleting Account...</span>
+                </>
+              ) : (
+                <>
+                  <Trash2 size={13} />
+                  <span>Permanently Delete</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
       </Modal>
 
     </div>

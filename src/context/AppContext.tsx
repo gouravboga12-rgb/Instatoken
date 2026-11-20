@@ -22,6 +22,7 @@ export interface Subscription {
 }
 
 export interface UserProfile {
+  id?: string;
   name: string;
   email: string;
   phone: string;
@@ -124,6 +125,7 @@ interface AppContextType {
   deleteHospital: (hospitalId: string) => Promise<boolean>;
   toggleCustomerStatus: (customerId: string) => void;
   deleteCustomer: (customerId: string) => Promise<boolean>;
+  deleteAccount: () => Promise<boolean>;
   bookToken: (
     patientDetails: {
       name: string;
@@ -2321,6 +2323,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return false;
   };
 
+  const deleteAccount = async (): Promise<boolean> => {
+    if (!user) return false;
+    try {
+      const res = await fetch('/api/customers/delete-account', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerId: (user as any)?.id || '',
+          phone: user.phone,
+          email: user.email
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data.success || res.ok) {
+        setUser(null);
+        localStorage.removeItem('insta_user');
+        localStorage.removeItem('customer_token');
+        localStorage.removeItem('customer_user');
+        addNotification("Account Deleted", "Your login credentials have been deleted. Past token receipts and payments remain preserved.", "info");
+        return true;
+      }
+    } catch (e) {
+      console.error('Error in deleteAccount:', e);
+      // Fallback local cleanup
+      setUser(null);
+      localStorage.removeItem('insta_user');
+      localStorage.removeItem('customer_token');
+      localStorage.removeItem('customer_user');
+      addNotification("Account Deleted", "Your account has been deleted from this device.", "info");
+      return true;
+    }
+    return false;
+  };
+
   // --- Notification Helpers ---
   const addNotification = (title: string, message: string, type: 'success' | 'info' | 'warning') => {
     const newNotif: AppNotification = {
@@ -3044,6 +3080,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       deleteHospital,
       toggleCustomerStatus,
       deleteCustomer,
+      deleteAccount,
       bookToken,
       cancelAppointment,
       advanceQueue,

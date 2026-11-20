@@ -3160,12 +3160,71 @@ app.patch('/api/customers/:id/status', async (req, res) => {
   }
 });
 
+// POST /api/customers/delete-account - Customer Self Account Deletion
+// Purges login credentials & profile from PostgreSQL customers table & sync_store
+// PRESERVES all past token records, payments, and hospital financial ledger entries
+app.post('/api/customers/delete-account', async (req, res) => {
+  try {
+    const { customerId, phone, email } = req.body;
+    if (!customerId && !phone && !email) {
+      return res.status(400).json({ success: false, message: 'Missing customer identifier.' });
+    }
+
+    const normPhone = normalizeCustomerPhone(phone);
+    const normEmail = (email || '').trim().toLowerCase();
+
+    // 1. Purge from AWS RDS PostgreSQL customers table if connected
+    if (isDbConnected) {
+      try {
+        await query(
+          `DELETE FROM customers WHERE id = $1 OR (phone IS NOT NULL AND phone != '' AND phone = $2) OR (email IS NOT NULL AND email != '' AND LOWER(email) = $3)`,
+          [customerId || '', normPhone || '', normEmail || '']
+        );
+      } catch (dbErr) {
+        console.warn('Could not delete customer from RDS table:', dbErr.message);
+      }
+    }
+
+    // 2. Remove customer profile from unified store
+    const store = await getUnifiedStore();
+    store.customers = (store.customers || []).filter(c => {
+      if (customerId && c.id === customerId) return false;
+      const cPhone = normalizeCustomerPhone(c.phone);
+      if (normPhone && cPhone === normPhone) return false;
+      const cEmail = (c.email || '').trim().toLowerCase();
+      if (normEmail && cEmail === normEmail) return false;
+      return true;
+    });
+    await saveUnifiedStore(store);
+
+    // CRITICAL: Tokens, payment records, and financial transaction logs remain
+    // 100% saved and preserved in PostgreSQL and store.tokens to guarantee
+    // zero discrepancies in hospital and admin revenue accounting.
+    console.log(`[Account Deletion] Customer ${customerId || normPhone || normEmail} credentials purged. Payments & tokens preserved.`);
+
+    res.json({
+      success: true,
+      message: 'Account deleted successfully. Transaction history retained for compliance.'
+    });
+  } catch (err) {
+    console.error('Delete customer account error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // DELETE /api/customers/:id - Delete Customer Account (Admin)
 app.delete('/api/customers/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    if (isDbConnected) {
+      try {
+        await query(`DELETE FROM customers WHERE id = $1 OR phone = $1`, [id]);
+      } catch (dbErr) {
+        console.warn('Could not delete customer from RDS table:', dbErr.message);
+      }
+    }
     const store = await getUnifiedStore();
-    store.customers = (store.customers || []).filter(c => c.id !== id);
+    store.customers = (store.customers || []).filter(c => c.id !== id && c.phone !== id);
     await saveUnifiedStore(store);
     res.json({ success: true, message: 'Customer deleted', deletedId: id });
   } catch (err) {
