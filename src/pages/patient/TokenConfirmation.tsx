@@ -7,7 +7,7 @@ import {
   Calendar, Download, Share2, CheckCircle2, 
   Phone, Compass, Building2, User, CreditCard,
   AlertCircle, ArrowLeft, Loader2,
-  Clock, MapPin, ShieldCheck
+  Clock, MapPin, ShieldCheck, MessageSquare
 } from 'lucide-react';
 
 const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -426,21 +426,23 @@ export const TokenConfirmation: React.FC = () => {
   };
 
   const handleShare = async () => {
+    const origin = typeof window !== 'undefined' && window.location.origin ? window.location.origin : 'https://instatoken.in';
+    const passUrl = `${origin}/confirmation/${appointment.id}`;
     const shareText = `🏥 InstaToken Appointment Pass\n` +
       `Hospital: ${appointment.hospitalName}\n` +
       `Token: #${appointment.tokenNumber}\n` +
       `Doctor: ${appointment.doctorName} (${appointment.departmentName})\n` +
       `Patient: ${appointment.patientName}\n` +
       `Date & Time: ${formattedDate} (${appointment.time})\n` +
-      `Payment: ${isFullOnlineBooking ? 'Doctor Fee Paid Online' : 'Pay Doctor Fee at OPD Desk'}\n` +
-      `View Pass: ${window.location.href}`;
+      `Payment: ${isFullOnlineBooking ? 'Doctor Fee Paid Online' : 'Pay Doctor Fee at OPD Desk'}\n\n` +
+      `👉 Track Live Queue & Digital Pass:\n${passUrl}`;
 
     if (navigator.share) {
       try {
         await navigator.share({
           title: `OPD Token #${appointment.tokenNumber} - ${appointment.hospitalName}`,
           text: shareText,
-          url: window.location.href,
+          url: passUrl,
         });
         return;
       } catch (err: any) {
@@ -467,6 +469,21 @@ export const TokenConfirmation: React.FC = () => {
       setCopiedShare(true);
       setTimeout(() => setCopiedShare(false), 3000);
     }
+  };
+
+  const handleWhatsAppShare = () => {
+    const origin = typeof window !== 'undefined' && window.location.origin ? window.location.origin : 'https://instatoken.in';
+    const passUrl = `${origin}/confirmation/${appointment.id}`;
+    const text = `🏥 *InstaToken Appointment Pass*\n\n` +
+      `📍 *Hospital:* ${appointment.hospitalName}\n` +
+      `🔢 *Token Number:* #${appointment.tokenNumber}\n` +
+      `👨‍⚕️ *Doctor:* ${appointment.doctorName} (${appointment.departmentName})\n` +
+      `👤 *Patient:* ${appointment.patientName}\n` +
+      `📅 *Date & Time:* ${formattedDate} (${appointment.time})\n` +
+      `💳 *Payment:* ${isFullOnlineBooking ? 'Doctor Fee Paid Online' : 'Pay Doctor Fee at OPD Desk'}\n\n` +
+      `📲 *Live Digital Token Pass & Queue Tracker:*\n${passUrl}`;
+    const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+    window.open(waUrl, '_blank');
   };
 
   return (
@@ -802,7 +819,7 @@ export const TokenConfirmation: React.FC = () => {
         </div>
 
         {/* Action Buttons Grid */}
-        <div className="grid grid-cols-2 gap-2.5">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
           <Button 
             variant="primary" 
             size="sm" 
@@ -818,9 +835,19 @@ export const TokenConfirmation: React.FC = () => {
             ) : (
               <>
                 <Download size={14} />
-                <span>Download Token (PDF)</span>
+                <span>Download (PDF)</span>
               </>
             )}
+          </Button>
+
+          <Button 
+            variant="secondary" 
+            size="sm" 
+            onClick={handleWhatsAppShare}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white border-none py-2.5 text-xs font-extrabold flex items-center justify-center gap-1.5 rounded-xl cursor-pointer shadow-sm transition-colors"
+          >
+            <MessageSquare size={14} />
+            <span>Share on WhatsApp</span>
           </Button>
 
           <Button 
@@ -836,12 +863,12 @@ export const TokenConfirmation: React.FC = () => {
             {copiedShare ? (
               <>
                 <CheckCircle2 size={14} className="text-emerald-600" />
-                <span>Copied to Clipboard!</span>
+                <span>Copied Link!</span>
               </>
             ) : (
               <>
                 <Share2 size={14} />
-                <span>Share Token</span>
+                <span>Share / Copy Link</span>
               </>
             )}
           </Button>

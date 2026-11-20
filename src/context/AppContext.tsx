@@ -1085,7 +1085,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const socketBackendUrl =
         window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
           ? 'http://localhost:5000'
-          : 'https://16.113.86.236.nip.io';
+          : (window.location.origin || 'https://instatoken.in');
 
       socket = io(socketBackendUrl, {
         transports: ['websocket', 'polling'],

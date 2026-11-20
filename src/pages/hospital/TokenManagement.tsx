@@ -1721,7 +1721,7 @@ const PatientFileModal: React.FC<{
                   <Phone size={12} /> Call Phone
                 </a>
                 <a
-                  href={`https://wa.me/${token.patientPhone.replace(/\D/g, '').length === 10 ? '91' + token.patientPhone.replace(/\D/g, '') : token.patientPhone.replace(/\D/g, '')}?text=${encodeURIComponent(`Hello ${token.patientName}, your token #${token.tokenNo} for Dr. ${token.doctorName} is being called at the hospital. Please proceed to the consultation room.`)}`}
+                  href={`https://wa.me/${token.patientPhone.replace(/\D/g, '').length === 10 ? '91' + token.patientPhone.replace(/\D/g, '') : token.patientPhone.replace(/\D/g, '')}?text=${encodeURIComponent(`Hello ${token.patientName}, your token #${token.tokenNo} for Dr. ${token.doctorName} is being called at the hospital. Please proceed to the consultation room.\n\nLive Token & Queue Pass: ${(typeof window !== 'undefined' && window.location.origin ? window.location.origin : 'https://instatoken.in')}/confirmation/${token.id}`)}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-[11px] flex items-center gap-1.5 transition-colors no-underline cursor-pointer"
@@ -2218,7 +2218,7 @@ const TokenTable: React.FC<{
                       {/* Direct WhatsApp Alert Button */}
                       {t.patientPhone && (
                         <a
-                          href={`https://wa.me/${t.patientPhone.replace(/\D/g, '').length === 10 ? '91' + t.patientPhone.replace(/\D/g, '') : t.patientPhone.replace(/\D/g, '')}?text=${encodeURIComponent(`Hello ${t.patientName}, your token #${t.tokenNo} for Dr. ${t.doctorName} at ${hospitalProfile?.name || 'the hospital'} is now being called. Please proceed to the consultation room.`)}`}
+                          href={`https://wa.me/${t.patientPhone.replace(/\D/g, '').length === 10 ? '91' + t.patientPhone.replace(/\D/g, '') : t.patientPhone.replace(/\D/g, '')}?text=${encodeURIComponent(`Hello ${t.patientName}, your token #${t.tokenNo} for Dr. ${t.doctorName} at ${hospitalProfile?.name || 'the hospital'} is now being called. Please proceed to the consultation room.\n\nLive Token & Queue Pass: ${(typeof window !== 'undefined' && window.location.origin ? window.location.origin : 'https://instatoken.in')}/confirmation/${t.id}`)}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="p-1.5 text-emerald-600 hover:bg-emerald-50 border border-emerald-200 rounded-lg cursor-pointer transition-colors inline-flex items-center justify-center"

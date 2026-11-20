@@ -1004,11 +1004,11 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   useEffect(() => {
     if (!targetHospId || typeof window === 'undefined') return;
 
-    // Connect directly to EC2 host to avoid Vercel proxy connection timeouts
+    // Connect directly to live backend (same origin on instatoken.in, port 5000 on localhost)
     const socketBackendUrl =
       window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
         ? 'http://localhost:5000'
-        : 'https://16.113.86.236.nip.io';
+        : (window.location.origin || 'https://instatoken.in');
 
     let socket: Socket | null = null;
     try {
