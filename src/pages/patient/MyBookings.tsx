@@ -41,6 +41,7 @@ export const MyBookings: React.FC = () => {
         event?.type === 'APPOINTMENT_STATUS_UPDATED' ||
         event?.type === 'HOSPITAL_TOKENS_UPDATED' ||
         event?.type === 'TOKEN_CREATED' ||
+        event?.type === 'TOKEN_READMITTED' ||
         event?.type === 'DATA_MUTATED'
       ) {
         refreshAppointments();
@@ -143,13 +144,21 @@ export const MyBookings: React.FC = () => {
 
         <div className="p-4">
           {/* Card Top: Status & Booking ID */}
-          <div className="flex justify-between items-center mb-2.5 pb-2 border-b border-slate-100">
-            <Badge 
-              variant={currentStatus === 'completed' ? 'green' : currentStatus === 'cancelled' ? 'red' : currentStatus === 'calling' ? 'orange' : currentStatus === 'in-cabin' || currentStatus === 'checked-in' ? 'orange' : 'green'} 
-              className={`text-[9.5px] px-2.5 py-0.5 rounded-full uppercase font-black ${currentStatus === 'calling' ? 'animate-pulse bg-amber-500 text-white' : ''}`}
-            >
-              {currentStatus === 'calling' ? '🔔 CALLED • PROCEED TO CABIN' : currentStatus === 'in-cabin' ? 'In Consultation' : currentStatus === 'checked-in' ? 'Checked In' : currentStatus === 'booked' ? 'Confirmed' : currentStatus.toUpperCase()}
-            </Badge>
+          <div className="flex justify-between items-center mb-2.5 pb-2 border-b border-slate-100 flex-wrap gap-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <Badge 
+                variant={currentStatus === 'completed' ? 'green' : currentStatus === 'cancelled' ? 'red' : currentStatus === 'calling' ? 'orange' : currentStatus === 'in-cabin' || currentStatus === 'checked-in' ? 'orange' : 'green'} 
+                className={`text-[9.5px] px-2.5 py-0.5 rounded-full uppercase font-black ${currentStatus === 'calling' ? 'animate-pulse bg-amber-500 text-white' : ''}`}
+              >
+                {currentStatus === 'calling' ? '🔔 CALLED • PROCEED TO CABIN' : currentStatus === 'in-cabin' ? 'In Consultation' : currentStatus === 'checked-in' ? 'Checked In' : currentStatus === 'booked' ? 'Confirmed' : currentStatus.toUpperCase()}
+              </Badge>
+
+              {(appt.isRevisit || (appt as any).revisitDetails) && (
+                <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1 shadow-2xs animate-fadeIn">
+                  <span>✨ Re-Admitted to Active Queue</span>
+                </span>
+              )}
+            </div>
 
             <span className="text-[10px] font-bold text-slate-400 tracking-wide">
               Booking ID: <strong className="text-slate-600 font-extrabold">{bookingIdDisplay}</strong>
@@ -197,8 +206,15 @@ export const MyBookings: React.FC = () => {
               <span className="text-[9px] text-blue-600 font-extrabold uppercase tracking-wider block">
                 Token & Consulting Doctor
               </span>
-              <div className="text-2xl sm:text-3xl font-black text-blue-700 font-heading leading-tight mt-0.5 truncate">
-                #{appt.tokenNumber} <span className="text-slate-300 font-light">·</span> <span className="text-slate-900 text-lg sm:text-xl font-extrabold">{appt.doctorName}</span>
+              <div className="text-2xl sm:text-3xl font-black text-blue-700 font-heading leading-tight mt-0.5 truncate flex items-baseline gap-2 flex-wrap">
+                <span>#{appt.tokenNumber}</span>
+                <span className="text-slate-300 font-light">·</span>
+                <span className="text-slate-900 text-lg sm:text-xl font-extrabold">{appt.doctorName}</span>
+                {Boolean(appt.revisitDetails?.originalTokenNo) && (
+                  <span className="text-[10px] font-bold text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded-lg shadow-2xs">
+                    (Originally #{appt.revisitDetails?.originalTokenNo})
+                  </span>
+                )}
               </div>
               <div className="flex items-center gap-2 flex-wrap mt-1.5 text-[9.5px]">
                 <span className="text-slate-600 font-bold">

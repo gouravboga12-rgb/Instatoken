@@ -507,10 +507,10 @@ export const TokenConfirmation: React.FC = () => {
         </div>
 
         <h2 className="text-xl font-black text-emerald-800 tracking-tight font-heading">
-          Token Booked Successfully!
+          {appointment?.isRevisit ? "Token Re-Admitted to Active Queue!" : "Token Booked Successfully!"}
         </h2>
         <p className="text-xs text-slate-500 font-semibold mt-0.5">
-          Your OPD Token has been confirmed.
+          {appointment?.isRevisit ? "Your consultation has been re-admitted into today's live queue." : "Your OPD Token has been confirmed."}
         </p>
       </div>
 
@@ -537,9 +537,9 @@ export const TokenConfirmation: React.FC = () => {
               </div>
             </div>
 
-            {/* Confirmed Pill Badge */}
-            <span className="bg-emerald-500 text-white text-[10px] font-black uppercase px-3 py-1 rounded-full flex items-center gap-1 shadow-sm shrink-0">
-              TOKEN CONFIRMED <CheckCircle2 size={10} className="stroke-[3]" />
+            {/* Confirmed / Re-Admitted Pill Badge */}
+            <span className={`${appointment?.isRevisit ? 'bg-amber-500' : 'bg-emerald-500'} text-white text-[10px] font-black uppercase px-3 py-1 rounded-full flex items-center gap-1 shadow-sm shrink-0`}>
+              {appointment?.isRevisit ? 'RE-ADMITTED TOKEN' : 'TOKEN CONFIRMED'} <CheckCircle2 size={10} className="stroke-[3]" />
             </span>
           </div>
 

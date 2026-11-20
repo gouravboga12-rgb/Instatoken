@@ -67,6 +67,17 @@ export interface Appointment {
   paymentMethod: string;
   estimatedWaitTime: number; // in minutes
   isExisting?: boolean;
+  isRevisit?: boolean;
+  revisitDetails?: {
+    originalBookingDate?: string;
+    originalTokenNo?: number;
+    originalDoctorId?: string;
+    originalDoctorName?: string;
+    originalFee?: number;
+    feeDifference?: number;
+    deskCollectedDifference?: number;
+    readmittedAt?: string;
+  };
   doctorReference?: { name: string; phone: string; place?: string } | null;
   rmpReference?: { name: string; phone: string; place?: string } | null;
   ageDisplay?: string;
@@ -920,6 +931,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           });
         }
 
+      } else if (event.type === 'TOKEN_READMITTED') {
+        const payload = event.data;
+        const readmittedTok = payload?.token || payload;
+        const targetId = payload?.tokenId || readmittedTok?.id || readmittedTok?.appointmentId;
+        if (readmittedTok) {
+          setAppointments(prev => {
+            const updated = prev.map(a => {
+              if (a.id === targetId || a.id === readmittedTok.id || a.id === readmittedTok.appointmentId) {
+                return {
+                  ...a,
+                  tokenNumber: Number(readmittedTok.tokenNo || readmittedTok.tokenNumber || a.tokenNumber),
+                  date: readmittedTok.bookingDate || a.date,
+                  session: readmittedTok.session || a.session,
+                  doctorId: readmittedTok.doctorId || a.doctorId,
+                  doctorName: readmittedTok.doctorName || a.doctorName,
+                  departmentName: readmittedTok.departmentName || a.departmentName,
+                  status: 'booked' as const,
+                  isExisting: true,
+                  isRevisit: true,
+                  revisitDetails: readmittedTok.revisitDetails || a.revisitDetails
+                };
+              }
+              return a;
+            });
+            localStorage.setItem('insta_appointments', JSON.stringify(updated));
+            return updated;
+          });
+        }
+
       } else if (event.type === 'HOSPITAL_TOKENS_UPDATED') {
         const updatedTokens = event.data;
         if (Array.isArray(updatedTokens)) {
@@ -1118,6 +1158,102 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
           // Broadcast to global bus for banner trigger
           broadcastGlobalSync('TOKEN_CALLED', callPayload);
+        }
+      });
+
+      socket.on('token_readmitted', ({ tokenId, token: readmittedTok }: { tokenId: string; token: any }) => {
+        if (!readmittedTok) return;
+        const targetPhone = String(readmittedTok.patientPhone || readmittedTok.phone || '').replace(/\D/g, '').slice(-10);
+        const matchesUser = Boolean(myPhone && targetPhone === myPhone);
+
+        setAppointments(prev => {
+          let matched = false;
+          const updatedList = prev.map(a => {
+            const isMatch = a.id === tokenId ||
+              a.id === readmittedTok.id ||
+              a.id === readmittedTok.appointmentId ||
+              (a.hospitalId === readmittedTok.hospitalId && (matchesUser || (a.phone && a.phone.replace(/\D/g, '').slice(-10) === targetPhone)));
+
+            if (isMatch) {
+              matched = true;
+              return {
+                ...a,
+                tokenNumber: Number(readmittedTok.tokenNo || readmittedTok.tokenNumber || a.tokenNumber),
+                date: readmittedTok.bookingDate || a.date,
+                session: readmittedTok.session || a.session,
+                doctorId: readmittedTok.doctorId || a.doctorId,
+                doctorName: readmittedTok.doctorName || a.doctorName,
+                departmentName: readmittedTok.departmentName || a.departmentName,
+                status: 'booked' as const,
+                isExisting: true,
+                isRevisit: true,
+                revisitDetails: readmittedTok.revisitDetails || {
+                  readmittedAt: new Date().toISOString(),
+                  originalTokenNo: a.tokenNumber,
+                  originalBookingDate: a.date
+                }
+              };
+            }
+            return a;
+          });
+
+          if (matched) {
+            try {
+              localStorage.setItem('insta_appointments', JSON.stringify(updatedList));
+            } catch (e) {}
+          }
+          return updatedList;
+        });
+
+        // If this token belongs to the logged-in patient, trigger audio chime & notification
+        if (matchesUser) {
+          const rawDoc = readmittedTok.doctorName || 'Doctor';
+          const cleanDoc = rawDoc.replace(/^Dr\.?\s*/i, '');
+          const newTokNo = readmittedTok.tokenNo || readmittedTok.tokenNumber;
+          const notifId = `notif-readmit-${tokenId || Date.now()}`;
+          const newNotif: AppNotification = {
+            id: notifId,
+            title: `✨ Re-Admitted: Token #${newTokNo}`,
+            message: `Your appointment for Dr. ${cleanDoc} at ${readmittedTok.hospitalName || 'the clinic'} has been re-admitted into the active queue as Token #${newTokNo} (${readmittedTok.session || 'OPD'}).`,
+            type: 'success',
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            read: false
+          };
+
+          setNotifications(prev => {
+            const filtered = prev.filter(n => n.id !== notifId);
+            const updated = [newNotif, ...filtered];
+            try {
+              localStorage.setItem('insta_notifications', JSON.stringify(updated));
+            } catch (e) {}
+            return updated;
+          });
+
+          // Play pleasant chime tone using Web Audio API
+          try {
+            const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5
+            osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.15); // A5
+            gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+            osc.start(audioCtx.currentTime);
+            osc.stop(audioCtx.currentTime + 0.4);
+          } catch (e) {}
+
+          // Mobile vibration
+          if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+            try {
+              navigator.vibrate([200, 100, 200]);
+            } catch (e) {}
+          }
+
+          broadcastGlobalSync('APPOINTMENT_STATUS_UPDATED', { id: tokenId, status: 'booked', tokenNumber: newTokNo });
+          broadcastGlobalSync('TOKEN_READMITTED', { tokenId, token: readmittedTok });
         }
       });
     } catch (e) {
