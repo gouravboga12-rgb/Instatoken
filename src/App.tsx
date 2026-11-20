@@ -23,6 +23,10 @@ import { HospitalSignup } from './pages/hospital/HospitalSignup';
 import { HospitalLayout } from './pages/hospital/HospitalLayout';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { Footer } from './components/common/Footer';
+import { TermsAndConditions } from './pages/common/TermsAndConditions';
+import { PrivacyPolicy } from './pages/common/PrivacyPolicy';
+import { RefundPolicy } from './pages/common/RefundPolicy';
+import { ContactUs } from './pages/common/ContactUs';
 import { PatientCallAlertBanner } from './components/patient/PatientCallAlertBanner';
 import { 
   Home as HomeIcon, Search as SearchIcon, Award, User as UserIcon, 
@@ -369,10 +373,17 @@ const AppContent: React.FC = () => {
   }, [onboarded]);
 
   const isConfirmationRoute = location.pathname.startsWith('/confirmation/');
-  const isPublicRoute = isManagementRoute || isConfirmationRoute;
+  const isLegalRoute = (
+    location.pathname.startsWith('/terms') ||
+    location.pathname.startsWith('/privacy') ||
+    location.pathname.startsWith('/refund') ||
+    location.pathname.startsWith('/cancellation') ||
+    location.pathname.startsWith('/contact')
+  );
+  const isPublicRoute = isManagementRoute || isConfirmationRoute || isLegalRoute;
 
   // Always show Splash Screen first only for customer account routes (400ms ultra-short)
-  if (showSplash && !isManagementRoute && !isConfirmationRoute) {
+  if (showSplash && !isManagementRoute && !isConfirmationRoute && !isLegalRoute) {
     return (
       <SplashScreen 
         duration={400} 
@@ -384,7 +395,7 @@ const AppContent: React.FC = () => {
     );
   }
 
-  if (!onboarded && !isManagementRoute && !isConfirmationRoute) {
+  if (!onboarded && !isManagementRoute && !isConfirmationRoute && !isLegalRoute) {
     return <Onboarding onComplete={() => setOnboarded(true)} />;
   }
 
@@ -469,6 +480,17 @@ const AppContent: React.FC = () => {
           <Route path="/profile" element={<Profile />} />
           <Route path="/notifications" element={<Notifications />} />
           
+          {/* Legal and Compliance Policies (Razorpay Mandatory) */}
+          <Route path="/terms" element={<TermsAndConditions />} />
+          <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/refund-policy" element={<RefundPolicy />} />
+          <Route path="/cancellation-refund-policy" element={<RefundPolicy />} />
+          <Route path="/refunds" element={<RefundPolicy />} />
+          <Route path="/contact" element={<ContactUs />} />
+          <Route path="/contact-us" element={<ContactUs />} />
+
           {/* Admin routes */}
           <Route path="/admin" element={<AdminGuard><AdminDashboard /></AdminGuard>} />
           <Route path="/admin/login" element={<AdminGuard><Navigate to="/admin" replace /></AdminGuard>} />

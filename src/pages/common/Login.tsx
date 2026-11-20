@@ -529,6 +529,25 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
         <span className="text-[#16a34a] font-black">•</span>
         <span className="text-slate-700 font-semibold">No password required</span>
       </div>
+
+      {/* Razorpay Compliance Legal Links */}
+      <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[11px] text-slate-400 font-medium">
+        <a href="/terms" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 transition-colors">
+          Terms &amp; Conditions
+        </a>
+        <span>•</span>
+        <a href="/privacy" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 transition-colors">
+          Privacy Policy
+        </a>
+        <span>•</span>
+        <a href="/refund-policy" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 transition-colors">
+          Refund Policy
+        </a>
+        <span>•</span>
+        <a href="/contact" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 transition-colors">
+          Contact Us
+        </a>
+      </div>
     </div>
   );
 
@@ -599,6 +618,17 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
             alt="" 
             className="w-full max-w-2xl mx-auto object-cover object-bottom h-[65px] sm:h-[85px]" 
           />
+        </div>
+
+        {/* Mobile Legal Strip */}
+        <div className="w-full py-3 px-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[11px] text-slate-500 font-medium z-10 bg-white/70 border-t border-blue-50">
+          <a href="/terms" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 transition-colors">Terms &amp; Conditions</a>
+          <span>•</span>
+          <a href="/privacy" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 transition-colors">Privacy Policy</a>
+          <span>•</span>
+          <a href="/refund-policy" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 transition-colors">Refunds</a>
+          <span>•</span>
+          <a href="/contact" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 transition-colors">Contact</a>
         </div>
       </div>
 
@@ -703,6 +733,19 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
             {renderFormContent()}
           </div>
         </div>
+      </div>
+
+      {/* Desktop Footer Strip */}
+      <div className="hidden lg:flex w-full justify-center items-center py-4 px-6 text-xs text-slate-500 gap-4 border-t border-slate-200/60 bg-white/60 backdrop-blur-xs">
+        <p>© 2026 InstaToken Healthcare Solutions Inc.</p>
+        <span className="text-slate-300">|</span>
+        <a href="/terms" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 transition-colors font-medium">Terms &amp; Conditions</a>
+        <span>•</span>
+        <a href="/privacy" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 transition-colors font-medium">Privacy Policy</a>
+        <span>•</span>
+        <a href="/refund-policy" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 transition-colors font-medium">Cancellation &amp; Refund Policy</a>
+        <span>•</span>
+        <a href="/contact" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 transition-colors font-medium">Contact Us</a>
       </div>
 
     </div>
