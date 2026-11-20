@@ -5,12 +5,15 @@ import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { 
   Users, UserCheck, Search, Plus, X, Phone, MapPin, 
-  ChevronLeft, ChevronRight, Stethoscope, Download
+  ChevronLeft, ChevronRight, Stethoscope, Download, CheckCircle2
 } from 'lucide-react';
 
 export const DoctorReferences: React.FC = () => {
   const { doctorReferences, addDoctorReference, tokens, hospitalProfile } = useHospital();
   const { appointments } = useApp();
+
+  // Tab View Mode: 'referrals' (Default - Direct Patient Referrals Ledger) vs 'doctors' (Referring Doctors Roster)
+  const [activeTab, setActiveTab] = useState<'referrals' | 'doctors'>('referrals');
 
   // Unified Search & Global Date Filter
   const [searchQuery, setSearchQuery] = useState('');
@@ -22,11 +25,10 @@ export const DoctorReferences: React.FC = () => {
   const [selectedDoctorId, setSelectedDoctorId] = useState<string | null>(null);
   const [drawerPatientSearch, setDrawerPatientSearch] = useState('');
 
-  // Main Table Pagination
+  // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
 
-  // Slide-Over Drawer Pagination
   const [drawerPage, setDrawerPage] = useState(1);
   const drawerItemsPerPage = 7;
 
@@ -148,7 +150,24 @@ export const DoctorReferences: React.FC = () => {
     });
   }, [allReferredRecords, dateFilter, todayStr, yesterdayStr, sevenDaysAgoStr, thisMonthStr, customStartDate, customEndDate]);
 
-  // 3. Aggregate referral counts and latest referral date per doctor phone / name
+  // 3. Search-filtered Patient Referrals (for the primary Ledger tab)
+  const filteredReferralsLedger = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return dateFilteredReferrals;
+
+    return dateFilteredReferrals.filter(r => 
+      r.patientName.toLowerCase().includes(q) ||
+      r.patientPhone.includes(q) ||
+      r.place.toLowerCase().includes(q) ||
+      r.doctorRefName.toLowerCase().includes(q) ||
+      r.doctorRefPhone.includes(q) ||
+      (r.doctorRefPlace || '').toLowerCase().includes(q) ||
+      r.doctorName.toLowerCase().includes(q) ||
+      String(r.tokenNo).toLowerCase().includes(q)
+    );
+  }, [dateFilteredReferrals, searchQuery]);
+
+  // 4. Aggregate referral stats per doctor phone / name
   const doctorReferralStats = useMemo(() => {
     const stats: Record<string, { count: number; lastDate: string }> = {};
 
@@ -171,7 +190,7 @@ export const DoctorReferences: React.FC = () => {
     return stats;
   }, [dateFilteredReferrals]);
 
-  // 4. Combine registered doctors with patient-entered doctors (clean, deduped, 0 demo data)
+  // 5. Unified Referring Doctors list (from DB + tokens, deduped)
   const unifiedDoctorList = useMemo(() => {
     const list: Array<{
       id: string;
@@ -241,7 +260,7 @@ export const DoctorReferences: React.FC = () => {
     return list;
   }, [doctorReferences, allReferredRecords, todayStr]);
 
-  // 5. Global Filtered Doctors List (matches doctor name, phone, place, or referred patient)
+  // 6. Filtered Doctors List (for the Doctors Roster tab)
   const filteredDoctors = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
     if (!q) return unifiedDoctorList;
@@ -252,7 +271,6 @@ export const DoctorReferences: React.FC = () => {
       const matchPlace = doc.place.toLowerCase().includes(q);
       const matchSpec = (doc.specialization || '').toLowerCase().includes(q);
 
-      // Check if any of this doctor's referred patients match the query
       const matchPatient = dateFilteredReferrals.some(r => {
         const matchesThisDoctor = (doc.phone && r.doctorRefPhone === doc.phone) ||
           r.doctorRefName.toLowerCase().includes(doc.name.toLowerCase().replace(/^dr\.?\s*/i, '').trim());
@@ -264,7 +282,7 @@ export const DoctorReferences: React.FC = () => {
     });
   }, [unifiedDoctorList, searchQuery, dateFilteredReferrals]);
 
-  // Helper to get referral stats for a doctor
+  // Helper to get stats for a doctor
   const getDoctorStats = (doc: { name: string; phone: string }) => {
     const cleanPhone = String(doc.phone || '').replace(/\D/g, '').slice(-10);
     const normName = doc.name.toLowerCase().replace(/^dr\.?\s*/i, '').trim();
@@ -342,34 +360,63 @@ export const DoctorReferences: React.FC = () => {
 
   // Export to CSV
   const handleExportCSV = () => {
-    const rows = [
-      ['Doctor Name', 'Mobile Number', 'Clinic / Place', 'Specialization', 'Total Referred Patients', 'Last Referral Date']
-    ];
-
-    filteredDoctors.forEach(d => {
-      const { count, lastDate } = getDoctorStats(d);
-      rows.push([
-        `"${d.name}"`,
-        `"${d.phone}"`,
-        `"${d.place}"`,
-        `"${d.specialization}"`,
-        String(count),
-        `"${lastDate || 'None'}"`
-      ]);
-    });
-
-    const csvContent = 'data:text/csv;charset=utf-8,' + rows.map(e => e.join(',')).join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `doctor_references_${hospitalProfile?.id || 'hospital'}_${todayStr}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    if (activeTab === 'referrals') {
+      const rows = [
+        ['Token No', 'Patient Name', 'Patient Phone', 'Patient Place', 'Referring Doctor', 'Doctor Phone', 'Doctor Place', 'Hospital Doctor', 'Department', 'Referral Date', 'Status']
+      ];
+      filteredReferralsLedger.forEach(r => {
+        rows.push([
+          `"${r.tokenNo}"`,
+          `"${r.patientName}"`,
+          `"${r.patientPhone}"`,
+          `"${r.place}"`,
+          `"${r.doctorRefName}"`,
+          `"${r.doctorRefPhone}"`,
+          `"${r.doctorRefPlace || ''}"`,
+          `"${r.doctorName}"`,
+          `"${r.departmentName || ''}"`,
+          `"${r.referralDate}"`,
+          `"${r.status}"`
+        ]);
+      });
+      const csvContent = 'data:text/csv;charset=utf-8,' + rows.map(e => e.join(',')).join('\n');
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement('a');
+      link.setAttribute('href', encodedUri);
+      link.setAttribute('download', `patient_referrals_${hospitalProfile?.id || 'hospital'}_${todayStr}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else {
+      const rows = [
+        ['Doctor Name', 'Mobile Number', 'Clinic / Place', 'Specialization', 'Total Referred Patients', 'Last Referral Date']
+      ];
+      filteredDoctors.forEach(d => {
+        const { count, lastDate } = getDoctorStats(d);
+        rows.push([
+          `"${d.name}"`,
+          `"${d.phone}"`,
+          `"${d.place}"`,
+          `"${d.specialization}"`,
+          String(count),
+          `"${lastDate || 'None'}"`
+        ]);
+      });
+      const csvContent = 'data:text/csv;charset=utf-8,' + rows.map(e => e.join(',')).join('\n');
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement('a');
+      link.setAttribute('href', encodedUri);
+      link.setAttribute('download', `doctor_references_${hospitalProfile?.id || 'hospital'}_${todayStr}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
   };
 
   // Pagination Math
-  const totalPages = Math.ceil(filteredDoctors.length / itemsPerPage) || 1;
+  const activeCount = activeTab === 'referrals' ? filteredReferralsLedger.length : filteredDoctors.length;
+  const totalPages = Math.ceil(activeCount / itemsPerPage) || 1;
+  const paginatedReferrals = filteredReferralsLedger.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
   const paginatedDoctors = filteredDoctors.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const totalDrawerPages = Math.ceil(selectedDoctorPatients.length / drawerItemsPerPage) || 1;
@@ -387,14 +434,14 @@ export const DoctorReferences: React.FC = () => {
         <div>
           <div className="flex items-center gap-2.5">
             <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight font-heading">
-              Doctor References
+              Doctor References & Referrals
             </h1>
             <span className="bg-blue-50 text-blue-700 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider border border-blue-200/60">
               Referring Network
             </span>
           </div>
           <p className="text-xs text-slate-500 font-semibold mt-1">
-            Track referring doctors and inspect patients referred to your hospital OPD in real time.
+            View patient referral entries, referring doctor contact info, and assigned OPD doctors in real time.
           </p>
         </div>
 
@@ -402,7 +449,7 @@ export const DoctorReferences: React.FC = () => {
           <button
             onClick={handleExportCSV}
             className="px-3.5 py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold text-xs rounded-xl flex items-center gap-1.5 border border-slate-200 transition-colors cursor-pointer"
-            title="Export Doctor References to CSV"
+            title="Export to CSV"
           >
             <Download size={14} className="text-slate-500" />
             <span className="hidden sm:inline">Export CSV</span>
@@ -434,7 +481,7 @@ export const DoctorReferences: React.FC = () => {
             </span>
             <span className="text-[11px] text-emerald-600 font-bold flex items-center gap-1 mt-0.5">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-pulse" />
-              Active network of referring physicians & regional clinics
+              Active network of referring physicians & regional partner clinics
             </span>
           </div>
         </Card>
@@ -453,40 +500,60 @@ export const DoctorReferences: React.FC = () => {
             </span>
             <span className="text-[11px] text-blue-600 font-bold flex items-center gap-1 mt-0.5">
               <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block" />
-              Verified via digital OPD tokens & walk-in registrations
+              Verified via patient token bookings & walk-in references
             </span>
           </div>
         </Card>
       </div>
 
-      {/* ── UNIFIED FILTER & SEARCH BAR ────────────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-xs flex flex-wrap items-center justify-between gap-3">
-        {/* Search Input */}
-        <div className="relative flex-1 min-w-[280px]">
-          <Search size={16} className="absolute left-3.5 top-3 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search doctor name, mobile, clinic place, or patient..."
-            value={searchQuery}
-            onChange={e => {
-              setSearchQuery(e.target.value);
+      {/* ── PRIMARY VIEW MODE TABS ─────────────────────────────────────────── */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        {/* Tabs Switcher */}
+        <div className="flex items-center bg-slate-200/60 p-1 rounded-2xl w-full sm:w-auto">
+          <button
+            onClick={() => {
+              setActiveTab('referrals');
               setCurrentPage(1);
             }}
-            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-blue-500 focus:bg-white transition-all placeholder:text-slate-400"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 border-none bg-transparent cursor-pointer p-0.5"
-            >
-              <X size={14} />
-            </button>
-          )}
+            className={`flex-1 sm:flex-initial px-5 py-2.5 rounded-xl text-xs font-black transition-all border-none cursor-pointer flex items-center justify-center gap-2 ${
+              activeTab === 'referrals'
+                ? 'bg-white text-blue-700 shadow-sm'
+                : 'text-slate-600 hover:text-slate-900 bg-transparent'
+            }`}
+          >
+            <UserCheck size={15} />
+            <span>Patient Referrals Ledger</span>
+            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+              activeTab === 'referrals' ? 'bg-blue-100 text-blue-800' : 'bg-slate-300 text-slate-700'
+            }`}>
+              {filteredReferralsLedger.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveTab('doctors');
+              setCurrentPage(1);
+            }}
+            className={`flex-1 sm:flex-initial px-5 py-2.5 rounded-xl text-xs font-black transition-all border-none cursor-pointer flex items-center justify-center gap-2 ${
+              activeTab === 'doctors'
+                ? 'bg-white text-blue-700 shadow-sm'
+                : 'text-slate-600 hover:text-slate-900 bg-transparent'
+            }`}
+          >
+            <Users size={15} />
+            <span>Referring Doctors Roster</span>
+            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+              activeTab === 'doctors' ? 'bg-blue-100 text-blue-800' : 'bg-slate-300 text-slate-700'
+            }`}>
+              {filteredDoctors.length}
+            </span>
+          </button>
         </div>
 
         {/* Date Filter Pills */}
         <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider mr-1 hidden lg:inline">
+          <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider mr-1 hidden xl:inline">
             Date Filter:
           </span>
           {[
@@ -512,6 +579,36 @@ export const DoctorReferences: React.FC = () => {
               {f.label}
             </button>
           ))}
+        </div>
+      </div>
+
+      {/* ── SEARCH & CUSTOM DATE BAR ───────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-xs flex flex-wrap items-center justify-between gap-3">
+        {/* Search Input */}
+        <div className="relative flex-1 min-w-[280px]">
+          <Search size={16} className="absolute left-3.5 top-3 text-slate-400" />
+          <input
+            type="text"
+            placeholder={
+              activeTab === 'referrals'
+                ? "Search patient name, mobile, place, referring doctor, or token #..."
+                : "Search referring doctor name, mobile, or clinic place..."
+            }
+            value={searchQuery}
+            onChange={e => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-blue-500 focus:bg-white transition-all placeholder:text-slate-400"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 border-none bg-transparent cursor-pointer p-0.5"
+            >
+              <X size={14} />
+            </button>
+          )}
         </div>
 
         {/* Custom Date Range Picker */}
@@ -540,202 +637,386 @@ export const DoctorReferences: React.FC = () => {
         )}
       </div>
 
-      {/* ── FULL-WIDTH DOCTOR REFERENCES ROSTER TABLE ───────────────────────── */}
-      <div className="bg-white rounded-3xl border border-slate-100 shadow-xs overflow-hidden">
-        <div className="p-5 border-b border-slate-100 flex items-center justify-between">
-          <div>
-            <h3 className="text-sm font-black text-slate-800 uppercase tracking-wide">
-              Referring Doctors Roster
-            </h3>
-            <p className="text-xs text-slate-400 font-semibold mt-0.5">
-              Click 'View Patients' on any doctor to see the exact patient referrals and token records
-            </p>
+      {/* ── TAB CONTENT 1: PATIENT REFERRALS LEDGER (PRIMARY VIEW) ─────────── */}
+      {activeTab === 'referrals' && (
+        <div className="bg-white rounded-3xl border border-slate-100 shadow-xs overflow-hidden animate-in fade-in duration-150">
+          <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-black text-slate-800 uppercase tracking-wide">
+                Patient Referrals Ledger
+              </h3>
+              <p className="text-xs text-slate-400 font-semibold mt-0.5">
+                Full list of patient bookings that cited an external referring doctor or partner clinic
+              </p>
+            </div>
+            <span className="text-xs font-black text-blue-700 bg-blue-50 px-3 py-1 rounded-full border border-blue-200/50">
+              {filteredReferralsLedger.length} Referrals Found
+            </span>
           </div>
-          <span className="text-xs font-black text-blue-700 bg-blue-50 px-3 py-1 rounded-full border border-blue-200/50">
-            {filteredDoctors.length} Doctors Found
-          </span>
-        </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs min-w-[750px]">
-            <thead className="bg-slate-50/80 border-b border-slate-100 text-[10px] font-black text-slate-500 uppercase tracking-wider">
-              <tr>
-                <th className="px-5 py-4 w-12 text-center">#</th>
-                <th className="px-5 py-4">Referring Doctor</th>
-                <th className="px-5 py-4">Specialization / Role</th>
-                <th className="px-5 py-4">Mobile Number</th>
-                <th className="px-5 py-4">Clinic / Place</th>
-                <th className="px-5 py-4 text-center">Patients Referred</th>
-                <th className="px-5 py-4">Last Referral</th>
-                <th className="px-5 py-4 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {paginatedDoctors.length === 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs min-w-[900px]">
+              <thead className="bg-slate-50/80 border-b border-slate-100 text-[10px] font-black text-slate-500 uppercase tracking-wider">
                 <tr>
-                  <td colSpan={8} className="px-5 py-14 text-center">
-                    <div className="max-w-sm mx-auto space-y-2.5">
-                      <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl mx-auto flex items-center justify-center">
-                        <Stethoscope size={24} />
-                      </div>
-                      <p className="font-extrabold text-slate-800 text-sm">No Referring Doctors Found</p>
-                      <p className="text-xs text-slate-400">
-                        {searchQuery 
-                          ? `No doctors or referrals matched your search for "${searchQuery}".` 
-                          : 'Register referring doctors using the button below or wait for patients to input their doctor reference during token booking.'}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => setShowAddModal(true)}
-                        className="mt-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all border-none cursor-pointer"
-                      >
-                        + Add Referring Doctor
-                      </button>
-                    </div>
-                  </td>
+                  <th className="px-5 py-4 w-12 text-center">#</th>
+                  <th className="px-5 py-4">Patient Details</th>
+                  <th className="px-5 py-4">Mobile & Village</th>
+                  <th className="px-5 py-4">Referring Doctor (Source)</th>
+                  <th className="px-5 py-4">Hospital Doctor Consulted</th>
+                  <th className="px-5 py-4 text-center">Token No</th>
+                  <th className="px-5 py-4">Referral Date</th>
+                  <th className="px-5 py-4 text-center">Status</th>
                 </tr>
-              ) : (
-                paginatedDoctors.map((doc, idx) => {
-                  const rowNum = (currentPage - 1) * itemsPerPage + idx + 1;
-                  const { count, lastDate } = getDoctorStats(doc);
-                  const isSelected = selectedDoctorId === doc.id;
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {paginatedReferrals.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="px-5 py-14 text-center">
+                      <div className="max-w-sm mx-auto space-y-2.5">
+                        <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl mx-auto flex items-center justify-center">
+                          <UserCheck size={24} />
+                        </div>
+                        <p className="font-extrabold text-slate-800 text-sm">No Patient Referrals Found</p>
+                        <p className="text-xs text-slate-400">
+                          {searchQuery 
+                            ? `No referrals matched your search for "${searchQuery}".` 
+                            : 'Patient bookings citing a referring doctor will appear here automatically.'}
+                        </p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedReferrals.map((r, idx) => {
+                    const rowNum = (currentPage - 1) * itemsPerPage + idx + 1;
+                    return (
+                      <tr key={r.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="px-5 py-4 text-center font-bold text-slate-400">
+                          {rowNum}
+                        </td>
 
-                  return (
-                    <tr 
-                      key={doc.id}
-                      onClick={() => {
-                        setSelectedDoctorId(doc.id);
-                        setDrawerPage(1);
-                        setDrawerPatientSearch('');
-                      }}
-                      className={`transition-colors cursor-pointer ${
-                        isSelected ? 'bg-blue-50/70 font-medium' : 'hover:bg-slate-50/80'
-                      }`}
-                    >
-                      <td className="px-5 py-4 text-center font-bold text-slate-400">
-                        {rowNum}
-                      </td>
-
-                      {/* Doctor Name & Avatar */}
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-100 to-indigo-100 text-blue-700 font-black flex items-center justify-center shrink-0 text-xs shadow-2xs border border-blue-200/50">
-                            {doc.name.replace(/^Dr\.?\s*/i, '').charAt(0) || 'D'}
-                          </div>
-                          <div>
-                            <p className="font-black text-slate-900 text-xs leading-tight">
-                              {doc.name}
-                            </p>
-                            <span className="text-[10px] text-emerald-600 font-bold inline-block mt-0.5">
-                              ● Active Partner
+                        {/* Patient Name & Age */}
+                        <td className="px-5 py-4">
+                          <p className="font-black text-slate-900 text-xs">
+                            {r.patientName}
+                          </p>
+                          {(r.patientAge || r.patientGender) && (
+                            <span className="text-[10px] text-slate-400 font-bold block mt-0.5">
+                              {r.patientAge ? `${r.patientAge} Y` : ''} {r.patientGender || ''}
                             </span>
+                          )}
+                        </td>
+
+                        {/* Mobile & Village */}
+                        <td className="px-5 py-4">
+                          <p className="font-bold text-slate-700 text-xs">
+                            {r.patientPhone}
+                          </p>
+                          <span className="text-[10px] text-slate-500 font-medium flex items-center gap-1 mt-0.5">
+                            <MapPin size={10} className="text-blue-500 shrink-0" />
+                            {r.place}
+                          </span>
+                        </td>
+
+                        {/* Referring Doctor (The Source) */}
+                        <td className="px-5 py-4">
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-800 font-black text-[10px] flex items-center justify-center shrink-0">
+                              Dr
+                            </div>
+                            <div>
+                              <p className="font-black text-slate-900 text-xs leading-tight">
+                                {r.doctorRefName}
+                              </p>
+                              <div className="flex items-center gap-2 text-[10px] text-slate-500 mt-0.5">
+                                {r.doctorRefPhone && <span>📞 {r.doctorRefPhone}</span>}
+                                {r.doctorRefPlace && <span>📍 {r.doctorRefPlace}</span>}
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      </td>
+                        </td>
 
-                      {/* Specialization */}
-                      <td className="px-5 py-4 font-bold text-slate-700">
-                        <span className="inline-block bg-slate-100 text-slate-800 text-[11px] px-2.5 py-0.5 rounded-md">
-                          {doc.specialization || 'General Physician'}
-                        </span>
-                      </td>
+                        {/* Hospital Doctor & Department */}
+                        <td className="px-5 py-4">
+                          <p className="font-bold text-slate-800 text-xs leading-tight">
+                            {r.doctorName}
+                          </p>
+                          <span className="text-[10px] text-slate-400 font-medium block mt-0.5">
+                            {r.departmentName}
+                          </span>
+                        </td>
 
-                      {/* Mobile */}
-                      <td className="px-5 py-4 font-bold text-slate-700">
-                        <a 
-                          href={`tel:${doc.phone}`}
-                          onClick={e => e.stopPropagation()}
-                          className="text-slate-800 hover:text-blue-600 flex items-center gap-1.5 transition-colors no-underline"
-                        >
-                          <Phone size={12} className="text-emerald-500 shrink-0" />
-                          <span>{doc.phone}</span>
-                        </a>
-                      </td>
+                        {/* Token No */}
+                        <td className="px-5 py-4 text-center">
+                          <span className="font-black text-blue-700 bg-blue-50 border border-blue-200/60 px-2.5 py-1 rounded text-xs">
+                            {r.tokenNo}
+                          </span>
+                        </td>
 
-                      {/* Clinic / Place */}
-                      <td className="px-5 py-4 font-bold text-slate-600">
-                        <div className="flex items-center gap-1.5">
-                          <MapPin size={12} className="text-blue-500 shrink-0" />
-                          <span>{doc.place}</span>
-                        </div>
-                      </td>
+                        {/* Referral Date */}
+                        <td className="px-5 py-4 text-slate-600 font-bold text-xs whitespace-nowrap">
+                          {r.referralDate}
+                          {r.referralTime && (
+                            <span className="text-[10px] text-slate-400 font-normal block">
+                              {r.referralTime}
+                            </span>
+                          )}
+                        </td>
 
-                      {/* Patients Referred Badge */}
-                      <td className="px-5 py-4 text-center">
-                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-black ${
-                          count > 0 
-                            ? 'bg-blue-100 text-blue-800' 
-                            : 'bg-slate-100 text-slate-400'
-                        }`}>
-                          {count} {count === 1 ? 'Patient' : 'Patients'}
-                        </span>
-                      </td>
+                        {/* Status */}
+                        <td className="px-5 py-4 text-center">
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                            r.status === 'completed'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : r.status === 'in-cabin'
+                              ? 'bg-indigo-100 text-indigo-800'
+                              : 'bg-blue-100 text-blue-800'
+                          }`}>
+                            <CheckCircle2 size={10} />
+                            {r.status}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
 
-                      {/* Last Referral Date */}
-                      <td className="px-5 py-4 text-slate-500 font-semibold text-[11px] whitespace-nowrap">
-                        {lastDate ? lastDate : <span className="text-slate-400 italic">No visits in period</span>}
-                      </td>
-
-                      {/* Action */}
-                      <td className="px-5 py-4 text-right">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedDoctorId(doc.id);
-                            setDrawerPage(1);
-                            setDrawerPatientSearch('');
-                          }}
-                          className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer border-none ${
-                            isSelected 
-                              ? 'bg-blue-600 text-white shadow-xs' 
-                              : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
-                          }`}
-                        >
-                          View Patients
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination Controls */}
-        <div className="p-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 bg-slate-50/40">
-          <span>
-            Showing {Math.min(1, filteredDoctors.length)} to {Math.min(currentPage * itemsPerPage, filteredDoctors.length)} of {filteredDoctors.length} Doctors
-          </span>
-          <div className="flex items-center gap-1">
-            <button
-              disabled={currentPage <= 1}
-              onClick={() => setCurrentPage(p => p - 1)}
-              className="p-1.5 rounded-lg border border-slate-200 hover:bg-white disabled:opacity-40 cursor-pointer"
-            >
-              <ChevronLeft size={14} />
-            </button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).slice(0, 5).map(page => (
+          {/* Pagination Controls */}
+          <div className="p-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 bg-slate-50/40">
+            <span>
+              Showing {Math.min(1, filteredReferralsLedger.length)} to {Math.min(currentPage * itemsPerPage, filteredReferralsLedger.length)} of {filteredReferralsLedger.length} Referrals
+            </span>
+            <div className="flex items-center gap-1">
               <button
-                key={page}
-                onClick={() => setCurrentPage(page)}
-                className={`w-7 h-7 rounded-lg text-xs font-bold cursor-pointer border-none ${
-                  currentPage === page ? 'bg-blue-600 text-white shadow-2xs' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                }`}
+                disabled={currentPage <= 1}
+                onClick={() => setCurrentPage(p => p - 1)}
+                className="p-1.5 rounded-lg border border-slate-200 hover:bg-white disabled:opacity-40 cursor-pointer"
               >
-                {page}
+                <ChevronLeft size={14} />
               </button>
-            ))}
-            <button
-              disabled={currentPage >= totalPages}
-              onClick={() => setCurrentPage(p => p + 1)}
-              className="p-1.5 rounded-lg border border-slate-200 hover:bg-white disabled:opacity-40 cursor-pointer"
-            >
-              <ChevronRight size={14} />
-            </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).slice(0, 5).map(page => (
+                <button
+                  key={page}
+                  onClick={() => setCurrentPage(page)}
+                  className={`w-7 h-7 rounded-lg text-xs font-bold cursor-pointer border-none ${
+                    currentPage === page ? 'bg-blue-600 text-white shadow-2xs' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  {page}
+                </button>
+              ))}
+              <button
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage(p => p + 1)}
+                className="p-1.5 rounded-lg border border-slate-200 hover:bg-white disabled:opacity-40 cursor-pointer"
+              >
+                <ChevronRight size={14} />
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* ── TAB CONTENT 2: REFERRING DOCTORS ROSTER TABLE ──────────────────── */}
+      {activeTab === 'doctors' && (
+        <div className="bg-white rounded-3xl border border-slate-100 shadow-xs overflow-hidden animate-in fade-in duration-150">
+          <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-black text-slate-800 uppercase tracking-wide">
+                Referring Doctors Directory
+              </h3>
+              <p className="text-xs text-slate-400 font-semibold mt-0.5">
+                External referring physicians, partner clinics, and regional healthcare centers
+              </p>
+            </div>
+            <span className="text-xs font-black text-blue-700 bg-blue-50 px-3 py-1 rounded-full border border-blue-200/50">
+              {filteredDoctors.length} Doctors Found
+            </span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs min-w-[750px]">
+              <thead className="bg-slate-50/80 border-b border-slate-100 text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                <tr>
+                  <th className="px-5 py-4 w-12 text-center">#</th>
+                  <th className="px-5 py-4">Referring Doctor</th>
+                  <th className="px-5 py-4">Specialization</th>
+                  <th className="px-5 py-4">Mobile Number</th>
+                  <th className="px-5 py-4">Clinic / Place</th>
+                  <th className="px-5 py-4 text-center">Patients Referred</th>
+                  <th className="px-5 py-4">Last Referral</th>
+                  <th className="px-5 py-4 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {paginatedDoctors.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="px-5 py-14 text-center">
+                      <div className="max-w-sm mx-auto space-y-2.5">
+                        <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl mx-auto flex items-center justify-center">
+                          <Stethoscope size={24} />
+                        </div>
+                        <p className="font-extrabold text-slate-800 text-sm">No Referring Doctors Found</p>
+                        <p className="text-xs text-slate-400">
+                          {searchQuery 
+                            ? `No doctors matched your search for "${searchQuery}".` 
+                            : 'Click "+ Add Referring Doctor" to register partner clinics or wait for patients to enter a doctor during booking.'}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setShowAddModal(true)}
+                          className="mt-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all border-none cursor-pointer"
+                        >
+                          + Add Referring Doctor
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedDoctors.map((doc, idx) => {
+                    const rowNum = (currentPage - 1) * itemsPerPage + idx + 1;
+                    const { count, lastDate } = getDoctorStats(doc);
+                    const isSelected = selectedDoctorId === doc.id;
+
+                    return (
+                      <tr 
+                        key={doc.id}
+                        onClick={() => {
+                          setSelectedDoctorId(doc.id);
+                          setDrawerPage(1);
+                          setDrawerPatientSearch('');
+                        }}
+                        className={`transition-colors cursor-pointer ${
+                          isSelected ? 'bg-blue-50/70 font-medium' : 'hover:bg-slate-50/80'
+                        }`}
+                      >
+                        <td className="px-5 py-4 text-center font-bold text-slate-400">
+                          {rowNum}
+                        </td>
+
+                        {/* Doctor Name & Avatar */}
+                        <td className="px-5 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-100 to-indigo-100 text-blue-700 font-black flex items-center justify-center shrink-0 text-xs shadow-2xs border border-blue-200/50">
+                              {doc.name.replace(/^Dr\.?\s*/i, '').charAt(0) || 'D'}
+                            </div>
+                            <div>
+                              <p className="font-black text-slate-900 text-xs leading-tight">
+                                {doc.name}
+                              </p>
+                              <span className="text-[10px] text-emerald-600 font-bold inline-block mt-0.5">
+                                ● Active Partner
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Specialization */}
+                        <td className="px-5 py-4 font-bold text-slate-700">
+                          <span className="inline-block bg-slate-100 text-slate-800 text-[11px] px-2.5 py-0.5 rounded-md">
+                            {doc.specialization || 'General Physician'}
+                          </span>
+                        </td>
+
+                        {/* Mobile */}
+                        <td className="px-5 py-4 font-bold text-slate-700">
+                          <a 
+                            href={`tel:${doc.phone}`}
+                            onClick={e => e.stopPropagation()}
+                            className="text-slate-800 hover:text-blue-600 flex items-center gap-1.5 transition-colors no-underline"
+                          >
+                            <Phone size={12} className="text-emerald-500 shrink-0" />
+                            <span>{doc.phone}</span>
+                          </a>
+                        </td>
+
+                        {/* Clinic / Place */}
+                        <td className="px-5 py-4 font-bold text-slate-600">
+                          <div className="flex items-center gap-1.5">
+                            <MapPin size={12} className="text-blue-500 shrink-0" />
+                            <span>{doc.place}</span>
+                          </div>
+                        </td>
+
+                        {/* Patients Referred Badge */}
+                        <td className="px-5 py-4 text-center">
+                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-black ${
+                            count > 0 
+                              ? 'bg-blue-100 text-blue-800' 
+                              : 'bg-slate-100 text-slate-400'
+                          }`}>
+                            {count} {count === 1 ? 'Patient' : 'Patients'}
+                          </span>
+                        </td>
+
+                        {/* Last Referral Date */}
+                        <td className="px-5 py-4 text-slate-500 font-semibold text-[11px] whitespace-nowrap">
+                          {lastDate ? lastDate : <span className="text-slate-400 italic">No visits in period</span>}
+                        </td>
+
+                        {/* Action */}
+                        <td className="px-5 py-4 text-right">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedDoctorId(doc.id);
+                              setDrawerPage(1);
+                              setDrawerPatientSearch('');
+                            }}
+                            className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer border-none ${
+                              isSelected 
+                                ? 'bg-blue-600 text-white shadow-xs' 
+                                : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                            }`}
+                          >
+                            View Patients
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination Controls */}
+          <div className="p-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 bg-slate-50/40">
+            <span>
+              Showing {Math.min(1, filteredDoctors.length)} to {Math.min(currentPage * itemsPerPage, filteredDoctors.length)} of {filteredDoctors.length} Doctors
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                disabled={currentPage <= 1}
+                onClick={() => setCurrentPage(p => p - 1)}
+                className="p-1.5 rounded-lg border border-slate-200 hover:bg-white disabled:opacity-40 cursor-pointer"
+              >
+                <ChevronLeft size={14} />
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).slice(0, 5).map(page => (
+                <button
+                  key={page}
+                  onClick={() => setCurrentPage(page)}
+                  className={`w-7 h-7 rounded-lg text-xs font-bold cursor-pointer border-none ${
+                    currentPage === page ? 'bg-blue-600 text-white shadow-2xs' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  {page}
+                </button>
+              ))}
+              <button
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage(p => p + 1)}
+                className="p-1.5 rounded-lg border border-slate-200 hover:bg-white disabled:opacity-40 cursor-pointer"
+              >
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── SLIDE-OVER DRAWER: REFERRED PATIENTS DIRECTORY ───────────────────── */}
       {selectedDoctor && (
@@ -761,7 +1042,7 @@ export const DoctorReferences: React.FC = () => {
                         {selectedDoctor.name}
                       </h3>
                       <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
-                        Active
+                        Active Partner
                       </span>
                     </div>
                     <div className="flex items-center gap-3 text-xs font-bold text-slate-500 mt-1">
@@ -827,7 +1108,7 @@ export const DoctorReferences: React.FC = () => {
                         <th className="px-3.5 py-3">Patient</th>
                         <th className="px-3.5 py-3">Mobile & Place</th>
                         <th className="px-3.5 py-3 text-center">Token</th>
-                        <th className="px-3.5 py-3">Consulted Doctor</th>
+                        <th className="px-3.5 py-3">Hospital Doctor</th>
                         <th className="px-3.5 py-3 text-right">Referral Date</th>
                       </tr>
                     </thead>
