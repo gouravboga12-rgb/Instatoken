@@ -91,26 +91,57 @@ export const HospitalDetails: React.FC<HospitalDetailsProps> = ({ onDoctorSelect
   const [selectedDeptId, setSelectedDeptId] = useState<string>('All');
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [liveProfile, setLiveProfile] = useState<any>(null);
+
+  useEffect(() => {
+    if (!id) return;
+    fetch(`/api/hospitals/${id}/profile`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.profile) {
+          setLiveProfile(data.profile);
+        }
+      })
+      .catch(() => {});
+  }, [id]);
 
   const mediaList = useMemo(() => {
-    const rawGallery = (hospital as any)?.gallery;
+    const rawGallery = liveProfile?.gallery || (hospital as any)?.gallery;
+    const coverUrl = liveProfile?.coverImage || hospital?.image || (hospital as any)?.coverImage || '';
+    const items: Array<{ id: string; type: 'image' | 'video'; url: string; caption: string }> = [];
+
     if (Array.isArray(rawGallery) && rawGallery.length > 0) {
-      return rawGallery.map((item: any, i: number) => {
+      rawGallery.forEach((item: any, i: number) => {
         if (typeof item === 'string') {
-          return { id: `gal-${i}`, type: 'image', url: item, caption: hospital?.name || 'Hospital' };
+          items.push({ id: `gal-${i}`, type: 'image', url: item, caption: hospital?.name || 'Hospital' });
+        } else if (item?.url || item?.image) {
+          items.push({
+            id: item?.id || `gal-${i}`,
+            type: item?.type || 'image',
+            url: item?.url || item?.image || '',
+            caption: item?.caption || hospital?.name || 'Hospital'
+          });
         }
-        return {
-          id: item?.id || `gal-${i}`,
-          type: item?.type || 'image',
-          url: item?.url || item?.image || '',
-          caption: item?.caption || hospital?.name || 'Hospital'
-        };
       });
     }
-    return [
-      { id: 'cover', type: 'image', url: hospital?.image || '', caption: hospital?.name || 'Hospital' }
-    ];
-  }, [hospital]);
+
+    if (coverUrl) {
+      const existingIdx = items.findIndex(it => it.url === coverUrl);
+      if (existingIdx > 0) {
+        const [cov] = items.splice(existingIdx, 1);
+        items.unshift(cov);
+      } else if (existingIdx === -1) {
+        items.unshift({ id: 'cover', type: 'image', url: coverUrl, caption: `${hospital?.name || 'Hospital'} Campus` });
+      }
+    }
+
+    if (items.length === 0 && coverUrl) {
+      items.push({ id: 'cover', type: 'image', url: coverUrl, caption: hospital?.name || 'Hospital' });
+    }
+
+    return items;
+  }, [hospital, liveProfile]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
@@ -127,20 +158,6 @@ export const HospitalDetails: React.FC<HospitalDetailsProps> = ({ onDoctorSelect
     }, 5000);
     return () => clearInterval(interval);
   }, [mediaList.length, isHovered]);
-
-  const [liveProfile, setLiveProfile] = useState<any>(null);
-
-  useEffect(() => {
-    if (!id) return;
-    fetch(`/api/hospitals/${id}/profile`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.success && data.profile) {
-          setLiveProfile(data.profile);
-        }
-      })
-      .catch(() => {});
-  }, [id]);
 
   const groupedTimings = useMemo(() => {
     const raw = liveProfile?.timings || (hospital as any)?.timings;
@@ -238,6 +255,18 @@ export const HospitalDetails: React.FC<HospitalDetailsProps> = ({ onDoctorSelect
             className="h-72 sm:h-80 md:h-96 w-full relative bg-slate-900 group"
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
+            onTouchStart={(e) => setTouchStartX(e.targetTouches[0].clientX)}
+            onTouchEnd={(e) => {
+              if (touchStartX === null) return;
+              const touchEndX = e.changedTouches[0].clientX;
+              const diff = touchStartX - touchEndX;
+              if (diff > 40) {
+                setActiveMediaIndex(prev => (prev + 1) % mediaList.length);
+              } else if (diff < -40) {
+                setActiveMediaIndex(prev => (prev - 1 + mediaList.length) % mediaList.length);
+              }
+              setTouchStartX(null);
+            }}
           >
             {/* Active Media (Image or Video) */}
             {mediaList[activeMediaIndex]?.type === 'video' ? (
@@ -368,6 +397,36 @@ export const HospitalDetails: React.FC<HospitalDetailsProps> = ({ onDoctorSelect
               <span>{hospital.rating}</span>
             </div>
           </div>
+
+          {/* Horizontal Scrolling Thumbnail Strip */}
+          {mediaList.length > 1 && (
+            <div className="flex items-center gap-2 px-3 sm:px-4 py-2.5 overflow-x-auto bg-slate-950/95 scrollbar-none border-t border-white/10">
+              {mediaList.map((item, idx) => (
+                <button
+                  key={item.id || idx}
+                  type="button"
+                  onClick={() => setActiveMediaIndex(idx)}
+                  className={`relative h-14 w-20 rounded-xl overflow-hidden shrink-0 border-2 transition-all cursor-pointer ${
+                    idx === activeMediaIndex ? 'border-blue-500 ring-2 ring-blue-500/40 scale-105' : 'border-white/20 opacity-60 hover:opacity-100'
+                  }`}
+                  aria-label={`View media ${idx + 1}`}
+                >
+                  {item.type === 'video' ? (
+                    <div className="w-full h-full bg-slate-800 flex items-center justify-center">
+                      <Video size={16} className="text-amber-400" />
+                    </div>
+                  ) : (
+                    <img src={item.url} alt={item.caption} className="w-full h-full object-cover" />
+                  )}
+                  {item.type === 'video' && (
+                    <span className="absolute bottom-1 right-1 bg-black/80 text-[8px] font-black px-1 rounded text-white uppercase">
+                      Video
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

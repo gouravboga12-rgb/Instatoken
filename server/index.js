@@ -852,7 +852,9 @@ function syncProfileToHospitalsList(store, hospitalId, profile) {
     timings: profile.timings,
     about: profile.about,
     facilities: profile.facilities,
-    image: profile.coverImage || profile.logo,
+    logo: profile.logo || '',
+    coverImage: profile.coverImage || profile.image || '',
+    image: profile.coverImage || profile.image || profile.logo,
     gallery: profile.gallery || [],
     lat: profile.lat !== undefined ? Number(profile.lat) : undefined,
     lng: profile.lng !== undefined ? Number(profile.lng) : undefined

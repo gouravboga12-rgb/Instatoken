@@ -1976,12 +1976,12 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     // Scope strictly to target doctor, today's date, and shift session
     const docSessionTokens = tokens.filter(t =>
       t.doctorId === form.doctorId &&
-      (t.bookingDate === todayStr || t.date === todayStr || (!t.bookingDate && t.status !== 'not-visited')) &&
+      (t.bookingDate === todayStr || (t as any).date === todayStr || (!t.bookingDate && t.status !== 'not-visited')) &&
       (t.session || 'morning').toLowerCase() === form.session.toLowerCase() &&
       t.status !== 'cancelled'
     );
     const maxToken = docSessionTokens.length > 0
-      ? docSessionTokens.reduce((max, t) => Math.max(max, Number(t.tokenNo || t.tokenNumber || 0)), 0)
+      ? docSessionTokens.reduce((max, t) => Math.max(max, Number(t.tokenNo || (t as any).tokenNumber || 0)), 0)
       : 0;
 
     const doctor = doctors.find(d => d.id === form.doctorId);

@@ -4,7 +4,7 @@ import { geocodeLocation, reverseGeocodeAddressDetails } from '../../utils/googl
 import {
   Building2, Save, Check, MapPin, Layers, Compass,
   ExternalLink, Sparkles, Loader2, Upload, ImageIcon, Phone,
-  AlertCircle, Video, Trash2, Plus, Film, Star, Banknote, CheckCircle2, Clock
+  AlertCircle, Video, Trash2, Film, Star, Banknote, CheckCircle2, Clock
 } from 'lucide-react';
 
 const COMMON_FACILITIES = [
@@ -30,13 +30,9 @@ export const HospitalSettings: React.FC = () => {
   const [isLocating, setIsLocating] = useState(false);
   const [geocodeNotice, setGeocodeNotice] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  const photoInputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const [uploadingGallery, setUploadingGallery] = useState(false);
-  const [customMediaUrl, setCustomMediaUrl] = useState('');
-  const [customMediaType, setCustomMediaType] = useState<'image' | 'video'>('image');
-  const [customMediaCaption, setCustomMediaCaption] = useState('');
 
   const isApollo = hospitalProfile?.id === 'hosp-apollo';
 
@@ -282,23 +278,6 @@ export const HospitalSettings: React.FC = () => {
     }
   };
 
-  const handleAddMediaUrl = () => {
-    if (!customMediaUrl.trim()) return;
-    const newItem = {
-      id: `med-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-      type: customMediaType,
-      url: customMediaUrl.trim(),
-      caption: customMediaCaption.trim() || (customMediaType === 'video' ? 'Facility Video Tour' : 'Campus Photo')
-    };
-    setForm(prev => ({
-      ...prev,
-      gallery: [...(prev.gallery || []), newItem],
-      coverImage: prev.coverImage || (newItem.type === 'image' ? newItem.url : prev.coverImage)
-    }));
-    setCustomMediaUrl('');
-    setCustomMediaCaption('');
-  };
-
   const handleRemoveMedia = (id: string) => {
     setForm(prev => ({
       ...prev,
@@ -524,92 +503,87 @@ export const HospitalSettings: React.FC = () => {
             {/* ─── BASIC PROFILE & PHOTO ─── */}
             {activeTab === 'basic' && (
               <div className="space-y-6">
-                <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Hospital Identity & Main Photo</h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Hospital Branding &amp; Media</h3>
+                </div>
 
-                {/* Main Hospital Photo Upload */}
-                <div>
-                  <label className={labelCls}>Hospital Main Photo <span className="text-blue-600">(shown on patient search & booking pages)</span></label>
-                  <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-start">
-                    {/* Preview */}
-                    <div className="w-full sm:w-32 h-28 sm:h-24 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center shrink-0 relative">
-                      {form.coverImage ? (
+                {/* ── 1. HOSPITAL OFFICIAL LOGO (1:1 SQUARE) ── */}
+                <div className="bg-slate-50/70 p-4 sm:p-5 rounded-3xl border border-slate-200/80 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Building2 size={16} className="text-blue-600" />
+                    <div>
+                      <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">Hospital Official Logo</h4>
+                      <p className="text-[10px] text-slate-400 font-semibold">1:1 Square format. Displayed in patient app headers, appointment passes, and search results.</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl border-2 border-dashed border-slate-300 bg-white overflow-hidden flex items-center justify-center shrink-0 shadow-2xs relative">
+                      {form.logo ? (
                         <img
-                          src={form.coverImage}
-                          alt="Hospital"
+                          src={form.logo}
+                          alt="Hospital Logo"
                           className="w-full h-full object-cover"
                           onError={(e) => {
                             const img = e.target as HTMLImageElement;
                             if (img.src.includes('instatoken-media-prod.') && !img.src.includes('instatoken-media-prod-2026.')) {
                               img.src = img.src.replace('instatoken-media-prod.', 'instatoken-media-prod-2026.');
                             } else {
-                              img.src = 'https://images.unsplash.com/photo-1586773860418-d37222d8fce3?w=800';
+                              img.src = 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=400';
                             }
                           }}
                         />
                       ) : (
-                        <div className="flex flex-col items-center gap-1 text-slate-400">
-                          <ImageIcon size={24} />
-                          <span className="text-[10px] font-bold">No Photo</span>
-                        </div>
+                        <Building2 size={24} className="text-slate-300" />
                       )}
                       {uploadingPhoto && (
                         <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
-                          <Loader2 size={20} className="animate-spin text-blue-600" />
+                          <Loader2 size={18} className="animate-spin text-blue-600" />
                         </div>
                       )}
                     </div>
 
-                    <div className="w-full sm:flex-1 space-y-2">
+                    <div className="space-y-1.5">
                       <input
                         type="file"
-                        ref={photoInputRef}
+                        ref={logoInputRef}
                         accept="image/*"
                         className="hidden"
                         onChange={e => {
                           const file = e.target.files?.[0];
-                          if (file) handlePhotoUpload(file, 'coverImage');
+                          if (file) handlePhotoUpload(file, 'logo');
                           e.target.value = '';
                         }}
                       />
                       <button
                         type="button"
-                        onClick={() => photoInputRef.current?.click()}
+                        onClick={() => logoInputRef.current?.click()}
                         disabled={uploadingPhoto}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold rounded-xl cursor-pointer border-none shadow-xs shadow-blue-500/20 transition-colors disabled:opacity-50"
+                        className="flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 text-xs font-extrabold rounded-xl cursor-pointer shadow-2xs transition-colors disabled:opacity-50"
                       >
                         <Upload size={13} />
-                        {uploadingPhoto ? 'Uploading...' : 'Upload Hospital Photo'}
+                        <span>{uploadingPhoto ? 'Uploading...' : 'Upload Logo'}</span>
                       </button>
-                      <p className="text-[10px] text-slate-400 font-semibold">Recommended: 1200×600px, JPG/PNG/WEBP, max 5MB</p>
-                      <div>
-                        <label className="text-[10px] font-extrabold text-slate-500 block mb-1">Or paste image URL:</label>
-                        <input
-                          type="text"
-                          value={form.coverImage}
-                          onChange={e => setForm({ ...form, coverImage: e.target.value })}
-                          className={inputCls}
-                          placeholder="https://example.com/hospital-photo.jpg"
-                        />
-                      </div>
+                      <p className="text-[10px] text-slate-400 font-medium">PNG, JPG, SVG or WEBP (Max 5MB)</p>
                     </div>
                   </div>
                 </div>
 
-                {/* ── MULTI-MEDIA GALLERY (IMAGES & VIDEOS) ── */}
-                <div className="bg-slate-50/80 p-5 rounded-3xl border border-slate-200/80 space-y-4">
+                {/* ── 2. HOSPITAL FACILITY GALLERY & COVER PHOTOS ── */}
+                <div className="bg-slate-50/70 p-4 sm:p-5 rounded-3xl border border-slate-200/80 space-y-4">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div>
                       <div className="flex items-center gap-2">
                         <Film size={16} className="text-blue-600" />
                         <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                          Hospital Multi-Media Gallery (Photos &amp; Videos)
+                          Hospital Facility Gallery &amp; Cover Photos
                         </h4>
                         <span className="bg-blue-100 text-blue-800 text-[10px] font-extrabold px-2 py-0.5 rounded-full">
                           {(form.gallery || []).length} media items
                         </span>
                       </div>
                       <p className="text-[11px] text-slate-500 font-semibold mt-0.5">
-                        Upload facility photos and video tours. These appear as an interactive carousel on your hospital page.
+                        Upload facility photos and video tours. These appear as an interactive swipeable carousel on your hospital page.
                       </p>
                     </div>
 
@@ -630,52 +604,19 @@ export const HospitalSettings: React.FC = () => {
                         type="button"
                         onClick={() => galleryInputRef.current?.click()}
                         disabled={uploadingGallery}
-                        className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold rounded-xl cursor-pointer border-none shadow-xs disabled:opacity-50 transition-colors"
+                        className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold rounded-xl cursor-pointer border-none shadow-xs disabled:opacity-50 transition-colors"
                       >
-                        {uploadingGallery ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+                        {uploadingGallery ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
                         <span>{uploadingGallery ? 'Uploading to S3...' : 'Upload Media Files'}</span>
                       </button>
                     </div>
-                  </div>
-
-                  {/* Add Media via Direct URL */}
-                  <div className="bg-white p-3.5 rounded-2xl border border-slate-200 flex flex-wrap items-center gap-2 text-xs">
-                    <select
-                      value={customMediaType}
-                      onChange={e => setCustomMediaType(e.target.value as any)}
-                      className="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-bold outline-none"
-                    >
-                      <option value="image">🖼️ Photo Image</option>
-                      <option value="video">🎬 Video Clip</option>
-                    </select>
-                    <input
-                      type="text"
-                      placeholder="Paste Image / Video MP4 URL..."
-                      value={customMediaUrl}
-                      onChange={e => setCustomMediaUrl(e.target.value)}
-                      className="flex-1 min-w-[200px] bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs outline-none focus:border-blue-500"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Caption (e.g. ICU Wing, Reception)"
-                      value={customMediaCaption}
-                      onChange={e => setCustomMediaCaption(e.target.value)}
-                      className="w-48 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs outline-none focus:border-blue-500"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleAddMediaUrl}
-                      className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-extrabold text-xs cursor-pointer border-none flex items-center gap-1"
-                    >
-                      <Plus size={12} /> Add to Gallery
-                    </button>
                   </div>
 
                   {/* Gallery Items Grid */}
                   {(form.gallery || []).length > 0 ? (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 pt-1">
                       {(form.gallery || []).map((item: any, idx: number) => {
-                        const isCover = form.coverImage === item.url;
+                        const isCover = form.coverImage === item.url || (idx === 0 && !form.coverImage);
                         return (
                           <div
                             key={item.id || idx}
@@ -709,7 +650,7 @@ export const HospitalSettings: React.FC = () => {
 
                               {isCover && (
                                 <span className="absolute bottom-2 left-2 px-2 py-0.5 bg-blue-600 text-white text-[9px] font-black rounded-lg flex items-center gap-1 shadow-sm">
-                                  <Star size={9} className="fill-white" /> Cover
+                                  <Star size={9} className="fill-white" /> Cover Photo
                                 </span>
                               )}
 
@@ -732,7 +673,7 @@ export const HospitalSettings: React.FC = () => {
                                 <button
                                   type="button"
                                   onClick={() => handleSetAsCover(item.url)}
-                                  className="w-full py-1 text-[10px] font-bold text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer border-none"
+                                  className="w-full py-1 text-[10px] font-extrabold text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer border-none"
                                 >
                                   Make Cover Photo
                                 </button>
@@ -743,65 +684,14 @@ export const HospitalSettings: React.FC = () => {
                       })}
                     </div>
                   ) : (
-                    <div className="py-6 text-center text-slate-400 space-y-1">
-                      <Film size={28} className="mx-auto text-slate-300" />
-                      <p className="text-xs font-bold text-slate-600">No gallery media added yet</p>
-                      <p className="text-[10px] text-slate-400">Upload facility photos or video tours above.</p>
+                    <div className="py-8 text-center text-slate-400 space-y-2 border-2 border-dashed border-slate-200 rounded-2xl bg-white">
+                      <Film size={32} className="mx-auto text-slate-300" />
+                      <p className="text-xs font-bold text-slate-600">No facility photos or videos added yet</p>
+                      <p className="text-[10px] text-slate-400 max-w-sm mx-auto">
+                        Click "Upload Media Files" above to select hospital photos (ICU, Reception, Operation Theatre, Rooms) or video clips from your device.
+                      </p>
                     </div>
                   )}
-                </div>
-
-                {/* Hospital Logo Upload */}
-                <div>
-                  <label className={labelCls}>Hospital Logo</label>
-                  <div className="flex gap-4 items-start">
-                    <div className="w-16 h-16 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center shrink-0">
-                      {form.logo ? (
-                        <img
-                          src={form.logo}
-                          alt="Logo"
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            const img = e.target as HTMLImageElement;
-                            if (img.src.includes('instatoken-media-prod.') && !img.src.includes('instatoken-media-prod-2026.')) {
-                              img.src = img.src.replace('instatoken-media-prod.', 'instatoken-media-prod-2026.');
-                            } else {
-                              img.src = 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=400';
-                            }
-                          }}
-                        />
-                      ) : (
-                        <Building2 size={20} className="text-slate-300" />
-                      )}
-                    </div>
-                    <div className="flex-1 space-y-2">
-                      <input
-                        type="file"
-                        ref={logoInputRef}
-                        accept="image/*"
-                        className="hidden"
-                        onChange={e => {
-                          const file = e.target.files?.[0];
-                          if (file) handlePhotoUpload(file, 'logo');
-                          e.target.value = '';
-                        }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => logoInputRef.current?.click()}
-                        className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl cursor-pointer border-none transition-colors"
-                      >
-                        <Upload size={12} /> Upload Logo
-                      </button>
-                      <input
-                        type="text"
-                        value={form.logo}
-                        onChange={e => setForm({ ...form, logo: e.target.value })}
-                        className={inputCls}
-                        placeholder="Logo URL"
-                      />
-                    </div>
-                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
