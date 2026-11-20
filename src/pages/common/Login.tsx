@@ -588,7 +588,7 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
           ========================================================================= */}
       <div className="w-full flex-1 flex flex-col items-center justify-between lg:hidden">
         {/* Top Hero Banner matching Reference UI template */}
-        <div className="w-full relative overflow-hidden bg-gradient-to-r from-[#0047b3] via-[#005cdb] to-[#0047b3]">
+        <div className="w-full relative overflow-hidden bg-gradient-to-r from-[#0047b3] via-[#005cdb] to-[#0047b3] pt-11 sm:pt-12">
           <img 
             src="/mobile_login_hero.png" 
             alt="InstaToken - Smart Queue. Better Care" 

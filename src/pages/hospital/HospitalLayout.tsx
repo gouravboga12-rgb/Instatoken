@@ -296,7 +296,7 @@ const TopHeader: React.FC<{ onMenuToggle: () => void }> = ({ onMenuToggle }) => 
   const roleColor = roleColors[hospitalUser?.role || 'receptionist'];
 
   return (
-    <header className="bg-white border-b border-slate-100 px-3 sm:px-6 pt-9 pb-2.5 flex items-center gap-2 sm:gap-4 shrink-0 z-30">
+    <header className="bg-white border-b border-slate-100 px-3 sm:px-6 pt-11 pb-3 flex items-center gap-2 sm:gap-4 shrink-0 z-30 shadow-xs">
       {/* Mobile menu toggle */}
       <button onClick={onMenuToggle} className="md:hidden px-2.5 py-1.5 rounded-xl bg-blue-50 text-blue-700 hover:bg-blue-100 cursor-pointer font-extrabold text-xs flex items-center gap-1.5 shrink-0 shadow-2xs">
         <Menu size={18} />
@@ -507,7 +507,7 @@ export const HospitalLayout: React.FC = () => {
       {/* Main content area */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <TopHeader onMenuToggle={() => setMobileSidebarOpen(true)} />
-        <main className="flex-1 overflow-y-auto bg-slate-50 pb-24 md:pb-0">
+        <main className="flex-1 overflow-y-auto bg-slate-50 pt-3 pb-28 md:pb-0">
           <ErrorBoundary fallbackTitle="Hospital Panel View Error">
             <Routes>
               <Route path="dashboard" element={<HospitalDashboard />} />

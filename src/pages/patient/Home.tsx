@@ -504,7 +504,7 @@ export const Home: React.FC<HomeProps> = ({
     >
       
       {/* 1. Header Bar (Image 5 style: Menu, InstaToken, Location dropdown, Bell badge, Cart - visible on mobile) */}
-      <div className="md:hidden sticky top-0 bg-white/95 backdrop-blur-md px-5 pt-9 pb-3.5 flex items-center justify-between border-b border-slate-100 z-30">
+      <div className="md:hidden sticky top-0 bg-white/95 backdrop-blur-md px-5 pt-11 pb-3 flex items-center justify-between border-b border-slate-100 z-30">
         
         {/* Left Side: Hamburger & Logo with Location */}
         <div className="flex items-center gap-3">
@@ -536,7 +536,7 @@ export const Home: React.FC<HomeProps> = ({
 
         {/* Location Dropdown Modal */}
         {showLocationSelect && (
-          <div className="absolute left-5 top-20 bg-white rounded-2xl shadow-xl border border-slate-100 p-2 w-64 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="absolute left-5 top-24 bg-white rounded-2xl shadow-xl border border-slate-100 p-2 w-64 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 py-1.5 border-b border-slate-50">Select City Area</p>
             
             <button
@@ -768,7 +768,7 @@ export const Home: React.FC<HomeProps> = ({
 
               {/* Slider Dots */}
               {displayBanners.length > 1 && (
-                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5">
+                <div className="absolute bottom-3 right-4 z-20 flex items-center gap-1.5 bg-black/40 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10">
                   {displayBanners.map((_, i) => (
                     <button
                       key={i}

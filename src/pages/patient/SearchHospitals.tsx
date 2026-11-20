@@ -112,7 +112,7 @@ export const SearchHospitals: React.FC<SearchHospitalsProps> = ({
     <div className="pb-24 bg-slate-50 min-h-screen md:bg-transparent md:min-h-0 md:pb-6">
       
       {/* Mobile Search Header */}
-      <div className="sticky top-0 bg-white/95 backdrop-blur-md px-5 pt-9 pb-3.5 border-b border-slate-100 z-30 space-y-3 md:hidden">
+      <div className="sticky top-0 bg-white/95 backdrop-blur-md px-5 pt-11 pb-3.5 border-b border-slate-100 z-30 space-y-3 md:hidden">
         <div className="flex items-center gap-3">
           <button 
             onClick={() => navigate(-1)}

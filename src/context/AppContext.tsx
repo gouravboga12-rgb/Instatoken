@@ -2793,7 +2793,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       },
       (err) => {
         const msg = err.code === 1
-          ? "Location permission was denied. Please allow access in browser address bar settings."
+          ? "Location access was not granted. Please select your city or area from the top location menu."
           : "Unable to retrieve device GPS. Please choose your city/area from the location menu.";
         addNotification("Location Error", msg, "warning");
       },

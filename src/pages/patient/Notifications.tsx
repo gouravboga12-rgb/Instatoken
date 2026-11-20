@@ -41,7 +41,7 @@ export const Notifications: React.FC = () => {
     <div className="pb-24 bg-slate-50 min-h-screen md:min-h-0 md:bg-transparent md:pb-6 max-w-4xl mx-auto">
       
       {/* Header */}
-      <div className="sticky top-0 bg-white/95 backdrop-blur-md px-5 py-4 border-b border-slate-100 z-30 flex items-center justify-between md:rounded-2xl md:mb-6">
+      <div className="sticky top-0 bg-white/95 backdrop-blur-md px-5 pt-11 pb-3.5 border-b border-slate-100 z-30 flex items-center justify-between md:pt-4 md:rounded-2xl md:mb-6">
         <div className="flex items-center gap-3">
           <button 
             onClick={() => navigate('/')}
