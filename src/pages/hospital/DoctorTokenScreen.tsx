@@ -21,7 +21,7 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
 
   // Filters State
   const [statusTab, setStatusTab] = useState<'all' | 'active' | 'completed' | 'not-visited' | 'cancelled'>('all');
-  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'tomorrow' | 'yesterday' | 'custom'>('all');
+  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'tomorrow' | 'yesterday' | 'custom'>('today');
   const [customDate, setCustomDate] = useState('');
   const [sourceFilter, setSourceFilter] = useState<'all' | 'online' | 'offline'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -451,8 +451,12 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
           })}
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
+        {/* Action Buttons & Revenue */}
+        <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto flex-wrap">
+          <div className="px-3 py-2 bg-purple-50 text-purple-700 border border-purple-200 rounded-xl font-black text-xs flex items-center gap-1.5 shadow-2xs">
+            <Sparkles size={14} className="text-purple-600" />
+            <span>₹{todayDoctorRevenue.toLocaleString('en-IN')} Earned</span>
+          </div>
           <button
             onClick={() => handleCallNext()}
             disabled={activeQueue.length === 0}
@@ -466,109 +470,6 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
           >
             + Add Walk-in
           </button>
-        </div>
-      </div>
-
-      {/* ── 4 Interactive Operational Metric Cards (Click to filter queue instantly) ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
-        {/* 1. Waiting in Queue */}
-        <button
-          type="button"
-          onClick={() => setStatusTab('active')}
-          className={`p-3 rounded-2xl border text-left cursor-pointer transition-all flex items-center gap-3 ${
-            statusTab === 'active'
-              ? 'bg-blue-600 text-white border-blue-600 shadow-md ring-2 ring-blue-500/30'
-              : 'bg-white text-slate-800 border-slate-200 hover:border-blue-300 hover:bg-blue-50/20'
-          }`}
-        >
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-            statusTab === 'active' ? 'bg-white/20 text-white' : 'bg-blue-50 text-blue-600'
-          }`}>
-            <Clock size={18} />
-          </div>
-          <div className="min-w-0">
-            <span className={`text-[10px] font-black uppercase tracking-wider block truncate ${
-              statusTab === 'active' ? 'text-blue-100' : 'text-slate-400'
-            }`}>
-              Waiting in Queue
-            </span>
-            <span className="text-xl font-black leading-tight block">
-              {activeQueue.length}
-            </span>
-          </div>
-        </button>
-
-        {/* 2. On-Hold / Late-Coming */}
-        <button
-          type="button"
-          onClick={() => setStatusTab('not-visited')}
-          className={`p-3 rounded-2xl border text-left cursor-pointer transition-all flex items-center gap-3 ${
-            statusTab === 'not-visited'
-              ? 'bg-amber-500 text-white border-amber-500 shadow-md ring-2 ring-amber-400/30'
-              : 'bg-white text-slate-800 border-slate-200 hover:border-amber-300 hover:bg-amber-50/20'
-          }`}
-        >
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-            statusTab === 'not-visited' ? 'bg-white/20 text-white' : 'bg-amber-50 text-amber-600'
-          }`}>
-            <UserX size={18} />
-          </div>
-          <div className="min-w-0">
-            <span className={`text-[10px] font-black uppercase tracking-wider block truncate ${
-              statusTab === 'not-visited' ? 'text-amber-100' : 'text-slate-400'
-            }`}>
-              On-Hold / Late
-            </span>
-            <span className={`text-xl font-black leading-tight block ${
-              statusTab === 'not-visited' ? 'text-white' : 'text-amber-600'
-            }`}>
-              {notVisitedToday.length}
-            </span>
-          </div>
-        </button>
-
-        {/* 3. Visited / Completed */}
-        <button
-          type="button"
-          onClick={() => setStatusTab('completed')}
-          className={`p-3 rounded-2xl border text-left cursor-pointer transition-all flex items-center gap-3 ${
-            statusTab === 'completed'
-              ? 'bg-emerald-600 text-white border-emerald-600 shadow-md ring-2 ring-emerald-500/30'
-              : 'bg-white text-slate-800 border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/20'
-          }`}
-        >
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-            statusTab === 'completed' ? 'bg-white/20 text-white' : 'bg-emerald-50 text-emerald-600'
-          }`}>
-            <CheckCircle size={18} />
-          </div>
-          <div className="min-w-0">
-            <span className={`text-[10px] font-black uppercase tracking-wider block truncate ${
-              statusTab === 'completed' ? 'text-emerald-100' : 'text-slate-400'
-            }`}>
-              Visited / Done
-            </span>
-            <span className={`text-xl font-black leading-tight block ${
-              statusTab === 'completed' ? 'text-white' : 'text-emerald-600'
-            }`}>
-              {completedToday.length}
-            </span>
-          </div>
-        </button>
-
-        {/* 4. Earned Revenue */}
-        <div className="p-3 rounded-2xl border border-slate-200 bg-white text-slate-800 flex items-center gap-3 shadow-2xs">
-          <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
-            <Sparkles size={18} />
-          </div>
-          <div className="min-w-0">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block truncate">
-              Earned Revenue
-            </span>
-            <span className="text-xl font-black text-slate-900 leading-tight block truncate">
-              ₹{todayDoctorRevenue.toLocaleString('en-IN')}
-            </span>
-          </div>
         </div>
       </div>
 
