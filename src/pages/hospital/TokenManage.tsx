@@ -9,6 +9,38 @@ import {
 
 const DAYS_OF_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
+const generateClinicalTimeSlots = (): string[] => {
+  const slots: string[] = [];
+  for (let h = 0; h < 24; h++) {
+    for (let m = 0; m < 60; m += 15) {
+      const period = h < 12 ? 'AM' : 'PM';
+      const displayHour = h === 0 ? 12 : h > 12 ? h - 12 : h;
+      const hourStr = String(displayHour).padStart(2, '0');
+      const minStr = String(m).padStart(2, '0');
+      slots.push(`${hourStr}:${minStr} ${period}`);
+    }
+  }
+  const morningIdx = slots.indexOf('06:00 AM');
+  return [...slots.slice(morningIdx), ...slots.slice(0, morningIdx)];
+};
+
+const CLINICAL_TIME_SLOTS = generateClinicalTimeSlots();
+
+const normalizeTimeSlot = (val: string): string => {
+  if (!val) return '09:00 AM';
+  const clean = val.trim();
+  const match = clean.match(/^(\d{1,2}):(\d{2})\s*(am|pm)?$/i);
+  if (match) {
+    let h = parseInt(match[1]);
+    const m = match[2];
+    const period = match[3] ? match[3].toUpperCase() : (h < 12 ? 'AM' : 'PM');
+    if (h === 0) h = 12;
+    if (h > 12) h -= 12;
+    return `${String(h).padStart(2, '0')}:${m} ${period}`;
+  }
+  return clean;
+};
+
 export const TokenManage: React.FC = () => {
   const { scheduleConfig, updateScheduleConfig, updateSession, doctors, updateDoctor } = useHospital();
 
@@ -124,8 +156,8 @@ export const TokenManage: React.FC = () => {
     setEditingSessionId(sess.id);
     setSessForm({
       name: sess.name,
-      startTime: sess.startTime,
-      endTime: sess.endTime,
+      startTime: normalizeTimeSlot(sess.startTime),
+      endTime: normalizeTimeSlot(sess.endTime),
       maxTokens: String(sess.maxTokens),
       consultationDuration: String(sess.consultationDuration),
       breakTime: String(sess.breakTime),
@@ -553,23 +585,33 @@ export const TokenManage: React.FC = () => {
                       </div>
                       <div>
                         <label className="text-[10px] font-bold text-slate-600 block mb-1">Start Time</label>
-                        <input
-                          type="text"
+                        <select
                           value={sessForm.startTime}
                           onChange={e => setSessForm({ ...sessForm, startTime: e.target.value })}
-                          placeholder="09:00 AM"
-                          className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500"
-                        />
+                          className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500 bg-white cursor-pointer"
+                        >
+                          {sessForm.startTime && !CLINICAL_TIME_SLOTS.includes(sessForm.startTime) && (
+                            <option value={sessForm.startTime}>{sessForm.startTime}</option>
+                          )}
+                          {CLINICAL_TIME_SLOTS.map(t => (
+                            <option key={t} value={t}>{t}</option>
+                          ))}
+                        </select>
                       </div>
                       <div>
                         <label className="text-[10px] font-bold text-slate-600 block mb-1">End Time</label>
-                        <input
-                          type="text"
+                        <select
                           value={sessForm.endTime}
                           onChange={e => setSessForm({ ...sessForm, endTime: e.target.value })}
-                          placeholder="01:00 PM"
-                          className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500"
-                        />
+                          className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500 bg-white cursor-pointer"
+                        >
+                          {sessForm.endTime && !CLINICAL_TIME_SLOTS.includes(sessForm.endTime) && (
+                            <option value={sessForm.endTime}>{sessForm.endTime}</option>
+                          )}
+                          {CLINICAL_TIME_SLOTS.map(t => (
+                            <option key={t} value={t}>{t}</option>
+                          ))}
+                        </select>
                       </div>
                       <div>
                         <label className="text-[10px] font-bold text-slate-600 block mb-1">Max Token Limit</label>
@@ -693,25 +735,29 @@ export const TokenManage: React.FC = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">Start Time *</label>
-                  <input
-                    type="text"
+                  <select
                     required
                     value={newSess.startTime}
                     onChange={e => setNewSess({ ...newSess, startTime: e.target.value })}
-                    placeholder="09:00 AM"
-                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-bold"
-                  />
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-bold bg-white cursor-pointer"
+                  >
+                    {CLINICAL_TIME_SLOTS.map(t => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">End Time *</label>
-                  <input
-                    type="text"
+                  <select
                     required
                     value={newSess.endTime}
                     onChange={e => setNewSess({ ...newSess, endTime: e.target.value })}
-                    placeholder="01:00 PM"
-                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-bold"
-                  />
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 font-bold bg-white cursor-pointer"
+                  >
+                    {CLINICAL_TIME_SLOTS.map(t => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
