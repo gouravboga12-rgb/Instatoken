@@ -82,6 +82,9 @@ export interface ReverseGeocodeDetails {
   district?: string;
   mandal?: string;
   village?: string;
+  houseNumber?: string;
+  street?: string;
+  streetNumber?: string;
   pinCode: string;
   country: string;
   lat: number;
@@ -112,6 +115,9 @@ function extractGoogleAddressComponents(result: any, lat: number, lng: number): 
     return '';
   };
 
+  const houseNumber = getComp('premise', 'subpremise', 'street_number');
+  const streetNumber = getComp('street_number');
+  const street = getComp('route');
   const pinCode = getComp('postal_code');
   const state = getComp('administrative_area_level_1');
   const rawDistrict = getComp('administrative_area_level_2');
@@ -146,6 +152,9 @@ function extractGoogleAddressComponents(result: any, lat: number, lng: number): 
     district,
     mandal,
     village,
+    houseNumber,
+    street,
+    streetNumber,
     pinCode,
     country,
     lat,
@@ -155,6 +164,9 @@ function extractGoogleAddressComponents(result: any, lat: number, lng: number): 
 
 function extractNominatimAddressComponents(data: any, lat: number, lng: number): ReverseGeocodeDetails {
   const a = data.address || {};
+  const houseNumber = a.house_number || a.building || '';
+  const streetNumber = a.house_number || '';
+  const street = a.road || '';
   const pinCode = a.postcode || '';
   const state = a.state || '';
   const city = a.city || a.town || a.village || a.county || '';
@@ -187,6 +199,9 @@ function extractNominatimAddressComponents(data: any, lat: number, lng: number):
     district,
     mandal,
     village,
+    houseNumber,
+    street,
+    streetNumber,
     pinCode,
     country,
     lat,
@@ -417,6 +432,9 @@ export async function reverseGeocodeAddressDetails(
       if (proxyData.success && proxyData.result) {
         return extractGoogleAddressComponents(proxyData.result, lat, lng);
       }
+      if (proxyData.success && proxyData.nominatim) {
+        return extractNominatimAddressComponents(proxyData.nominatim, lat, lng);
+      }
     }
   } catch (err) {
     // Continue to direct Google API
@@ -438,11 +456,11 @@ export async function reverseGeocodeAddressDetails(
     }
   }
 
-  // 3. OpenStreetMap Nominatim Reverse Geocoding
+  // 3. OpenStreetMap Nominatim Reverse Geocoding (Rapido/Uber style detailed address)
   try {
     const res = await fetch(
       `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
-      { headers: { 'Accept-Language': 'en' } }
+      { headers: { 'User-Agent': 'InstaToken-Healthcare-App/1.0', 'Accept-Language': 'en' } }
     );
     const data = await res.json();
     if (data && (data.address || data.display_name)) {
@@ -470,7 +488,55 @@ export async function reverseGeocodeAddressDetails(
 }
 
 /**
- * Reverse geocodes coordinates to human readable city/location
+ * Formats a ReverseGeocodeDetails object into Rapido / Uber style full location
+ * (Street, Door/House No, Area, Mandal, Village, District, City, State, Pincode)
+ */
+export function formatUberRapidoAddress(details: ReverseGeocodeDetails): string {
+  // If we already have a detailed display_name from Nominatim or formatted_address from Google:
+  if (details.address && details.address.includes(',')) {
+    // Clean redundant trailing ", India" for cleaner Uber-like display
+    return details.address.replace(/,\s*India$/i, '').trim();
+  }
+
+  // Construct from specific structural components
+  const parts: string[] = [];
+  const house = details.houseNumber || details.streetNumber || '';
+  const street = details.street || '';
+  if (house && street) {
+    parts.push(`${house}, ${street}`);
+  } else if (house || street) {
+    parts.push(house || street);
+  }
+
+  if (details.village && !parts.some(p => p.toLowerCase().includes(details.village!.toLowerCase()))) {
+    parts.push(details.village);
+  }
+
+  if (details.area && !parts.some(p => p.toLowerCase().includes(details.area.toLowerCase()))) {
+    parts.push(details.area);
+  }
+
+  if (details.mandal && !parts.some(p => p.toLowerCase().includes(details.mandal!.toLowerCase()))) {
+    parts.push(`${details.mandal} Mandal`);
+  }
+
+  if (details.district && details.city && details.district.toLowerCase() !== details.city.toLowerCase()) {
+    parts.push(`${details.city}, ${details.district} District`);
+  } else if (details.city) {
+    parts.push(details.city);
+  } else if (details.district) {
+    parts.push(details.district);
+  }
+
+  if (details.state) {
+    parts.push(details.pinCode ? `${details.state} - ${details.pinCode}` : details.state);
+  }
+
+  return parts.filter(Boolean).join(', ');
+}
+
+/**
+ * Reverse geocodes coordinates to full Rapido / Uber style detailed location
  */
 export async function reverseGeocode(
   lat: number,
@@ -478,17 +544,12 @@ export async function reverseGeocode(
   apiKey?: string
 ): Promise<string> {
   const details = await reverseGeocodeAddressDetails(lat, lng, apiKey);
-  if (details.area && details.city && !details.area.toLowerCase().includes(details.city.toLowerCase())) {
-    return `${details.area}, ${details.city}`;
+  const formatted = formatUberRapidoAddress(details);
+  if (formatted && formatted.length > 5) {
+    return formatted;
   }
-  if (details.area) return details.area;
-  if (details.city) return `${details.city}${details.state ? ', ' + details.state : ''}`;
-  if (details.address) {
-    const parts = details.address.split(',').map(s => s.trim()).filter(Boolean);
-    if (parts.length >= 2) {
-      return `${parts[0]}, ${parts[1]}`;
-    }
-    return details.address;
-  }
+  if (details.address) return details.address;
+  if (details.area && details.city) return `${details.area}, ${details.city}`;
+  if (details.city) return `${details.city}, ${details.state}`;
   return "Current Location";
 }

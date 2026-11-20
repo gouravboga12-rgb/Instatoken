@@ -3,10 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
-import { ArrowLeft, BellOff, CheckCircle2, Clock, Info, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, BellOff, CheckCircle2, Clock, Info, ShieldAlert, Trash2 } from 'lucide-react';
 
 export const Notifications: React.FC = () => {
-  const { notifications, clearNotifications, markNotificationsAsRead } = useApp();
+  const { notifications, deleteNotification, clearNotifications, markNotificationsAsRead } = useApp();
   const navigate = useNavigate();
 
   // Mark notifications as read when opening this screen
@@ -91,9 +91,22 @@ export const Notifications: React.FC = () => {
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-center">
                     <span className="text-xs font-bold text-slate-800">{notif.title}</span>
-                    <span className="text-[8px] text-slate-400 font-medium flex items-center gap-0.5">
-                      <Clock size={8} /> {notif.timestamp}
-                    </span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="text-[8px] text-slate-400 font-medium flex items-center gap-0.5">
+                        <Clock size={8} /> {notif.timestamp}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteNotification(notif.id);
+                        }}
+                        title="Delete notification"
+                        className="p-1 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
                   </div>
                   <p className="text-[10px] text-slate-500 leading-relaxed mt-1">
                     {notif.message}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { Button } from '../../components/ui/Button';
@@ -38,11 +38,14 @@ export const Profile: React.FC = () => {
   const openRecordsTrigger = location.state?.openRecords;
   const tabRecordsTrigger = searchParams.get('tab') === 'records';
 
+  const hasHandledRecordsRef = useRef(false);
+
   useEffect(() => {
-    if (openRecordsTrigger || tabRecordsTrigger) {
+    if ((openRecordsTrigger || tabRecordsTrigger) && !hasHandledRecordsRef.current) {
+      hasHandledRecordsRef.current = true;
       setIsMedicalRecordsOpen(true);
-      const newState = { ...location.state };
-      delete newState.openRecords;
+      const newState = location.state ? { ...location.state } : {};
+      delete (newState as any).openRecords;
       
       let newSearch = location.search;
       if (tabRecordsTrigger) {
@@ -54,7 +57,7 @@ export const Profile: React.FC = () => {
       
       navigate(location.pathname + newSearch, { replace: true, state: newState });
     }
-  }, [openRecordsTrigger, tabRecordsTrigger, location.search, location.pathname, location.state, navigate]);
+  }, [openRecordsTrigger, tabRecordsTrigger, location.pathname, location.search, navigate]);
 
   const [isAddFamilyOpen, setIsAddFamilyOpen] = useState(false);
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
@@ -142,11 +145,13 @@ export const Profile: React.FC = () => {
     navigate('/login');
   };
 
-  const savedDoctorObjects = hospitals.flatMap(hosp => 
-    (hosp.doctors || [])
-      .filter(doc => (user?.savedDoctors || []).includes(doc.id))
-      .map(doc => ({ ...doc, hospital: hosp }))
-  );
+  const savedDoctorObjects = useMemo(() => {
+    return hospitals.flatMap(hosp => 
+      (hosp.doctors || [])
+        .filter(doc => (user?.savedDoctors || []).includes(doc.id))
+        .map(doc => ({ ...doc, hospital: hosp }))
+    );
+  }, [hospitals, user?.savedDoctors]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });

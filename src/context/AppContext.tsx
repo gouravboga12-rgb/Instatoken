@@ -160,6 +160,7 @@ interface AppContextType {
   updateHospitalDepartments: (hospitalId: string, departments: { id: string; name: string; icon: string }[]) => void;
   addDoctor: (hospitalId: string, doctor: Omit<Doctor, 'id' | 'rating' | 'reviewsCount' | 'currentQueue' | 'nextAvailableToken'>) => void;
   addNotification: (title: string, message: string, type: 'success' | 'info' | 'warning') => void;
+  deleteNotification: (id: string) => void;
   clearNotifications: () => void;
   markNotificationsAsRead: () => void;
   purchaseSubscription: (planName: string, price: number, durationDays: number) => void;
@@ -2383,6 +2384,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
+  const deleteNotification = (id: string) => {
+    setNotifications(prev => {
+      const remaining = prev.filter(n => n.id !== id);
+      try {
+        const existingCleared = JSON.parse(localStorage.getItem('insta_notifications_cleared_ids') || '[]') as string[];
+        const newCleared = [...new Set([...existingCleared, id])];
+        localStorage.setItem('insta_notifications_cleared_ids', JSON.stringify(newCleared));
+        localStorage.setItem('insta_notifications', JSON.stringify(remaining));
+      } catch (e) {}
+      return remaining;
+    });
+  };
+
   const clearNotifications = () => {
     // Remember which broadcast IDs were cleared so cloud sync doesn't re-inject them
     setNotifications(prev => {
@@ -3173,6 +3187,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       updateHospitalDepartments,
       addDoctor,
       addNotification,
+      deleteNotification,
       clearNotifications,
       markNotificationsAsRead,
       purchaseSubscription,

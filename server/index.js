@@ -7000,6 +7000,22 @@ app.get('/api/reverse-geocode', async (req, res) => {
   } catch (err) {
     console.warn('Server reverse-geocode error:', err.message);
   }
+
+  // Fallback to high-detail Nominatim OpenStreetMap (Rapido/Uber style)
+  try {
+    const nRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`, {
+      headers: { 'User-Agent': 'InstaToken-Healthcare/1.0', 'Accept-Language': 'en' }
+    });
+    if (nRes.ok) {
+      const nData = await nRes.json();
+      if (nData && (nData.address || nData.display_name)) {
+        return res.json({ success: true, nominatim: nData });
+      }
+    }
+  } catch (nErr) {
+    console.warn('Server Nominatim reverse-geocode error:', nErr.message);
+  }
+
   res.json({ success: false });
 });
 
