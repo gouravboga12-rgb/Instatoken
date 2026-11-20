@@ -312,7 +312,7 @@ export const MyBookings: React.FC = () => {
       )}
 
       {/* Header */}
-      <div className="sticky top-0 bg-white/95 backdrop-blur-md px-5 py-4 border-b border-slate-100 z-30 flex items-center justify-between md:rounded-2xl md:mb-6">
+      <div className="sticky top-0 bg-white/95 backdrop-blur-md px-5 pt-9 pb-3.5 border-b border-slate-100 z-30 flex items-center justify-between md:rounded-2xl md:mb-6">
         <div className="flex items-center gap-3">
           <button 
             onClick={() => navigate('/')}

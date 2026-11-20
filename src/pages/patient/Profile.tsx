@@ -160,7 +160,7 @@ export const Profile: React.FC = () => {
     <div className="pb-36 bg-slate-50 min-h-screen md:min-h-0 md:pb-8 w-full px-3 sm:px-0 max-w-full">
       
       {/* 1. TOP PROFILE HEADER BANNER */}
-      <div className="bg-gradient-to-r from-[#0055FE] via-[#004CF6] to-[#0038CE] text-white p-4 sm:p-6 rounded-2xl sm:rounded-3xl shadow-lg relative overflow-hidden">
+      <div className="bg-gradient-to-r from-[#0055FE] via-[#004CF6] to-[#0038CE] text-white p-4 pt-9 sm:p-6 rounded-2xl sm:rounded-3xl shadow-lg relative overflow-hidden">
         
         {/* Top Header Icons */}
         <div className="flex justify-between items-center mb-3.5">

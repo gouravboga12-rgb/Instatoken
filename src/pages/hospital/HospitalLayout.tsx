@@ -26,7 +26,7 @@ import {
   Users, Stethoscope, Building2, UserCheck, UserX,
   BarChart2, Settings,
   ChevronLeft, ChevronRight, Bell, Search, LogOut, Menu, X, Activity,
-  CreditCard, DollarSign, Sliders, Megaphone, Banknote
+  CreditCard, DollarSign, Sliders, Megaphone, Banknote, Ticket
 } from 'lucide-react';
 
 // ─── RBAC permission map ──────────────────────────────────────────────────────
@@ -296,10 +296,11 @@ const TopHeader: React.FC<{ onMenuToggle: () => void }> = ({ onMenuToggle }) => 
   const roleColor = roleColors[hospitalUser?.role || 'receptionist'];
 
   return (
-    <header className="bg-white border-b border-slate-100 px-3 sm:px-6 py-2 sm:py-3 flex items-center gap-2 sm:gap-4 shrink-0">
+    <header className="bg-white border-b border-slate-100 px-3 sm:px-6 pt-9 pb-2.5 flex items-center gap-2 sm:gap-4 shrink-0 z-30">
       {/* Mobile menu toggle */}
-      <button onClick={onMenuToggle} className="md:hidden p-1.5 sm:p-2 rounded-xl hover:bg-slate-100 cursor-pointer text-slate-600 shrink-0">
-        <Menu size={20} />
+      <button onClick={onMenuToggle} className="md:hidden px-2.5 py-1.5 rounded-xl bg-blue-50 text-blue-700 hover:bg-blue-100 cursor-pointer font-extrabold text-xs flex items-center gap-1.5 shrink-0 shadow-2xs">
+        <Menu size={18} />
+        <span>Menu</span>
       </button>
 
       {/* Big Hospital Name & Welcome Header */}
@@ -459,6 +460,15 @@ export const HospitalLayout: React.FC = () => {
   const { hospitalUser } = useHospital();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    (window as any).__openHospitalMenu = () => setMobileSidebarOpen(true);
+    return () => {
+      delete (window as any).__openHospitalMenu;
+    };
+  }, []);
 
   if (!hospitalUser) {
     return <Navigate to="/hospital-login" replace />;
@@ -497,7 +507,7 @@ export const HospitalLayout: React.FC = () => {
       {/* Main content area */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <TopHeader onMenuToggle={() => setMobileSidebarOpen(true)} />
-        <main className="flex-1 overflow-y-auto bg-slate-50">
+        <main className="flex-1 overflow-y-auto bg-slate-50 pb-24 md:pb-0">
           <ErrorBoundary fallbackTitle="Hospital Panel View Error">
             <Routes>
               <Route path="dashboard" element={<HospitalDashboard />} />
@@ -525,6 +535,59 @@ export const HospitalLayout: React.FC = () => {
             </Routes>
           </ErrorBoundary>
         </main>
+
+        {/* Hospital Mobile Bottom Navigation Bar (Clone of full mobile app experience) */}
+        <nav className="md:hidden fixed bottom-0 left-0 w-full bg-white/95 backdrop-blur-md border-t border-slate-200 flex items-center justify-around py-2 z-40 shadow-lg">
+          <button
+            onClick={() => navigate('/hospital/dashboard')}
+            className={`flex flex-col items-center gap-0.5 cursor-pointer transition-colors ${
+              location.pathname.endsWith('/dashboard') || location.pathname === '/hospital' ? 'text-blue-600 font-extrabold' : 'text-slate-400 hover:text-slate-600'
+            }`}
+          >
+            <LayoutDashboard size={19} />
+            <span className="text-[10px] font-bold">Dashboard</span>
+          </button>
+
+          <button
+            onClick={() => navigate('/hospital/tokens/manage')}
+            className={`flex flex-col items-center gap-0.5 cursor-pointer transition-colors ${
+              location.pathname.includes('/tokens') ? 'text-blue-600 font-extrabold' : 'text-slate-400 hover:text-slate-600'
+            }`}
+          >
+            <Ticket size={19} />
+            <span className="text-[10px] font-bold">Tokens</span>
+          </button>
+
+          <button
+            onClick={() => navigate('/hospital/doctors')}
+            className={`flex flex-col items-center gap-0.5 cursor-pointer transition-colors ${
+              location.pathname.includes('/doctors') ? 'text-blue-600 font-extrabold' : 'text-slate-400 hover:text-slate-600'
+            }`}
+          >
+            <Stethoscope size={19} />
+            <span className="text-[10px] font-bold">Doctors</span>
+          </button>
+
+          <button
+            onClick={() => navigate('/hospital/departments')}
+            className={`flex flex-col items-center gap-0.5 cursor-pointer transition-colors ${
+              location.pathname.includes('/departments') ? 'text-blue-600 font-extrabold' : 'text-slate-400 hover:text-slate-600'
+            }`}
+          >
+            <Building2 size={19} />
+            <span className="text-[10px] font-bold">Depts</span>
+          </button>
+
+          <button
+            onClick={() => setMobileSidebarOpen(true)}
+            className={`flex flex-col items-center gap-0.5 cursor-pointer transition-colors ${
+              mobileSidebarOpen ? 'text-blue-600 font-extrabold' : 'text-slate-400 hover:text-slate-600'
+            }`}
+          >
+            <Menu size={19} />
+            <span className="text-[10px] font-bold">All Menus</span>
+          </button>
+        </nav>
       </div>
     </div>
   );

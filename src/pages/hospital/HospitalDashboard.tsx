@@ -5,7 +5,7 @@ import {
   Users, Ticket, Stethoscope, Wifi,
   UserPlus, Search,
   CheckCircle2, X, Printer, Eye,
-  ArrowRight
+  ArrowRight, Menu
 } from 'lucide-react';
 
 export const HospitalDashboard: React.FC = () => {
@@ -136,19 +136,31 @@ export const HospitalDashboard: React.FC = () => {
 
       {/* ─── 1. TOP HEADER & OPERATIONAL ACTIONS ─────────────────────────────── */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 bg-white p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-100 shadow-2xs">
-        <div>
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-emerald-600">Hospital Live OPD</span>
-            <span className="text-slate-300">·</span>
-            <span className="text-[11px] sm:text-xs font-bold text-slate-500">{dateFormatted}</span>
+        <div className="flex items-start justify-between w-full md:w-auto">
+          <div>
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-emerald-600">Hospital Live OPD</span>
+              <span className="text-slate-300">·</span>
+              <span className="text-[11px] sm:text-xs font-bold text-slate-500">{dateFormatted}</span>
+            </div>
+            <h2 className="text-lg sm:text-2xl font-black text-slate-900 tracking-tight font-heading mt-1">
+              Welcome, {firstName} 👋
+            </h2>
+            <p className="text-[11px] sm:text-xs text-slate-400 font-semibold mt-0.5 truncate">
+              {hospitalProfile?.name || 'Hospital Panel'} · Live queue and OPD doctor operations
+            </p>
           </div>
-          <h2 className="text-lg sm:text-2xl font-black text-slate-900 tracking-tight font-heading mt-1">
-            Welcome, {firstName} 👋
-          </h2>
-          <p className="text-[11px] sm:text-xs text-slate-400 font-semibold mt-0.5 truncate">
-            {hospitalProfile?.name || 'Hospital Panel'} · Live queue and OPD doctor operations
-          </p>
+
+          {/* Quick Menu Button on Mobile (Image 2 highlighted red area) */}
+          <button
+            type="button"
+            onClick={() => (window as any).__openHospitalMenu?.()}
+            className="md:hidden flex items-center gap-1.5 px-3 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-xl font-extrabold text-xs border border-blue-100 shadow-2xs cursor-pointer shrink-0 mt-1"
+          >
+            <Menu size={16} />
+            <span>Menu</span>
+          </button>
         </div>
 
         {/* Action Buttons */}
