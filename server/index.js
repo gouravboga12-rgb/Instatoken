@@ -3431,6 +3431,13 @@ app.post('/api/hospitals/:hospitalId/tokens', requireHospitalAuth, async (req, r
 
   store.tokens.unshift(newToken);
 
+  const ref = newToken.doctorReference || newToken.rmpReference || null;
+  if (ref && hospitalId) {
+    newToken.doctorReference = ref;
+    newToken.rmpReference = ref;
+    autoUpsertDoctorReference(hospitalId, ref).catch(e => console.warn('Doctor ref upsert warning:', e.message));
+  }
+
   if (isDbConnected) {
     try {
       await query(
@@ -4472,6 +4479,9 @@ app.post('/api/appointments', async (req, res) => {
   if (ref) {
     appt.doctorReference = ref;
     appt.rmpReference = ref;
+    if (appt.hospitalId) {
+      autoUpsertDoctorReference(appt.hospitalId, ref).catch(e => console.warn('Doctor ref upsert warning:', e.message));
+    }
   }
   appt.address = appt.address || appt.place || '';
   appt.place = appt.place || appt.address || '';
@@ -5060,48 +5070,168 @@ app.post('/api/hospitals/:hospitalId/notifications', async (req, res) => {
   res.json({ success: true, hospitalId, notification: newRecord });
 });
 
-// ─── Hospital Doctor References / RMP Referrals ─────────────────────────────
+// ─── Hospital Doctor References (AWS RDS PostgreSQL & Unified Store) ─────────
+async function autoUpsertDoctorReference(hospitalId, ref) {
+  if (!hospitalId || !ref) return null;
+  const rawName = String(ref.name || '').replace(/[`'"]/g, '').trim();
+  const rawPhone = String(ref.phone || '').replace(/\D/g, '').slice(-10);
+  if (!rawName || rawPhone.length < 7) return null;
+
+  let cleanName = rawName;
+  if (!cleanName.toLowerCase().startsWith('dr.') && !cleanName.toLowerCase().startsWith('dr ')) {
+    cleanName = `Dr. ${cleanName}`;
+  }
+  const cleanPlace = String(ref.place || '').replace(/[`'"]/g, '').trim();
+  const specialization = ref.specialization || 'General Physician';
+  const qualification = ref.qualification || 'MBBS / Consultant';
+  const notes = ref.notes || 'Registered from patient referral';
+  const status = ref.status || 'active';
+
+  let savedRecord = null;
+  if (isDbConnected) {
+    try {
+      const id = `doc-ref-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+      const res = await query(
+        `INSERT INTO hospital_doctor_references 
+         (id, hospital_id, name, phone, place, specialization, qualification, status, notes, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+         ON CONFLICT (hospital_id, phone) DO UPDATE
+         SET name = EXCLUDED.name,
+             place = COALESCE(NULLIF(EXCLUDED.place, ''), hospital_doctor_references.place),
+             specialization = COALESCE(NULLIF(EXCLUDED.specialization, ''), hospital_doctor_references.specialization),
+             qualification = COALESCE(NULLIF(EXCLUDED.qualification, ''), hospital_doctor_references.qualification),
+             status = EXCLUDED.status,
+             notes = COALESCE(NULLIF(EXCLUDED.notes, ''), hospital_doctor_references.notes),
+             updated_at = NOW()
+         RETURNING id, hospital_id, name, phone, place, specialization, qualification, status, notes,
+                   TO_CHAR(created_at, 'YYYY-MM-DD') as "registeredDate"`,
+        [id, hospitalId, cleanName, rawPhone, cleanPlace, specialization, qualification, status, notes]
+      );
+      if (res.rows && res.rows.length > 0) {
+        savedRecord = res.rows[0];
+      }
+    } catch (err) {
+      console.warn('Auto-upsert doctor reference in DB error:', err.message);
+    }
+  }
+
+  try {
+    const store = await getUnifiedStore();
+    store.hospitalDoctorReferences = store.hospitalDoctorReferences || {};
+    store.hospitalDoctorReferences[hospitalId] = store.hospitalDoctorReferences[hospitalId] || [];
+    const refObj = savedRecord || {
+      id: `doc-ref-${rawPhone}`,
+      hospitalId,
+      name: cleanName,
+      phone: rawPhone,
+      place: cleanPlace,
+      specialization,
+      qualification,
+      status,
+      registeredDate: new Date().toISOString().split('T')[0],
+      notes
+    };
+    const existingIdx = store.hospitalDoctorReferences[hospitalId].findIndex(r => r.phone === rawPhone);
+    if (existingIdx >= 0) {
+      store.hospitalDoctorReferences[hospitalId][existingIdx] = {
+        ...store.hospitalDoctorReferences[hospitalId][existingIdx],
+        ...refObj
+      };
+    } else {
+      store.hospitalDoctorReferences[hospitalId].unshift(refObj);
+    }
+    await saveUnifiedStore(store);
+    return refObj;
+  } catch (e) {
+    return savedRecord;
+  }
+}
+
 app.get('/api/hospitals/:hospitalId/doctor-references', requireHospitalAuth, async (req, res) => {
   const { hospitalId } = req.params;
   const store = await getUnifiedStore();
+  let references = [];
+
+  if (isDbConnected) {
+    try {
+      const dbRes = await query(
+        `SELECT id, hospital_id, name, phone, place, specialization, qualification, status, notes,
+                TO_CHAR(created_at, 'YYYY-MM-DD') as "registeredDate",
+                updated_at
+         FROM hospital_doctor_references 
+         WHERE hospital_id = $1 
+         ORDER BY updated_at DESC`,
+        [hospitalId]
+      );
+      references = dbRes.rows || [];
+    } catch (err) {
+      console.warn('Error fetching hospital_doctor_references from RDS:', err.message);
+    }
+  }
+
+  // Fallback / merge with in-memory store
   store.hospitalDoctorReferences = store.hospitalDoctorReferences || {};
-  const references = store.hospitalDoctorReferences[hospitalId] || [];
+  const memRefs = store.hospitalDoctorReferences[hospitalId] || [];
+  const seenPhones = new Set(references.map(r => r.phone));
+  for (const mr of memRefs) {
+    if (!seenPhones.has(mr.phone)) {
+      references.push(mr);
+      seenPhones.add(mr.phone);
+    }
+  }
+
   res.json({ success: true, hospitalId, references });
 });
 
 app.post('/api/hospitals/:hospitalId/doctor-references', requireHospitalAuth, async (req, res) => {
   const { hospitalId } = req.params;
   const { reference, references } = req.body;
-  const store = await getUnifiedStore();
-  store.hospitalDoctorReferences = store.hospitalDoctorReferences || {};
-  store.hospitalDoctorReferences[hospitalId] = store.hospitalDoctorReferences[hospitalId] || [];
 
   if (Array.isArray(references)) {
-    store.hospitalDoctorReferences[hospitalId] = references;
+    for (const r of references) {
+      await autoUpsertDoctorReference(hospitalId, r);
+    }
   } else if (reference && reference.name) {
-    const newRef = {
-      ...reference,
-      id: reference.id || `doc-ref-${Date.now()}`,
-      hospitalId,
-      registeredDate: reference.registeredDate || new Date().toISOString().split('T')[0]
-    };
-    const existingIdx = store.hospitalDoctorReferences[hospitalId].findIndex(r => r.id === newRef.id || (r.phone && r.phone === newRef.phone));
-    if (existingIdx >= 0) {
-      store.hospitalDoctorReferences[hospitalId][existingIdx] = {
-        ...store.hospitalDoctorReferences[hospitalId][existingIdx],
-        ...newRef
-      };
-    } else {
-      store.hospitalDoctorReferences[hospitalId].unshift(newRef);
+    await autoUpsertDoctorReference(hospitalId, reference);
+  } else {
+    return res.status(400).json({ success: false, error: 'Doctor Name and Mobile Number are required.' });
+  }
+
+  // Fetch updated list from DB
+  let updatedList = [];
+  if (isDbConnected) {
+    try {
+      const dbRes = await query(
+        `SELECT id, hospital_id, name, phone, place, specialization, qualification, status, notes,
+                TO_CHAR(created_at, 'YYYY-MM-DD') as "registeredDate"
+         FROM hospital_doctor_references 
+         WHERE hospital_id = $1 
+         ORDER BY updated_at DESC`,
+        [hospitalId]
+      );
+      updatedList = dbRes.rows || [];
+    } catch (err) {
+      console.warn('Error fetching updated doctor references:', err.message);
     }
   }
 
-  await saveUnifiedStore(store);
-  res.json({ success: true, hospitalId, references: store.hospitalDoctorReferences[hospitalId] });
+  if (updatedList.length === 0) {
+    const store = await getUnifiedStore();
+    updatedList = store.hospitalDoctorReferences?.[hospitalId] || [];
+  }
+
+  res.json({ success: true, hospitalId, references: updatedList });
 });
 
 app.delete('/api/hospitals/:hospitalId/doctor-references/:refId', requireHospitalAuth, async (req, res) => {
   const { hospitalId, refId } = req.params;
+  if (isDbConnected) {
+    try {
+      await query(`DELETE FROM hospital_doctor_references WHERE hospital_id = $1 AND id = $2`, [hospitalId, refId]);
+    } catch (err) {
+      console.warn('Error deleting doctor reference from DB:', err.message);
+    }
+  }
   const store = await getUnifiedStore();
   store.hospitalDoctorReferences = store.hospitalDoctorReferences || {};
   store.hospitalDoctorReferences[hospitalId] = (store.hospitalDoctorReferences[hospitalId] || []).filter(r => r.id !== refId);

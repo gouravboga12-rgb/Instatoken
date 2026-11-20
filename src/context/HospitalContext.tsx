@@ -240,6 +240,7 @@ export interface DoctorReferenceRecord {
   phone: string;
   place: string;
   qualification?: string;
+  specialization?: string;
   status: 'active' | 'inactive';
   registeredDate: string;
   notes?: string;

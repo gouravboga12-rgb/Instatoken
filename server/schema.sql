@@ -116,6 +116,24 @@ CREATE TABLE IF NOT EXISTS hospital_schedules (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS hospital_doctor_references (
+    id VARCHAR(100) PRIMARY KEY,
+    hospital_id VARCHAR(100) NOT NULL REFERENCES hospitals(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    phone VARCHAR(50) NOT NULL,
+    place VARCHAR(255),
+    specialization VARCHAR(255) DEFAULT 'General Physician',
+    qualification VARCHAR(255) DEFAULT 'MBBS',
+    status VARCHAR(50) DEFAULT 'active',
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_hospital_doc_ref_phone UNIQUE (hospital_id, phone)
+);
+
+CREATE INDEX IF NOT EXISTS idx_hdr_hosp_id ON hospital_doctor_references(hospital_id);
+CREATE INDEX IF NOT EXISTS idx_hdr_phone ON hospital_doctor_references(phone);
+
 CREATE INDEX IF NOT EXISTS idx_tokens_hospital_date ON tokens (hospital_id, token_date);
 CREATE INDEX IF NOT EXISTS idx_tokens_doctor_date ON tokens (doctor_id, token_date);
 CREATE INDEX IF NOT EXISTS idx_doctors_hospital ON hospital_doctors (hospital_id);
