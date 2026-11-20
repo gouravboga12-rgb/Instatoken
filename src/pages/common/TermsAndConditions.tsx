@@ -76,6 +76,7 @@ export const TermsAndConditions: React.FC = () => {
               <li>Accepted payment methods include UPI (Google Pay, PhonePe, Paytm), Net Banking, Credit Cards, and Debit Cards.</li>
               <li>InstaToken does not store or process your credit/debit card numbers, CVV, or net banking passwords on its servers.</li>
               <li>A booking confirmation with a unique Token Number and QR code is issued upon successful transaction verification.</li>
+              <li><strong>Non-Refundable:</strong> Token fees are strictly non-refundable once booked. If payment is deducted but a token is not generated or sent, the user is entitled to a full refund within 3 to 7 working days.</li>
             </ul>
           </section>
 

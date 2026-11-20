@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, RefreshCw, Clock } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Clock, CheckCircle2, Mail, Phone, ShieldCheck } from 'lucide-react';
 
 export const RefundPolicy: React.FC = () => {
   const navigate = useNavigate();
@@ -31,106 +31,136 @@ export const RefundPolicy: React.FC = () => {
         {/* Content Body */}
         <div className="p-6 sm:p-10 space-y-8 text-slate-700 text-sm leading-relaxed">
           
-          <div className="bg-indigo-50/70 border border-indigo-200/60 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5">
-            <Clock className="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" />
-            <div className="text-xs text-indigo-900 leading-relaxed">
-              <strong className="font-bold">Transparent Refund Commitment:</strong> At InstaToken, we believe in complete fairness and transparency. If an appointment is cancelled under eligible conditions or a doctor is unavailable, your refund is processed directly back to your original source of payment within <strong className="underline">5 to 7 business days</strong>.
+          {/* Key Policy Highlights Box */}
+          <div className="bg-blue-50/80 border border-blue-200/80 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5">
+            <ShieldCheck className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+            <div className="text-xs text-blue-950 leading-relaxed">
+              <strong className="font-bold">Summary:</strong> All token bookings on InstaToken are for live, reserved hospital OPD queue slots. 
+              <strong> Token fees are non-refundable once booked.</strong> In the event that payment is debited from your account but a token is not generated or sent, you are entitled to a full refund processed within <strong>3 to 7 working days</strong>.
             </div>
           </div>
 
+          {/* Section 1: Non-Refundable Once Booked */}
           <section className="space-y-3">
             <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
               <span className="w-6 h-6 rounded-lg bg-indigo-100 text-indigo-700 text-xs font-black flex items-center justify-center">1</span>
-              Token Cancellation by Patient
+              Non-Refundable Policy on Confirmed Bookings
             </h2>
-            <p>
-              Patients can cancel their booked OPD token through the <strong>"My Bookings"</strong> section of the InstaToken web or mobile app:
-            </p>
-            <ul className="list-disc pl-5 space-y-2 text-slate-600">
-              <li><strong>Prior to OPD Session Start:</strong> If you cancel your token at least 1 hour before the scheduled session start time (e.g., Morning OPD 09:00 AM or Evening OPD 05:00 PM), you are eligible for a 100% refund of the doctor consultation fee.</li>
-              <li><strong>During Ongoing Session:</strong> Once a doctor's OPD session has commenced and your token number is within the active call queue, cancellation is subject to the individual hospital's policy.</li>
-              <li><strong>Post-Consultation or Concluded Session:</strong> Once the doctor has marked your consultation complete or the session has ended, no cancellation or refund requests can be entertained.</li>
-            </ul>
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-xs text-slate-700 space-y-2">
+              <p className="font-semibold text-slate-900">
+                • The token fees will not be refunded once booked.
+              </p>
+              <p className="text-slate-600 leading-relaxed">
+                When an OPD token is confirmed, a specific sequential consultation slot is immediately blocked and reserved for the patient in the hospital's live queue management system. Because other patients cannot book that reserved slot, cancellation or refund is strictly not available once the token has been issued.
+              </p>
+            </div>
           </section>
 
+          {/* Section 2: When Refund is Applicable */}
           <section className="space-y-3">
             <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
               <span className="w-6 h-6 rounded-lg bg-indigo-100 text-indigo-700 text-xs font-black flex items-center justify-center">2</span>
-              Doctor Unavailability or Hospital Cancellation
+              When is a Refund Applicable?
             </h2>
             <p>
-              In rare situations where a medical practitioner is unavailable due to an emergency surgery, unexpected leave, or hospital facility closure:
+              A refund is applicable only under the following specific condition:
             </p>
-            <ul className="list-disc pl-5 space-y-2 text-slate-600">
-              <li>You will receive an immediate SMS alert notifying you of the doctor's unavailability.</li>
-              <li>You will be offered the choice to reschedule your token to the next available session at no additional cost.</li>
-              <li>If you prefer not to reschedule, a <strong>100% full refund</strong> (including any platform charges) will be initiated automatically.</li>
-            </ul>
+            <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-2xl p-4 text-xs text-emerald-950 space-y-2">
+              <div className="flex items-center gap-2 font-bold text-emerald-900">
+                <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                <span>Payment Deducted but Token Not Sent / Generated</span>
+              </div>
+              <p className="text-slate-700 leading-relaxed">
+                If payment is successfully deducted from your bank account, credit/debit card, or UPI app, but the OPD token is <strong>not generated or sent</strong> to you (for example, due to sudden network disruption, payment gateway sync timeout, or technical failure), you will receive a <strong>100% full refund</strong> of the debited amount.
+              </p>
+            </div>
           </section>
 
+          {/* Section 3: Refund Process & Timeline */}
           <section className="space-y-3">
             <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
               <span className="w-6 h-6 rounded-lg bg-indigo-100 text-indigo-700 text-xs font-black flex items-center justify-center">3</span>
-              Refund Method &amp; Processing Timelines
+              Refund Timeline (3 to 7 Working Days)
             </h2>
-            <div className="overflow-hidden border border-slate-200 rounded-2xl">
+            <div className="flex items-center gap-2.5 bg-indigo-50 border border-indigo-200/80 rounded-2xl p-4 text-xs text-indigo-950">
+              <Clock className="w-5 h-5 text-indigo-600 shrink-0" />
+              <span>
+                Once verified, all eligible refunds are credited back to the original source payment method within <strong>3 to 7 working days</strong> in accordance with standard banking and Razorpay settlement cycles.
+              </span>
+            </div>
+
+            <div className="overflow-hidden border border-slate-200 rounded-2xl mt-3">
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
                   <tr>
                     <th className="p-3">Payment Method</th>
                     <th className="p-3">Refund Destination</th>
-                    <th className="p-3">Standard Timeline</th>
+                    <th className="p-3">Processing Timeline</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-600">
                   <tr>
-                    <td className="p-3 font-medium text-slate-800">UPI (GPay / PhonePe / Paytm)</td>
-                    <td className="p-3">Linked Bank Account via UPI VPA</td>
-                    <td className="p-3 font-semibold text-emerald-600">2 to 4 Business Days</td>
+                    <td className="p-3 font-medium text-slate-800">UPI (GPay / PhonePe / Paytm / BHIM)</td>
+                    <td className="p-3">Original Bank Account via UPI VPA</td>
+                    <td className="p-3 font-semibold text-emerald-600">3 to 5 Working Days</td>
                   </tr>
                   <tr>
-                    <td className="p-3 font-medium text-slate-800">Debit / Credit Card</td>
-                    <td className="p-3">Issuing Bank Card Account</td>
-                    <td className="p-3 font-semibold text-emerald-600">5 to 7 Business Days</td>
+                    <td className="p-3 font-medium text-slate-800">Debit / Credit Cards</td>
+                    <td className="p-3">Original Issuing Bank Card</td>
+                    <td className="p-3 font-semibold text-emerald-600">3 to 7 Working Days</td>
                   </tr>
                   <tr>
                     <td className="p-3 font-medium text-slate-800">Net Banking</td>
                     <td className="p-3">Source Bank Account</td>
-                    <td className="p-3 font-semibold text-emerald-600">4 to 7 Business Days</td>
+                    <td className="p-3 font-semibold text-emerald-600">3 to 7 Working Days</td>
                   </tr>
                 </tbody>
               </table>
             </div>
-            <p className="text-xs text-slate-500 italic mt-2">
-              * Note: Refund timelines depend on your issuing bank and NPCI network processing cycles.
-            </p>
           </section>
 
+          {/* Section 4: How to Contact Support for Refund */}
           <section className="space-y-3">
             <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
               <span className="w-6 h-6 rounded-lg bg-indigo-100 text-indigo-700 text-xs font-black flex items-center justify-center">4</span>
-              Failed Transactions &amp; Deductions
+              How to Contact Support for a Refund
             </h2>
-            <p className="text-slate-600">
-              If an amount is debited from your bank account or UPI application but you do not receive a token confirmation screen (e.g. due to mobile network interruption during Razorpay checkout), Razorpay's auto-reconciliation engine will automatically reverse the transaction back to your bank account within 24 to 48 hours.
+            <p className="text-slate-600 text-xs">
+              If your payment was completed but you did not receive your token, simply contact our support team with your payment details:
             </p>
-          </section>
+            
+            <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-5 space-y-3 text-xs text-slate-700">
+              <div className="space-y-1">
+                <p className="font-bold text-slate-900">Please provide the following details in your email or call:</p>
+                <ul className="list-disc pl-5 space-y-1 text-slate-600">
+                  <li>Registered 10-digit mobile number</li>
+                  <li>Razorpay Payment ID / Transaction Reference ID</li>
+                  <li>Date and approximate time of payment</li>
+                  <li>Amount debited</li>
+                </ul>
+              </div>
 
-          <section className="space-y-3">
-            <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <span className="w-6 h-6 rounded-lg bg-indigo-100 text-indigo-700 text-xs font-black flex items-center justify-center">5</span>
-              How to Request a Refund / Support
-            </h2>
-            <p className="text-slate-600">
-              For any questions regarding a refund or cancellation status, please reach out to our dedicated support desk with your Token Number and registered mobile number:
-            </p>
-            <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 text-xs space-y-1.5 text-slate-600">
-              <p><strong className="text-slate-800">Support Desk:</strong> InstaToken Help &amp; Billing Support</p>
-              <p><strong className="text-slate-800">Email:</strong> token.in1999@gmail.com | refunds@instatoken.in</p>
-              <p><strong className="text-slate-800">Helpline:</strong> +91 80 4668 8888 / 1800-INSTA-TOKEN</p>
-              <p><strong className="text-slate-800">Support Hours:</strong> Monday – Saturday: 9:00 AM – 8:00 PM IST</p>
+              <div className="border-t border-slate-200 pt-3 flex flex-col sm:flex-row gap-3 sm:gap-8">
+                <div className="flex items-center gap-2 text-slate-800 font-semibold">
+                  <Mail size={16} className="text-blue-600" />
+                  <a href="mailto:token.in1999@gmail.com" className="hover:underline text-blue-600 font-bold">
+                    token.in1999@gmail.com
+                  </a>
+                </div>
+                <div className="flex items-center gap-2 text-slate-800 font-semibold">
+                  <Phone size={16} className="text-emerald-600" />
+                  <a href="tel:+918046688888" className="hover:underline">
+                    +91 80 4668 8888
+                  </a>
+                </div>
+              </div>
             </div>
           </section>
+
+          {/* Compliance Footer Note */}
+          <div className="text-[11px] text-slate-400 border-t border-slate-100 pt-4 text-center">
+            InstaToken Healthcare Solutions • Payments facilitated securely through Razorpay • Governed by the laws of India.
+          </div>
 
         </div>
 
