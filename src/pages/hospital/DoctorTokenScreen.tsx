@@ -81,10 +81,15 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
 
   const filteredTokens = useMemo(() => {
     const list = doctorTokens.filter(t => {
+      // 0. Exclude tokens that have been routed to the Unvisited Directory (/hospital/tokens/unvisited)
+      if (t.status === 'not-visited' || t.status === 'unvisited') {
+        return false;
+      }
+
       // 1. Status Tab
       if (statusTab === 'active' && !['booked', 'waiting', 'checked-in', 'calling', 'in-consultation', 'arrived'].includes(t.status)) return false;
       if (statusTab === 'completed' && t.status !== 'completed') return false;
-      if (statusTab === 'not-visited' && !['not-visited', 'skipped', 'late-coming'].includes(t.status)) return false;
+      if (statusTab === 'not-visited' && !['skipped', 'late-coming'].includes(t.status)) return false;
       if (statusTab === 'cancelled' && t.status !== 'cancelled') return false;
 
       // 2. Date Filter
@@ -228,8 +233,8 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
     }
     return true;
   });
-  const notVisitedToday = doctorTokens.filter(t => {
-    if (!isDateMatching(t) || !['not-visited', 'skipped', 'late-coming'].includes(t.status)) return false;
+  const onHoldToday = doctorTokens.filter(t => {
+    if (!isDateMatching(t) || !['skipped', 'late-coming'].includes(t.status)) return false;
     if (selectedSessionFilter !== 'all') {
       return (t.session || 'morning').toLowerCase() === selectedSessionFilter.toLowerCase();
     }
@@ -306,8 +311,16 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
     }
   };
 
-  const handleMarkNotVisited = (id: string) => {
-    updateTokenStatus(id, 'not-visited');
+  const handlePutOnHold = (id: string) => {
+    updateTokenStatus(id, 'late-coming');
+  };
+
+  const handleMarkUnvisitedSingle = async (id: string) => {
+    const tok = doctorTokens.find(t => t.id === id);
+    const tokLabel = tok ? `Token #${tok.tokenNo} (${tok.patientName})` : 'this token';
+    if (window.confirm(`Mark ${tokLabel} as Unvisited? It will be moved to the Unvisited Directory and cleared from this doctor's screen.`)) {
+      await markTokensUnvisited([id]);
+    }
   };
 
   const handleRecallToken = async (id: string) => {
@@ -315,20 +328,20 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
     await callPatientToken(id);
   };
 
-  // Tokens for this doctor that are NOT visited (can be cleared at the end of the day)
-  const unvisitedDoctorTokens = useMemo(() => {
-    return doctorTokens.filter(t => isDateMatching(t) && t.status !== 'completed');
+  // Tokens for this doctor that are still active/on-hold and can be routed in bulk at end of session
+  const unroutedDoctorTokens = useMemo(() => {
+    return doctorTokens.filter(t => isDateMatching(t) && !['completed', 'cancelled', 'not-visited', 'unvisited'].includes(t.status));
   }, [doctorTokens, dateFilter, customDate, todayStr, tomorrowStr, yesterdayStr]);
 
   const handleRouteAllToUnvisited = async () => {
-    if (unvisitedDoctorTokens.length === 0) {
-      alert('No unvisited or pending tokens found to route.');
+    if (unroutedDoctorTokens.length === 0) {
+      alert('No active or on-hold tokens found to route.');
       return;
     }
-    const count = unvisitedDoctorTokens.length;
+    const count = unroutedDoctorTokens.length;
     const dateLabel = dateFilter === 'today' ? "today's" : dateFilter === 'all' ? 'all' : dateFilter;
-    if (window.confirm(`Route all ${count} unvisited / absent / pending tokens for ${doctor?.name || 'this doctor'} (${dateLabel}) to the Unvisited Directory? Patients will be safely archived for smart re-admission without deleting their medical or payment records.`)) {
-      await markTokensUnvisited(unvisitedDoctorTokens.map(t => t.id));
+    if (window.confirm(`Route all ${count} remaining absent / on-hold tokens for ${doctor?.name || 'this doctor'} (${dateLabel}) to the Unvisited Directory? Patients will be safely archived for smart re-admission without deleting their medical or payment records.`)) {
+      await markTokensUnvisited(unroutedDoctorTokens.map(t => t.id));
     }
   };
 
@@ -514,11 +527,18 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
               <Volume2 size={13} /> Re-Call
             </button>
             <button
-              onClick={() => handleMarkNotVisited(activelyCalling.id)}
-              className="px-3 py-2 bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-xl font-bold text-xs cursor-pointer flex items-center gap-1 transition-colors"
-              title="Patient absent or skipped"
+              onClick={() => handlePutOnHold(activelyCalling.id)}
+              className="px-3 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-white border border-amber-400/40 rounded-xl font-bold text-xs cursor-pointer flex items-center gap-1 transition-colors"
+              title="Put patient on hold for this session"
             >
-              <UserX size={13} /> Absent / Hold
+              <Clock size={13} /> Hold
+            </button>
+            <button
+              onClick={() => handleMarkUnvisitedSingle(activelyCalling.id)}
+              className="px-3 py-2 bg-rose-600/80 hover:bg-rose-600 text-white border border-rose-400/40 rounded-xl font-bold text-xs cursor-pointer flex items-center gap-1 transition-colors shadow-xs"
+              title="Patient absent - route directly to Unvisited Directory"
+            >
+              <UserX size={13} /> Unvisit
             </button>
           </div>
         </div>
@@ -564,10 +584,10 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
               <CheckCircle size={14} /> Visited / Done
             </button>
             <button
-              onClick={() => handleMarkNotVisited(inConsultation.id)}
+              onClick={() => handlePutOnHold(inConsultation.id)}
               className="px-3 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-xl font-bold text-xs cursor-pointer flex items-center gap-1 transition-colors"
             >
-              <UserX size={13} /> Absent / Hold
+              <Clock size={13} /> Hold
             </button>
             <button
               onClick={() => setPrintToken(inConsultation)}
@@ -623,11 +643,11 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
                   : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
               }`}
             >
-              <span>On-Hold / Late</span>
+              <span>On-Hold</span>
               <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
                 statusTab === 'not-visited' ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-700'
               }`}>
-                {notVisitedToday.length}
+                {onHoldToday.length}
               </span>
             </button>
 
@@ -666,14 +686,14 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
             </button>
           </div>
 
-          {unvisitedDoctorTokens.length > 0 && (
+          {unroutedDoctorTokens.length > 0 && (
             <button
               onClick={handleRouteAllToUnvisited}
               className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-black cursor-pointer flex items-center gap-1.5 transition-colors shadow-xs shrink-0"
-              title="Safely archive unvisited tokens into Unvisited Directory"
+              title="Safely archive all remaining absent / on-hold tokens into Unvisited Directory"
             >
               <UserX size={13} />
-              <span>Route Unvisited ({unvisitedDoctorTokens.length})</span>
+              <span>Route All to Unvisited ({unroutedDoctorTokens.length})</span>
             </button>
           )}
         </div>
@@ -758,14 +778,15 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
               ) : (
                 filteredTokens.map(tok => {
                   const isCurrent = inConsultation?.id === tok.id;
-                  const isNotVisited = ['not-visited', 'skipped', 'late-coming'].includes(tok.status);
+                  const isOnHold = ['late-coming', 'skipped'].includes(tok.status);
+                  const isNotVisited = ['not-visited', 'unvisited'].includes(tok.status);
                   const isCompleted = tok.status === 'completed';
                   const otherSessions = doctorSessions.filter(s => s.name.toLowerCase() !== (tok.session || 'morning').toLowerCase());
 
                   return (
                     <tr
                       key={tok.id}
-                      className={`hover:bg-slate-50/80 transition-colors ${isCurrent ? 'bg-blue-50/50' : isNotVisited ? 'bg-amber-50/20' : ''
+                      className={`hover:bg-slate-50/80 transition-colors ${isCurrent ? 'bg-blue-50/50' : isOnHold ? 'bg-amber-50/20' : ''
                         }`}
                     >
                       <td className="py-3.5 px-4">
@@ -773,7 +794,7 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
                             ? 'bg-blue-600 text-white shadow-xs'
                             : isCompleted
                               ? 'bg-emerald-100 text-emerald-800'
-                              : isNotVisited
+                              : isOnHold
                                 ? 'bg-amber-100 text-amber-800'
                                 : 'bg-slate-100 text-slate-800'
                           }`}>
@@ -946,30 +967,46 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
                           )}
 
                           {['booked', 'waiting', 'checked-in', 'calling', 'in-consultation', 'arrived'].includes(tok.status) && (
-                            <button
-                              onClick={() => handleMarkNotVisited(tok.id)}
-                              className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-lg text-xs font-bold cursor-pointer flex items-center gap-1 transition-colors"
-                              title="Put token On-Hold / Absent"
-                            >
-                              <UserX size={11} /> Hold / Absent
-                            </button>
+                            <>
+                              <button
+                                onClick={() => handlePutOnHold(tok.id)}
+                                className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-lg text-xs font-bold cursor-pointer flex items-center gap-1 transition-colors"
+                                title="Put token on hold for this session"
+                              >
+                                <Clock size={11} /> Hold
+                              </button>
+                              <button
+                                onClick={() => handleMarkUnvisitedSingle(tok.id)}
+                                className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold cursor-pointer flex items-center gap-1 transition-colors"
+                                title="Mark patient as unvisited and move to Unvisited Directory"
+                              >
+                                <UserX size={11} /> Unvisit
+                              </button>
+                            </>
                           )}
 
-                          {isNotVisited && (
+                          {['late-coming', 'skipped'].includes(tok.status) && (
                             <>
                               <button
                                 onClick={() => handleAdmitCabin(tok.id)}
                                 className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold cursor-pointer border-none shadow-xs flex items-center gap-1 transition-transform active:scale-95"
-                                title="Patient arrived late - admit directly into cabin"
+                                title="Patient arrived - admit directly into cabin"
                               >
                                 <Play size={11} /> Admit Cabin
                               </button>
                               <button
-                                onClick={() => handleCompleteToken(tok.id)}
-                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold cursor-pointer border-none shadow-xs flex items-center gap-1 transition-colors"
-                                title="Patient arrived - mark as visited and add revenue"
+                                onClick={() => handleRecallToken(tok.id)}
+                                className="px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold cursor-pointer border-none shadow-xs flex items-center gap-1 transition-colors"
+                                title="Call patient again"
                               >
-                                <CheckCircle size={11} /> Mark Visited
+                                <Volume2 size={11} /> Call
+                              </button>
+                              <button
+                                onClick={() => handleMarkUnvisitedSingle(tok.id)}
+                                className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold cursor-pointer flex items-center gap-1 transition-colors"
+                                title="Mark patient as unvisited and move to Unvisited Directory"
+                              >
+                                <UserX size={11} /> Unvisit
                               </button>
                             </>
                           )}
