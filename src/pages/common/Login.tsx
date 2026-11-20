@@ -219,6 +219,29 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
     }
   });
 
+  // Native Android Google Sign-In Listener for Mobile App (bottom sheet bridge)
+  useEffect(() => {
+    (window as any).__handleNativeGoogleLogin = async (profile: any) => {
+      if (profile?.email) {
+        setLoading(true);
+        setGoogleLoading(true);
+        setError('');
+        try {
+          await login(profile.email, 'google', profile.name || profile.given_name, true, profile);
+          onSuccess();
+        } catch (err: any) {
+          setError(err?.message || 'Native Google Sign-In failed.');
+        } finally {
+          setLoading(false);
+          setGoogleLoading(false);
+        }
+      }
+    };
+    return () => {
+      delete (window as any).__handleNativeGoogleLogin;
+    };
+  }, [login, onSuccess]);
+
   // Reusable Form Content (used in both Mobile View and Desktop View)
   const renderFormContent = () => (
     <div>
@@ -506,7 +529,13 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
       <div>
         <button 
           type="button"
-          onClick={() => triggerGoogleLogin()}
+          onClick={() => {
+            if ((window as any).ReactNativeWebView) {
+              (window as any).ReactNativeWebView.postMessage(JSON.stringify({ type: 'GOOGLE_SIGN_IN' }));
+            } else {
+              triggerGoogleLogin();
+            }
+          }}
           disabled={loading || googleLoading}
           className="w-full py-3 px-4 rounded-full border border-slate-200/90 bg-white hover:bg-slate-50/90 hover:border-slate-300 text-slate-800 font-bold text-xs sm:text-sm flex items-center justify-center gap-2.5 shadow-xs transition-all cursor-pointer active:scale-[0.99] disabled:opacity-60"
         >
