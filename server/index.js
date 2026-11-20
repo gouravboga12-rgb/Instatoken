@@ -315,6 +315,63 @@ function ensureDefaultDepartments(existingDepts) {
   return result;
 }
 
+// ─── Real-World IST Timezone & Session Cutoff Helpers ─────────────────────────
+function getNowIST() {
+  const now = new Date();
+  const dateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(now);
+  const timeFormatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Kolkata',
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+  const timeParts = timeFormatter.formatToParts(now);
+  const hour = parseInt(timeParts.find(p => p.type === 'hour')?.value || '0', 10);
+  const minute = parseInt(timeParts.find(p => p.type === 'minute')?.value || '0', 10);
+  const totalMinutes = hour * 60 + minute;
+  return { dateStr, totalMinutes, time24: `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}` };
+}
+
+function parseTimeToMinutes(rawStr) {
+  if (!rawStr || typeof rawStr !== 'string') return 1440;
+  const parts = rawStr.split(/[-–—]|to/i);
+  const target = parts[parts.length - 1].trim();
+
+  const ampmMatch = target.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$/i);
+  if (ampmMatch) {
+    let hour = parseInt(ampmMatch[1], 10);
+    const minute = parseInt(ampmMatch[2] || '0', 10);
+    const meridiem = ampmMatch[3].toLowerCase();
+    if (meridiem === 'pm' && hour < 12) hour += 12;
+    if (meridiem === 'am' && hour === 12) hour = 0;
+    return hour * 60 + minute;
+  }
+
+  const militaryMatch = target.match(/^(\d{1,2}):(\d{2})$/);
+  if (militaryMatch) {
+    const hour = parseInt(militaryMatch[1], 10);
+    const minute = parseInt(militaryMatch[2], 10);
+    return hour * 60 + minute;
+  }
+
+  const lower = target.toLowerCase();
+  if (lower.includes('morn')) return 13 * 60; // 01:00 PM (780 mins)
+  if (lower.includes('after')) return 17 * 60; // 05:00 PM (1020 mins)
+  if (lower.includes('even')) return 21 * 60; // 09:00 PM (1260 mins)
+  if (lower.includes('night')) return 23 * 60; // 11:00 PM (1380 mins)
+
+  return 1440;
+}
+
+function isSessionExpiredInIST(sessionEndTimeOrRange, targetDateStr) {
+  const { dateStr: todayIST, totalMinutes: nowMinutesIST } = getNowIST();
+  const dateToEvaluate = targetDateStr || todayIST;
+  if (dateToEvaluate < todayIST) return true;
+  if (dateToEvaluate > todayIST) return false;
+  const sessionEndMinutes = parseTimeToMinutes(sessionEndTimeOrRange);
+  return nowMinutesIST >= sessionEndMinutes;
+}
+
 const INITIAL_HOSPITALS = [
   {
     id: "hosp-apollo",
@@ -2158,6 +2215,7 @@ app.get('/api/hospitals/:id/doctors/:doctorId/session-capacity', async (req, res
       const booked = sessionCounts[sKey] || 0;
       const max = parseInt(s.maxTokens, 10) || (sKey.includes('morn') ? 30 : 20);
       const isFull = booked >= max;
+      const isExpired = isSessionExpiredInIST(s.endTime || s.name, targetDate);
       return {
         id: s.id || s.name,
         name: s.name,
@@ -2167,6 +2225,7 @@ app.get('/api/hospitals/:id/doctors/:doctorId/session-capacity', async (req, res
         bookedTokens: booked,
         remainingSlots: Math.max(0, max - booked),
         isFull: isFull,
+        isExpired: isExpired,
         active: s.active !== false
       };
     });
@@ -3503,6 +3562,18 @@ app.get('/api/hospitals/:hospitalId/tokens', requireHospitalAuth, async (req, re
 app.post('/api/hospitals/:hospitalId/tokens', requireHospitalAuth, async (req, res) => {
   const { hospitalId } = req.params;
   const tokenData = req.body;
+
+  const targetDate = tokenData.bookingDate || tokenData.tokenDate || getNowIST().dateStr;
+  const targetSession = (tokenData.session || 'morning').toLowerCase();
+
+  // Validate session against real-world IST time
+  if (isSessionExpiredInIST(targetSession, targetDate)) {
+    return res.status(400).json({
+      success: false,
+      message: `Cannot generate token: The ${targetSession} OPD session has already concluded for ${targetDate} (IST). Please select an active session.`
+    });
+  }
+
   const store = await getUnifiedStore();
 
   store.tokens = store.tokens || [];
@@ -3884,7 +3955,16 @@ app.post('/api/hospitals/:hospitalId/tokens/:tokenId/readmit', requireHospitalAu
   const { targetDoctorId, targetDoctorName, departmentId, departmentName, session, tokenNo, feeDifference, bookingDate } = req.body;
   const store = await getUnifiedStore();
 
-  const todayStr = bookingDate || new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+  const todayStr = bookingDate || getNowIST().dateStr;
+  const targetSession = (session || 'morning').toLowerCase();
+
+  // Validate session against real-world IST time
+  if (isSessionExpiredInIST(targetSession, todayStr)) {
+    return res.status(400).json({
+      success: false,
+      message: `Cannot re-admit patient: The ${targetSession} OPD session has already concluded for ${todayStr} (IST). Please select an active session.`
+    });
+  }
 
   let updatedToken = null;
   store.tokens = (store.tokens || []).map(t => {
@@ -4405,6 +4485,14 @@ app.post('/api/razorpay/create-order', async (req, res) => {
     const targetDate = date || notes?.date;
     const targetSession = (session || notes?.session || 'morning').toLowerCase();
     const targetHospId = hospitalId || notes?.hospitalId;
+
+    // Validate session cutoff in real-world IST time
+    if (targetDate && isSessionExpiredInIST(targetSession, targetDate)) {
+      return res.status(400).json({
+        success: false,
+        message: `This OPD session (${targetSession.toUpperCase()}) has already concluded for ${targetDate} (IST). Please select an upcoming session or choose a future date.`
+      });
+    }
 
     if (targetDocId && targetDate && isDbConnected) {
       try {

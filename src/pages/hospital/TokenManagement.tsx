@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { TokenPaymentModal } from '../../components/hospital/TokenPaymentModal';
 import { broadcastGlobalSync } from '../../utils/syncBus';
+import { getNowIST, isSessionExpiredInIST } from '../../utils/timeZone';
 
 const statusColors: Record<string, string> = {
   booked: 'bg-blue-50 text-blue-700 border border-blue-200',
@@ -306,6 +307,8 @@ const WalkInGenerator: React.FC<{
 
   const { docId: resolvedDocId, deptId: resolvedDeptId } = getInitialDoctorAndDept();
 
+  const { dateStr: todayStr } = getNowIST();
+
   const [form, setForm] = useState({
     patientName: initialPatient?.name || '',
     patientPhone: initialPatient?.phone ? initialPatient.phone.replace(/\D/g, '').slice(-10) : '',
@@ -314,7 +317,7 @@ const WalkInGenerator: React.FC<{
     address: initialPatient?.address || '',
     departmentId: resolvedDeptId,
     doctorId: resolvedDocId,
-    session: 'morning' as 'morning' | 'afternoon' | 'evening',
+    session: (isSessionExpiredInIST('01:00 PM', todayStr) ? 'evening' : 'morning') as 'morning' | 'afternoon' | 'evening',
     isRevisit: Boolean(initialPatient),
     selectedPatientUhid: initialPatient?.uhid || ''
   });
@@ -541,6 +544,14 @@ const WalkInGenerator: React.FC<{
       setError(`Dr. ${selDoc.name} is currently marked as unavailable for walk-in counter bookings.`);
       return;
     }
+
+    // Real-world IST session cutoff validation
+    const chosenSessionObj = activeSessions.find(s => s.name.toLowerCase() === (form.session || '').toLowerCase());
+    if (chosenSessionObj && isSessionExpiredInIST(chosenSessionObj.endTime || chosenSessionObj.name, todayStr)) {
+      setError(`The ${chosenSessionObj.name} OPD session has already concluded for today (${chosenSessionObj.endTime || ''} IST). Please select an upcoming active session.`);
+      return;
+    }
+
     const ageNum = parseInt(form.patientAge, 10) || 0;
     const computedAgeDisplay = form.patientAge ? `${form.patientAge} ${patientAgeUnit}` : '25 Years';
     const token = generateWalkInToken({
@@ -571,6 +582,7 @@ const WalkInGenerator: React.FC<{
     setPaymentStatus('paid');
     setPaymentMethod('Online');
     const { docId, deptId } = getInitialDoctorAndDept();
+    const firstAvailSession = activeSessions.find(s => !isSessionExpiredInIST(s.endTime || s.name, todayStr));
     setForm({
       patientName: '',
       patientPhone: '',
@@ -579,7 +591,7 @@ const WalkInGenerator: React.FC<{
       address: '',
       departmentId: deptId,
       doctorId: docId,
-      session: (activeSessions[0]?.name?.toLowerCase() || 'morning') as any,
+      session: (firstAvailSession?.name?.toLowerCase() || 'evening') as any,
       isRevisit: false,
       selectedPatientUhid: ''
     });
@@ -828,24 +840,39 @@ const WalkInGenerator: React.FC<{
               <label className="text-xs font-bold text-slate-700 block mb-1.5">OPD Session Time *</label>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {activeSessions.map(s => {
+                  const isExpired = isSessionExpiredInIST(s.endTime || s.name, todayStr);
                   const isSel = form.session === (s.name.toLowerCase() as any);
                   return (
                     <div
                       key={s.id}
-                      onClick={() => setForm(p => ({ ...p, session: s.name.toLowerCase() as any }))}
-                      className={`p-3 rounded-2xl border cursor-pointer transition-all flex items-center justify-between ${
-                        isSel ? 'border-blue-500 bg-blue-50/60 shadow-xs' : 'border-slate-200 bg-white hover:border-slate-300'
+                      onClick={() => {
+                        if (isExpired) return;
+                        setForm(p => ({ ...p, session: s.name.toLowerCase() as any }));
+                      }}
+                      className={`p-3 rounded-2xl border transition-all flex items-center justify-between ${
+                        isExpired
+                          ? 'border-slate-200 bg-slate-50 opacity-40 cursor-not-allowed'
+                          : isSel
+                            ? 'border-blue-500 bg-blue-50/60 shadow-xs cursor-pointer'
+                            : 'border-slate-200 bg-white hover:border-slate-300 cursor-pointer'
                       }`}
                     >
                       <div>
                         <div className="text-xs font-black text-slate-800 flex items-center gap-1.5">
                           <span>{s.name}</span>
                           <span className="text-xs">{s.name.toLowerCase().includes('morn') ? '🌅' : s.name.toLowerCase().includes('even') ? '🌙' : '☀️'}</span>
+                          {isExpired && (
+                            <span className="text-[9px] font-black bg-rose-100 text-rose-700 px-1.5 py-0.2 rounded">
+                              Ended
+                            </span>
+                          )}
                         </div>
                         <div className="text-[10px] text-slate-400 font-bold mt-0.5">{s.startTime} – {s.endTime}</div>
                       </div>
-                      <div className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center ${isSel ? 'border-blue-600 bg-blue-600' : 'border-slate-300'}`}>
-                        {isSel && <div className="w-1 h-1 bg-white rounded-full" />}
+                      <div className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center ${
+                        isExpired ? 'border-slate-200 bg-slate-100' : isSel ? 'border-blue-600 bg-blue-600' : 'border-slate-300'
+                      }`}>
+                        {isSel && !isExpired && <div className="w-1 h-1 bg-white rounded-full" />}
                       </div>
                     </div>
                   );
@@ -1281,13 +1308,30 @@ const ReadmissionModal: React.FC<{
   const { readmitToken } = useHospital();
   const activeDoctors = doctors.filter(d => d.active !== false);
 
+  const { dateStr: todayIST } = getNowIST();
+  const tomorrowIST = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(d);
+  }, []);
+
+  const [readmitDate, setReadmitDate] = useState<string>(todayIST);
+
+  const isMorningExpired = isSessionExpiredInIST('01:00 PM', readmitDate);
+  const isEveningExpired = isSessionExpiredInIST('09:00 PM', readmitDate);
+  const allSessionsExpiredToday = isMorningExpired && isEveningExpired && readmitDate === todayIST;
+
   const [selectedDoctorId, setSelectedDoctorId] = useState(() => {
     const isDocActive = activeDoctors.some(d => d.id === token.doctorId);
     return isDocActive ? token.doctorId : (activeDoctors[0]?.id || token.doctorId);
   });
-  const [selectedSession, setSelectedSession] = useState<'morning' | 'afternoon' | 'evening'>(
-    token.session === 'evening' ? 'evening' : 'morning'
-  );
+
+  const [selectedSession, setSelectedSession] = useState<'morning' | 'afternoon' | 'evening'>(() => {
+    const morningEnded = isSessionExpiredInIST('01:00 PM', todayIST);
+    if (morningEnded) return 'evening';
+    return token.session === 'evening' ? 'evening' : 'morning';
+  });
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -1296,10 +1340,9 @@ const ReadmissionModal: React.FC<{
   const targetFee = Number(selectedDoctor?.consultationFee || origFee);
   const feeDifference = Math.max(0, targetFee - origFee);
 
-  const todayStr = new Date().toISOString().split('T')[0];
   const targetDocQueueCount = tokens.filter(t => 
     t.doctorId === selectedDoctorId && 
-    (t.bookingDate === todayStr || (!t.bookingDate && t.status !== 'not-visited')) &&
+    (t.bookingDate === readmitDate || (!t.bookingDate && t.status !== 'not-visited')) &&
     t.session === selectedSession &&
     ['booked', 'waiting', 'checked-in', 'calling'].includes(t.status)
   ).length;
@@ -1309,10 +1352,15 @@ const ReadmissionModal: React.FC<{
       setError('Please select a doctor to re-admit.');
       return;
     }
+    const currentSessionExpired = selectedSession === 'morning' ? isMorningExpired : isEveningExpired;
+    if (currentSessionExpired) {
+      setError(`The ${selectedSession} OPD session has already ended for ${readmitDate}. Please select an upcoming active session or switch to tomorrow.`);
+      return;
+    }
     setIsSubmitting(true);
     setError('');
     try {
-      const updated = await readmitToken(token.id, selectedDoctorId, selectedSession, feeDifference);
+      const updated = await readmitToken(token.id, selectedDoctorId, selectedSession, feeDifference, readmitDate);
       onSuccess(updated);
     } catch (err: any) {
       setError(err.message || 'Failed to re-admit patient. Please try again.');
@@ -1408,37 +1456,105 @@ const ReadmissionModal: React.FC<{
 
           {/* Session Selection */}
           <div className="space-y-1.5">
-            <label className="text-xs font-black text-slate-700 uppercase tracking-wide">
-              Select OPD Session Today
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-black text-slate-700 uppercase tracking-wide">
+                Select OPD Session ({readmitDate === todayIST ? 'Today' : 'Tomorrow'})
+              </label>
+              {allSessionsExpiredToday && (
+                <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full">
+                  All OPD Sessions Ended Today
+                </span>
+              )}
+            </div>
+
+            {/* Notice if all sessions ended today */}
+            {allSessionsExpiredToday && (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex flex-col gap-2">
+                <div className="flex items-center gap-2 font-bold">
+                  <AlertCircle size={15} className="text-amber-600 shrink-0" />
+                  <span>All OPD sessions have concluded for today (IST).</span>
+                </div>
+                <p className="text-[11px] text-amber-800 leading-relaxed">
+                  Morning (10:00 AM - 01:00 PM) and Evening (05:00 PM - 09:00 PM) consultations have ended. You can schedule this patient into tomorrow's queue.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReadmitDate(tomorrowIST);
+                    setSelectedSession('morning');
+                  }}
+                  className="self-start px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-black cursor-pointer shadow-xs transition-colors"
+                >
+                  Schedule for Tomorrow ({tomorrowIST})
+                </button>
+              </div>
+            )}
+
+            {readmitDate !== todayIST && (
+              <div className="flex items-center justify-between p-2.5 bg-blue-50 border border-blue-200 rounded-xl text-xs font-bold text-blue-900">
+                <span>Booking Date: <strong>Tomorrow ({readmitDate})</strong></span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReadmitDate(todayIST);
+                    setSelectedSession(isMorningExpired ? 'evening' : 'morning');
+                  }}
+                  className="text-[11px] text-blue-700 underline font-semibold cursor-pointer"
+                >
+                  Switch to Today
+                </button>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => setSelectedSession('morning')}
-                className={`p-3 rounded-xl border text-xs font-bold cursor-pointer transition-all flex flex-col items-center gap-0.5 ${
-                  selectedSession === 'morning'
-                    ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-2xs font-black'
-                    : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                disabled={isMorningExpired}
+                onClick={() => !isMorningExpired && setSelectedSession('morning')}
+                className={`p-3 rounded-xl border text-xs font-bold transition-all flex flex-col items-center gap-0.5 relative ${
+                  isMorningExpired
+                    ? 'border-slate-200 bg-slate-50 text-slate-400 opacity-50 cursor-not-allowed'
+                    : selectedSession === 'morning'
+                      ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-2xs font-black cursor-pointer'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 cursor-pointer'
                 }`}
               >
-                <span>Morning OPD</span>
+                <div className="flex items-center gap-1.5">
+                  <span>Morning OPD</span>
+                  {isMorningExpired && (
+                    <span className="text-[9px] font-black bg-rose-100 text-rose-700 px-1.5 py-0.2 rounded">
+                      Ended
+                    </span>
+                  )}
+                </div>
                 <span className="text-[10px] text-slate-400 font-semibold">10:00 AM - 01:00 PM</span>
               </button>
+
               <button
                 type="button"
-                onClick={() => setSelectedSession('evening')}
-                className={`p-3 rounded-xl border text-xs font-bold cursor-pointer transition-all flex flex-col items-center gap-0.5 ${
-                  selectedSession === 'evening'
-                    ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-2xs font-black'
-                    : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                disabled={isEveningExpired}
+                onClick={() => !isEveningExpired && setSelectedSession('evening')}
+                className={`p-3 rounded-xl border text-xs font-bold transition-all flex flex-col items-center gap-0.5 relative ${
+                  isEveningExpired
+                    ? 'border-slate-200 bg-slate-50 text-slate-400 opacity-50 cursor-not-allowed'
+                    : selectedSession === 'evening'
+                      ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-2xs font-black cursor-pointer'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 cursor-pointer'
                 }`}
               >
-                <span>Evening OPD</span>
+                <div className="flex items-center gap-1.5">
+                  <span>Evening OPD</span>
+                  {isEveningExpired && (
+                    <span className="text-[9px] font-black bg-rose-100 text-rose-700 px-1.5 py-0.2 rounded">
+                      Ended
+                    </span>
+                  )}
+                </div>
                 <span className="text-[10px] text-slate-400 font-semibold">05:00 PM - 09:00 PM</span>
               </button>
             </div>
             <p className="text-[10px] text-slate-400 font-semibold text-center mt-1">
-              Active Queue: {targetDocQueueCount} patients currently waiting today
+              Active Queue: {targetDocQueueCount} patients currently waiting {readmitDate === todayIST ? 'today' : 'on selected date'}
             </p>
           </div>
 

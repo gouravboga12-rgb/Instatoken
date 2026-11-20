@@ -10,6 +10,7 @@ import {
   Wallet, MapPin, AlertTriangle, CheckCircle2, X
 } from 'lucide-react';
 import { TokenPaymentModal } from '../../components/hospital/TokenPaymentModal';
+import { isSessionExpiredInIST } from '../../utils/timeZone';
 
 export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorIdProp }) => {
   const params = useParams<{ doctorId: string }>();
@@ -351,6 +352,12 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
     const maxCapacity = (sessionObj as any)?.maxTokens || (cleanTarget.includes('morn') ? 30 : 20);
 
     const targetDate = tok.bookingDate || todayStr;
+
+    // Validate real-world IST time cutoff
+    if (sessionObj && isSessionExpiredInIST(sessionObj.endTime || sessionObj.name, targetDate)) {
+      alert(`⚠️ Cannot shift to ${sessionObj.name} Session: this OPD session has already concluded for ${targetDate} (IST).`);
+      return;
+    }
     const currentBookedCount = tokens.filter(t =>
       t.doctorId === doctor?.id &&
       (t.bookingDate || todayStr) === targetDate &&
@@ -1011,17 +1018,21 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
                             </>
                           )}
 
-                          {/* Option to shift to another session with Option 1 availability check */}
-                          {!isCompleted && otherSessions.map(os => (
-                            <button
-                              key={os.id}
-                              onClick={() => handleShiftSession(tok, os.name)}
-                              className="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold cursor-pointer flex items-center gap-1 transition-colors"
-                              title={`Shift to ${os.name} Session (${os.startTime} - ${os.endTime})`}
-                            >
-                              <Clock size={11} /> Shift {os.name}
-                            </button>
-                          ))}
+                          {/* Option to shift to another session with IST cutoff check */}
+                          {!isCompleted && otherSessions.map(os => {
+                            const isExpired = isSessionExpiredInIST(os.endTime || os.name, tok.bookingDate || todayStr);
+                            if (isExpired) return null;
+                            return (
+                              <button
+                                key={os.id}
+                                onClick={() => handleShiftSession(tok, os.name)}
+                                className="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold cursor-pointer flex items-center gap-1 transition-colors"
+                                title={`Shift to ${os.name} Session (${os.startTime} - ${os.endTime})`}
+                              >
+                                <Clock size={11} /> Shift {os.name}
+                              </button>
+                            );
+                          })}
 
                           <button
                             onClick={() => setPrintToken(tok)}

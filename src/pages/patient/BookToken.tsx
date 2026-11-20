@@ -2,6 +2,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { calculateDistanceKm, reverseGeocode } from '../../utils/googleMaps';
 import { subscribeGlobalSync } from '../../utils/syncBus';
+import { isSessionExpiredInIST } from '../../utils/timeZone';
 import { Button } from '../../components/ui/Button';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
@@ -129,10 +130,14 @@ export const BookToken: React.FC = () => {
     activeClass: string;
     iconBg: string;
     isFull: boolean;
+    isExpired: boolean;
     booked: number;
     max: number;
     remaining: number;
   }
+
+  // States
+  const [selectedDate, setSelectedDate] = useState<string>(getTodayDateStr());
 
   // Session Capacities: { [sessionLowerName]: { max, booked, remaining, isFull } }
   const [sessionCapacities, setSessionCapacities] = useState<Record<string, { max: number; booked: number; remaining: number; isFull: boolean }>>({});
@@ -146,6 +151,7 @@ export const BookToken: React.FC = () => {
       const booked = cap?.booked ?? 0;
       const max = cap?.max ?? s.maxTokens ?? (isMorning ? 30 : 20);
       const remaining = cap?.remaining ?? Math.max(0, max - booked);
+      const isExpired = isSessionExpiredInIST(s.endTime || s.timing || s.name, selectedDate);
 
       return {
         id: s.name,
@@ -155,12 +161,13 @@ export const BookToken: React.FC = () => {
         activeClass: isMorning ? 'bg-amber-50/70 border-amber-400' : isAfternoon ? 'bg-orange-50/70 border-orange-400' : 'bg-blue-50/70 border-blue-500',
         iconBg: isMorning ? 'bg-amber-100 text-amber-600' : isAfternoon ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600',
         isFull,
+        isExpired,
         booked,
         max,
         remaining
       };
     });
-  }, [activeSessionsList, sessionCapacities]);
+  }, [activeSessionsList, sessionCapacities, selectedDate]);
 
   // Resolve doctor's configured working days
   const doctorWorkingDays: string[] = useMemo(() => {
@@ -261,8 +268,18 @@ export const BookToken: React.FC = () => {
   }, [doctor, hospitalId, syncVersion]);
 
   // States
-  const [selectedDate, setSelectedDate] = useState<string>(getTodayDateStr());
   const [selectedSession, setSelectedSession] = useState<string>(activeSessionsList[0]?.name || 'Morning');
+  
+  // Auto-switch to next active non-expired session if current selection has ended
+  useEffect(() => {
+    const active = sessionOptions.find(s => s.id === selectedSession);
+    if (active?.isExpired) {
+      const nextOpen = sessionOptions.find(s => !s.isExpired && !s.isFull) || sessionOptions.find(s => !s.isExpired);
+      if (nextOpen) {
+        setSelectedSession(nextOpen.id);
+      }
+    }
+  }, [selectedDate, sessionOptions, selectedSession]);
   
   // Patient details form
   const [name, setName] = useState(user?.name || '');
@@ -596,6 +613,10 @@ export const BookToken: React.FC = () => {
     };
 
     const activeSessionObj = sessionOptions.find(s => s.id === selectedSession);
+    if (activeSessionObj?.isExpired) {
+      setError(`The ${activeSessionObj.title} has already concluded for ${selectedDate} (IST). Please choose an upcoming active session or select a future date.`);
+      return;
+    }
     if (activeSessionObj?.isFull) {
       setError(`The ${activeSessionObj.title} is completely full (${activeSessionObj.booked}/${activeSessionObj.max} tokens booked). Please choose another session or visit the hospital reception counter for walk-in availability.`);
       return;
@@ -934,10 +955,16 @@ export const BookToken: React.FC = () => {
               {sessionOptions.map((s) => {
                 const isActive = selectedSession === s.id;
                 const isFull = s.isFull;
+                const isExpired = s.isExpired;
+                const isDisabled = isFull || isExpired;
                 return (
                   <div 
                     key={s.id}
                     onClick={() => {
+                      if (isExpired) {
+                        setError(`The ${s.title} has already concluded for today (${s.timing} IST). Please choose an upcoming session or select a future date.`);
+                        return;
+                      }
                       if (isFull) {
                         setError(`The ${s.title} is completely full (${s.booked}/${s.max} tokens booked). Please choose another session or visit the hospital reception counter for walk-in availability.`);
                         return;
@@ -946,21 +973,25 @@ export const BookToken: React.FC = () => {
                       setError('');
                     }}
                     className={`p-2.5 rounded-2xl border transition-all flex items-center justify-between ${
-                      isFull
-                        ? 'bg-slate-50 border-slate-200 opacity-75 cursor-not-allowed'
+                      isDisabled
+                        ? 'bg-slate-50 border-slate-200 opacity-60 cursor-not-allowed'
                         : isActive 
                           ? 'bg-amber-50/60 border-amber-400 shadow-2xs cursor-pointer' 
                           : 'bg-white border-slate-200 hover:border-slate-300 cursor-pointer'
                     }`}
                   >
                     <div className="flex items-center gap-2 min-w-0">
-                      <div className={`w-8 h-8 ${isFull ? 'bg-slate-200 text-slate-500' : s.iconBg} rounded-xl flex items-center justify-center shrink-0`}>
+                      <div className={`w-8 h-8 ${isDisabled ? 'bg-slate-200 text-slate-500' : s.iconBg} rounded-xl flex items-center justify-center shrink-0`}>
                         {s.icon}
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <h5 className="text-xs font-extrabold text-slate-900 truncate">{s.title}</h5>
-                          {isFull ? (
+                          {isExpired ? (
+                            <span className="text-[8.5px] font-black text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded-full">
+                              Ended
+                            </span>
+                          ) : isFull ? (
                             <span className="text-[8.5px] font-black text-rose-600 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded-full">
                               Full ({s.booked}/{s.max})
                             </span>
@@ -976,13 +1007,13 @@ export const BookToken: React.FC = () => {
 
                     {/* Radio Circle */}
                     <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ml-1 ${
-                      isFull 
+                      isDisabled 
                         ? 'border-slate-300 bg-slate-100' 
                         : isActive 
                           ? 'border-blue-600 bg-blue-600' 
                           : 'border-slate-300'
                     }`}>
-                      {!isFull && isActive && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                      {!isDisabled && isActive && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
                     </div>
                   </div>
                 );

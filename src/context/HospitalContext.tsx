@@ -4,6 +4,7 @@ import { useApp } from './AppContext';
 import type { Doctor } from '../utils/mockData';
 import { broadcastGlobalSync, subscribeGlobalSync } from '../utils/syncBus';
 import { verifyHospitalOtpLoginClient, verifyHospitalOtpSignupClient } from '../utils/otpService';
+import { getNowIST } from '../utils/timeZone';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -324,7 +325,8 @@ interface HospitalContextType {
     tokenId: string, 
     targetDoctorId: string, 
     session: 'morning' | 'afternoon' | 'evening', 
-    deskDifference?: number
+    deskDifference?: number,
+    bookingDate?: string
   ) => Promise<TokenRecord>;
   callPatientToken: (id: string) => Promise<any>;
   admitPatientToCabin: (tokenId: string) => Promise<any>;
@@ -2518,7 +2520,8 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     tokenId: string,
     targetDoctorId: string,
     session: 'morning' | 'afternoon' | 'evening',
-    deskDifference?: number
+    deskDifference?: number,
+    targetBookingDate?: string
   ): Promise<TokenRecord> => {
     const targetToken = tokens.find(t => t.id === tokenId || (t as any).appointmentId === tokenId);
     if (!targetToken) throw new Error("Token not found");
@@ -2526,9 +2529,9 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const targetDoc = doctors.find(d => d.id === targetDoctorId);
     if (!targetDoc) throw new Error("Target doctor not found");
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = targetBookingDate || getNowIST().dateStr;
 
-    // Compute next available token number for target doctor on today's date in this session
+    // Compute next available token number for target doctor on target date in this session
     const docTodayTokens = tokens.filter(t => 
       t.doctorId === targetDoctorId && 
       (t.bookingDate === todayStr || (!t.bookingDate && t.status !== 'not-visited')) &&
