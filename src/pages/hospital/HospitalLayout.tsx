@@ -24,18 +24,18 @@ import { HospitalPayouts } from './HospitalPayouts';
 import {
   LayoutDashboard, Plus, List, Wifi, WifiOff, Calendar, RefreshCw,
   Users, Stethoscope, Building2, UserCheck, UserX,
-  BarChart2, Download, Settings,
+  BarChart2, Settings,
   ChevronLeft, ChevronRight, Bell, Search, LogOut, Menu, X, Activity,
   CreditCard, DollarSign, Sliders, Megaphone, Banknote
 } from 'lucide-react';
 
 // ─── RBAC permission map ──────────────────────────────────────────────────────
 const ROLE_SECTIONS: Record<string, string[]> = {
-  owner:        ['dashboard','doctor-screens','token-manage','tokens','add-token','all-tokens','online-tokens','offline-tokens','today-tokens','upcoming-tokens','completed-tokens','cancelled-tokens','revisit-tokens','unvisited-tokens','revenue','doctors','departments','doctor-references','sessions','staff','patients','communication','ads-promotion','billing','reports','download','settings','payouts'],
-  admin:        ['dashboard','doctor-screens','token-manage','tokens','add-token','all-tokens','online-tokens','offline-tokens','today-tokens','upcoming-tokens','completed-tokens','cancelled-tokens','revisit-tokens','unvisited-tokens','revenue','doctors','departments','doctor-references','sessions','staff','patients','communication','ads-promotion','reports','download','payouts'],
+  owner:        ['dashboard','doctor-screens','token-manage','tokens','add-token','all-tokens','online-tokens','offline-tokens','today-tokens','upcoming-tokens','completed-tokens','cancelled-tokens','revisit-tokens','unvisited-tokens','revenue','doctors','departments','doctor-references','sessions','staff','patients','communication','ads-promotion','billing','reports','settings','payouts'],
+  admin:        ['dashboard','doctor-screens','token-manage','tokens','add-token','all-tokens','online-tokens','offline-tokens','today-tokens','upcoming-tokens','completed-tokens','cancelled-tokens','revisit-tokens','unvisited-tokens','revenue','doctors','departments','doctor-references','sessions','staff','patients','communication','ads-promotion','reports','payouts'],
   receptionist: ['dashboard','doctor-screens','token-manage','add-token','all-tokens','today-tokens','unvisited-tokens','doctor-references','staff','patients'],
   doctor:       ['dashboard','doctor-screens','today-tokens','doctor-references','patients'],
-  accountant:   ['dashboard','revenue','billing','doctor-references','reports','download','payouts'],
+  accountant:   ['dashboard','revenue','billing','doctor-references','reports','payouts'],
   nurse:        ['dashboard','doctor-screens','today-tokens','staff'],
 };
 
@@ -49,14 +49,9 @@ const isItemActive = (item: NavItem, pathname: string, search: string): boolean 
   const [itemBase, itemQuery] = item.path.split('?');
   const normItemPath = itemBase.replace(/\/+$/, '') || '/';
 
-  // If item expects query params (e.g. /hospital/reports?tab=download)
+  // If item expects query params
   if (itemQuery) {
     return normPath === normItemPath && search.includes(itemQuery);
-  }
-
-  // If viewing /hospital/reports with tab=download, regular reports tab should not be active
-  if (item.id === 'reports' && search.includes('tab=download')) {
-    return false;
   }
 
   // Exact path match
@@ -156,7 +151,6 @@ const buildNav = (doctors: HospitalDoctor[], tokens: TokenRecord[]): { section: 
     ]},
     { section: 'Reports & Analytics', items: [
       { id: 'reports', label: 'Reports & Analytics', icon: <BarChart2 size={15} />, path: '/hospital/reports' },
-      { id: 'download', label: 'Download Reports', icon: <Download size={15} />, path: '/hospital/reports?tab=download' },
     ]},
     { section: 'Settings', items: [
       { id: 'settings', label: 'Hospital Settings', icon: <Settings size={15} />, path: '/hospital/settings' },
