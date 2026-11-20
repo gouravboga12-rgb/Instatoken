@@ -2127,7 +2127,7 @@ app.get('/api/hospitals/:id/doctors/:doctorId/session-capacity', async (req, res
           `SELECT LOWER(session) as sess, COUNT(*) as count 
            FROM tokens 
            WHERE doctor_id = $1 
-             AND (token_date = $2 OR data->>'bookingDate' = $2) 
+             AND (token_date::text = $2 OR data->>'bookingDate' = $2) 
              AND status != 'cancelled' 
            GROUP BY LOWER(session)`,
           [doctorId, targetDate]
@@ -4243,7 +4243,7 @@ app.post('/api/razorpay/create-order', async (req, res) => {
         }
 
         const countRes = await query(
-          `SELECT COUNT(*) as count FROM tokens WHERE doctor_id = $1 AND (token_date = $2 OR data->>'bookingDate' = $2) AND LOWER(session) = $3 AND status != 'cancelled'`,
+          `SELECT COUNT(*) as count FROM tokens WHERE doctor_id = $1 AND (token_date::text = $2 OR data->>'bookingDate' = $2) AND LOWER(session) = $3 AND status != 'cancelled'`,
           [targetDocId, targetDate, targetSession]
         );
         const booked = parseInt(countRes.rows[0]?.count, 10) || 0;
@@ -4423,7 +4423,7 @@ app.post('/api/appointments', async (req, res) => {
       }
 
       const countRes = await query(
-        `SELECT COUNT(*) as count FROM tokens WHERE doctor_id = $1 AND (token_date = $2::date OR data->>'bookingDate' = $2) AND LOWER(session) = $3 AND status != 'cancelled' AND id != $4`,
+        `SELECT COUNT(*) as count FROM tokens WHERE doctor_id = $1 AND (token_date::text = $2 OR data->>'bookingDate' = $2) AND LOWER(session) = $3 AND status != 'cancelled' AND id != $4`,
         [appt.doctorId, apptDate, apptSession, appt.id]
       );
       const booked = parseInt(countRes.rows[0]?.count, 10) || 0;
@@ -4457,7 +4457,7 @@ app.post('/api/appointments', async (req, res) => {
   if (isDbConnected) {
     try {
       const maxDbRes = await query(
-        `SELECT COALESCE(MAX(token_number), 0) as max_tok FROM tokens WHERE doctor_id = $1 AND (token_date = $2::date OR data->>'bookingDate' = $2) AND LOWER(session) = $3 AND status != 'cancelled' AND id != $4`,
+        `SELECT COALESCE(MAX(NULLIF(regexp_replace(token_number, '\\D', '', 'g'), '')::integer), 0) as max_tok FROM tokens WHERE doctor_id = $1 AND (token_date::text = $2 OR data->>'bookingDate' = $2) AND LOWER(session) = $3 AND status != 'cancelled' AND id != $4`,
         [appt.doctorId, apptDate, apptSession, appt.id]
       );
       if (maxDbRes.rows && maxDbRes.rows.length > 0 && Number(maxDbRes.rows[0].max_tok) >= assignedTokenNumber) {
