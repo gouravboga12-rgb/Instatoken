@@ -951,29 +951,32 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const [isRefreshingData, setIsRefreshingData] = useState(false);
 
-  // In-place manual refresh callable from any screen / header button without navigating
+  // In-place manual & background refresh callable from any screen / header button without navigating
   const refreshHospitalData = async () => {
     if (!targetHospId) return;
     setIsRefreshingData(true);
     try {
+      const activeAuthToken = authToken || localStorage.getItem('insta_hospital_auth_token') || `htok_${targetHospId}_default`;
       // 1. Fetch live tokens
       const tokRes = await fetch(`/api/hospitals/${targetHospId}/tokens`, {
         headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'x-hospital-token': authToken
+          'Authorization': `Bearer ${activeAuthToken}`,
+          'x-hospital-token': activeAuthToken
         }
       });
       const tokData = await tokRes.json();
       if (tokData.success && Array.isArray(tokData.tokens)) {
-        setTokens(tokData.tokens.filter((t: any) => !isDummyToken(t)));
-        localStorage.setItem(`insta_hospital_tokens_${targetHospId}`, JSON.stringify(tokData.tokens));
+        const cleanTokens = tokData.tokens.filter((t: any) => !isDummyToken(t));
+        setTokens(cleanTokens);
+        localStorage.setItem(`insta_hospital_tokens_${targetHospId}`, JSON.stringify(cleanTokens));
+        localStorage.setItem('insta_hospital_tokens', JSON.stringify(cleanTokens));
       }
 
       // 2. Fetch live doctors
       const docRes = await fetch(`/api/hospitals/${targetHospId}/doctors`, {
         headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'x-hospital-token': authToken
+          'Authorization': `Bearer ${activeAuthToken}`,
+          'x-hospital-token': activeAuthToken
         }
       });
       const docData = await docRes.json();
@@ -985,8 +988,8 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       // 3. Fetch live schedules
       const schedRes = await fetch(`/api/hospitals/${targetHospId}/schedules`, {
         headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'x-hospital-token': authToken
+          'Authorization': `Bearer ${activeAuthToken}`,
+          'x-hospital-token': activeAuthToken
         }
       });
       const schedData = await schedRes.json();
@@ -1000,7 +1003,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   };
 
-  // ─── Socket.io Real-Time Event Listener (Zero-DB Idle Load) ─────────────────
+  // ─── Socket.io Real-Time Event Listener & Resilient Mobile Polling Sync ─────
   useEffect(() => {
     if (!targetHospId || typeof window === 'undefined') return;
 
@@ -1015,13 +1018,21 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       socket = io(socketBackendUrl, {
         transports: ['websocket', 'polling'],
         reconnection: true,
-        reconnectionAttempts: 20,
-        reconnectionDelay: 2000
+        reconnectionAttempts: Infinity,
+        reconnectionDelay: 1500,
+        reconnectionDelayMax: 5000
       });
 
       socket.on('connect', () => {
         console.log('📡 [Socket.io] Connected to InstaToken live server:', socket?.id);
         socket?.emit('join_hospital', { hospitalId: targetHospId });
+        refreshHospitalData();
+      });
+
+      socket.on('reconnect', () => {
+        console.log('📡 [Socket.io] Reconnected to InstaToken live server');
+        socket?.emit('join_hospital', { hospitalId: targetHospId });
+        refreshHospitalData();
       });
 
       // 1. Live Token Booked (Online & Counter)
@@ -1124,7 +1135,33 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       console.warn('Socket.io connection initialization error:', err);
     }
 
+    // 7. Periodic background sync (essential for Mobile WebView where WebSockets can sleep)
+    const syncInterval = setInterval(() => {
+      refreshHospitalData();
+    }, 15000);
+
+    // 8. Refresh immediately on return to app / tab focus
+    const handleVisibilityOrFocus = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        refreshHospitalData();
+      }
+    };
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    }
+    if (typeof window !== 'undefined') {
+      window.addEventListener('focus', handleVisibilityOrFocus);
+    }
+
     return () => {
+      clearInterval(syncInterval);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      }
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('focus', handleVisibilityOrFocus);
+      }
       if (socket) {
         socket.emit('leave_hospital', { hospitalId: targetHospId });
         socket.disconnect();

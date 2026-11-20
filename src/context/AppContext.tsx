@@ -792,6 +792,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .catch(err => console.warn('Failed to fetch customers from server:', err));
   }, []);
 
+  // Auto-upgrade user location to full Rapido/Uber street address if currently only City/State
+  useEffect(() => {
+    if (!userCoords) return;
+    const isBasicLocation = !user?.location || user.location.split(',').length <= 2;
+    if (isBasicLocation) {
+      reverseGeocode(userCoords.lat, userCoords.lng).then(detailed => {
+        if (detailed && detailed.length > 5 && detailed !== 'Current Location' && detailed !== user?.location) {
+          setCurrentLocationState(detailed);
+          localStorage.setItem('insta_location', detailed);
+          setUser(prev => prev ? { ...prev, location: detailed } : null);
+          updateUserProfile({ location: detailed, lat: userCoords.lat, lng: userCoords.lng });
+        }
+      }).catch(() => {});
+    }
+  }, [user?.email, user?.phone, userCoords?.lat, userCoords?.lng]);
+
   // --- Cross-tab & Real-time Global Sync ---
   useEffect(() => {
     const unsubscribe = subscribeGlobalSync((event) => {
@@ -2765,8 +2781,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (data && data.lat && data.lng) {
         const city = data.city || 'Chennai';
         const region = data.region || 'Tamil Nadu';
-        const areaName = `${city}, ${region}`;
         const coords = { lat: Number(data.lat), lng: Number(data.lng) };
+
+        // 1. Detailed Uber/Rapido reverse geocoding from IP coordinates
+        const detailedAddress = await reverseGeocode(coords.lat, coords.lng);
+        const areaName = (detailedAddress && detailedAddress.length > 5 && detailedAddress !== 'Current Location')
+          ? detailedAddress
+          : `${city}, ${region}`;
 
         setUserCoords(coords);
         localStorage.setItem('insta_user_coords', JSON.stringify(coords));
@@ -2793,6 +2814,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const updated = { ...prev, location: areaName, lat: coords.lat, lng: coords.lng };
           localStorage.setItem('insta_user', JSON.stringify(updated));
           return updated;
+        });
+
+        // Persist directly to PostgreSQL customer profile on server
+        updateUserProfile({
+          location: areaName,
+          lat: coords.lat,
+          lng: coords.lng
         });
 
         addNotification(
@@ -2866,6 +2894,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           });
           localStorage.setItem('insta_customers', JSON.stringify(updated));
           return updated;
+        });
+
+        // Persist directly to PostgreSQL customer profile on server
+        updateUserProfile({
+          location: areaName,
+          lat: latitude,
+          lng: longitude
         });
 
         const isIpEstimate = (accuracy || 0) > 4000;

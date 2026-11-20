@@ -242,6 +242,7 @@ export const WebContainerScreen: React.FC<WebContainerScreenProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 0,
   },
   loader: {
     position: 'absolute',
