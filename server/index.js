@@ -4407,6 +4407,38 @@ app.post('/api/appointments', async (req, res) => {
   const apptDate = appt.date || new Date().toISOString().split('T')[0];
   const apptSession = (appt.session || ((appt.time && parseInt(appt.time.split(':')[0], 10) >= 12 && parseInt(appt.time.split(':')[0], 10) < 17) ? 'afternoon' : (appt.time && parseInt(appt.time.split(':')[0], 10) >= 17) ? 'evening' : 'morning')).toLowerCase();
 
+  // Enforce Online Session Hard-Cap
+  const isOnline = appt.type !== 'offline' && (appt.type === 'online' || isFullOnlineBooking);
+  if (isOnline && isDbConnected) {
+    try {
+      let sessionMax = apptSession.includes('morn') ? 30 : 20;
+      if (appt.hospitalId) {
+        const hospDb = await query(`SELECT data FROM hospitals WHERE id = $1`, [appt.hospitalId]);
+        if (hospDb.rows && hospDb.rows.length > 0) {
+          const hData = typeof hospDb.rows[0].data === 'string' ? JSON.parse(hospDb.rows[0].data) : hospDb.rows[0].data;
+          const doc = (hData?.doctors || []).find(d => d.id === appt.doctorId);
+          const sessObj = (doc?.sessions || []).find(s => (s.name || '').toLowerCase() === apptSession);
+          if (sessObj?.maxTokens) sessionMax = parseInt(sessObj.maxTokens, 10);
+        }
+      }
+
+      const countRes = await query(
+        `SELECT COUNT(*) as count FROM tokens WHERE doctor_id = $1 AND (token_date = $2::date OR data->>'bookingDate' = $2) AND LOWER(session) = $3 AND status != 'cancelled' AND id != $4`,
+        [appt.doctorId, apptDate, apptSession, appt.id]
+      );
+      const booked = parseInt(countRes.rows[0]?.count, 10) || 0;
+      if (booked >= sessionMax) {
+        return res.status(400).json({
+          success: false,
+          error: `This OPD session has reached full online capacity (${booked}/${sessionMax} tokens booked). Please select another session or visit the hospital reception desk for walk-in availability.`,
+          code: 'SESSION_CAPACITY_REACHED'
+        });
+      }
+    } catch (checkErr) {
+      console.warn('Error checking session limit:', checkErr.message);
+    }
+  }
+
   // Find max existing token number for this doctor on this date & session
   let assignedTokenNumber = Number(appt.tokenNumber || 0);
   const existingDocTokens = (store.tokens || []).filter(t =>
@@ -4425,7 +4457,7 @@ app.post('/api/appointments', async (req, res) => {
   if (isDbConnected) {
     try {
       const maxDbRes = await query(
-        `SELECT COALESCE(MAX(token_number), 0) as max_tok FROM tokens WHERE doctor_id = $1 AND (token_date = $2 OR data->>'bookingDate' = $2) AND session = $3 AND status != 'cancelled' AND id != $4`,
+        `SELECT COALESCE(MAX(token_number), 0) as max_tok FROM tokens WHERE doctor_id = $1 AND (token_date = $2::date OR data->>'bookingDate' = $2) AND LOWER(session) = $3 AND status != 'cancelled' AND id != $4`,
         [appt.doctorId, apptDate, apptSession, appt.id]
       );
       if (maxDbRes.rows && maxDbRes.rows.length > 0 && Number(maxDbRes.rows[0].max_tok) >= assignedTokenNumber) {
@@ -4444,7 +4476,7 @@ app.post('/api/appointments', async (req, res) => {
     id: appt.id,
     tokenNo: appt.tokenNumber,
     tokenNumber: appt.tokenNumber,
-    type: 'online',
+    type: appt.type || 'online',
     patientName: appt.patientName,
     patientPhone: appt.phone,
     patientAge: appt.age,
@@ -4455,7 +4487,7 @@ app.post('/api/appointments', async (req, res) => {
     doctorId: appt.doctorId,
     doctorName: appt.doctorName,
     departmentName: appt.departmentName,
-    session: (appt.time && parseInt(appt.time.split(':')[0], 10) >= 12 && parseInt(appt.time.split(':')[0], 10) < 17) ? 'afternoon' : (appt.time && parseInt(appt.time.split(':')[0], 10) >= 17) ? 'evening' : 'morning',
+    session: apptSession,
     time: appt.time,
     bookingDate: appt.date || new Date().toISOString().split('T')[0],
     status: appt.status || 'booked',
