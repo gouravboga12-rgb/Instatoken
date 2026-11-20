@@ -2030,17 +2030,29 @@ app.post('/api/hospitals/:id/profile', requireHospitalAuth, async (req, res) => 
 // ─── Hospital Schedules & Booking Rules ──────────────────────────────────────
 app.get('/api/hospitals/:id/schedules', async (req, res) => {
   const { id } = req.params;
-  const store = await getUnifiedStore();
-  const schedule = store.hospitalSchedules?.[id] || {
-    bookingOpensDaysBefore: 3,
-    advanceBookingLimit: 7,
-    bufferTime: 15,
-    dailyTokenLimit: 150,
-    walkInPercentage: 30,
-    onlinePercentage: 70,
-    emergencySlots: 5,
-    autoContinuity: true
-  };
+  let schedule = null;
+  if (isDbConnected) {
+    try {
+      const dbRes = await query(`SELECT schedule_data FROM hospital_schedules WHERE hospital_id = $1`, [id]);
+      if (dbRes.rows && dbRes.rows.length > 0) {
+        schedule = typeof dbRes.rows[0].schedule_data === 'string'
+          ? JSON.parse(dbRes.rows[0].schedule_data)
+          : dbRes.rows[0].schedule_data;
+      }
+    } catch (e) {
+      console.warn('Error fetching schedule from RDS:', e.message);
+    }
+  }
+  if (!schedule) {
+    const store = await getUnifiedStore();
+    schedule = store.hospitalSchedules?.[id] || {
+      advanceBookingLimit: 7,
+      bookingOpensDaysBefore: 7,
+      bufferTime: 15,
+      dailyTokenLimit: 150,
+      autoContinuity: true
+    };
+  }
   res.json({ success: true, hospitalId: id, schedule });
 });
 
@@ -2051,7 +2063,112 @@ app.post('/api/hospitals/:id/schedules', async (req, res) => {
   store.hospitalSchedules = store.hospitalSchedules || {};
   store.hospitalSchedules[id] = schedule;
   await saveUnifiedStore(store);
+
+  if (isDbConnected && schedule) {
+    try {
+      await query(
+        `INSERT INTO hospital_schedules (hospital_id, schedule_data, updated_at)
+         VALUES ($1, $2, NOW())
+         ON CONFLICT (hospital_id) DO UPDATE SET schedule_data = $2, updated_at = NOW()`,
+        [id, JSON.stringify(schedule)]
+      );
+    } catch (dbErr) {
+      console.warn('Error persisting schedule to RDS:', dbErr.message);
+    }
+  }
+
   res.json({ success: true, hospitalId: id, schedule });
+});
+
+// ─── Doctor Session Capacity & Availability API (For Patient Booking Hard-Cap) ─
+app.get('/api/hospitals/:id/doctors/:doctorId/session-capacity', async (req, res) => {
+  try {
+    const { id: hospitalId, doctorId } = req.params;
+    const targetDate = req.query.date || new Date().toISOString().split('T')[0];
+
+    // 1. Fetch Doctor details (specifically sessions & maxTokens)
+    let doctor = null;
+    if (isDbConnected) {
+      try {
+        const hospDb = await query(`SELECT data FROM hospitals WHERE id = $1`, [hospitalId]);
+        if (hospDb.rows && hospDb.rows.length > 0) {
+          const hData = typeof hospDb.rows[0].data === 'string' ? JSON.parse(hospDb.rows[0].data) : hospDb.rows[0].data;
+          doctor = (hData?.doctors || []).find(d => d.id === doctorId);
+        }
+        if (!doctor) {
+          const docDb = await query(`SELECT data FROM hospital_doctors WHERE id = $1 OR doctor_id = $1`, [doctorId]);
+          if (docDb.rows && docDb.rows.length > 0) {
+            doctor = typeof docDb.rows[0].data === 'string' ? JSON.parse(docDb.rows[0].data) : docDb.rows[0].data;
+          }
+        }
+      } catch (e) {
+        console.warn('Error fetching doctor from RDS:', e.message);
+      }
+    }
+
+    if (!doctor) {
+      const store = await getUnifiedStore();
+      const hosp = (store.hospitals || []).find(h => h.id === hospitalId);
+      doctor = (hosp?.doctors || hosp?.data?.doctors || store.doctors || []).find(d => d.id === doctorId);
+    }
+
+    const doctorSessions = (doctor && Array.isArray(doctor.sessions) && doctor.sessions.length > 0)
+      ? doctor.sessions
+      : [
+          { name: 'Morning', maxTokens: 30, active: true },
+          { name: 'Evening', maxTokens: 20, active: true }
+        ];
+
+    // 2. Count active booked tokens (Online + Walk-In Desk) for targetDate
+    const sessionCounts = {};
+    if (isDbConnected) {
+      try {
+        const countRes = await query(
+          `SELECT LOWER(session) as sess, COUNT(*) as count 
+           FROM tokens 
+           WHERE doctor_id = $1 
+             AND (token_date = $2 OR data->>'bookingDate' = $2) 
+             AND status != 'cancelled' 
+           GROUP BY LOWER(session)`,
+          [doctorId, targetDate]
+        );
+        countRes.rows.forEach(r => {
+          sessionCounts[r.sess] = parseInt(r.count, 10) || 0;
+        });
+      } catch (e) {
+        console.warn('Error querying session counts from RDS:', e.message);
+      }
+    }
+
+    const availability = doctorSessions.map(s => {
+      const sKey = (s.name || '').toLowerCase();
+      const booked = sessionCounts[sKey] || 0;
+      const max = parseInt(s.maxTokens, 10) || (sKey.includes('morn') ? 30 : 20);
+      const isFull = booked >= max;
+      return {
+        id: s.id || s.name,
+        name: s.name,
+        startTime: s.startTime || '',
+        endTime: s.endTime || '',
+        maxTokens: max,
+        bookedTokens: booked,
+        remainingSlots: Math.max(0, max - booked),
+        isFull: isFull,
+        active: s.active !== false
+      };
+    });
+
+    res.json({
+      success: true,
+      hospitalId,
+      doctorId,
+      date: targetDate,
+      sessions: availability
+    });
+  } catch (err) {
+    console.error('Error fetching session capacity:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 // ─── Hospital Departments (Phase 21 & 22) ────────────────────────────────────
@@ -4104,7 +4221,44 @@ app.get('/api/razorpay/key', (req, res) => {
 // 2. Create Razorpay Order
 app.post('/api/razorpay/create-order', async (req, res) => {
   try {
-    const { amount, receipt, notes, patientName, patientPhone } = req.body || {};
+    const { amount, receipt, notes, patientName, patientPhone, doctorId, date, session, hospitalId } = req.body || {};
+
+    // Check doctor session capacity before initiating payment
+    const targetDocId = doctorId || notes?.doctorId;
+    const targetDate = date || notes?.date;
+    const targetSession = (session || notes?.session || 'morning').toLowerCase();
+    const targetHospId = hospitalId || notes?.hospitalId;
+
+    if (targetDocId && targetDate && isDbConnected) {
+      try {
+        let maxLimit = targetSession.includes('morn') ? 30 : 20;
+        if (targetHospId) {
+          const hospDb = await query(`SELECT data FROM hospitals WHERE id = $1`, [targetHospId]);
+          if (hospDb.rows && hospDb.rows.length > 0) {
+            const hData = typeof hospDb.rows[0].data === 'string' ? JSON.parse(hospDb.rows[0].data) : hospDb.rows[0].data;
+            const doc = (hData?.doctors || []).find(d => d.id === targetDocId);
+            const matchedSession = (doc?.sessions || []).find(s => (s.name || '').toLowerCase() === targetSession);
+            if (matchedSession?.maxTokens) maxLimit = parseInt(matchedSession.maxTokens, 10);
+          }
+        }
+
+        const countRes = await query(
+          `SELECT COUNT(*) as count FROM tokens WHERE doctor_id = $1 AND (token_date = $2 OR data->>'bookingDate' = $2) AND LOWER(session) = $3 AND status != 'cancelled'`,
+          [targetDocId, targetDate, targetSession]
+        );
+        const booked = parseInt(countRes.rows[0]?.count, 10) || 0;
+        if (booked >= maxLimit) {
+          return res.status(400).json({
+            success: false,
+            message: `This OPD session has reached full capacity (${booked}/${maxLimit} tokens booked). Please select another session or visit the hospital reception counter for walk-in availability.`,
+            code: 'SESSION_CAPACITY_REACHED'
+          });
+        }
+      } catch (checkErr) {
+        console.warn('Error checking session limit before order creation:', checkErr.message);
+      }
+    }
+
     const amtNumber = Number(amount) || 25;
     const amountInPaise = Math.max(100, Math.round(amtNumber * 100)); // Minimum ₹1.00
 

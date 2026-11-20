@@ -107,13 +107,9 @@ export const TokenManage: React.FC = () => {
 
   // Global Config Form State
   const [rulesForm, setRulesForm] = useState({
-    bookingOpensDaysBefore: String(scheduleConfig.bookingOpensDaysBefore || 3),
-    advanceBookingLimit: String(scheduleConfig.advanceBookingLimit || 7),
+    advanceBookingLimit: String(scheduleConfig.advanceBookingLimit || scheduleConfig.bookingOpensDaysBefore || 7),
     bufferTime: String(scheduleConfig.bufferTime || 15),
     dailyTokenLimit: String(scheduleConfig.dailyTokenLimit || 150),
-    walkInPercentage: String(scheduleConfig.walkInPercentage || 50),
-    onlinePercentage: String(scheduleConfig.onlinePercentage || 50),
-    emergencySlots: String(scheduleConfig.emergencySlots || 5),
     autoContinuity: scheduleConfig.autoContinuity ?? true
   });
 
@@ -215,17 +211,15 @@ export const TokenManage: React.FC = () => {
 
   const handleSaveGlobalRules = (e: React.FormEvent) => {
     e.preventDefault();
+    const days = parseInt(rulesForm.advanceBookingLimit) || 7;
     updateScheduleConfig({
-      bookingOpensDaysBefore: parseInt(rulesForm.bookingOpensDaysBefore) || 3,
-      advanceBookingLimit: parseInt(rulesForm.advanceBookingLimit) || 7,
+      advanceBookingLimit: days,
+      bookingOpensDaysBefore: days,
       bufferTime: parseInt(rulesForm.bufferTime) || 15,
       dailyTokenLimit: parseInt(rulesForm.dailyTokenLimit) || 150,
-      walkInPercentage: parseInt(rulesForm.walkInPercentage) || 50,
-      onlinePercentage: parseInt(rulesForm.onlinePercentage) || 50,
-      emergencySlots: parseInt(rulesForm.emergencySlots) || 5,
       autoContinuity: rulesForm.autoContinuity
     });
-    showSuccessNotice('Global hospital token rules saved!');
+    showSuccessNotice('Hospital advance booking rules saved successfully!');
   };
 
   return (
@@ -638,71 +632,23 @@ export const TokenManage: React.FC = () => {
               <Zap size={16} className="text-amber-500" />
               <div>
                 <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">Hospital Booking Rules</h3>
-                <p className="text-[10px] text-slate-400 font-semibold">Advance booking limits & quotas</p>
+                <p className="text-[10px] text-slate-400 font-semibold">Advance booking limits</p>
               </div>
             </div>
 
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">Advance Booking Open Days</label>
-              <input
-                type="number"
-                min={1}
-                max={30}
-                value={rulesForm.bookingOpensDaysBefore}
-                onChange={e => setRulesForm({ ...rulesForm, bookingOpensDaysBefore: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500"
-              />
-              <span className="text-[10px] text-slate-400 font-medium">How many days in advance customer can view slots</span>
-            </div>
-
-            <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">Max Advance Booking Window (Days)</label>
+              <label className="text-xs font-bold text-slate-700 block mb-1">Advance Booking Window (Days)</label>
               <input
                 type="number"
                 min={1}
                 max={60}
                 value={rulesForm.advanceBookingLimit}
                 onChange={e => setRulesForm({ ...rulesForm, advanceBookingLimit: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500"
+                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500"
               />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">Walk-in Quota %</label>
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={rulesForm.walkInPercentage}
-                  onChange={e => setRulesForm({ ...rulesForm, walkInPercentage: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">Online Quota %</label>
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={rulesForm.onlinePercentage}
-                  onChange={e => setRulesForm({ ...rulesForm, onlinePercentage: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">Emergency Reserved Tokens</label>
-              <input
-                type="number"
-                min={0}
-                max={50}
-                value={rulesForm.emergencySlots}
-                onChange={e => setRulesForm({ ...rulesForm, emergencySlots: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500"
-              />
-              <span className="text-[10px] text-slate-400 font-medium">Slots held for priority emergency walk-ins</span>
+              <span className="text-[10px] text-slate-400 font-medium mt-1 block">
+                How many days in advance patients can view and book appointments based on the doctor's weekly shift schedule.
+              </span>
             </div>
 
             <button

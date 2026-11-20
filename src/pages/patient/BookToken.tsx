@@ -128,22 +128,39 @@ export const BookToken: React.FC = () => {
     icon: React.ReactNode;
     activeClass: string;
     iconBg: string;
+    isFull: boolean;
+    booked: number;
+    max: number;
+    remaining: number;
   }
+
+  // Session Capacities: { [sessionLowerName]: { max, booked, remaining, isFull } }
+  const [sessionCapacities, setSessionCapacities] = useState<Record<string, { max: number; booked: number; remaining: number; isFull: boolean }>>({});
 
   const sessionOptions: SessionOptionItem[] = useMemo(() => {
     return activeSessionsList.map((s: any) => {
       const isMorning = s.name.toLowerCase().includes('morn');
       const isAfternoon = s.name.toLowerCase().includes('after');
+      const cap = sessionCapacities[s.name.toLowerCase()];
+      const isFull = cap?.isFull || false;
+      const booked = cap?.booked ?? 0;
+      const max = cap?.max ?? s.maxTokens ?? (isMorning ? 30 : 20);
+      const remaining = cap?.remaining ?? Math.max(0, max - booked);
+
       return {
         id: s.name,
         title: `${s.name} OPD`,
         timing: `${s.startTime} - ${s.endTime}`,
         icon: isMorning ? <Sun size={20} /> : isAfternoon ? <Sun size={20} className="text-amber-500" /> : <Moon size={20} />,
         activeClass: isMorning ? 'bg-amber-50/70 border-amber-400' : isAfternoon ? 'bg-orange-50/70 border-orange-400' : 'bg-blue-50/70 border-blue-500',
-        iconBg: isMorning ? 'bg-amber-100 text-amber-600' : isAfternoon ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'
+        iconBg: isMorning ? 'bg-amber-100 text-amber-600' : isAfternoon ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600',
+        isFull,
+        booked,
+        max,
+        remaining
       };
     });
-  }, [activeSessionsList]);
+  }, [activeSessionsList, sessionCapacities]);
 
   // Resolve doctor's configured working days
   const doctorWorkingDays: string[] = useMemo(() => {
@@ -167,9 +184,8 @@ export const BookToken: React.FC = () => {
     return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   }, [doctor, hospitalId, syncVersion]);
 
-  // Resolve Hospital Booking Rules
+  // Resolve Hospital Booking Rules (Unified Single Advance Booking Window)
   const [scheduleConfig, setScheduleConfig] = useState<{
-    bookingOpensDaysBefore: number;
     advanceBookingLimit: number;
   }>(() => {
     try {
@@ -177,12 +193,11 @@ export const BookToken: React.FC = () => {
       if (saved) {
         const p = JSON.parse(saved);
         return {
-          bookingOpensDaysBefore: Number(p.bookingOpensDaysBefore) || 3,
-          advanceBookingLimit: Number(p.advanceBookingLimit) || 7
+          advanceBookingLimit: Number(p.advanceBookingLimit || p.bookingOpensDaysBefore) || 7
         };
       }
     } catch (e) {}
-    return { bookingOpensDaysBefore: 3, advanceBookingLimit: 7 };
+    return { advanceBookingLimit: 7 };
   });
 
   useEffect(() => {
@@ -192,19 +207,16 @@ export const BookToken: React.FC = () => {
       .then(data => {
         if (data.success && data.schedule) {
           setScheduleConfig({
-            bookingOpensDaysBefore: Number(data.schedule.bookingOpensDaysBefore) || 3,
-            advanceBookingLimit: Number(data.schedule.advanceBookingLimit) || 7
+            advanceBookingLimit: Number(data.schedule.advanceBookingLimit || data.schedule.bookingOpensDaysBefore) || 7
           });
         }
       })
       .catch(() => {});
   }, [hospitalId, syncVersion]);
 
-  // How many days into the future slots can be booked
+  // How many days into the future slots can be booked (Single Unified Setting)
   const maxBookingDays = useMemo(() => {
-    const openDays = Number(scheduleConfig?.bookingOpensDaysBefore) || 3;
-    const maxDays = Number(scheduleConfig?.advanceBookingLimit) || 7;
-    return Math.max(1, Math.min(openDays, maxDays));
+    return Math.max(1, Number(scheduleConfig?.advanceBookingLimit) || 7);
   }, [scheduleConfig]);
 
   const maxAllowedDateStr = useMemo(() => {
@@ -273,6 +285,28 @@ export const BookToken: React.FC = () => {
   useEffect(() => {
     loadRazorpayScript();
   }, []);
+
+  // Fetch real-time session capacities and availability
+  useEffect(() => {
+    if (!hospitalId || !doctor?.id || !selectedDate) return;
+    fetch(`/api/hospitals/${hospitalId}/doctors/${doctor.id}/session-capacity?date=${selectedDate}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.sessions)) {
+          const map: Record<string, any> = {};
+          data.sessions.forEach((s: any) => {
+            map[(s.name || '').toLowerCase()] = {
+              max: s.maxTokens,
+              booked: s.bookedTokens,
+              remaining: s.remainingSlots,
+              isFull: s.isFull
+            };
+          });
+          setSessionCapacities(map);
+        }
+      })
+      .catch(() => {});
+  }, [hospitalId, doctor?.id, selectedDate, syncVersion]);
 
   // Auto-detect current place using Reverse Geocoding
   const handleDetectLocation = () => {
@@ -562,6 +596,11 @@ export const BookToken: React.FC = () => {
     };
 
     const activeSessionObj = sessionOptions.find(s => s.id === selectedSession);
+    if (activeSessionObj?.isFull) {
+      setError(`The ${activeSessionObj.title} is completely full (${activeSessionObj.booked}/${activeSessionObj.max} tokens booked). Please choose another session or visit the hospital reception counter for walk-in availability.`);
+      return;
+    }
+
     const slotTime = activeSessionObj ? `${activeSessionObj.title} (${activeSessionObj.timing})` : '10:00 AM - 12:00 PM';
     const planTitle = isFullOnline ? "Doctor Consultation + Booking Fee" : "InstaToken Booking Charges";
 
@@ -583,11 +622,16 @@ export const BookToken: React.FC = () => {
           receipt: `tok_${Date.now().toString().slice(-8)}`,
           patientName: name.trim(),
           patientPhone: cleanPhone,
+          doctorId: doctor.id,
+          date: selectedDate,
+          session: selectedSession,
+          hospitalId: hospital.id,
           notes: {
             hospitalId: hospital.id,
             doctorId: doctor.id,
             slotDate: selectedDate,
             slotTime: slotTime,
+            session: selectedSession,
             planName: planTitle
           }
         })
@@ -889,31 +933,56 @@ export const BookToken: React.FC = () => {
             <div className="grid grid-cols-2 gap-2">
               {sessionOptions.map((s) => {
                 const isActive = selectedSession === s.id;
+                const isFull = s.isFull;
                 return (
                   <div 
                     key={s.id}
-                    onClick={() => setSelectedSession(s.id as any)}
-                    className={`p-2.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
-                      isActive 
-                        ? 'bg-amber-50/60 border-amber-400 shadow-2xs' 
-                        : 'bg-white border-slate-200 hover:border-slate-300'
+                    onClick={() => {
+                      if (isFull) {
+                        setError(`The ${s.title} is completely full (${s.booked}/${s.max} tokens booked). Please choose another session or visit the hospital reception counter for walk-in availability.`);
+                        return;
+                      }
+                      setSelectedSession(s.id as any);
+                      setError('');
+                    }}
+                    className={`p-2.5 rounded-2xl border transition-all flex items-center justify-between ${
+                      isFull
+                        ? 'bg-slate-50 border-slate-200 opacity-75 cursor-not-allowed'
+                        : isActive 
+                          ? 'bg-amber-50/60 border-amber-400 shadow-2xs cursor-pointer' 
+                          : 'bg-white border-slate-200 hover:border-slate-300 cursor-pointer'
                     }`}
                   >
                     <div className="flex items-center gap-2 min-w-0">
-                      <div className={`w-8 h-8 ${s.iconBg} rounded-xl flex items-center justify-center shrink-0`}>
+                      <div className={`w-8 h-8 ${isFull ? 'bg-slate-200 text-slate-500' : s.iconBg} rounded-xl flex items-center justify-center shrink-0`}>
                         {s.icon}
                       </div>
                       <div className="min-w-0">
-                        <h5 className="text-xs font-extrabold text-slate-900 truncate">{s.title}</h5>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <h5 className="text-xs font-extrabold text-slate-900 truncate">{s.title}</h5>
+                          {isFull ? (
+                            <span className="text-[8.5px] font-black text-rose-600 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded-full">
+                              Full ({s.booked}/{s.max})
+                            </span>
+                          ) : s.booked > 0 ? (
+                            <span className="text-[8.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full">
+                              {s.remaining} left
+                            </span>
+                          ) : null}
+                        </div>
                         <p className="text-[9px] text-slate-500 font-semibold truncate">{s.timing}</p>
                       </div>
                     </div>
 
                     {/* Radio Circle */}
                     <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ml-1 ${
-                      isActive ? 'border-blue-600 bg-blue-600' : 'border-slate-300'
+                      isFull 
+                        ? 'border-slate-300 bg-slate-100' 
+                        : isActive 
+                          ? 'border-blue-600 bg-blue-600' 
+                          : 'border-slate-300'
                     }`}>
-                      {isActive && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                      {!isFull && isActive && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
                     </div>
                   </div>
                 );
