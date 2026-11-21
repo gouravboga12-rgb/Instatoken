@@ -39,6 +39,12 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
   const tomorrowStr = new Date(Date.now() + 86400000).toISOString().split('T')[0];
   const yesterdayStr = new Date(Date.now() - 86400000).toISOString().split('T')[0];
 
+  const resolveTokenDate = (t: any): string => {
+    const raw = t?.bookingDate || t?.date || t?.token_date || t?.appointment_date || '';
+    if (!raw) return todayStr;
+    return String(raw).split('T')[0];
+  };
+
   // Web Audio Calling Chime
   const playCallChime = () => {
     try {
@@ -94,7 +100,7 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
       if (statusTab === 'cancelled' && t.status !== 'cancelled') return false;
 
       // 2. Date Filter
-      const tDate = t.bookingDate || todayStr;
+      const tDate = resolveTokenDate(t);
       if (dateFilter === 'today' && tDate !== todayStr) return false;
       if (dateFilter === 'tomorrow' && tDate !== tomorrowStr) return false;
       if (dateFilter === 'yesterday' && tDate !== yesterdayStr) return false;
@@ -171,7 +177,7 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
   // Helper to check if token matches the active date filter
   const isDateMatching = (t: TokenRecord) => {
     if (dateFilter === 'all') return true;
-    const tDate = t.bookingDate || todayStr;
+    const tDate = resolveTokenDate(t);
     if (dateFilter === 'today') return tDate === todayStr;
     if (dateFilter === 'tomorrow') return tDate === tomorrowStr;
     if (dateFilter === 'yesterday') return tDate === yesterdayStr;
@@ -351,7 +357,7 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
     const sessionObj = doctorSessions.find(s => s.name.toLowerCase() === cleanTarget);
     const maxCapacity = (sessionObj as any)?.maxTokens || (cleanTarget.includes('morn') ? 30 : 20);
 
-    const targetDate = tok.bookingDate || todayStr;
+    const targetDate = resolveTokenDate(tok);
 
     // Validate real-world IST time cutoff
     if (sessionObj && isSessionExpiredInIST(sessionObj.endTime || sessionObj.name, targetDate)) {
@@ -360,7 +366,7 @@ export const DoctorTokenScreen: React.FC<{ doctorIdProp?: string }> = ({ doctorI
     }
     const currentBookedCount = tokens.filter(t =>
       t.doctorId === doctor?.id &&
-      (t.bookingDate || todayStr) === targetDate &&
+      resolveTokenDate(t) === targetDate &&
       (t.session || '').toLowerCase() === cleanTarget &&
       t.status !== 'cancelled' &&
       t.id !== tok.id

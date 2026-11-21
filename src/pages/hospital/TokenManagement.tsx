@@ -1872,7 +1872,8 @@ const TokenTable: React.FC<{
     const matchesStatus = statusFilter === 'all' || t.status === statusFilter;
     const matchesDept = deptFilter === 'all' || t.departmentId === deptFilter;
     const matchesDoc = docFilter === 'all' || t.doctorId === docFilter;
-    const matchesDate = !dateFilter || t.bookingDate === dateFilter || (!t.bookingDate && dateFilter === todayStr);
+    const tDate = String(t.bookingDate || (t as any).date || (t as any).token_date || (t as any).appointment_date || todayStr).split('T')[0];
+    const matchesDate = !dateFilter || tDate === dateFilter;
 
     return matchesSearch && matchesStatus && matchesDept && matchesDoc && matchesDate;
   });
