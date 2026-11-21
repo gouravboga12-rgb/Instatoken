@@ -17,7 +17,7 @@ import { HealthRecords } from './pages/patient/HealthRecords';
 import { Notifications } from './pages/patient/Notifications';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { AdminLogin } from './pages/admin/AdminLogin';
-import { HospitalProvider } from './context/HospitalContext';
+import { HospitalProvider, useHospital } from './context/HospitalContext';
 import { HospitalLogin } from './pages/hospital/HospitalLogin';
 import { HospitalSignup } from './pages/hospital/HospitalSignup';
 import { HospitalLayout } from './pages/hospital/HospitalLayout';
@@ -325,6 +325,7 @@ const ScrollToTop: React.FC = () => {
 
 const AppContent: React.FC = () => {
   const { user } = useApp();
+  const { hospitalUser } = useHospital();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -413,6 +414,11 @@ const AppContent: React.FC = () => {
   // If on /login and already logged in, go straight to home
   if (location.pathname === '/login' && user) {
     return <Navigate to="/" replace />;
+  }
+
+  // If on hospital login route and already logged in, go straight to hospital dashboard
+  if ((location.pathname === '/hospital-login' || location.pathname === '/hospital/login') && hospitalUser) {
+    return <Navigate to="/hospital/dashboard" replace />;
   }
 
   // For website visitors: must log in or choose Guest Login to browse

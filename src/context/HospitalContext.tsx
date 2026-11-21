@@ -607,7 +607,7 @@ export const useHospital = () => {
 };
 
 export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { hospitals, updateHospital, updateHospitalDoctors, updateHospitalDepartments, getOrCreateCustomerAccount, addNotification } = useApp();
+  const { hospitals, updateHospital, updateHospitalDoctors, updateHospitalDepartments, getOrCreateCustomerAccount } = useApp();
 
   const [hospitalUser, setHospitalUser] = useState<HospitalUser | null>(() => {
     const saved = localStorage.getItem('insta_hospital_user');
@@ -1623,7 +1623,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setActiveSection('dashboard');
     if (typeof window !== 'undefined' && (window as any).ReactNativeWebView) {
       try {
-        (window as any).ReactNativeWebView.postMessage(JSON.stringify({ type: 'LOGOUT' }));
+        (window as any).ReactNativeWebView.postMessage(JSON.stringify({ type: 'LOGOUT', role: 'hospital' }));
       } catch (e) {
         // ignore
       }
@@ -2752,29 +2752,6 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       } catch (e) { }
       return updated;
     });
-
-    // Directly insert into patient notifications storage for current browser
-    try {
-      const hospName = hospitalProfile?.name || hospitalUser?.hospitalName || 'Hospital';
-      const patientNotifTitle = msg.type === 'push' ? `Push Alert • ${hospName}` : `Hospital Alert • ${hospName}`;
-      const savedNotifsRaw = localStorage.getItem('insta_notifications');
-      const savedNotifs = savedNotifsRaw ? JSON.parse(savedNotifsRaw) : [];
-      const newPatientNotif = {
-        id: newNotif.id,
-        title: patientNotifTitle,
-        message: msg.message,
-        type: 'info' as const,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        read: false
-      };
-      const updatedPatientNotifs = [newPatientNotif, ...savedNotifs.filter((n: any) => n.id !== newNotif.id)];
-      localStorage.setItem('insta_notifications', JSON.stringify(updatedPatientNotifs));
-      if (typeof addNotification === 'function') {
-        addNotification(patientNotifTitle, msg.message, 'info');
-      }
-    } catch (e) {
-      console.warn('Error writing patient notification:', e);
-    }
 
     // 1. Post to AWS server so other devices and web users receive broadcast
     const token = authToken || localStorage.getItem('insta_hospital_auth_token') || `htok_${hospId}_default`;

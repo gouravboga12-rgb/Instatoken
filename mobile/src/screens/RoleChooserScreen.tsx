@@ -63,7 +63,7 @@ export const RoleChooserScreen: React.FC<RoleChooserScreenProps> = ({ navigation
             style={styles.cardWrapper}
             onPress={() =>
               navigation.navigate('WebContainer', {
-                initialUrl: 'https://instatoken.in/login',
+                initialUrl: 'https://instatoken.in/',
                 title: 'Patient Portal',
                 role: 'patient',
               })
@@ -114,7 +114,7 @@ export const RoleChooserScreen: React.FC<RoleChooserScreenProps> = ({ navigation
             style={styles.cardWrapper}
             onPress={() =>
               navigation.navigate('WebContainer', {
-                initialUrl: 'https://instatoken.in/hospital-login',
+                initialUrl: 'https://instatoken.in/hospital/dashboard',
                 title: 'Hospital Portal',
                 role: 'hospital',
               })

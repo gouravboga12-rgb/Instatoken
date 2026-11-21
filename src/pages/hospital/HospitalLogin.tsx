@@ -1,12 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useHospital } from '../../context/HospitalContext';
 import { Activity, Eye, EyeOff, AlertCircle, ArrowRight, Building2, Shield } from 'lucide-react';
 import { ForgotPasswordModal } from '../../components/common/ForgotPasswordModal';
 
 export const HospitalLogin: React.FC = () => {
-  const { hospitalLogin } = useHospital();
+  const { hospitalUser, hospitalLogin } = useHospital();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (hospitalUser) {
+      navigate('/hospital/dashboard', { replace: true });
+    }
+  }, [hospitalUser, navigate]);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);

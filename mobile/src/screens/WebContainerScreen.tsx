@@ -18,6 +18,7 @@ import { GOOGLE_WEB_CLIENT_ID } from '../context/AuthContext';
 import * as Haptics from 'expo-haptics';
 import * as Speech from 'expo-speech';
 import * as Notifications from 'expo-notifications';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 
 interface WebContainerScreenProps {
@@ -98,7 +99,11 @@ export const WebContainerScreen: React.FC<WebContainerScreenProps> = ({
     };
   }, [canGoBack]);
 
-  const registerPushToken = async (patientPhone?: string, patientTokenId?: string) => {
+  const registerPushToken = async (
+    patientPhone?: string,
+    patientTokenId?: string,
+    clientRole: 'patient' | 'hospital' = 'patient'
+  ) => {
     try {
       const { status } = await Notifications.getPermissionsAsync();
       if (status === 'granted') {
@@ -107,9 +112,10 @@ export const WebContainerScreen: React.FC<WebContainerScreenProps> = ({
         if (fcmToken) {
           await axios.post('https://instatoken.in/api/notifications/register-token', {
             fcmToken,
-            phone: patientPhone || undefined,
-            tokenId: patientTokenId || undefined,
-            platform: Platform.OS
+            phone: clientRole === 'patient' ? patientPhone || undefined : undefined,
+            tokenId: clientRole === 'patient' ? patientTokenId || undefined : undefined,
+            platform: Platform.OS,
+            role: clientRole,
           });
         }
       }
@@ -123,7 +129,22 @@ export const WebContainerScreen: React.FC<WebContainerScreenProps> = ({
       const data = JSON.parse(event.nativeEvent.data);
 
       if (data.type === 'LOGOUT') {
-        // Return to Role Chooser on logout
+        const logoutRole = data.role || role;
+        try {
+          const savedRole = await AsyncStorage.getItem('saved_active_role');
+          if (savedRole === logoutRole) {
+            await AsyncStorage.removeItem('saved_active_role');
+          }
+          if (logoutRole === 'patient') {
+            const tokenData = await Notifications.getDevicePushTokenAsync().catch(() => null);
+            if (tokenData?.data) {
+              axios
+                .post('https://instatoken.in/api/notifications/unregister-token', { fcmToken: tokenData.data })
+                .catch(() => {});
+            }
+          }
+        } catch (e) {}
+
         navigation.reset({
           index: 0,
           routes: [{ name: 'RoleChooser' }],
@@ -131,7 +152,11 @@ export const WebContainerScreen: React.FC<WebContainerScreenProps> = ({
       } else if (data.type === 'GOOGLE_SIGN_IN') {
         await triggerNativeGoogleSignIn();
       } else if (data.type === 'REGISTER_PUSH' || data.type === 'PATIENT_LOGGED_IN') {
-        await registerPushToken(data.phone, data.tokenId);
+        await AsyncStorage.setItem('saved_active_role', 'patient');
+        await registerPushToken(data.phone, data.tokenId, 'patient');
+      } else if (data.type === 'HOSPITAL_LOGGED_IN') {
+        await AsyncStorage.setItem('saved_active_role', 'hospital');
+        await registerPushToken(undefined, undefined, 'hospital');
       } else if (data.type === 'SHARE') {
         try {
           await Share.share({
@@ -200,8 +225,10 @@ export const WebContainerScreen: React.FC<WebContainerScreenProps> = ({
       const origRemove = localStorage.removeItem.bind(localStorage);
       localStorage.removeItem = function(key) {
         origRemove(key);
-        if (key === 'insta_user' || key === 'insta_hospital_user' || key === 'insta_hospital_auth_token') {
-          window.ReactNativeWebView?.postMessage(JSON.stringify({ type: 'LOGOUT' }));
+        if (key === 'insta_user' && window.__NATIVE_ROLE__ === 'patient') {
+          window.ReactNativeWebView?.postMessage(JSON.stringify({ type: 'LOGOUT', role: 'patient' }));
+        } else if ((key === 'insta_hospital_user' || key === 'insta_hospital_auth_token') && window.__NATIVE_ROLE__ === 'hospital') {
+          window.ReactNativeWebView?.postMessage(JSON.stringify({ type: 'LOGOUT', role: 'hospital' }));
         }
       };
 
@@ -214,22 +241,39 @@ export const WebContainerScreen: React.FC<WebContainerScreenProps> = ({
             if (u && u.phone) {
               window.ReactNativeWebView?.postMessage(JSON.stringify({
                 type: 'REGISTER_PUSH',
-                phone: u.phone
+                phone: u.phone,
+                role: 'patient'
               }));
             }
           } catch(e) {}
+        } else if (key === 'insta_hospital_user') {
+          window.ReactNativeWebView?.postMessage(JSON.stringify({
+            type: 'HOSPITAL_LOGGED_IN',
+            role: 'hospital'
+          }));
         }
       };
 
       setTimeout(function() {
         try {
-          const raw = localStorage.getItem('insta_user');
-          if (raw) {
-            const u = JSON.parse(raw);
-            if (u && u.phone) {
+          if (window.__NATIVE_ROLE__ === 'patient') {
+            const raw = localStorage.getItem('insta_user');
+            if (raw) {
+              const u = JSON.parse(raw);
+              if (u && u.phone) {
+                window.ReactNativeWebView?.postMessage(JSON.stringify({
+                  type: 'REGISTER_PUSH',
+                  phone: u.phone,
+                  role: 'patient'
+                }));
+              }
+            }
+          } else if (window.__NATIVE_ROLE__ === 'hospital') {
+            const rawH = localStorage.getItem('insta_hospital_user');
+            if (rawH) {
               window.ReactNativeWebView?.postMessage(JSON.stringify({
-                type: 'REGISTER_PUSH',
-                phone: u.phone
+                type: 'HOSPITAL_LOGGED_IN',
+                role: 'hospital'
               }));
             }
           }
@@ -271,19 +315,29 @@ export const WebContainerScreen: React.FC<WebContainerScreenProps> = ({
         onNavigationStateChange={(navState) => {
           setCanGoBack(navState.canGoBack);
           const url = navState.url || '';
-          const isAuthPage =
-            url.includes('/login') ||
-            url.includes('/hospital-login') ||
-            url.includes('/hospital/login');
+          const isPatientAuthPage = (url.includes('/login') || url.endsWith('/login')) && !url.includes('/hospital');
+          const isHospitalAuthPage = url.includes('/hospital-login') || url.includes('/hospital/login');
 
-          if (!isAuthPage) {
-            setHasVisitedApp(true);
-          } else if (hasVisitedApp) {
-            // User was inside the app and redirected back to login page -> trigger return to RoleChooser
-            navigation.reset({
-              index: 0,
-              routes: [{ name: 'RoleChooser' }],
-            });
+          if (role === 'patient') {
+            if (!isPatientAuthPage) {
+              setHasVisitedApp(true);
+            } else if (hasVisitedApp) {
+              AsyncStorage.removeItem('saved_active_role').catch(() => {});
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'RoleChooser' }],
+              });
+            }
+          } else if (role === 'hospital') {
+            if (!isHospitalAuthPage) {
+              setHasVisitedApp(true);
+            } else if (hasVisitedApp) {
+              AsyncStorage.removeItem('saved_active_role').catch(() => {});
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'RoleChooser' }],
+              });
+            }
           }
         }}
         onLoadStart={() => setLoading(true)}

@@ -43,20 +43,23 @@ async function sendFcmCallingAlert(phone, tokenId, callPayload) {
   try {
     const admin = require('firebase-admin');
     const cleanPhone = phone ? String(phone).replace(/\D/g, '').slice(-10) : '';
+    const cleanTokenId = tokenId ? String(tokenId) : '';
+    if (!cleanPhone && !cleanTokenId) return;
+
     const tokens = new Set();
 
     if (cleanPhone && fcmTokensStore[cleanPhone]) {
       fcmTokensStore[cleanPhone].forEach(t => tokens.add(t));
     }
-    if (tokenId && fcmTokensStore[tokenId]) {
-      fcmTokensStore[tokenId].forEach(t => tokens.add(t));
+    if (cleanTokenId && fcmTokensStore[cleanTokenId]) {
+      fcmTokensStore[cleanTokenId].forEach(t => tokens.add(t));
     }
 
     if (isDbConnected) {
       try {
         const dbRes = await query(
-          `SELECT token FROM fcm_tokens WHERE phone = $1 OR token_id = $2`,
-          [cleanPhone || 'none', String(tokenId || 'none')]
+          `SELECT token FROM fcm_tokens WHERE (phone IS NOT NULL AND phone = $1) OR (token_id IS NOT NULL AND token_id = $2)`,
+          [cleanPhone || 'invalid_phone', cleanTokenId || 'invalid_token']
         );
         dbRes.rows.forEach(r => tokens.add(r.token));
       } catch (e) {
@@ -3958,12 +3961,29 @@ app.post('/api/hospitals/:hospitalId/tokens/:tokenId/call', requireHospitalAuth,
 
 // ─── Register FCM Push Token for Patient / Device ────────────────────────────
 app.post('/api/notifications/register-token', async (req, res) => {
-  const { phone, tokenId, fcmToken, platform = 'android' } = req.body;
+  const { phone, tokenId, fcmToken, platform = 'android', role = 'patient' } = req.body;
   if (!fcmToken) {
     return res.status(400).json({ success: false, error: 'fcmToken is required' });
   }
 
   const cleanPhone = phone ? String(phone).replace(/\D/g, '').slice(-10) : '';
+
+  // 1. Remove this device token from all existing entries in memory to prevent cross-account leakage
+  for (const key of Object.keys(fcmTokensStore)) {
+    if (fcmTokensStore[key] && fcmTokensStore[key].has(fcmToken)) {
+      fcmTokensStore[key].delete(fcmToken);
+    }
+  }
+
+  // 2. Only associate with phone if role is patient and valid phone provided
+  if (role === 'patient' && cleanPhone) {
+    if (!fcmTokensStore[cleanPhone]) fcmTokensStore[cleanPhone] = new Set();
+    fcmTokensStore[cleanPhone].add(fcmToken);
+  }
+  if (role === 'patient' && tokenId) {
+    if (!fcmTokensStore[tokenId]) fcmTokensStore[tokenId] = new Set();
+    fcmTokensStore[tokenId].add(fcmToken);
+  }
 
   if (isDbConnected) {
     try {
@@ -3974,34 +3994,50 @@ app.post('/api/notifications/register-token', async (req, res) => {
           phone VARCHAR(20),
           token_id VARCHAR(100),
           platform VARCHAR(20),
+          role VARCHAR(20) DEFAULT 'patient',
           updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
         )
       `);
       await query(`
-        INSERT INTO fcm_tokens (token, phone, token_id, platform, updated_at)
-        VALUES ($1, $2, $3, $4, NOW())
+        INSERT INTO fcm_tokens (token, phone, token_id, platform, role, updated_at)
+        VALUES ($1, $2, $3, $4, $5, NOW())
         ON CONFLICT (token) DO UPDATE SET
-          phone = COALESCE(EXCLUDED.phone, fcm_tokens.phone),
-          token_id = COALESCE(EXCLUDED.token_id, fcm_tokens.token_id),
+          phone = EXCLUDED.phone,
+          token_id = EXCLUDED.token_id,
           platform = EXCLUDED.platform,
+          role = EXCLUDED.role,
           updated_at = NOW()
-      `, [fcmToken, cleanPhone || null, tokenId || null, platform]);
+      `, [fcmToken, (role === 'patient' ? cleanPhone : null) || null, (role === 'patient' ? tokenId : null) || null, platform, role]);
     } catch (e) {
       console.warn('RDS FCM token save error:', e.message);
     }
   }
 
-  if (cleanPhone) {
-    if (!fcmTokensStore[cleanPhone]) fcmTokensStore[cleanPhone] = new Set();
-    fcmTokensStore[cleanPhone].add(fcmToken);
-  }
-  if (tokenId) {
-    if (!fcmTokensStore[tokenId]) fcmTokensStore[tokenId] = new Set();
-    fcmTokensStore[tokenId].add(fcmToken);
+  console.log(`📲 [FCM] Device token registered: role=${role}, phone=${cleanPhone || 'none'}, tokenId=${tokenId || 'none'}`);
+  res.json({ success: true, message: 'FCM Token registered successfully' });
+});
+
+// ─── Unregister FCM Push Token on Logout ─────────────────────────────────────
+app.post('/api/notifications/unregister-token', async (req, res) => {
+  const { fcmToken } = req.body;
+  if (!fcmToken) {
+    return res.json({ success: true });
   }
 
-  console.log(`📲 [FCM] Device token registered: phone=${cleanPhone || 'anon'}, tokenId=${tokenId || 'none'}`);
-  res.json({ success: true, message: 'FCM Token registered successfully' });
+  for (const key of Object.keys(fcmTokensStore)) {
+    if (fcmTokensStore[key] && fcmTokensStore[key].has(fcmToken)) {
+      fcmTokensStore[key].delete(fcmToken);
+    }
+  }
+
+  if (isDbConnected) {
+    try {
+      await query(`UPDATE fcm_tokens SET phone = NULL, token_id = NULL, updated_at = NOW() WHERE token = $1`, [fcmToken]);
+    } catch (e) {}
+  }
+
+  console.log(`📲 [FCM] Device token unregistered from active patient routing`);
+  res.json({ success: true, message: 'FCM Token unregistered successfully' });
 });
 
 // ─── Out-of-Order Cabin Admission & Auto-Hold ───────────────────────

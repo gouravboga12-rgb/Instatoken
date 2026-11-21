@@ -428,6 +428,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return MOCK_CUSTOMERS;
   });
 
+  // Load account-scoped notifications whenever user logs in or out
+  useEffect(() => {
+    const phoneKey = user?.phone ? String(user.phone).replace(/\D/g, '').slice(-10) : 'guest';
+    const notifKey = `insta_notifications_${phoneKey}`;
+    try {
+      const saved = localStorage.getItem(notifKey) || (phoneKey === 'guest' ? localStorage.getItem('insta_notifications') : null);
+      if (saved) {
+        setNotifications(JSON.parse(saved));
+        return;
+      }
+    } catch (e) {}
+
+    setNotifications([
+      {
+        id: `notif-welcome-${phoneKey}`,
+        title: "Welcome to InstaToken!",
+        message: "Book digital OPD tokens and skip waiting lines at hospitals near you.",
+        type: "info",
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        read: false
+      }
+    ]);
+  }, [user?.phone]);
+
   const [currentLocation, setCurrentLocationState] = useState<string>(() => {
     return localStorage.getItem('insta_location') || "Koramangala, Bengaluru";
   });
@@ -948,12 +972,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
 
       } else if (event.type === 'HOSPITAL_TOKEN_CALLED') {
-        const { tokenNo, patientName, doctorName, hospitalName } = event.data || {};
-        addNotification(
-          `Token #${tokenNo} Called!`,
-          `Please proceed to consultation room. Dr. ${doctorName || 'Doctor'} at ${hospitalName || 'Hospital'} is calling ${patientName || 'you'}.`,
-          'info'
-        );
+        const { tokenNo, patientName, doctorName, hospitalName, patientPhone, phone } = event.data || {};
+        const targetPhone = String(patientPhone || phone || '').replace(/\D/g, '').slice(-10);
+        let myPhone = (user?.phone || '').replace(/\D/g, '').slice(-10);
+        if (!myPhone) {
+          try {
+            const rawU = localStorage.getItem('insta_user');
+            if (rawU) {
+              const u = JSON.parse(rawU);
+              myPhone = String(u.phone || '').replace(/\D/g, '').slice(-10);
+            }
+          } catch (e) {}
+        }
+
+        // Strict 1-to-1 targeting: NEVER alert unless this patient matches the called phone
+        if (myPhone && targetPhone && myPhone === targetPhone) {
+          addNotification(
+            `Token #${tokenNo} Called!`,
+            `Please proceed to consultation room. Dr. ${doctorName || 'Doctor'} at ${hospitalName || 'Hospital'} is calling ${patientName || 'you'}.`,
+            'info'
+          );
+        }
 
       } else if (event.type === 'APPOINTMENT_ADDED') {
         const appt = event.data;
@@ -1663,10 +1702,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const logout = () => {
     setUser(null);
     localStorage.removeItem('insta_user');
+    localStorage.removeItem('customer_token');
+    localStorage.removeItem('customer_user');
+    setNotifications([]);
     addNotification("Logged Out", "You have successfully logged out of your account.", "info");
     if (typeof window !== 'undefined' && (window as any).ReactNativeWebView) {
       try {
-        (window as any).ReactNativeWebView.postMessage(JSON.stringify({ type: 'LOGOUT' }));
+        (window as any).ReactNativeWebView.postMessage(JSON.stringify({ type: 'LOGOUT', role: 'patient' }));
       } catch (e) {
         // ignore
       }
@@ -2421,6 +2463,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setNotifications(prev => {
       const updated = [newNotif, ...prev.filter(n => n.id !== newNotif.id)];
       try {
+        const phoneKey = user?.phone ? String(user.phone).replace(/\D/g, '').slice(-10) : 'guest';
+        localStorage.setItem(`insta_notifications_${phoneKey}`, JSON.stringify(updated));
         localStorage.setItem('insta_notifications', JSON.stringify(updated));
       } catch (e) {}
       return updated;

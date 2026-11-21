@@ -92,7 +92,7 @@ export const MyBookings: React.FC = () => {
       if (!a || !a.id || deletedSet.has(a.id)) return;
       if (a.id === 'tok-1001' || a.patientName === 'Guest Patient') return;
 
-      // When patient is logged in, filter to show only this user's appointments
+      // When patient is logged in, filter strictly to show only this user's appointments
       if (user) {
         const uPhone = (user.phone || '').replace(/\D/g, '').slice(-10);
         const aPhone = (a.phone || '').replace(/\D/g, '').slice(-10);
@@ -100,7 +100,20 @@ export const MyBookings: React.FC = () => {
         const aEmail = (a.email || '').trim().toLowerCase();
         const hasPhoneMatch = Boolean(uPhone && aPhone && uPhone === aPhone);
         const hasEmailMatch = Boolean(uEmail && aEmail && uEmail === aEmail);
-        if (uPhone && aPhone && !hasPhoneMatch && (!uEmail || !hasEmailMatch)) {
+        if (!hasPhoneMatch && (!uEmail || !hasEmailMatch)) {
+          return;
+        }
+      } else {
+        // Unauthenticated visitor / Guest: ONLY show appointments booked in this guest session
+        let guestTokenIds: string[] = [];
+        try {
+          const single = sessionStorage.getItem('insta_guest_token_id') || localStorage.getItem('insta_guest_token_id');
+          if (single) guestTokenIds.push(single);
+          const multi = JSON.parse(sessionStorage.getItem('insta_guest_token_ids') || localStorage.getItem('insta_guest_token_ids') || '[]');
+          if (Array.isArray(multi)) guestTokenIds.push(...multi);
+        } catch (e) {}
+
+        if (!guestTokenIds.includes(a.id)) {
           return;
         }
       }

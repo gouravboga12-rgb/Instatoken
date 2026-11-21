@@ -1842,7 +1842,7 @@ const TokenTable: React.FC<{
   isUnvisitedView,
   onIssueFollowUp
 }) => {
-  const { updateTokenStatus, updateTokenPayment, cancelToken, markTokensUnvisited, departments, doctors, hospitalProfile, patients } = useHospital();
+  const { updateTokenStatus, callPatientToken, updateTokenPayment, cancelToken, markTokensUnvisited, departments, doctors, hospitalProfile, patients } = useHospital();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [deptFilter, setDeptFilter] = useState('all');
@@ -2398,10 +2398,11 @@ const TokenTable: React.FC<{
           token={callConfirmToken}
           onConfirm={() => {
             playCallingChime();
-            updateTokenStatus(callConfirmToken.id, 'calling');
+            callPatientToken(callConfirmToken.id);
             broadcastGlobalSync('HOSPITAL_TOKEN_CALLED', {
               tokenNo: callConfirmToken.tokenNo,
               patientName: callConfirmToken.patientName,
+              patientPhone: callConfirmToken.patientPhone || (callConfirmToken as any).phone,
               doctorName: callConfirmToken.doctorName,
               hospitalName: hospitalProfile?.name,
               hospitalId: callConfirmToken.hospitalId

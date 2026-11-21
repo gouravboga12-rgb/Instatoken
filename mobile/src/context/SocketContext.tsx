@@ -40,11 +40,6 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     s.on('TOKEN_CALLED', (data: any) => {
       console.log('📢 Realtime Token Called:', data);
       setActiveCallingToken(data);
-      try {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      } catch (e) {
-        // ignore
-      }
     });
 
     s.on('QUEUE_ADVANCED', (data: any) => {
