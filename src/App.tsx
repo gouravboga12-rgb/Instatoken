@@ -388,6 +388,10 @@ const AppContent: React.FC = () => {
     location.pathname.startsWith('/contact')
   );
   const isPublicRoute = isManagementRoute || isConfirmationRoute || isLegalRoute || isAuthRoute;
+  const isNativeApp = typeof window !== 'undefined' && Boolean((window as any).__IS_INSTATOKEN_NATIVE_APP__);
+  const [isGuestMode, setIsGuestMode] = useState<boolean>(() => {
+    return typeof window !== 'undefined' && sessionStorage.getItem('insta_guest_mode') === 'true';
+  });
 
   // Always show Splash Screen first only for customer account routes (400ms ultra-short)
   if (showSplash && !isManagementRoute && !isConfirmationRoute && !isLegalRoute && !isAuthRoute) {
@@ -411,7 +415,8 @@ const AppContent: React.FC = () => {
     return <Navigate to="/" replace />;
   }
 
-  if (!user && !isPublicRoute) {
+  // For website visitors: must log in or choose Guest Login to browse
+  if (!user && !isGuestMode && !isNativeApp && !isPublicRoute) {
     return (
       <Login 
         onSuccess={() => {
@@ -419,6 +424,13 @@ const AppContent: React.FC = () => {
           setShowSplash(false);
           navigate('/');
         }} 
+        onGuestLogin={() => {
+          sessionStorage.setItem('insta_guest_mode', 'true');
+          setIsGuestMode(true);
+          sessionStorage.setItem('insta_splash_viewed', 'true');
+          setShowSplash(false);
+          navigate('/');
+        }}
       />
     );
   }
@@ -512,7 +524,19 @@ const AppContent: React.FC = () => {
           <Route path="/admin/payouts" element={<AdminGuard><AdminDashboard initialTab="hospital-payouts" /></AdminGuard>} />
 
           {/* Hospital Panel routes */}
-          <Route path="/login" element={<Login onSuccess={() => navigate('/')} />} />
+          <Route 
+            path="/login" 
+            element={
+              <Login 
+                onSuccess={() => navigate('/')} 
+                onGuestLogin={() => {
+                  sessionStorage.setItem('insta_guest_mode', 'true');
+                  setIsGuestMode(true);
+                  navigate('/');
+                }} 
+              />
+            } 
+          />
           <Route path="/hospital-login" element={<HospitalLogin />} />
           <Route path="/hospital-signup" element={<HospitalSignup />} />
           <Route path="/hospital/login" element={<HospitalLogin />} />

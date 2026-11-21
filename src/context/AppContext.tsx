@@ -309,8 +309,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try {
         const parsed = JSON.parse(saved);
         if (parsed) {
-          // Completely remove legacy "Guest Patient" account
-          if (parsed.name === "Guest Patient" || parsed.email === "patient@example.com") {
+          // Completely remove legacy "Guest Patient" or generic "Patient" account so visitors are not auto-logged-in
+          if (
+            parsed.name === "Guest Patient" || 
+            parsed.name === "Patient" || 
+            parsed.name === "Valued Patient" ||
+            parsed.email === "patient@example.com" ||
+            (!parsed.phone && (!parsed.email || parsed.email.endsWith('@patient.instatoken.in')))
+          ) {
             delete localStorage['insta_user'];
             return null;
           }
