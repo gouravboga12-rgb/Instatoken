@@ -610,73 +610,25 @@ export const Login: React.FC<LoginProps> = ({ onSuccess, onGuestLogin }) => {
     <div className="min-h-screen bg-gradient-to-b from-[#eaf2fc] via-[#f4f8fd] to-[#f8fbff] flex flex-col justify-between items-center relative overflow-x-hidden selection:bg-blue-100">
       
       {/* =========================================================================
-          MOBILE & TABLET VIEW (< lg) - Exactly matching Reference UI template (Image 82)
+          MOBILE & TABLET VIEW (< lg) - Fits cleanly on screen without scrolling
           ========================================================================= */}
-      <div className="w-full flex-1 flex flex-col items-center justify-between lg:hidden">
-        {/* Top Hero Banner matching Reference UI template */}
-        <div className="w-full relative overflow-hidden bg-gradient-to-r from-[#0047b3] via-[#005cdb] to-[#0047b3] pt-11 sm:pt-12">
-          <img 
-            src="/mobile_login_hero.png" 
-            alt="InstaToken - Smart Queue. Better Care" 
-            className="w-full max-w-xl mx-auto h-auto block select-none"
-          />
+      <div className="w-full flex-1 flex flex-col justify-between items-center lg:hidden px-4 py-3 min-h-[100dvh]">
+        {/* Top Minimal Branding Header */}
+        <div className="w-full text-center pt-2 pb-1 shrink-0">
+          <div className="inline-flex items-center gap-2">
+            <span className="text-xl font-black text-[#0f52ba] tracking-tight font-heading">Insta<span className="text-[#10b981]">Token</span></span>
+          </div>
         </div>
 
-        {/* Floating White Card Overlapping Hero Header */}
-        <div className="w-full max-w-[440px] px-4 -mt-5 sm:-mt-8 relative z-10">
-          <div className="bg-white rounded-[28px] sm:rounded-[32px] p-6 sm:p-7 shadow-[0_16px_45px_-8px_rgba(15,45,130,0.14)] border border-blue-100/80">
+        {/* Floating White Card */}
+        <div className="w-full max-w-[420px] my-auto">
+          <div className="bg-white rounded-[24px] p-5 shadow-[0_12px_36px_-6px_rgba(15,45,130,0.12)] border border-blue-100/80">
             {renderFormContent()}
           </div>
         </div>
 
-        {/* 3 Trust Pillars underneath Card matching Reference UI template */}
-        <div className="w-full max-w-[440px] mx-auto px-4 my-6 flex items-center justify-between text-center relative z-10">
-          {/* Pillar 1: Instant Access */}
-          <div className="flex-1 flex flex-col items-center">
-            <div className="w-11 h-11 rounded-full bg-[#dcfce7] flex items-center justify-center text-[#16a34a] mb-1.5 shadow-xs">
-              <Zap className="w-5 h-5 fill-[#16a34a] text-[#16a34a]" />
-            </div>
-            <span className="text-xs sm:text-[13px] font-black text-[#0f172a] tracking-tight font-heading">
-              Instant Access
-            </span>
-          </div>
-
-          <div className="h-10 w-[1.5px] bg-blue-200/60 mx-1 shrink-0" />
-
-          {/* Pillar 2: Secure & Reliable */}
-          <div className="flex-1 flex flex-col items-center">
-            <div className="w-11 h-11 rounded-full bg-[#dcfce7] flex items-center justify-center text-[#16a34a] mb-1.5 shadow-xs">
-              <ShieldCheck className="w-5 h-5 fill-[#16a34a] text-white" />
-            </div>
-            <span className="text-xs sm:text-[13px] font-black text-[#0f172a] tracking-tight font-heading">
-              Secure &amp; Reliable
-            </span>
-          </div>
-
-          <div className="h-10 w-[1.5px] bg-blue-200/60 mx-1 shrink-0" />
-
-          {/* Pillar 3: 24x7 Support */}
-          <div className="flex-1 flex flex-col items-center">
-            <div className="w-11 h-11 rounded-full bg-[#dcfce7] flex items-center justify-center text-[#16a34a] mb-1.5 shadow-xs">
-              <Headphones className="w-5 h-5 text-[#16a34a] stroke-[2.5]" />
-            </div>
-            <span className="text-xs sm:text-[13px] font-black text-[#0f172a] tracking-tight font-heading">
-              24×7 Support
-            </span>
-          </div>
-        </div>
-
-        {/* Bottom Graphic Waves and Skyline matching Reference UI template */}
-        <div className="w-full mt-auto relative overflow-hidden pointer-events-none select-none">
-          <img 
-            src="/bottom_waves_clean.png" 
-            alt="" 
-            className="w-full max-w-2xl mx-auto object-cover object-bottom h-[65px] sm:h-[85px]" 
-          />
-        </div>
-
         {/* Mobile Legal Strip */}
-        <div className="w-full py-3 px-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[11px] text-slate-500 font-medium z-10 bg-white/70 border-t border-blue-50">
+        <div className="w-full py-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-0.5 text-[10.5px] text-slate-400 font-medium shrink-0">
           <a href="/terms" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 transition-colors">Terms &amp; Conditions</a>
           <span>•</span>
           <a href="/privacy" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 transition-colors">Privacy Policy</a>

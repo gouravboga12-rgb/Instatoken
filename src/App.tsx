@@ -435,8 +435,8 @@ const AppContent: React.FC = () => {
     );
   }
 
-  // Show bottom nav bar on all patient routes (non-admin routes)
-  const showBottomNav = !isManagementRoute;
+  // Show bottom nav bar on all patient routes (non-admin routes, never on auth/login routes)
+  const showBottomNav = !isManagementRoute && !isAuthRoute;
 
   // Determine active nav item
   const isHomeActive = location.pathname === '/';

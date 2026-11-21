@@ -5,7 +5,7 @@ import {
   Users, Ticket, Stethoscope, Wifi,
   UserPlus, Search,
   CheckCircle2, X, Printer, Eye,
-  ArrowRight, Menu
+  ArrowRight
 } from 'lucide-react';
 
 export const HospitalDashboard: React.FC = () => {
@@ -151,16 +151,6 @@ export const HospitalDashboard: React.FC = () => {
               {hospitalProfile?.name || 'Hospital Panel'} · Live queue and OPD doctor operations
             </p>
           </div>
-
-          {/* Quick Menu Button on Mobile (Image 2 highlighted red area) */}
-          <button
-            type="button"
-            onClick={() => (window as any).__openHospitalMenu?.()}
-            className="md:hidden flex items-center gap-1.5 px-3 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-xl font-extrabold text-xs border border-blue-100 shadow-2xs cursor-pointer shrink-0 mt-1"
-          >
-            <Menu size={16} />
-            <span>Menu</span>
-          </button>
         </div>
 
         {/* Action Buttons */}

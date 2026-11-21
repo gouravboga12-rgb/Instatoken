@@ -93,7 +93,7 @@ export const RoleChooserScreen: React.FC<RoleChooserScreenProps> = ({ navigation
               <View style={styles.badgeRow}>
                 <View style={styles.featureBadgeLight}>
                   <ShieldCheck size={12} color="#16A34A" />
-                  <Text style={styles.badgeTextLight}>Mobile SMS OTP (DLT)</Text>
+                  <Text style={styles.badgeTextLight}>Mobile SMS OTP</Text>
                 </View>
                 <View style={styles.featureBadgeLight}>
                   <Sparkles size={12} color="#0055FE" />
@@ -144,7 +144,7 @@ export const RoleChooserScreen: React.FC<RoleChooserScreenProps> = ({ navigation
               <View style={styles.badgeRow}>
                 <View style={styles.featureBadgeDark}>
                   <ShieldCheck size={12} color="#38BDF8" />
-                  <Text style={styles.badgeTextDark}>Email & Password (SMTP)</Text>
+                  <Text style={styles.badgeTextDark}>Email & Password</Text>
                 </View>
                 <View style={styles.featureBadgeDark}>
                   <Mail size={12} color="#38BDF8" />
