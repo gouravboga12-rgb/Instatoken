@@ -75,6 +75,14 @@ export const BookToken: React.FC = () => {
   const [syncVersion, setSyncVersion] = useState(0);
   const [livePaymentMode, setLivePaymentMode] = useState<string | null>(null);
 
+  // Strict patient authentication guard: redirect to login if not authenticated
+  useEffect(() => {
+    if (!user) {
+      const currentPath = window.location.pathname + window.location.search;
+      navigate(`/signin?redirect=${encodeURIComponent(currentPath)}`, { replace: true });
+    }
+  }, [user, navigate]);
+
   useEffect(() => {
     const unsubscribe = subscribeGlobalSync((event: any) => {
       setSyncVersion(v => v + 1);
@@ -312,6 +320,15 @@ export const BookToken: React.FC = () => {
   const [rmpName, setRmpName] = useState('');
   const [rmpPhone, setRmpPhone] = useState('');
   const [rmpPlace, setRmpPlace] = useState('');
+
+  // Auto-sync form if user logs in or profile changes
+  useEffect(() => {
+    if (user) {
+      if (!name && user.name) setName(user.name);
+      if (!phone && user.phone) setPhone((user.phone || '').replace(/\D/g, '').slice(-10));
+      if (!place && (user.address || user.location)) setPlace(user.address || user.location || '');
+    }
+  }, [user]);
   
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<{ name?: boolean; phone?: boolean; age?: boolean; place?: boolean }>({});
@@ -558,6 +575,13 @@ export const BookToken: React.FC = () => {
     if (isPaymentProcessing) return;
     setError('');
     setFieldErrors({});
+
+    if (!user) {
+      setError('Please sign in or register with your mobile number to book your token.');
+      const currentPath = window.location.pathname + window.location.search;
+      navigate(`/signin?redirect=${encodeURIComponent(currentPath)}`);
+      return;
+    }
 
     if (!isDoctorOnlineAvailable) {
       setError(`Dr. ${doctor?.name || 'Doctor'} is currently unavailable for online token booking at this hospital.`);
@@ -808,6 +832,32 @@ export const BookToken: React.FC = () => {
       setIsPaymentProcessing(false);
     }
   };
+
+  if (!user) {
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center p-6 bg-slate-50">
+        <div className="bg-white p-8 rounded-3xl border border-slate-200/80 shadow-md text-center max-w-sm w-full space-y-4">
+          <div className="w-14 h-14 bg-blue-50 text-blue-600 rounded-2xl mx-auto flex items-center justify-center">
+            <User size={28} />
+          </div>
+          <div>
+            <h3 className="text-lg font-black text-slate-900">Patient Login Required</h3>
+            <p className="text-xs text-slate-500 mt-1">Please sign in to book your OPD token for Dr. {doctor?.name || 'Doctor'} and receive live call alerts.</p>
+          </div>
+          <button 
+            type="button"
+            onClick={() => {
+              const currentPath = window.location.pathname + window.location.search;
+              navigate(`/signin?redirect=${encodeURIComponent(currentPath)}`);
+            }} 
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-3 rounded-2xl shadow-md cursor-pointer border-none transition-colors"
+          >
+            Log In / Sign Up to Book
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="pb-24 bg-slate-50 min-h-screen md:min-h-0 md:pb-8 w-full">

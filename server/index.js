@@ -4822,6 +4822,11 @@ app.post('/api/appointments', async (req, res) => {
     return res.status(400).json({ success: false, message: 'Invalid appointment payload' });
   }
 
+  const cleanPhone = (appt.phone || '').replace(/\D/g, '').slice(-10);
+  if (!cleanPhone || cleanPhone.length !== 10) {
+    return res.status(400).json({ success: false, message: 'Valid 10-digit patient mobile number is required to book appointment' });
+  }
+
   const store = await getUnifiedStore();
   store.appointments = store.appointments || [];
 

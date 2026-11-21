@@ -31,7 +31,13 @@ const loadRazorpayScript = (): Promise<boolean> => {
 export const Payment: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { bookToken, purchaseSubscription } = useApp();
+  const { user, bookToken, purchaseSubscription } = useApp();
+
+  useEffect(() => {
+    if (!user) {
+      navigate('/signin?redirect=/bookings', { replace: true });
+    }
+  }, [user, navigate]);
 
   const state = location.state as {
     patientDetails: {

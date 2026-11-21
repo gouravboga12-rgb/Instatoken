@@ -32,12 +32,12 @@ import {
 
 // ─── RBAC permission map ──────────────────────────────────────────────────────
 const ROLE_SECTIONS: Record<string, string[]> = {
-  owner:        ['dashboard','doctor-screens','token-manage','tokens','add-token','all-tokens','online-tokens','offline-tokens','today-tokens','upcoming-tokens','completed-tokens','cancelled-tokens','revisit-tokens','unvisited-tokens','revenue','doctors','departments','doctor-references','sessions','staff','patients','communication','ads-promotion','billing','reports','settings','payouts'],
-  admin:        ['dashboard','doctor-screens','token-manage','tokens','add-token','all-tokens','online-tokens','offline-tokens','today-tokens','upcoming-tokens','completed-tokens','cancelled-tokens','revisit-tokens','unvisited-tokens','revenue','doctors','departments','doctor-references','sessions','staff','patients','communication','ads-promotion','reports','payouts'],
-  receptionist: ['dashboard','doctor-screens','token-manage','add-token','all-tokens','today-tokens','unvisited-tokens','doctor-references','staff','patients'],
-  doctor:       ['dashboard','doctor-screens','today-tokens','doctor-references','patients'],
-  accountant:   ['dashboard','revenue','billing','doctor-references','reports','payouts'],
-  nurse:        ['dashboard','doctor-screens','today-tokens','staff'],
+  owner: ['dashboard', 'doctor-screens', 'token-manage', 'tokens', 'add-token', 'all-tokens', 'online-tokens', 'offline-tokens', 'today-tokens', 'upcoming-tokens', 'completed-tokens', 'cancelled-tokens', 'revisit-tokens', 'unvisited-tokens', 'revenue', 'doctors', 'departments', 'doctor-references', 'sessions', 'staff', 'patients', 'communication', 'ads-promotion', 'billing', 'reports', 'settings', 'payouts'],
+  admin: ['dashboard', 'doctor-screens', 'token-manage', 'tokens', 'add-token', 'all-tokens', 'online-tokens', 'offline-tokens', 'today-tokens', 'upcoming-tokens', 'completed-tokens', 'cancelled-tokens', 'revisit-tokens', 'unvisited-tokens', 'revenue', 'doctors', 'departments', 'doctor-references', 'sessions', 'staff', 'patients', 'communication', 'ads-promotion', 'reports', 'payouts'],
+  receptionist: ['dashboard', 'doctor-screens', 'token-manage', 'add-token', 'all-tokens', 'today-tokens', 'unvisited-tokens', 'doctor-references', 'staff', 'patients'],
+  doctor: ['dashboard', 'doctor-screens', 'today-tokens', 'doctor-references', 'patients'],
+  accountant: ['dashboard', 'revenue', 'billing', 'doctor-references', 'reports', 'payouts'],
+  nurse: ['dashboard', 'doctor-screens', 'today-tokens', 'staff'],
 };
 
 interface NavItem {
@@ -96,9 +96,9 @@ const isItemActive = (item: NavItem, pathname: string, search: string): boolean 
 const buildNav = (doctors: HospitalDoctor[], tokens: TokenRecord[]): { section: string; items: NavItem[] }[] => {
   const activeDoctors = doctors.filter(d => d.active);
   const todayStr = new Date().toISOString().split('T')[0];
-  const unvisitedCount = tokens.filter(t => 
-    t.status === 'not-visited' || 
-    t.status === 'unvisited' || 
+  const unvisitedCount = tokens.filter(t =>
+    t.status === 'not-visited' ||
+    t.status === 'unvisited' ||
     (['booked', 'waiting'].includes(t.status) && t.bookingDate && t.bookingDate < todayStr)
   ).length;
 
@@ -116,46 +116,64 @@ const buildNav = (doctors: HospitalDoctor[], tokens: TokenRecord[]): { section: 
   });
 
   return [
-    { section: '', items: [
-      { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={15} />, path: '/hospital/dashboard' },
-    ]},
+    {
+      section: '', items: [
+        { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={15} />, path: '/hospital/dashboard' },
+      ]
+    },
     { section: `Doctor Token Screens (${activeDoctors.length})`, items: doctorScreenItems },
-    { section: 'Token Management', items: [
-      { id: 'sessions', label: 'Sessions & Schedule', icon: <Sliders size={15} />, path: '/hospital/tokens/manage' },
-      { id: 'add-token', label: 'Add Token', icon: <Plus size={15} />, path: '/hospital/tokens/add' },
-      { id: 'all-tokens', label: 'All Tokens', icon: <List size={15} />, path: '/hospital/tokens/all' },
-      { id: 'online-tokens', label: 'Online Tokens', icon: <Wifi size={15} />, path: '/hospital/tokens/online' },
-      { id: 'offline-tokens', label: 'Offline Tokens', icon: <WifiOff size={15} />, path: '/hospital/tokens/offline' },
-      { id: 'today-tokens', label: "Today's Tokens", icon: <Calendar size={15} />, path: '/hospital/tokens/today' },
-      { id: 'revisit-tokens', label: 'Revisit Tokens', icon: <RefreshCw size={15} />, path: '/hospital/tokens/revisit' },
-      { id: 'unvisited-tokens', label: 'Unvisited Tokens', icon: <UserX size={15} />, path: '/hospital/tokens/unvisited', badge: unvisitedCount > 0 ? `${unvisitedCount}` : undefined },
-    ]},
-    { section: 'Revenue & Finance', items: [
-      { id: 'revenue', label: 'Revenue Overview', icon: <DollarSign size={15} />, path: '/hospital/revenue' },
-      { id: 'billing', label: 'Billing & Transactions', icon: <CreditCard size={15} />, path: '/hospital/billing' },
-      { id: 'payouts', label: 'InstaToken Payouts', icon: <Banknote size={15} />, path: '/hospital/payouts' },
-    ]},
-    { section: 'Doctor Management', items: [
-      { id: 'doctors', label: 'Doctors Management', icon: <Stethoscope size={15} />, path: '/hospital/doctors' },
-      { id: 'departments', label: 'Departments', icon: <Building2 size={15} />, path: '/hospital/departments' },
-      { id: 'doctor-references', label: 'Doctor References', icon: <UserCheck size={15} />, path: '/hospital/doctor-references' },
-    ]},
-    { section: 'Staff & Team', items: [
-      { id: 'staff', label: 'Staff & Employees', icon: <Users size={15} />, path: '/hospital/staff' },
-    ]},
-    { section: 'Patient Management', items: [
-      { id: 'patients', label: 'Patients', icon: <Users size={15} />, path: '/hospital/patients' },
-    ]},
-    { section: 'Communication', items: [
-      { id: 'communication', label: 'Push Notifications', icon: <Bell size={15} />, path: '/hospital/communication' },
-      { id: 'ads-promotion', label: 'Ads & Promotion', icon: <Megaphone size={15} />, path: '/hospital/ads-promotion' },
-    ]},
-    { section: 'Reports & Analytics', items: [
-      { id: 'reports', label: 'Reports & Analytics', icon: <BarChart2 size={15} />, path: '/hospital/reports' },
-    ]},
-    { section: 'Settings', items: [
-      { id: 'settings', label: 'Hospital Settings', icon: <Settings size={15} />, path: '/hospital/settings' },
-    ]},
+    {
+      section: 'Token Management', items: [
+        { id: 'sessions', label: 'Sessions & Schedule', icon: <Sliders size={15} />, path: '/hospital/tokens/manage' },
+        { id: 'add-token', label: 'Add Token', icon: <Plus size={15} />, path: '/hospital/tokens/add' },
+        { id: 'all-tokens', label: 'All Tokens', icon: <List size={15} />, path: '/hospital/tokens/all' },
+        { id: 'online-tokens', label: 'Online Tokens', icon: <Wifi size={15} />, path: '/hospital/tokens/online' },
+        { id: 'offline-tokens', label: 'Offline Tokens', icon: <WifiOff size={15} />, path: '/hospital/tokens/offline' },
+        { id: 'today-tokens', label: "Today's Tokens", icon: <Calendar size={15} />, path: '/hospital/tokens/today' },
+        { id: 'revisit-tokens', label: 'Revisit Tokens', icon: <RefreshCw size={15} />, path: '/hospital/tokens/revisit' },
+        { id: 'unvisited-tokens', label: 'Unvisited Tokens', icon: <UserX size={15} />, path: '/hospital/tokens/unvisited', badge: unvisitedCount > 0 ? `${unvisitedCount}` : undefined },
+      ]
+    },
+    {
+      section: 'Revenue & Finance', items: [
+        { id: 'revenue', label: 'Revenue Overview', icon: <DollarSign size={15} />, path: '/hospital/revenue' },
+        { id: 'billing', label: 'Billing & Transactions', icon: <CreditCard size={15} />, path: '/hospital/billing' },
+        { id: 'payouts', label: 'InstaToken Payouts', icon: <Banknote size={15} />, path: '/hospital/payouts' },
+      ]
+    },
+    {
+      section: 'Doctor Management', items: [
+        { id: 'doctors', label: 'Doctors Management', icon: <Stethoscope size={15} />, path: '/hospital/doctors' },
+        { id: 'departments', label: 'Departments', icon: <Building2 size={15} />, path: '/hospital/departments' },
+        { id: 'doctor-references', label: 'Doctor References', icon: <UserCheck size={15} />, path: '/hospital/doctor-references' },
+      ]
+    },
+    {
+      section: 'Staff & Team', items: [
+        { id: 'staff', label: 'Staff & Employees', icon: <Users size={15} />, path: '/hospital/staff' },
+      ]
+    },
+    {
+      section: 'Patient Management', items: [
+        { id: 'patients', label: 'Patients', icon: <Users size={15} />, path: '/hospital/patients' },
+      ]
+    },
+    {
+      section: 'Communication', items: [
+        { id: 'communication', label: 'Push Notifications', icon: <Bell size={15} />, path: '/hospital/communication' },
+        { id: 'ads-promotion', label: 'Ads & Promotion', icon: <Megaphone size={15} />, path: '/hospital/ads-promotion' },
+      ]
+    },
+    {
+      section: 'Reports & Analytics', items: [
+        { id: 'reports', label: 'Reports & Analytics', icon: <BarChart2 size={15} />, path: '/hospital/reports' },
+      ]
+    },
+    {
+      section: 'Settings', items: [
+        { id: 'settings', label: 'Hospital Settings', icon: <Settings size={15} />, path: '/hospital/settings' },
+      ]
+    },
   ];
 };
 
@@ -228,11 +246,10 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle, onItemClick }) =
                     key={item.id}
                     onClick={() => handleNav(item)}
                     title={collapsed ? item.label : undefined}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer border-none group ${
-                      isActive
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer border-none group ${isActive
                         ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
                         : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                    }`}
+                      }`}
                   >
                     <span className="shrink-0">{item.icon}</span>
                     {!collapsed && (
@@ -263,7 +280,7 @@ const TopHeader: React.FC<{ onMenuToggle: () => void }> = ({ onMenuToggle }) => 
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const todayStr = new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
-  const todayTokens = tokens.filter(t => ['booked','waiting','checked-in'].includes(t.status)).length;
+  const todayTokens = tokens.filter(t => ['booked', 'waiting', 'checked-in'].includes(t.status)).length;
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
   const notifsCount = (notifications || []).length;
@@ -353,7 +370,7 @@ const TopHeader: React.FC<{ onMenuToggle: () => void }> = ({ onMenuToggle }) => 
       {/* Right Controls Container */}
       <div className="flex items-center gap-1 sm:gap-2 shrink-0">
         {/* Manual Sync / Refresh Button (In-Place, Never Navigates Away) */}
-        <button 
+        <button
           type="button"
           onClick={handleManualRefresh}
           title="Refresh appointments and queues in-place (stays on current screen)"
@@ -365,7 +382,7 @@ const TopHeader: React.FC<{ onMenuToggle: () => void }> = ({ onMenuToggle }) => 
 
         {/* Notification Bell & Dropdown */}
         <div className="relative">
-          <button 
+          <button
             type="button"
             onClick={() => setShowNotificationsDropdown(prev => !prev)}
             className="relative p-1.5 sm:p-2 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer"
@@ -394,7 +411,7 @@ const TopHeader: React.FC<{ onMenuToggle: () => void }> = ({ onMenuToggle }) => 
                   Open Push Center
                 </button>
               </div>
-              
+
               <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
                 {notifications.length > 0 ? (
                   notifications.slice(0, 5).map(n => (
@@ -495,9 +512,9 @@ export const HospitalLayout: React.FC = () => {
               >
                 <X size={16} />
               </button>
-              <Sidebar 
-                collapsed={false} 
-                onToggle={() => setMobileSidebarOpen(false)} 
+              <Sidebar
+                collapsed={false}
+                onToggle={() => setMobileSidebarOpen(false)}
                 onItemClick={() => setMobileSidebarOpen(false)}
               />
             </div>
@@ -541,9 +558,8 @@ export const HospitalLayout: React.FC = () => {
         <nav className="md:hidden fixed bottom-0 left-0 w-full bg-white/95 backdrop-blur-md border-t border-slate-200 flex items-center justify-around py-2 z-40 shadow-lg">
           <button
             onClick={() => navigate('/hospital/dashboard')}
-            className={`flex flex-col items-center gap-0.5 cursor-pointer transition-colors ${
-              location.pathname.endsWith('/dashboard') || location.pathname === '/hospital' ? 'text-blue-600 font-extrabold' : 'text-slate-400 hover:text-slate-600'
-            }`}
+            className={`flex flex-col items-center gap-0.5 cursor-pointer transition-colors ${location.pathname.endsWith('/dashboard') || location.pathname === '/hospital' ? 'text-blue-600 font-extrabold' : 'text-slate-400 hover:text-slate-600'
+              }`}
           >
             <LayoutDashboard size={19} />
             <span className="text-[10px] font-bold">Dashboard</span>
@@ -551,9 +567,8 @@ export const HospitalLayout: React.FC = () => {
 
           <button
             onClick={() => navigate('/hospital/tokens/manage')}
-            className={`flex flex-col items-center gap-0.5 cursor-pointer transition-colors ${
-              location.pathname.includes('/tokens') ? 'text-blue-600 font-extrabold' : 'text-slate-400 hover:text-slate-600'
-            }`}
+            className={`flex flex-col items-center gap-0.5 cursor-pointer transition-colors ${location.pathname.includes('/tokens') ? 'text-blue-600 font-extrabold' : 'text-slate-400 hover:text-slate-600'
+              }`}
           >
             <Ticket size={19} />
             <span className="text-[10px] font-bold">Tokens</span>
@@ -561,9 +576,8 @@ export const HospitalLayout: React.FC = () => {
 
           <button
             onClick={() => navigate('/hospital/doctors')}
-            className={`flex flex-col items-center gap-0.5 cursor-pointer transition-colors ${
-              location.pathname.includes('/doctors') ? 'text-blue-600 font-extrabold' : 'text-slate-400 hover:text-slate-600'
-            }`}
+            className={`flex flex-col items-center gap-0.5 cursor-pointer transition-colors ${location.pathname.includes('/doctors') ? 'text-blue-600 font-extrabold' : 'text-slate-400 hover:text-slate-600'
+              }`}
           >
             <Stethoscope size={19} />
             <span className="text-[10px] font-bold">Doctors</span>
@@ -571,9 +585,8 @@ export const HospitalLayout: React.FC = () => {
 
           <button
             onClick={() => navigate('/hospital/departments')}
-            className={`flex flex-col items-center gap-0.5 cursor-pointer transition-colors ${
-              location.pathname.includes('/departments') ? 'text-blue-600 font-extrabold' : 'text-slate-400 hover:text-slate-600'
-            }`}
+            className={`flex flex-col items-center gap-0.5 cursor-pointer transition-colors ${location.pathname.includes('/departments') ? 'text-blue-600 font-extrabold' : 'text-slate-400 hover:text-slate-600'
+              }`}
           >
             <Building2 size={19} />
             <span className="text-[10px] font-bold">Depts</span>
@@ -581,9 +594,8 @@ export const HospitalLayout: React.FC = () => {
 
           <button
             onClick={() => setMobileSidebarOpen(true)}
-            className={`flex flex-col items-center gap-0.5 cursor-pointer transition-colors ${
-              mobileSidebarOpen ? 'text-blue-600 font-extrabold' : 'text-slate-400 hover:text-slate-600'
-            }`}
+            className={`flex flex-col items-center gap-0.5 cursor-pointer transition-colors ${mobileSidebarOpen ? 'text-blue-600 font-extrabold' : 'text-slate-400 hover:text-slate-600'
+              }`}
           >
             <Menu size={19} />
             <span className="text-[10px] font-bold">All Menus</span>

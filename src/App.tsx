@@ -416,9 +416,11 @@ const AppContent: React.FC = () => {
     return <Onboarding onComplete={() => setOnboarded(true)} />;
   }
 
-  // If on /login or /signin and already logged in, go straight to home
+  // If on /login or /signin and already logged in, go straight to redirect or home
   if ((location.pathname === '/login' || location.pathname === '/signin') && user) {
-    return <Navigate to="/" replace />;
+    const params = new URLSearchParams(location.search);
+    const redirectUrl = params.get('redirect') || '/';
+    return <Navigate to={redirectUrl} replace />;
   }
 
   // If on hospital login route and already logged in, go straight to hospital dashboard
@@ -486,7 +488,13 @@ const AppContent: React.FC = () => {
                 }
               }} 
               onHospitalSelect={(hospId) => navigate(`/hospital-details/${hospId}`)}
-              onDoctorSelect={(hospId, docId) => navigate(`/book/${hospId}/${docId}`)}
+              onDoctorSelect={(hospId, docId) => {
+                if (!user) {
+                  navigate(`/signin?redirect=${encodeURIComponent(`/book/${hospId}/${docId}`)}`);
+                } else {
+                  navigate(`/book/${hospId}/${docId}`);
+                }
+              }}
               onOpenNotifications={() => navigate('/notifications')}
             />
           } />
@@ -497,12 +505,24 @@ const AppContent: React.FC = () => {
           } />
           <Route path="/hospital-details/:id" element={
             <HospitalDetails 
-              onDoctorSelect={(hospId, docId) => navigate(`/book/${hospId}/${docId}`)} 
+              onDoctorSelect={(hospId, docId) => {
+                if (!user) {
+                  navigate(`/signin?redirect=${encodeURIComponent(`/book/${hospId}/${docId}`)}`);
+                } else {
+                  navigate(`/book/${hospId}/${docId}`);
+                }
+              }} 
             />
           } />
           <Route path="/hospitals/:id" element={
             <HospitalDetails 
-              onDoctorSelect={(hospId, docId) => navigate(`/book/${hospId}/${docId}`)} 
+              onDoctorSelect={(hospId, docId) => {
+                if (!user) {
+                  navigate(`/signin?redirect=${encodeURIComponent(`/book/${hospId}/${docId}`)}`);
+                } else {
+                  navigate(`/book/${hospId}/${docId}`);
+                }
+              }} 
             />
           } />
           <Route path="/book/:hospitalId/:doctorId" element={<BookToken />} />
@@ -539,11 +559,17 @@ const AppContent: React.FC = () => {
             path="/signin" 
             element={
               <Login 
-                onSuccess={() => navigate('/')} 
+                onSuccess={() => {
+                  const params = new URLSearchParams(window.location.search);
+                  const redirectUrl = params.get('redirect') || '/';
+                  navigate(redirectUrl, { replace: true });
+                }} 
                 onGuestLogin={() => {
                   sessionStorage.setItem('insta_guest_mode', 'true');
                   setIsGuestMode(true);
-                  navigate('/');
+                  const params = new URLSearchParams(window.location.search);
+                  const redirectUrl = params.get('redirect') || '/';
+                  navigate(redirectUrl, { replace: true });
                 }} 
               />
             } 
@@ -552,11 +578,17 @@ const AppContent: React.FC = () => {
             path="/login" 
             element={
               <Login 
-                onSuccess={() => navigate('/')} 
+                onSuccess={() => {
+                  const params = new URLSearchParams(window.location.search);
+                  const redirectUrl = params.get('redirect') || '/';
+                  navigate(redirectUrl, { replace: true });
+                }} 
                 onGuestLogin={() => {
                   sessionStorage.setItem('insta_guest_mode', 'true');
                   setIsGuestMode(true);
-                  navigate('/');
+                  const params = new URLSearchParams(window.location.search);
+                  const redirectUrl = params.get('redirect') || '/';
+                  navigate(redirectUrl, { replace: true });
                 }} 
               />
             } 
