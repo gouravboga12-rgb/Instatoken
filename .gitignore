@@ -41,3 +41,6 @@ instatoken_dump.sql
 
 
 .vercel
+
+server/firebase-service-account.json
+*firebase-adminsdk*.json

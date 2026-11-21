@@ -18,6 +18,96 @@ const { query, testConnection } = require('./config/db');
 const { generateUploadUrl, uploadFile, deleteFile } = require('./config/s3');
 const { normalizePhone10, sendSmsOtp, verifySmsOtp, clearSmsOtp } = require('./services/smsService');
 
+// ─── Firebase Admin SDK for Push Notifications ──────────────────────────────
+let firebaseApp = null;
+const fcmTokensStore = {};
+
+try {
+  const admin = require('firebase-admin');
+  const serviceAccountPath = path.join(__dirname, 'firebase-service-account.json');
+  if (fs.existsSync(serviceAccountPath)) {
+    const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
+    firebaseApp = admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount)
+    });
+    console.log(`✅ [Firebase Admin] Initialized successfully for project: ${serviceAccount.project_id}`);
+  } else {
+    console.warn('⚠️ [Firebase Admin] firebase-service-account.json not found in server directory');
+  }
+} catch (fbErr) {
+  console.warn('⚠️ [Firebase Admin] Init error:', fbErr.message);
+}
+
+async function sendFcmCallingAlert(phone, tokenId, callPayload) {
+  if (!firebaseApp) return;
+  try {
+    const admin = require('firebase-admin');
+    const cleanPhone = phone ? String(phone).replace(/\D/g, '').slice(-10) : '';
+    const tokens = new Set();
+
+    if (cleanPhone && fcmTokensStore[cleanPhone]) {
+      fcmTokensStore[cleanPhone].forEach(t => tokens.add(t));
+    }
+    if (tokenId && fcmTokensStore[tokenId]) {
+      fcmTokensStore[tokenId].forEach(t => tokens.add(t));
+    }
+
+    if (isDbConnected) {
+      try {
+        const dbRes = await query(
+          `SELECT token FROM fcm_tokens WHERE phone = $1 OR token_id = $2`,
+          [cleanPhone || 'none', String(tokenId || 'none')]
+        );
+        dbRes.rows.forEach(r => tokens.add(r.token));
+      } catch (e) {
+        // Table might not exist yet
+      }
+    }
+
+    const tokenList = Array.from(tokens);
+    if (tokenList.length === 0) {
+      console.log(`ℹ️ [FCM] No registered push tokens for patient ${cleanPhone || tokenId}`);
+      return;
+    }
+
+    const tokNo = callPayload.tokenNo || 1;
+    const docName = (callPayload.doctorName || 'Doctor').replace(/^Dr\.?\s*/i, '');
+    const hospName = callPayload.hospitalName || 'Hospital';
+
+    const message = {
+      tokens: tokenList,
+      notification: {
+        title: `🔔 Token #${tokNo} — Doctor is Calling!`,
+        body: `Dr. ${docName} at ${hospName} is ready in the cabin. Please proceed inside immediately!`
+      },
+      data: {
+        type: 'TOKEN_CALLED',
+        tokenId: String(tokenId || callPayload.tokenId || ''),
+        tokenNo: String(tokNo),
+        doctorName: docName,
+        hospitalName: hospName,
+        url: `https://instatoken.in/confirmation/${tokenId}`,
+        deepLink: `instatoken://confirmation/${tokenId}`
+      },
+      android: {
+        priority: 'high',
+        notification: {
+          channelId: 'doctor-calling',
+          sound: 'default',
+          priority: 'max',
+          visibility: 'public',
+          clickAction: 'OPEN_APPOINTMENT'
+        }
+      }
+    };
+
+    const response = await admin.messaging().sendEachForMulticast(message);
+    console.log(`📲 [FCM] Sent doctor calling push to ${response.successCount}/${tokenList.length} device(s) for patient ${cleanPhone}`);
+  } catch (err) {
+    console.warn('⚠️ [FCM] Send push error:', err.message);
+  }
+}
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -3859,9 +3949,60 @@ app.post('/api/hospitals/:hospitalId/tokens/:tokenId/call', requireHospitalAuth,
   // 3. Notify hospital room of target token status change to 'calling'
   io.to(`hospital_${hospitalId}`).emit('token_status_changed', targetToken);
 
+  // 4. Send High-Priority FCM Push Notification to wake Android device & sound call tone
+  sendFcmCallingAlert(cleanPhone, targetToken.id, callPayload);
+
   console.log(`📡 [Socket.io] Emitted private token_called for Token #${callPayload.tokenNo} strictly to patient room patient_${cleanPhone} (${targetToken.patientName}). Demoted ${demotedTokens.length} other calling token(s) to late-coming.`);
 
   res.json({ success: true, callPayload, token: targetToken, demotedCount: demotedTokens.length });
+});
+
+// ─── Register FCM Push Token for Patient / Device ────────────────────────────
+app.post('/api/notifications/register-token', async (req, res) => {
+  const { phone, tokenId, fcmToken, platform = 'android' } = req.body;
+  if (!fcmToken) {
+    return res.status(400).json({ success: false, error: 'fcmToken is required' });
+  }
+
+  const cleanPhone = phone ? String(phone).replace(/\D/g, '').slice(-10) : '';
+
+  if (isDbConnected) {
+    try {
+      await query(`
+        CREATE TABLE IF NOT EXISTS fcm_tokens (
+          id SERIAL PRIMARY KEY,
+          token TEXT UNIQUE NOT NULL,
+          phone VARCHAR(20),
+          token_id VARCHAR(100),
+          platform VARCHAR(20),
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        )
+      `);
+      await query(`
+        INSERT INTO fcm_tokens (token, phone, token_id, platform, updated_at)
+        VALUES ($1, $2, $3, $4, NOW())
+        ON CONFLICT (token) DO UPDATE SET
+          phone = COALESCE(EXCLUDED.phone, fcm_tokens.phone),
+          token_id = COALESCE(EXCLUDED.token_id, fcm_tokens.token_id),
+          platform = EXCLUDED.platform,
+          updated_at = NOW()
+      `, [fcmToken, cleanPhone || null, tokenId || null, platform]);
+    } catch (e) {
+      console.warn('RDS FCM token save error:', e.message);
+    }
+  }
+
+  if (cleanPhone) {
+    if (!fcmTokensStore[cleanPhone]) fcmTokensStore[cleanPhone] = new Set();
+    fcmTokensStore[cleanPhone].add(fcmToken);
+  }
+  if (tokenId) {
+    if (!fcmTokensStore[tokenId]) fcmTokensStore[tokenId] = new Set();
+    fcmTokensStore[tokenId].add(fcmToken);
+  }
+
+  console.log(`📲 [FCM] Device token registered: phone=${cleanPhone || 'anon'}, tokenId=${tokenId || 'none'}`);
+  res.json({ success: true, message: 'FCM Token registered successfully' });
 });
 
 // ─── Out-of-Order Cabin Admission & Auto-Hold ───────────────────────

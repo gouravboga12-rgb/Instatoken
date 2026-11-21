@@ -168,6 +168,16 @@ export const PatientCallAlertBanner: React.FC = () => {
       } catch (e) {}
     }
 
+    // Register push notification token with native mobile app
+    if (myPhone && (window as any).ReactNativeWebView) {
+      try {
+        (window as any).ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'REGISTER_PUSH',
+          phone: myPhone
+        }));
+      } catch (e) {}
+    }
+
     const isTargetPatient = (payload: CallAlertPayload) => {
       if (!payload) return false;
       const targetPhone = String(payload.patientPhone || '').replace(/\D/g, '').slice(-10);

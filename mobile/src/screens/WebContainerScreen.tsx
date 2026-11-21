@@ -17,6 +17,8 @@ import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-si
 import { GOOGLE_WEB_CLIENT_ID } from '../context/AuthContext';
 import * as Haptics from 'expo-haptics';
 import * as Speech from 'expo-speech';
+import * as Notifications from 'expo-notifications';
+import axios from 'axios';
 
 interface WebContainerScreenProps {
   route: any;
@@ -71,8 +73,43 @@ export const WebContainerScreen: React.FC<WebContainerScreenProps> = ({
       backAction
     );
 
-    return () => backHandler.remove();
+    // Listen for notification taps to route patient to appointment pass
+    const responseSub = Notifications.addNotificationResponseReceivedListener(response => {
+      const data = response.notification.request.content.data;
+      if (data && (data.url || data.tokenId)) {
+        const targetUrl = data.url || `https://instatoken.in/confirmation/${data.tokenId}`;
+        webViewRef.current?.injectJavaScript(`window.location.href = '${targetUrl}';`);
+      }
+    });
+
+    // Auto-register device push token with backend
+    registerPushToken();
+
+    return () => {
+      backHandler.remove();
+      responseSub.remove();
+    };
   }, [canGoBack]);
+
+  const registerPushToken = async (patientPhone?: string, patientTokenId?: string) => {
+    try {
+      const { status } = await Notifications.getPermissionsAsync();
+      if (status === 'granted') {
+        const tokenData = await Notifications.getDevicePushTokenAsync();
+        const fcmToken = tokenData?.data;
+        if (fcmToken) {
+          await axios.post('https://instatoken.in/api/notifications/register-token', {
+            fcmToken,
+            phone: patientPhone || undefined,
+            tokenId: patientTokenId || undefined,
+            platform: Platform.OS
+          });
+        }
+      }
+    } catch (e) {
+      // ignore registration errors
+    }
+  };
 
   const handleMessage = async (event: any) => {
     try {
@@ -86,6 +123,8 @@ export const WebContainerScreen: React.FC<WebContainerScreenProps> = ({
         });
       } else if (data.type === 'GOOGLE_SIGN_IN') {
         await triggerNativeGoogleSignIn();
+      } else if (data.type === 'REGISTER_PUSH' || data.type === 'PATIENT_LOGGED_IN') {
+        await registerPushToken(data.phone, data.tokenId);
       } else if (data.type === 'SHARE') {
         try {
           await Share.share({

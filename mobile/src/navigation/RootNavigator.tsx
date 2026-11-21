@@ -21,11 +21,11 @@ export const RootNavigator = () => {
         targetPath = url.split('instatoken.in/')[1] || '';
       }
       if (targetPath) {
-        navigationRef.navigate('WebContainer' as never, {
+        (navigationRef as any).navigate('WebContainer', {
           initialUrl: `https://instatoken.in/${targetPath.replace(/^\/+/, '')}`,
           role: 'patient',
           title: 'Patient Portal'
-        } as never);
+        });
       }
     };
 

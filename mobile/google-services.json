@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "671438975700",
+    "project_id": "instatoken-e7cb4",
+    "storage_bucket": "instatoken-e7cb4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:671438975700:android:c1626207c7938274c98141",
+        "android_client_info": {
+          "package_name": "in.instatoken.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCAhZBD8QPJwBmwc2QwhlP2CRK9LFXPnYw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
