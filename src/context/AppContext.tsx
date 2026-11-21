@@ -317,7 +317,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             parsed.email === "patient@example.com" ||
             (!parsed.phone && (!parsed.email || parsed.email.endsWith('@patient.instatoken.in')))
           ) {
-            delete localStorage['insta_user'];
+            localStorage.removeItem('insta_user');
             return null;
           }
           if (parsed.phone && isDummyPhone(parsed.phone)) {
@@ -340,6 +340,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     return null;
   });
+
+  // Guard against any persisted dummy "Patient" account on initial load
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('insta_user');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (
+          !parsed ||
+          parsed.name === "Guest Patient" || 
+          parsed.name === "Patient" || 
+          parsed.name === "Valued Patient" ||
+          parsed.email === "patient@example.com" ||
+          (!parsed.phone && (!parsed.email || parsed.email.endsWith('@patient.instatoken.in')))
+        ) {
+          localStorage.removeItem('insta_user');
+          setUser(null);
+        }
+      }
+    } catch (e) {}
+  }, []);
 
   const [hospitals, setHospitals] = useState<Hospital[]>(() => getHydratedHospitals());
 
@@ -800,7 +821,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Auto-upgrade user location to full Rapido/Uber street address if currently only City/State
   useEffect(() => {
-    if (!userCoords) return;
+    if (!user || !userCoords) return;
     const isBasicLocation = !user?.location || user.location.split(',').length <= 2;
     if (isBasicLocation) {
       reverseGeocode(userCoords.lat, userCoords.lng).then(detailed => {
@@ -2571,6 +2592,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } catch (geoErr) {}
     }
 
+    if (!oldUser && !updates.name && !updates.phone && !updates.email) {
+      // User is a guest / not logged in - do not auto-create a user session
+      if (targetLat !== undefined && targetLng !== undefined) {
+        setUserCoords({ lat: targetLat, lng: targetLng });
+        localStorage.setItem('insta_user_coords', JSON.stringify({ lat: targetLat, lng: targetLng }));
+      }
+      if (updates.location) {
+        setCurrentLocationState(updates.location);
+        localStorage.setItem('insta_location', updates.location);
+      }
+      return;
+    }
+
     const defaultUser: UserProfile = {
       role: 'patient',
       name: 'Valued Patient',
@@ -2822,12 +2856,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           return updated;
         });
 
-        // Persist directly to PostgreSQL customer profile on server
-        updateUserProfile({
-          location: areaName,
-          lat: coords.lat,
-          lng: coords.lng
-        });
+        // Persist directly to PostgreSQL customer profile on server only if user is logged in
+        if (user) {
+          updateUserProfile({
+            location: areaName,
+            lat: coords.lat,
+            lng: coords.lng
+          });
+        }
 
         addNotification(
           "Location Detected",
@@ -2902,12 +2938,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           return updated;
         });
 
-        // Persist directly to PostgreSQL customer profile on server
-        updateUserProfile({
-          location: areaName,
-          lat: latitude,
-          lng: longitude
-        });
+        // Persist directly to PostgreSQL customer profile on server only if user is logged in
+        if (user) {
+          updateUserProfile({
+            location: areaName,
+            lat: latitude,
+            lng: longitude
+          });
+        }
 
         const isIpEstimate = (accuracy || 0) > 4000;
         const accuracyNote = isIpEstimate 
