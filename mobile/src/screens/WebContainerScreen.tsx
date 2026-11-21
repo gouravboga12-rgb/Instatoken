@@ -36,7 +36,6 @@ export const WebContainerScreen: React.FC<WebContainerScreenProps> = ({
 
   const [canGoBack, setCanGoBack] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [hasVisitedApp, setHasVisitedApp] = useState(false);
 
   // Navigate WebView when new URL is passed via push notification or deep link
   useEffect(() => {
@@ -405,31 +404,6 @@ export const WebContainerScreen: React.FC<WebContainerScreenProps> = ({
         onMessage={handleMessage}
         onNavigationStateChange={(navState) => {
           setCanGoBack(navState.canGoBack);
-          const url = navState.url || '';
-          const isPatientAuthPage = (url.includes('/login') || url.endsWith('/login')) && !url.includes('/hospital');
-          const isHospitalAuthPage = url.includes('/hospital-login') || url.includes('/hospital/login');
-
-          if (role === 'patient') {
-            if (!isPatientAuthPage) {
-              setHasVisitedApp(true);
-            } else if (hasVisitedApp) {
-              AsyncStorage.removeItem('saved_active_role').catch(() => {});
-              navigation.reset({
-                index: 0,
-                routes: [{ name: 'RoleChooser' }],
-              });
-            }
-          } else if (role === 'hospital') {
-            if (!isHospitalAuthPage) {
-              setHasVisitedApp(true);
-            } else if (hasVisitedApp) {
-              AsyncStorage.removeItem('saved_active_role').catch(() => {});
-              navigation.reset({
-                index: 0,
-                routes: [{ name: 'RoleChooser' }],
-              });
-            }
-          }
         }}
         onLoadStart={() => setLoading(true)}
         onLoadEnd={() => setLoading(false)}

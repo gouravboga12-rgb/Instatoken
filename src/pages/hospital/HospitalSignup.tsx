@@ -510,7 +510,7 @@ export const HospitalSignup: React.FC = () => {
           <div className="mt-6 pt-4 border-t border-slate-100 text-center text-xs">
             <span className="text-slate-500 font-semibold">Already registered your hospital? </span>
             <button
-              onClick={() => navigate('/hospital-login')}
+              onClick={() => navigate('/hospital/dashboard')}
               className="text-blue-600 font-extrabold hover:underline cursor-pointer border-none bg-transparent"
             >
               Sign In

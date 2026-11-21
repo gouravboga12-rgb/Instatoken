@@ -1041,7 +1041,7 @@ export const Home: React.FC<HomeProps> = ({
                     <p className="text-[10px] text-blue-100 font-medium mt-0.5">Skip hospital lines & track live queue</p>
                   </div>
                   <button 
-                    onClick={() => { setIsMobileMenuOpen(false); navigate('/login'); }}
+                    onClick={() => { setIsMobileMenuOpen(false); navigate('/signin'); }}
                     className="px-3.5 py-1.5 bg-white hover:bg-blue-50 text-blue-700 rounded-xl text-xs font-black shadow-xs transition-colors border-none cursor-pointer shrink-0"
                   >
                     Login / Sign Up
@@ -1087,7 +1087,7 @@ export const Home: React.FC<HomeProps> = ({
               <button
                 onClick={() => {
                   setIsMobileMenuOpen(false);
-                  navigate('/login');
+                  navigate('/signin');
                 }}
                 className="w-full py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl text-xs font-extrabold flex items-center justify-center gap-2 cursor-pointer shadow-md transition-all border-none"
               >

@@ -21,6 +21,7 @@ import { HospitalStaff } from './HospitalStaff';
 import { DepartmentManagement } from './DepartmentManagement';
 import { DoctorReferences } from './DoctorReferences';
 import { HospitalPayouts } from './HospitalPayouts';
+import { HospitalLogin } from './HospitalLogin';
 import {
   LayoutDashboard, Plus, List, Wifi, WifiOff, Calendar, RefreshCw,
   Users, Stethoscope, Building2, UserCheck, UserX,
@@ -282,7 +283,7 @@ const TopHeader: React.FC<{ onMenuToggle: () => void }> = ({ onMenuToggle }) => 
 
   const handleLogout = () => {
     hospitalLogout();
-    navigate('/hospital-login');
+    navigate('/hospital/dashboard');
   };
 
   const roleColors: Record<string, string> = {
@@ -471,7 +472,7 @@ export const HospitalLayout: React.FC = () => {
   }, []);
 
   if (!hospitalUser) {
-    return <Navigate to="/hospital-login" replace />;
+    return <HospitalLogin />;
   }
 
   return (

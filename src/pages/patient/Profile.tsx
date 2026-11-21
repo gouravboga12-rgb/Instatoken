@@ -118,7 +118,7 @@ export const Profile: React.FC = () => {
             <h3 className="text-lg font-black text-slate-900">Patient Account</h3>
             <p className="text-xs text-slate-500 mt-1">Please sign in or register to access your profile, family members, and medical history.</p>
           </div>
-          <Button onClick={() => navigate('/login')} className="w-full">
+          <Button onClick={() => navigate('/signin')} className="w-full">
             Sign In / Register
           </Button>
         </div>
@@ -142,7 +142,7 @@ export const Profile: React.FC = () => {
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate('/signin');
   };
 
   const savedDoctorObjects = useMemo(() => {

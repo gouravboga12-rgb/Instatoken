@@ -288,7 +288,7 @@ const TopNavbar: React.FC = () => {
             </button>
           ) : (
             <button 
-              onClick={() => navigate('/login')}
+              onClick={() => navigate('/signin')}
               className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-3.5 py-1.5 shadow-xs transition-all cursor-pointer font-bold text-xs border-none"
             >
               <UserIcon size={14} />
@@ -354,6 +354,7 @@ const AppContent: React.FC = () => {
     const path = window.location.pathname;
     const isMgmt = (
       path === '/login' ||
+      path === '/signin' ||
       path.startsWith('/hospital/') ||
       path === '/hospital' ||
       path.startsWith('/hospital-login') ||
@@ -378,6 +379,7 @@ const AppContent: React.FC = () => {
   const isConfirmationRoute = location.pathname.startsWith('/confirmation/');
   const isAuthRoute = (
     location.pathname === '/login' ||
+    location.pathname === '/signin' ||
     location.pathname.startsWith('/hospital-login') ||
     location.pathname.startsWith('/hospital/login')
   );
@@ -389,7 +391,10 @@ const AppContent: React.FC = () => {
     location.pathname.startsWith('/contact')
   );
   const isPublicRoute = isManagementRoute || isConfirmationRoute || isLegalRoute || isAuthRoute;
-  const isNativeApp = typeof window !== 'undefined' && Boolean((window as any).__IS_INSTATOKEN_NATIVE_APP__);
+  const isNativeApp = typeof window !== 'undefined' && (
+    Boolean((window as any).__IS_INSTATOKEN_NATIVE_APP__) ||
+    (typeof navigator !== 'undefined' && Boolean(navigator.userAgent && navigator.userAgent.includes('InstaToken')))
+  );
   const [isGuestMode, setIsGuestMode] = useState<boolean>(() => {
     return typeof window !== 'undefined' && sessionStorage.getItem('insta_guest_mode') === 'true';
   });
@@ -411,8 +416,8 @@ const AppContent: React.FC = () => {
     return <Onboarding onComplete={() => setOnboarded(true)} />;
   }
 
-  // If on /login and already logged in, go straight to home
-  if (location.pathname === '/login' && user) {
+  // If on /login or /signin and already logged in, go straight to home
+  if ((location.pathname === '/login' || location.pathname === '/signin') && user) {
     return <Navigate to="/" replace />;
   }
 
@@ -529,7 +534,20 @@ const AppContent: React.FC = () => {
           <Route path="/admin/ads-inquiries" element={<AdminGuard><AdminDashboard initialTab="ads-inquiries" /></AdminGuard>} />
           <Route path="/admin/payouts" element={<AdminGuard><AdminDashboard initialTab="hospital-payouts" /></AdminGuard>} />
 
-          {/* Hospital Panel routes */}
+          {/* Patient Login & Hospital Panel routes */}
+          <Route 
+            path="/signin" 
+            element={
+              <Login 
+                onSuccess={() => navigate('/')} 
+                onGuestLogin={() => {
+                  sessionStorage.setItem('insta_guest_mode', 'true');
+                  setIsGuestMode(true);
+                  navigate('/');
+                }} 
+              />
+            } 
+          />
           <Route 
             path="/login" 
             element={
@@ -591,7 +609,7 @@ const AppContent: React.FC = () => {
           </button>
           
           <button 
-            onClick={() => navigate(user ? '/profile' : '/login')}
+            onClick={() => navigate(user ? '/profile' : '/signin')}
             className={`flex flex-col items-center gap-0.5 cursor-pointer transition-colors ${
               isProfileActive ? 'text-blue-600 font-extrabold scale-105' : 'text-slate-400 hover:text-slate-600'
             }`}
