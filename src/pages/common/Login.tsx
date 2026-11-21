@@ -741,20 +741,6 @@ export const Login: React.FC<LoginProps> = ({ onSuccess, onGuestLogin }) => {
           </div>
         </div>
       </div>
-
-      {/* Desktop Footer Strip */}
-      <div className="hidden lg:flex w-full justify-center items-center py-4 px-6 text-xs text-slate-500 gap-4 border-t border-slate-200/60 bg-white/60 backdrop-blur-xs">
-        <p>© 2026 InstaToken Healthcare Solutions Inc.</p>
-        <span className="text-slate-300">|</span>
-        <a href="/terms" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 transition-colors font-medium">Terms &amp; Conditions</a>
-        <span>•</span>
-        <a href="/privacy" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 transition-colors font-medium">Privacy Policy</a>
-        <span>•</span>
-        <a href="/refund-policy" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 transition-colors font-medium">Cancellation &amp; Refund Policy</a>
-        <span>•</span>
-        <a href="/contact" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 transition-colors font-medium">Contact Us</a>
-      </div>
-
     </div>
   );
 };

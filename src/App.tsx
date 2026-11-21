@@ -390,14 +390,6 @@ const AppContent: React.FC = () => {
     location.pathname.startsWith('/cancellation') ||
     location.pathname.startsWith('/contact')
   );
-  const isPublicRoute = isManagementRoute || isConfirmationRoute || isLegalRoute || isAuthRoute;
-  const isNativeApp = typeof window !== 'undefined' && (
-    Boolean((window as any).__IS_INSTATOKEN_NATIVE_APP__) ||
-    (typeof navigator !== 'undefined' && Boolean(navigator.userAgent && navigator.userAgent.includes('InstaToken')))
-  );
-  const [isGuestMode, setIsGuestMode] = useState<boolean>(() => {
-    return typeof window !== 'undefined' && sessionStorage.getItem('insta_guest_mode') === 'true';
-  });
 
   // Always show Splash Screen first only for customer account routes (400ms ultra-short)
   if (showSplash && !isManagementRoute && !isConfirmationRoute && !isLegalRoute && !isAuthRoute) {
@@ -426,26 +418,6 @@ const AppContent: React.FC = () => {
   // If on hospital login route and already logged in, go straight to hospital dashboard
   if ((location.pathname === '/hospital-login' || location.pathname === '/hospital/login') && hospitalUser) {
     return <Navigate to="/hospital/dashboard" replace />;
-  }
-
-  // For website visitors: must log in or choose Guest Login to browse
-  if (!user && !isGuestMode && !isNativeApp && !isPublicRoute) {
-    return (
-      <Login 
-        onSuccess={() => {
-          sessionStorage.setItem('insta_splash_viewed', 'true');
-          setShowSplash(false);
-          navigate('/');
-        }} 
-        onGuestLogin={() => {
-          sessionStorage.setItem('insta_guest_mode', 'true');
-          setIsGuestMode(true);
-          sessionStorage.setItem('insta_splash_viewed', 'true');
-          setShowSplash(false);
-          navigate('/');
-        }}
-      />
-    );
   }
 
   // Show bottom nav bar on all patient routes (non-admin routes, never on auth/login routes)
@@ -566,7 +538,6 @@ const AppContent: React.FC = () => {
                 }} 
                 onGuestLogin={() => {
                   sessionStorage.setItem('insta_guest_mode', 'true');
-                  setIsGuestMode(true);
                   const params = new URLSearchParams(window.location.search);
                   const redirectUrl = params.get('redirect') || '/';
                   navigate(redirectUrl, { replace: true });
@@ -585,7 +556,6 @@ const AppContent: React.FC = () => {
                 }} 
                 onGuestLogin={() => {
                   sessionStorage.setItem('insta_guest_mode', 'true');
-                  setIsGuestMode(true);
                   const params = new URLSearchParams(window.location.search);
                   const redirectUrl = params.get('redirect') || '/';
                   navigate(redirectUrl, { replace: true });
@@ -604,8 +574,8 @@ const AppContent: React.FC = () => {
         </Routes>
       </div>
 
-      {/* Desktop Footer */}
-      {!isManagementRoute && <Footer />}
+      {/* Desktop Footer (hidden on management and auth/login screens) */}
+      {!isManagementRoute && !isAuthRoute && <Footer />}
 
       {/* Bottom Navigation Menu (visible on mobile & tablet for all patient pages) */}
       {showBottomNav && (
