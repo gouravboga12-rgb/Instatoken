@@ -414,14 +414,23 @@ export const TokenConfirmation: React.FC = () => {
 
       // 1. If running inside native Android/iOS WebView container, trigger native download
       if ((window as any).ReactNativeWebView) {
-        (window as any).ReactNativeWebView.postMessage(JSON.stringify({
-          type: 'DOWNLOAD_PDF',
-          url: downloadUrl,
-          filename: filename
-        }));
+        try {
+          (window as any).ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'DOWNLOAD_PDF',
+            url: downloadUrl,
+            filename: filename
+          }));
+        } catch (e) {}
       }
 
-      // 2. Client-side jsPDF download with direct link fallback
+      // 2. Direct browser navigation to server PDF stream (triggers download/viewer on all mobile & desktop browsers)
+      try {
+        window.open(downloadUrl, '_blank');
+      } catch (e) {
+        window.location.href = downloadUrl;
+      }
+
+      // 3. Client-side jsPDF download with direct link fallback
       try {
         doc.save(filename);
       } catch (saveErr) {
@@ -457,7 +466,8 @@ export const TokenConfirmation: React.FC = () => {
       `Patient: ${appointment.patientName}\n` +
       `Date & Time: ${formattedDate} (${appointment.time})\n` +
       `Payment: ${isFullOnlineBooking ? 'Doctor Fee Paid Online' : 'Pay Doctor Fee at OPD Desk'}\n\n` +
-      `👉 Track Live Queue & Digital Pass:\n${passUrl}`;
+      `📲 Open in InstaToken App:\ninstatoken://confirmation/${appointment.id}\n\n` +
+      `👉 Web Pass & Tracker:\n${passUrl}`;
 
     // Bridge to native Android app share dialog
     if ((window as any).ReactNativeWebView) {
@@ -516,7 +526,8 @@ export const TokenConfirmation: React.FC = () => {
       `👤 *Patient:* ${appointment.patientName}\n` +
       `📅 *Date & Time:* ${formattedDate} (${appointment.time})\n` +
       `💳 *Payment:* ${isFullOnlineBooking ? 'Doctor Fee Paid Online' : 'Pay Doctor Fee at OPD Desk'}\n\n` +
-      `📲 *Live Digital Token Pass & Queue Tracker:*\n${passUrl}`;
+      `📲 *Open in InstaToken App:*\ninstatoken://confirmation/${appointment.id}\n\n` +
+      `🌐 *Web Pass & Queue Tracker:*\n${passUrl}`;
     const waUrl = `whatsapp://send?text=${encodeURIComponent(text)}`;
     const webWaUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
 
@@ -887,58 +898,55 @@ export const TokenConfirmation: React.FC = () => {
 
         {/* Action Buttons Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-          <Button 
-            variant="primary" 
-            size="sm" 
+          <button 
+            type="button"
             onClick={handleDownload}
             disabled={isDownloading}
-            className="bg-blue-600 hover:bg-blue-700 py-2.5 text-xs font-extrabold flex items-center justify-center gap-1.5 rounded-xl cursor-pointer shadow-sm disabled:opacity-75"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 px-3 text-xs font-black flex items-center justify-center gap-1.5 rounded-xl cursor-pointer shadow-md transition-all border-none disabled:opacity-75 active:scale-98"
           >
             {isDownloading ? (
               <>
-                <Loader2 size={14} className="animate-spin" />
-                <span>Generating PDF...</span>
+                <Loader2 size={14} className="animate-spin text-white" />
+                <span className="text-white font-black">Generating PDF...</span>
               </>
             ) : (
               <>
-                <Download size={14} />
-                <span>Download (PDF)</span>
+                <Download size={14} className="text-white" />
+                <span className="text-white font-black">Download (PDF)</span>
               </>
             )}
-          </Button>
+          </button>
 
-          <Button 
-            variant="secondary" 
-            size="sm" 
+          <button 
+            type="button" 
             onClick={handleWhatsAppShare}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white border-none py-2.5 text-xs font-extrabold flex items-center justify-center gap-1.5 rounded-xl cursor-pointer shadow-sm transition-colors"
+            className="w-full bg-[#25D366] hover:bg-[#1EBE5D] text-white py-2.5 px-3 text-xs font-black flex items-center justify-center gap-1.5 rounded-xl cursor-pointer shadow-md transition-all border-none active:scale-98"
           >
-            <MessageSquare size={14} />
-            <span>Share on WhatsApp</span>
-          </Button>
+            <MessageSquare size={14} className="text-white" />
+            <span className="text-white font-black">Share on WhatsApp</span>
+          </button>
 
-          <Button 
-            variant="secondary" 
-            size="sm" 
+          <button 
+            type="button" 
             onClick={handleShare}
-            className={`border py-2.5 text-xs font-extrabold flex items-center justify-center gap-1.5 rounded-xl cursor-pointer transition-colors shadow-2xs ${
+            className={`w-full py-2.5 px-3 text-xs font-black flex items-center justify-center gap-1.5 rounded-xl cursor-pointer transition-all border shadow-xs active:scale-98 ${
               copiedShare 
                 ? 'bg-emerald-50 border-emerald-300 text-emerald-700' 
-                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                : 'bg-white border-slate-200 text-slate-800 hover:bg-slate-50'
             }`}
           >
             {copiedShare ? (
               <>
                 <CheckCircle2 size={14} className="text-emerald-600" />
-                <span>Copied Link!</span>
+                <span className="font-black text-emerald-700">Copied Link!</span>
               </>
             ) : (
               <>
-                <Share2 size={14} />
-                <span>Share / Copy Link</span>
+                <Share2 size={14} className="text-slate-700" />
+                <span className="font-black text-slate-800">Share / Copy Link</span>
               </>
             )}
-          </Button>
+          </button>
         </div>
 
         {/* Navigation CTAs matching Image 57 */}

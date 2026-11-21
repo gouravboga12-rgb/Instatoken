@@ -72,7 +72,19 @@ export const PatientCallAlertBanner: React.FC = () => {
     } catch (e) {}
   };
 
+  const getDismissKey = (payload: CallAlertPayload) => `dismissed_call_${payload.tokenId}_${payload.calledAt || 'active'}`;
+
   const triggerAlertSequence = (payload: CallAlertPayload) => {
+    // Check if user already dismissed this specific call event
+    try {
+      if (
+        localStorage.getItem(getDismissKey(payload)) === 'true' ||
+        localStorage.getItem(`dismissed_call_${payload.tokenId}`) === 'true'
+      ) {
+        return;
+      }
+    } catch (e) {}
+
     setActiveCall(payload);
     setIsMuted(false);
 
@@ -109,6 +121,12 @@ export const PatientCallAlertBanner: React.FC = () => {
 
   const handleDismiss = () => {
     if (audioIntervalRef.current) clearInterval(audioIntervalRef.current);
+    if (activeCall) {
+      try {
+        localStorage.setItem(getDismissKey(activeCall), 'true');
+        localStorage.setItem(`dismissed_call_${activeCall.tokenId}`, 'true');
+      } catch (e) {}
+    }
     setActiveCall(null);
   };
 
@@ -220,36 +238,36 @@ export const PatientCallAlertBanner: React.FC = () => {
   if (!activeCall) return null;
 
   return (
-    <div className="fixed top-4 left-3 right-3 sm:left-auto sm:right-6 sm:max-w-md z-50 animate-in fade-in slide-in-from-top-4 duration-300">
-      <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-blue-800 text-white rounded-2xl shadow-2xl p-4 sm:p-5 border-2 border-amber-400 ring-4 ring-blue-500/20 backdrop-blur-md relative overflow-hidden">
+    <div className="fixed top-2 sm:top-5 left-2 right-2 sm:left-auto sm:right-6 sm:max-w-md z-[9999] animate-in fade-in slide-in-from-top-4 duration-300">
+      <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-blue-800 text-white rounded-2xl shadow-2xl p-3.5 sm:p-4 border-2 border-amber-400 ring-4 ring-blue-500/20 backdrop-blur-md relative overflow-hidden">
         {/* Glow pulse background indicator */}
         <div className="absolute -top-12 -right-12 w-28 h-28 bg-amber-400/20 rounded-full blur-xl pointer-events-none animate-pulse" />
 
-        <div className="flex items-start justify-between gap-3 relative z-10">
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <div className="w-11 h-11 rounded-xl bg-amber-400 text-slate-900 flex items-center justify-center font-black shadow-lg animate-bounce">
-                <Bell size={22} className="animate-spin" style={{ animationDuration: '3s' }} />
+        <div className="flex items-start justify-between gap-2.5 relative z-10">
+          <div className="flex items-center gap-2.5">
+            <div className="relative shrink-0">
+              <div className="w-10 h-10 rounded-xl bg-amber-400 text-slate-900 flex items-center justify-center font-black shadow-lg animate-bounce">
+                <Bell size={20} className="animate-spin" style={{ animationDuration: '3s' }} />
               </div>
-              <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
+              <span className="absolute -top-1 -right-1 flex h-3 w-3">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-300 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-amber-500"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
               </span>
             </div>
 
             <div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-[10px] font-black uppercase tracking-wider bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded-full border border-amber-400/30">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-[9px] font-black uppercase tracking-wider bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded-full border border-amber-400/30">
                   🔔 It's Your Turn!
                 </span>
-                <span className="text-[10px] font-bold text-blue-200">
+                <span className="text-[10px] font-extrabold text-blue-200">
                   Token #{activeCall.tokenNo}
                 </span>
               </div>
-              <h4 className="text-base sm:text-lg font-black text-white mt-0.5 leading-snug">
+              <h4 className="text-sm sm:text-base font-black text-white mt-0.5 leading-tight">
                 Dr. {(activeCall.doctorName || 'Doctor').replace(/^Dr\.?\s*/i, '')}
               </h4>
-              <p className="text-xs text-blue-100 font-medium line-clamp-1">
+              <p className="text-[11px] text-blue-100 font-medium line-clamp-1">
                 {activeCall.hospitalName} {activeCall.departmentName ? `• ${activeCall.departmentName}` : ''}
               </p>
             </div>
@@ -257,7 +275,7 @@ export const PatientCallAlertBanner: React.FC = () => {
 
           <button
             onClick={handleDismiss}
-            className="text-blue-200 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors"
+            className="text-blue-200 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors shrink-0 cursor-pointer"
             title="Dismiss alert"
           >
             <X size={18} />
@@ -265,17 +283,18 @@ export const PatientCallAlertBanner: React.FC = () => {
         </div>
 
         {/* Message Card */}
-        <div className="mt-3 pt-3 border-t border-white/10 flex items-center justify-between gap-3 text-xs">
-          <p className="text-blue-100 font-medium">
+        <div className="mt-2.5 pt-2.5 border-t border-white/10 flex items-center justify-between gap-2 text-xs">
+          <p className="text-blue-100 font-medium text-[11px] leading-tight">
             Doctor is ready in cabin. Please proceed inside immediately!
           </p>
         </div>
 
         {/* Action Controls */}
-        <div className="mt-3.5 flex items-center gap-2">
+        <div className="mt-3 flex items-center gap-2">
           <button
+            type="button"
             onClick={handleDismiss}
-            className="flex-1 py-2 px-3.5 bg-white/15 hover:bg-white/25 text-white font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer border border-white/20"
+            className="flex-1 py-1.5 px-3 bg-white/20 hover:bg-white/30 text-white font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer border border-white/25 active:scale-98"
           >
             <span>Dismiss Alert</span>
           </button>
@@ -286,10 +305,10 @@ export const PatientCallAlertBanner: React.FC = () => {
               setIsMuted(false);
               playAlertChime();
             }}
-            className="px-3 py-2 bg-white/20 hover:bg-white/30 text-white rounded-xl transition-colors cursor-pointer border border-white/20 flex items-center gap-1.5 text-xs font-bold"
+            className="px-3 py-1.5 bg-white/20 hover:bg-white/30 text-white rounded-xl transition-colors cursor-pointer border border-white/25 flex items-center gap-1.5 text-xs font-bold active:scale-98"
             title="Play calling chime & voice announcement"
           >
-            <Volume2 size={16} />
+            <Volume2 size={15} />
             <span>Play Sound</span>
           </button>
         </div>
