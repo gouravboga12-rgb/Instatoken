@@ -420,6 +420,21 @@ const AppContent: React.FC = () => {
     return <Navigate to="/hospital/dashboard" replace />;
   }
 
+  // Mandatory Patient Login: Patients must log in before accessing the app
+  if (!user && !isManagementRoute && !isConfirmationRoute && !isLegalRoute && !isAuthRoute) {
+    return (
+      <Login 
+        onSuccess={() => {
+          sessionStorage.setItem('insta_splash_viewed', 'true');
+          setShowSplash(false);
+          const params = new URLSearchParams(window.location.search);
+          const redirectUrl = params.get('redirect') || '/';
+          navigate(redirectUrl, { replace: true });
+        }} 
+      />
+    );
+  }
+
   // Show bottom nav bar on all patient routes (non-admin routes, never on auth/login routes)
   const showBottomNav = !isManagementRoute && !isAuthRoute;
 
@@ -536,12 +551,6 @@ const AppContent: React.FC = () => {
                   const redirectUrl = params.get('redirect') || '/';
                   navigate(redirectUrl, { replace: true });
                 }} 
-                onGuestLogin={() => {
-                  sessionStorage.setItem('insta_guest_mode', 'true');
-                  const params = new URLSearchParams(window.location.search);
-                  const redirectUrl = params.get('redirect') || '/';
-                  navigate(redirectUrl, { replace: true });
-                }} 
               />
             } 
           />
@@ -550,12 +559,6 @@ const AppContent: React.FC = () => {
             element={
               <Login 
                 onSuccess={() => {
-                  const params = new URLSearchParams(window.location.search);
-                  const redirectUrl = params.get('redirect') || '/';
-                  navigate(redirectUrl, { replace: true });
-                }} 
-                onGuestLogin={() => {
-                  sessionStorage.setItem('insta_guest_mode', 'true');
                   const params = new URLSearchParams(window.location.search);
                   const redirectUrl = params.get('redirect') || '/';
                   navigate(redirectUrl, { replace: true });

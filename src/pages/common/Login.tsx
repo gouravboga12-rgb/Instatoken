@@ -20,7 +20,6 @@ import { useGoogleLogin } from '@react-oauth/google';
 
 interface LoginProps {
   onSuccess: () => void;
-  onGuestLogin?: () => void;
 }
 
 const specializations = [
@@ -33,18 +32,8 @@ const specializations = [
   { name: "Ophthalmology", image: "/ophthalmology.webp", fallback: "/ophthalmology.png" },
 ];
 
-export const Login: React.FC<LoginProps> = ({ onSuccess, onGuestLogin }) => {
+export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
   const { login, loginWithPhoneOtp } = useApp();
-  const isNativeApp = typeof window !== 'undefined' && Boolean((window as any).__IS_INSTATOKEN_NATIVE_APP__);
-
-  const handleGuestLogin = () => {
-    sessionStorage.setItem('insta_guest_mode', 'true');
-    if (onGuestLogin) {
-      onGuestLogin();
-    } else {
-      onSuccess();
-    }
-  };
 
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [step, setStep] = useState<'form' | 'otp'>('form');
@@ -560,20 +549,6 @@ export const Login: React.FC<LoginProps> = ({ onSuccess, onGuestLogin }) => {
           <span>Continue with Google</span>
         </button>
       </div>
-
-      {/* Guest Login button (Clean & Direct - Website Only) */}
-      {!isNativeApp && (
-        <div className="mt-2.5">
-          <button 
-            type="button"
-            onClick={handleGuestLogin}
-            className="w-full py-3 px-4 rounded-full border border-blue-200 bg-blue-50/70 hover:bg-blue-100/80 text-blue-700 font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer active:scale-[0.99]"
-          >
-            <User className="w-4 h-4 text-blue-600" />
-            <span>Guest Login</span>
-          </button>
-        </div>
-      )}
 
       {/* Trust Badge matching Reference UI */}
       <div className="mt-4 flex items-center justify-center gap-2 text-xs font-bold text-slate-800">
