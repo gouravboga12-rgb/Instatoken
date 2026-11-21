@@ -95,8 +95,7 @@ async function sendFcmCallingAlert(phone, tokenId, callPayload) {
           channelId: 'doctor-calling',
           sound: 'default',
           priority: 'max',
-          visibility: 'public',
-          clickAction: 'OPEN_APPOINTMENT'
+          visibility: 'public'
         }
       }
     };

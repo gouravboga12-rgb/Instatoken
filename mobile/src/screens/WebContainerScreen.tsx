@@ -36,6 +36,13 @@ export const WebContainerScreen: React.FC<WebContainerScreenProps> = ({
   const [loading, setLoading] = useState(true);
   const [hasVisitedApp, setHasVisitedApp] = useState(false);
 
+  // Navigate WebView when new URL is passed via push notification or deep link
+  useEffect(() => {
+    if (route.params?.initialUrl && webViewRef.current) {
+      webViewRef.current.injectJavaScript(`window.location.href = '${route.params.initialUrl}';`);
+    }
+  }, [route.params?.initialUrl, route.params?.timestamp]);
+
   useEffect(() => {
     try {
       GoogleSignin.configure({
@@ -197,6 +204,37 @@ export const WebContainerScreen: React.FC<WebContainerScreenProps> = ({
           window.ReactNativeWebView?.postMessage(JSON.stringify({ type: 'LOGOUT' }));
         }
       };
+
+      const origSet = localStorage.setItem.bind(localStorage);
+      localStorage.setItem = function(key, val) {
+        origSet(key, val);
+        if (key === 'insta_user') {
+          try {
+            const u = JSON.parse(val);
+            if (u && u.phone) {
+              window.ReactNativeWebView?.postMessage(JSON.stringify({
+                type: 'REGISTER_PUSH',
+                phone: u.phone
+              }));
+            }
+          } catch(e) {}
+        }
+      };
+
+      setTimeout(function() {
+        try {
+          const raw = localStorage.getItem('insta_user');
+          if (raw) {
+            const u = JSON.parse(raw);
+            if (u && u.phone) {
+              window.ReactNativeWebView?.postMessage(JSON.stringify({
+                type: 'REGISTER_PUSH',
+                phone: u.phone
+              }));
+            }
+          }
+        } catch(e) {}
+      }, 600);
     } catch(e) {}
     true;
   `;
