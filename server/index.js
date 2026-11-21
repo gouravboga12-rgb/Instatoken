@@ -5038,53 +5038,115 @@ app.get(['/api/appointments/:id/download-pass', '/api/tokens/:id/download-pass']
     doc.text(`Est. Wait: ~${appt.estimatedWaitTime || 15} mins`, 113, 115);
     doc.text('Consultation Validity: 7 Days', 113, 121);
 
-    // 4. Payment breakdown
+    const fee = Number(appt.fee || appt.consultationFee || 250);
+    const totalPaid = Number(appt.totalFee || appt.amount || appt.tokenFee || 0);
+    const platformFee = Number(appt.platformFee || appt.tokenFee || (totalPaid > 0 && totalPaid < fee ? totalPaid : 15));
+    const pc = appt.paymentCollection;
+    const isFullOnlineBooking =
+      appt.collectionMode === 'full_online' ||
+      (pc && pc.mode === 'full_online') ||
+      (typeof appt.paymentMethod === 'string' && appt.paymentMethod.toLowerCase().includes('full online')) ||
+      (fee > 0 && totalPaid >= fee && totalPaid > 60);
+
+    // 4. Payment breakdown box
     doc.setFillColor(241, 245, 249);
     doc.setDrawColor(203, 213, 225);
-    doc.roundedRect(15, 131, 180, 36, 3, 3, 'FD');
+    doc.roundedRect(15, 129, 180, 42, 3, 3, 'FD');
+
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.setTextColor(51, 65, 85);
-    doc.text('PAYMENT & CHARGES BREAKDOWN', 20, 138);
-    doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.5);
-    doc.setTextColor(71, 85, 105);
-    doc.text('Doctor Consultation Fee:', 20, 145);
+    doc.setTextColor(30, 41, 59);
+    doc.text('PAYMENT & CHARGES BREAKDOWN', 20, 136);
+
+    // Payment Mode Status Badge
+    doc.setFillColor(isFullOnlineBooking ? 220 : 254, isFullOnlineBooking ? 252 : 243, isFullOnlineBooking ? 231 : 199);
+    doc.roundedRect(118, 131, 72, 6.5, 1.5, 1.5, 'F');
+    doc.setFontSize(7);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(15, 23, 42);
-    doc.text(`Rs. ${(Number(appt.fee) || 250).toFixed(2)}`, 85, 145);
+    doc.setTextColor(isFullOnlineBooking ? 22 : 154, isFullOnlineBooking ? 101 : 52, isFullOnlineBooking ? 52 : 18);
+    doc.text(
+      isFullOnlineBooking ? 'FULL CONSULTATION PAID ONLINE' : 'TOKEN ADVANCE CHARGE PAID ONLY',
+      154,
+      135.5,
+      { align: 'center' }
+    );
+
+    // Line 1: Doctor Consultation Fee
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(71, 85, 105);
+    doc.text('Doctor Consultation Fee:', 20, 143);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(isFullOnlineBooking ? 22 : 185, isFullOnlineBooking ? 101 : 28, isFullOnlineBooking ? 52 : 28);
+    doc.text(
+      isFullOnlineBooking
+        ? `Rs. ${fee.toFixed(2)} (PAID ONLINE IN ADVANCE)`
+        : `Rs. ${fee.toFixed(2)} (PAY AT DOCTOR CABIN / OPD DESK)`,
+      85,
+      143
+    );
+
+    // Line 2: Token & Platform Charges
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(71, 85, 105);
-    doc.text('Platform & Gateway Charges:', 20, 151);
+    doc.text('InstaToken Platform & Queue Fee:', 20, 149);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(15, 23, 42);
-    doc.text(`Rs. ${(Number(appt.platformFee) || 15).toFixed(2)}`, 85, 151);
+    doc.text(`Rs. ${platformFee.toFixed(2)} (PAID ONLINE VIA RAZORPAY)`, 85, 149);
+
+    // Line 3: Net Paid Online vs Payable at Hospital
     doc.setFont('helvetica', 'normal');
-    doc.setTextColor(71, 85, 105);
-    doc.text('Payment Status:', 20, 157);
+    doc.text('Total Amount Paid Online Now:', 20, 155);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(22, 101, 52);
-    doc.text(appt.paymentMethod === 'Online' ? 'PAID ONLINE VIA RAZORPAY' : 'CONFIRMED APPOINTMENT', 85, 157);
+    doc.text(
+      isFullOnlineBooking
+        ? `Rs. ${(totalPaid || (fee + platformFee)).toFixed(2)} (100% FULL FEE SETTLED ONLINE)`
+        : `Rs. ${(totalPaid || platformFee).toFixed(2)} (ADVANCE TOKEN BOOKING FEE ONLY)`,
+      85,
+      155
+    );
+
+    // Line 4: Amount Due at Hospital Desk
+    doc.setFont('helvetica', 'normal');
+    doc.text('Balance Due at Hospital Desk:', 20, 161);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(isFullOnlineBooking ? 22 : 220, isFullOnlineBooking ? 101 : 38, isFullOnlineBooking ? 52 : 38);
+    doc.text(
+      isFullOnlineBooking
+        ? 'Rs. 0.00 (NO PAYMENT REQUIRED AT HOSPITAL)'
+        : `Rs. ${fee.toFixed(2)} (PAY AT DOCTOR CABIN / DESK)`,
+      85,
+      161
+    );
+
+    // Line 5: Payment Reference
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.5);
     doc.setTextColor(100, 116, 139);
-    doc.text(`Transaction Ref: ${appt.paymentId || 'PAYID-INSTATOKEN'} · Verified Online`, 20, 163);
+    doc.text(`Transaction Reference: ${appt.paymentId || 'PAYID-INSTATOKEN'} · 100% Spot Guaranteed`, 20, 167);
 
-    // 5. Instructions
+    // 5. Instructions Box (y = 173 to 207)
     doc.setFillColor(254, 252, 232);
     doc.setDrawColor(254, 240, 138);
-    doc.roundedRect(15, 171, 180, 34, 3, 3, 'FD');
+    doc.roundedRect(15, 173, 180, 34, 3, 3, 'FD');
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
     doc.setTextColor(133, 77, 14);
-    doc.text('IMPORTANT PATIENT INSTRUCTIONS', 20, 178);
+    doc.text('IMPORTANT PATIENT INSTRUCTIONS', 20, 179);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(113, 63, 18);
-    doc.text('1. Please reach hospital 10-15 minutes prior to your allocated slot time.', 20, 184);
-    doc.text('2. Present this token pass at the hospital OPD reception upon arrival.', 20, 189);
-    doc.text('3. Carry previous medical prescriptions and health reports.', 20, 194);
-    doc.text('4. Consultation Fee is valid for 7 Days (up to 2 Follow-up visits).', 20, 199);
+    doc.text('1. Please reach hospital 10-15 minutes prior to your allocated slot time.', 20, 185);
+    doc.text('2. Present this token pass at the hospital OPD reception upon arrival.', 20, 190);
+    doc.text(
+      isFullOnlineBooking
+        ? '3. Doctor consultation fee has been paid online in full (No fee to be paid at hospital cabin).'
+        : `3. Only Token Fee was paid online. Doctor consultation fee of Rs. ${fee.toFixed(2)} must be paid at doctor cabin.`,
+      20,
+      195
+    );
+    doc.text('4. Consultation Fee is valid for 7 Days (up to 2 Follow-up visits).', 20, 200);
 
     // 6. Security Footer
     doc.setDrawColor(226, 232, 240);
