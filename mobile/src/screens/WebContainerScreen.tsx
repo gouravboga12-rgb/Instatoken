@@ -18,6 +18,7 @@ import { GOOGLE_WEB_CLIENT_ID } from '../context/AuthContext';
 import * as Haptics from 'expo-haptics';
 import * as Speech from 'expo-speech';
 import * as Notifications from 'expo-notifications';
+import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 
@@ -124,6 +125,94 @@ export const WebContainerScreen: React.FC<WebContainerScreenProps> = ({
     }
   };
 
+  const handleRequestLocation = async () => {
+    try {
+      // 1. Check if device location services are enabled
+      const servicesEnabled = await Location.hasServicesEnabledAsync();
+      if (!servicesEnabled) {
+        if (Platform.OS === 'android') {
+          try {
+            await Location.enableNetworkProviderAsync();
+          } catch (e) {
+            Alert.alert(
+              'Location Services Off',
+              'Please turn on your device GPS / Location switch to detect your exact area and nearby hospitals.',
+              [{ text: 'OK' }]
+            );
+            return;
+          }
+        } else {
+          Alert.alert(
+            'Location Services Off',
+            'Please turn on Location Services in phone settings to detect your exact area.',
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+      }
+
+      // 2. Request permission if not granted
+      let { status } = await Location.getForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        const req = await Location.requestForegroundPermissionsAsync();
+        status = req.status;
+      }
+
+      if (status !== 'granted') {
+        Alert.alert(
+          'Location Permission Required',
+          'InstaToken needs location permission to calculate real-time hospital distances and detect your area. Please allow permission in App Settings.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      // 3. Fetch exact GPS coordinates with High accuracy
+      const loc = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+
+      if (loc && loc.coords) {
+        const { latitude, longitude, accuracy } = loc.coords;
+        const injectedScript = `
+          if (window.__handleNativeLocation) {
+            window.__handleNativeLocation(${JSON.stringify({
+              lat: latitude,
+              lng: longitude,
+              accuracy: accuracy || 10,
+            })});
+          }
+        `;
+        webViewRef.current?.injectJavaScript(injectedScript);
+      }
+    } catch (err: any) {
+      console.warn('Native GPS Location error:', err);
+      try {
+        const lastLoc = await Location.getLastKnownPositionAsync();
+        if (lastLoc && lastLoc.coords) {
+          const { latitude, longitude } = lastLoc.coords;
+          const injectedScript = `
+            if (window.__handleNativeLocation) {
+              window.__handleNativeLocation(${JSON.stringify({
+                lat: latitude,
+                lng: longitude,
+                accuracy: 50,
+              })});
+            }
+          `;
+          webViewRef.current?.injectJavaScript(injectedScript);
+          return;
+        }
+      } catch (e) {}
+
+      Alert.alert(
+        'GPS Signal Unavailable',
+        'Could not obtain GPS lock. Please check your device location switch and try again.',
+        [{ text: 'OK' }]
+      );
+    }
+  };
+
   const handleMessage = async (event: any) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
@@ -151,6 +240,8 @@ export const WebContainerScreen: React.FC<WebContainerScreenProps> = ({
         });
       } else if (data.type === 'GOOGLE_SIGN_IN') {
         await triggerNativeGoogleSignIn();
+      } else if (data.type === 'REQUEST_GPS_LOCATION') {
+        await handleRequestLocation();
       } else if (data.type === 'REGISTER_PUSH' || data.type === 'PATIENT_LOGGED_IN') {
         await AsyncStorage.setItem('saved_active_role', 'patient');
         await registerPushToken(data.phone, data.tokenId, 'patient');

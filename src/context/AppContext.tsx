@@ -2836,181 +2836,117 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addNotification("Location Updated", `Recorded location: ${locationName}. Real-time hospital distance updated.`, "success");
   };
 
-  const fallbackIpLocation = async (): Promise<boolean> => {
-    try {
-      let data: any = null;
-      try {
-        const res = await fetch('/api/ip-location');
-        if (res.ok) data = await res.json();
-      } catch (e) {}
+  const applyDetectedLocation = async (latitude: number, longitude: number, accuracy?: number) => {
+    const coords = { lat: latitude, lng: longitude };
+    setUserCoords(coords);
+    localStorage.setItem('insta_user_coords', JSON.stringify(coords));
 
-      if (!data || !data.lat || !data.lng) {
-        try {
-          const directRes = await fetch('https://ipwho.is/');
-          if (directRes.ok) {
-            const d = await directRes.json();
-            if (d && d.success !== false) {
-              data = {
-                city: d.city,
-                region: d.region,
-                country: d.country,
-                lat: Number(d.latitude),
-                lng: Number(d.longitude)
-              };
-            }
-          }
-        } catch (e) {}
-      }
+    // Reverse geocode with Nominatim / Google Geocoding API / known cities
+    const areaName = await reverseGeocode(latitude, longitude);
+    setCurrentLocationState(areaName);
+    localStorage.setItem('insta_location', areaName);
 
-      if (data && data.lat && data.lng) {
-        const city = data.city || 'Chennai';
-        const region = data.region || 'Tamil Nadu';
-        const coords = { lat: Number(data.lat), lng: Number(data.lng) };
+    // Extract structured 5-level hierarchy
+    const details = await reverseGeocodeAddressDetails(latitude, longitude);
+    const geoObj: GeoLocationDetails = {
+      country: details.country || 'India',
+      state: details.state || 'Telangana',
+      district: details.district || details.city || 'Hyderabad',
+      mandal: details.mandal || '',
+      village: details.village || details.area || '',
+      city: details.city || 'Hyderabad',
+      formattedAddress: areaName,
+      lat: latitude,
+      lng: longitude
+    };
+    setUserGeoHierarchy(geoObj);
+    localStorage.setItem('insta_user_geo_hierarchy', JSON.stringify(geoObj));
+    fetchActiveBanners(geoObj);
 
-        // 1. Detailed Uber/Rapido reverse geocoding from IP coordinates
-        const detailedAddress = await reverseGeocode(coords.lat, coords.lng);
-        const areaName = (detailedAddress && detailedAddress.length > 5 && detailedAddress !== 'Current Location')
-          ? detailedAddress
-          : `${city}, ${region}`;
+    // Record in Customer Profile and Account list
+    setUser(prev => {
+      if (!prev) return null;
+      const updated = {
+        ...prev,
+        location: areaName,
+        lat: latitude,
+        lng: longitude
+      };
+      localStorage.setItem('insta_user', JSON.stringify(updated));
+      return updated;
+    });
 
-        setUserCoords(coords);
-        localStorage.setItem('insta_user_coords', JSON.stringify(coords));
-        setCurrentLocationState(areaName);
-        localStorage.setItem('insta_location', areaName);
-
-        const geoObj: GeoLocationDetails = {
-          country: data.country || 'India',
-          state: region,
-          district: city,
-          mandal: city,
-          village: city,
-          city,
-          formattedAddress: areaName,
-          lat: coords.lat,
-          lng: coords.lng
-        };
-        setUserGeoHierarchy(geoObj);
-        localStorage.setItem('insta_user_geo_hierarchy', JSON.stringify(geoObj));
-        fetchActiveBanners(geoObj);
-
-        setUser(prev => {
-          if (!prev) return null;
-          const updated = { ...prev, location: areaName, lat: coords.lat, lng: coords.lng };
-          localStorage.setItem('insta_user', JSON.stringify(updated));
-          return updated;
-        });
-
-        // Persist directly to PostgreSQL customer profile on server only if user is logged in
-        if (user) {
-          updateUserProfile({
-            location: areaName,
-            lat: coords.lat,
-            lng: coords.lng
-          });
+    setCustomers(prev => {
+      const updated = prev.map(c => {
+        if (user && (c.email === user.email || c.phone === user.phone)) {
+          return { ...c, location: areaName, lat: latitude, lng: longitude };
         }
+        return c;
+      });
+      localStorage.setItem('insta_customers', JSON.stringify(updated));
+      return updated;
+    });
 
-        addNotification(
-          "Location Detected",
-          `Live location: ${areaName}. Hospital distances updated in real-time.`,
-          "success"
-        );
-        return true;
-      }
-    } catch (e) {
-      console.warn('IP location fallback error:', e);
+    // Persist directly to PostgreSQL customer profile on server only if user is logged in
+    if (user) {
+      updateUserProfile({
+        location: areaName,
+        lat: latitude,
+        lng: longitude
+      });
     }
-    return false;
+
+    const accuracyNote = accuracy && accuracy > 0 ? ` (±${Math.round(accuracy)}m)` : '';
+    addNotification(
+      "Location Detected",
+      `Live location: ${areaName}${accuracyNote}. Hospital distances updated in real-time.`,
+      "success"
+    );
   };
 
+  // Expose bridge for native mobile app GPS location
+  useEffect(() => {
+    (window as any).__handleNativeLocation = (coords: { lat: number; lng: number; accuracy?: number }) => {
+      if (coords && coords.lat && coords.lng) {
+        applyDetectedLocation(coords.lat, coords.lng, coords.accuracy);
+      }
+    };
+    return () => {
+      delete (window as any).__handleNativeLocation;
+    };
+  }, [user]);
+
   const detectAndSetLocation = () => {
+    // 1. If running inside native Android/iOS WebView container, trigger native device GPS
+    if (typeof window !== 'undefined' && (window as any).ReactNativeWebView) {
+      try {
+        (window as any).ReactNativeWebView.postMessage(JSON.stringify({ type: 'REQUEST_GPS_LOCATION' }));
+        return;
+      } catch (e) {}
+    }
+
+    // 2. Web browser: use navigator.geolocation
     if (!navigator.geolocation) {
-      fallbackIpLocation().then(ok => {
-        if (!ok) addNotification("Location Error", "Location service unavailable. Please select your city from the top menu.", "warning");
-      });
+      addNotification("Location Notice", "Location service is unavailable on your browser. Please select your city from the top menu.", "warning");
       return;
     }
+
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude, accuracy } = position.coords;
-        const coords = { lat: latitude, lng: longitude };
-        setUserCoords(coords);
-        localStorage.setItem('insta_user_coords', JSON.stringify(coords));
-
-        // Reverse geocode with Nominatim / Google Geocoding API / known cities
-        const areaName = await reverseGeocode(latitude, longitude);
-        setCurrentLocationState(areaName);
-        localStorage.setItem('insta_location', areaName);
-
-        // Extract structured 5-level hierarchy
-        const details = await reverseGeocodeAddressDetails(latitude, longitude);
-        const geoObj: GeoLocationDetails = {
-          country: details.country || 'India',
-          state: details.state || 'Tamil Nadu',
-          district: details.district || details.city || 'Chennai',
-          mandal: details.mandal || '',
-          village: details.village || details.area || '',
-          city: details.city || '',
-          formattedAddress: areaName,
-          lat: latitude,
-          lng: longitude
-        };
-        setUserGeoHierarchy(geoObj);
-        localStorage.setItem('insta_user_geo_hierarchy', JSON.stringify(geoObj));
-        fetchActiveBanners(geoObj);
-
-        // Record in Customer Profile and Account list
-        setUser(prev => {
-          if (!prev) return null;
-          const updated = {
-            ...prev,
-            location: areaName,
-            lat: latitude,
-            lng: longitude
-          };
-          localStorage.setItem('insta_user', JSON.stringify(updated));
-          return updated;
-        });
-
-        setCustomers(prev => {
-          const updated = prev.map(c => {
-            if (user && (c.email === user.email || c.phone === user.phone)) {
-              return { ...c, location: areaName, lat: latitude, lng: longitude };
-            }
-            return c;
-          });
-          localStorage.setItem('insta_customers', JSON.stringify(updated));
-          return updated;
-        });
-
-        // Persist directly to PostgreSQL customer profile on server only if user is logged in
-        if (user) {
-          updateUserProfile({
-            location: areaName,
-            lat: latitude,
-            lng: longitude
-          });
-        }
-
-        const isIpEstimate = (accuracy || 0) > 4000;
-        const accuracyNote = isIpEstimate 
-          ? ` (Network location ±${Math.round((accuracy || 0) / 1000)}km)` 
-          : '';
-
-        addNotification(
-          "Customer Location Recorded",
-          `Live location: ${areaName}${accuracyNote}. Hospital distances updated in real-time.`,
-          "success"
-        );
+        await applyDetectedLocation(latitude, longitude, accuracy);
       },
       async (err) => {
-        console.warn('Geolocation unavailable, falling back to IP detection:', err?.message);
-        const ok = await fallbackIpLocation();
-        if (!ok) {
-          const msg = "Location access not available. Please choose your city or area from the location menu.";
-          addNotification("Location Notice", msg, "warning");
+        console.warn('Browser geolocation error:', err?.message);
+        if (err.code === 1) {
+          addNotification("Location Permission Denied", "Please allow location access in your browser or select your area from the menu.", "warning");
+        } else if (err.code === 2) {
+          addNotification("Device Location Off", "Please turn on GPS / Location on your device to detect your exact area.", "warning");
+        } else {
+          addNotification("Location Notice", "GPS location timed out. Please select your city from the location menu.", "warning");
         }
       },
-      { timeout: 7000, maximumAge: 60000, enableHighAccuracy: true }
+      { timeout: 15000, maximumAge: 30000, enableHighAccuracy: true }
     );
   };
 

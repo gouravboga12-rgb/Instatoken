@@ -62,6 +62,12 @@
     "plugins": [
       [
         "@react-native-google-signin/google-signin"
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow InstaToken to access your location to calculate real-time hospital distances and detect your area."
+        }
       ]
     ],
     "extra": {
